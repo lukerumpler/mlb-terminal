@@ -3,6 +3,187 @@
    Tabs, stat cells, tables, badges, bars, cards
    ============================================================ */
 
+/* ============================================================
+   MLB INTELLIGENCE TERMINAL - UI LOGIC
+   Tab switching, search, and interface interactions
+   ============================================================ */
+
+// --- TAB SWITCHING ---
+function switchTab(tabName) {
+  const allTabs = document.querySelectorAll(".tab-content");
+  allTabs.forEach(tab => tab.style.display = "none");
+
+  const allBtns = document.querySelectorAll(".tab-btn");
+  allBtns.forEach(btn => btn.classList.remove("active"));
+
+  const selectedTab = document.getElementById(`tab-${tabName}`);
+  if (selectedTab) selectedTab.style.display = "block";
+
+  const selectedBtn = Array.from(allBtns).find(
+    btn => btn.textContent.toLowerCase().includes(tabName)
+  );
+  if (selectedBtn) selectedBtn.classList.add("active");
+}
+
+// --- SEARCH AUTOCOMPLETE WITH LIVE DROPDOWN ---
+function initSearch() {
+  const input = document.querySelector(".cmd-bar input");
+  if (!input) return;
+
+  let searchTimeout;
+  
+  input.addEventListener("input", async (e) => {
+    const query = e.target.value.trim();
+    const select = document.getElementById("player-select");
+    
+    clearTimeout(searchTimeout);
+    
+    const dd = document.querySelector(".search-dd");
+    if (query.length < 2) {
+      if (dd) dd.style.display = "none";
+      return;
+    }
+
+    if (select) select.value = "";
+
+    searchTimeout = setTimeout(async () => {
+      try {
+        const results = await searchPlayer(query);
+        showSearchDropdown(results, input);
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    }, 300);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadPlayer();
+  });
+
+  document.addEventListener("click", (e) => {
+    const searchWrap = document.querySelector(".cmd-search-wrap");
+    if (!searchWrap?.contains(e.target)) {
+      const dd = document.querySelector(".search-dd");
+      if (dd) dd.style.display = "none";
+    }
+  });
+}
+
+// --- SHOW SEARCH DROPDOWN ---
+function showSearchDropdown(players, inputEl) {
+  let dd = document.querySelector(".search-dd");
+  
+  if (!dd) {
+    const wrap = document.querySelector(".cmd-search-wrap");
+    if (!wrap) return;
+    
+    dd = document.createElement("div");
+    dd.className = "search-dd";
+    wrap.appendChild(dd);
+  }
+
+  if (!players || !players.length) {
+    dd.innerHTML = '<div style="padding:12px 14px; color:var(--text-dim); text-align:center;">No players found</div>';
+    dd.style.display = "block";
+    return;
+  }
+
+  dd.innerHTML = players.slice(0, 8).map(p => `
+    <div class="sd-item" onclick="selectPlayer('${p.id}', '${p.fullName}')">
+      <img class="sd-photo" 
+        src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.id}/headshot/67/current" 
+        alt="${p.fullName}">
+      <div style="flex:1;">
+        <div class="sd-name">${p.fullName}</div>
+        <div class="sd-meta">${p.currentTeam?.name || "—"} • ${p.primaryPosition?.abbreviation || "—"}</div>
+      </div>
+    </div>
+  `).join("");
+  
+  dd.style.display = "block";
+}
+
+// --- SELECT PLAYER FROM DROPDOWN ---
+function selectPlayer(mlbId, fullName) {
+  const input = document.querySelector(".cmd-bar input");
+  const select = document.getElementById("player-select");
+  const dd = document.querySelector(".search-dd");
+  
+  if (input) input.value = fullName;
+  if (select) select.value = mlbId;
+  if (dd) dd.style.display = "none";
+  
+  loadPlayer();
+}
+
+// --- DROPDOWN HANDLER ---
+function initDropdown() {
+  const select = document.getElementById("player-select");
+  if (!select) return;
+
+  select.addEventListener("change", () => {
+    const input = document.querySelector(".cmd-bar input");
+    if (select.value && input) {
+      input.value = select.options[select.selectedIndex].text;
+    }
+  });
+}
+
+// --- KEYBOARD SHORTCUTS ---
+function initKeyboardShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      document.querySelector(".cmd-bar input")?.focus();
+    }
+
+    if (e.key === "Escape") {
+      document.querySelector(".cmd-bar input")?.blur();
+      const dd = document.querySelector(".search-dd");
+      if (dd) dd.style.display = "none";
+    }
+
+    const tabMap = {
+      "1": "overview",
+      "2": "batting",
+      "3": "advanced",
+      "4": "scouting",
+      "5": "gamelog"
+    };
+    if (tabMap[e.key] && document.activeElement.tagName !== "INPUT") {
+      switchTab(tabMap[e.key]);
+    }
+  });
+}
+
+// --- LOAD DEFAULT PLAYER ON INIT ---
+async function loadDefaultPlayer() {
+  try {
+    const results = await searchPlayer("Shohei Ohtani");
+    if (results.length) {
+      const defaultPlayer = results[0];
+      document.getElementById("player-select").value = defaultPlayer.id;
+      document.querySelector(".cmd-bar input").value = defaultPlayer.fullName;
+      await loadPlayer();
+    }
+  } catch (err) {
+    console.error("Failed to load default player:", err);
+  }
+}
+
+// --- INIT ON PAGE LOAD ---
+document.addEventListener("DOMContentLoaded", () => {
+  initSearch();
+  initDropdown();
+  initKeyboardShortcuts();
+  switchTab("overview");
+  
+  // Load Ohtani automatically
+  loadDefaultPlayer();
+
+  console.log("MLB Intelligence Terminal initialized.");
+});
+
 /* --- TAB NAVIGATION --- */
 .tab-nav {
   background: rgba(3,8,20,.85);
