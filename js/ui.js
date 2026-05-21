@@ -1,241 +1,204 @@
 /* ============================================================
    MLB INTELLIGENCE TERMINAL - UI LOGIC
-   Full player + team autocomplete search
+   Tab switching, search autocomplete, keyboard shortcuts
    ============================================================ */
 
-// --- TAB SWITCHING ---
+/* ── TAB SWITCHING ──────────────────────────────────────────── */
 function switchTab(tabName) {
-  const allTabs = document.querySelectorAll(".tab-content");
-  allTabs.forEach(tab => tab.style.display = "none");
+  // Deactivate all tabs and pages
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
 
-  const allBtns = document.querySelectorAll(".tab-btn");
-  allBtns.forEach(btn => btn.classList.remove("active"));
+  // Activate the selected tab button
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (tab) tab.classList.add('on');
 
-  const selectedTab = document.getElementById(`tab-${tabName}`);
-  if (selectedTab) selectedTab.style.display = "block";
-
-  const selectedBtn = Array.from(allBtns).find(
-    btn => btn.textContent.toLowerCase().includes(tabName)
-  );
-  if (selectedBtn) selectedBtn.classList.add("active");
+  // Show the selected page
+  const pg = document.getElementById(`pg-${tabName}`);
+  if (pg) pg.classList.add('on');
 }
 
-/* ============================================================
-   AUTOCOMPLETE SEARCH
-   ============================================================ */
-let searchTimeout = null;
-let currentDropdown = null;
-let dropdownIndex = -1;
-let lastResults = [];
+/* ── PLAYER SEARCH AUTOCOMPLETE ─────────────────────────────── */
+let _searchTimer   = null;
+let _dropdownIndex = -1;
 
-function initSearch() {
-  const input = document.querySelector(".cmd-bar input");
-  if (!input) return;
+function handlePlayerSearch(val) {
+  clearTimeout(_searchTimer);
+  const box = document.getElementById('psearch-results');
+  if (!box) return;
 
-  // Build autocomplete dropdown
-  const wrap = input.closest(".cmd-search-wrap") || input.parentElement;
-  const dropdown = document.createElement("div");
-  dropdown.id = "autocomplete-dropdown";
-  dropdown.style.cssText = `
-    position:absolute; top:100%; left:0; right:0; z-index:9999;
-    background:rgba(6,14,42,0.98); border:1px solid rgba(232,114,42,0.4);
-    border-top:none; border-radius:0 0 10px 10px;
-    max-height:320px; overflow-y:auto; display:none;
-    box-shadow:0 12px 40px rgba(0,0,0,0.6);
-    backdrop-filter:blur(16px);
-  `;
-  wrap.style.position = "relative";
-  wrap.appendChild(dropdown);
-  currentDropdown = dropdown;
-
-  input.addEventListener("input", () => {
-    const q = input.value.trim();
-    clearTimeout(searchTimeout);
-    if (q.length < 2) { hideDropdown(); return; }
-    showDropdownLoading();
-    searchTimeout = setTimeout(() => doAutocomplete(q), 280);
-  });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const active = currentDropdown?.querySelector(".ac-item.active");
-      if (active) { active.click(); }
-      else { hideDropdown(); loadPlayer(); }
-      return;
-    }
-    if (e.key === "Escape") { hideDropdown(); input.blur(); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); moveCursor(1); return; }
-    if (e.key === "ArrowUp")   { e.preventDefault(); moveCursor(-1); return; }
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!wrap.contains(e.target)) hideDropdown();
-  });
-}
-
-function moveCursor(dir) {
-  const items = currentDropdown?.querySelectorAll(".ac-item");
-  if (!items?.length) return;
-  items.forEach(i => i.classList.remove("active"));
-  dropdownIndex = Math.max(0, Math.min(items.length - 1, dropdownIndex + dir));
-  items[dropdownIndex]?.classList.add("active");
-  items[dropdownIndex]?.scrollIntoView({ block: "nearest" });
-}
-
-function showDropdownLoading() {
-  if (!currentDropdown) return;
-  currentDropdown.innerHTML = `
-    <div style="padding:14px 16px; color:rgba(160,180,204,0.7);
-      font-family:'Barlow Condensed',sans-serif; font-size:12px;
-      letter-spacing:1px; text-transform:uppercase;">
-      Searching...
-    </div>`;
-  currentDropdown.style.display = "block";
-}
-
-function hideDropdown() {
-  if (currentDropdown) currentDropdown.style.display = "none";
-  dropdownIndex = -1;
-}
-
-async function doAutocomplete(query) {
-  try {
-    const res = await fetch(`/api/mlb?path=/people/search&names=${encodeURIComponent(query)}&limit=10`);
-    if (!res.ok) { hideDropdown(); return; }
-    const data = await res.json();
-    const people = data.people || [];
-    lastResults = people;
-    renderDropdown(people, query);
-  } catch {
-    hideDropdown();
-  }
-}
-
-function renderDropdown(people, query) {
-  if (!currentDropdown) return;
-  dropdownIndex = -1;
-
-  if (!people.length) {
-    currentDropdown.innerHTML = `
-      <div style="padding:14px 16px; color:rgba(160,180,204,0.6);
-        font-family:'Barlow Condensed',sans-serif; font-size:12px;
-        letter-spacing:1px; text-transform:uppercase;">
-        No players found for "${query}"
-      </div>`;
-    currentDropdown.style.display = "block";
+  if (!val || val.length < 2) {
+    box.style.display = 'none';
     return;
   }
 
-  currentDropdown.innerHTML = people.map((p, i) => {
-    const pos  = p.primaryPosition?.abbreviation || p.primaryPosition?.name || "—";
-    const team = p.currentTeam?.name || p.lastTeam?.name || "";
-    const active = p.active ? "" : ` <span style="color:var(--red);font-size:9px;letter-spacing:1px">INACTIVE</span>`;
-    const photoUrl = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_40,q_auto:best/v1/people/${p.id}/headshot/67/current`;
+  box.innerHTML = _loadingHTML();
+  box.style.display = 'block';
+  _searchTimer = setTimeout(() => _doSearch(val), 280);
+}
 
-    return `
-      <div class="ac-item" data-id="${p.id}" data-name="${escAttr(p.fullName)}" 
-           style="padding:10px 14px; cursor:pointer;
-             border-bottom:1px solid rgba(255,255,255,0.05);
-             font-family:'Barlow Condensed',sans-serif;
-             display:flex; align-items:center; gap:10px;
-             transition:background 0.1s;">
-        <img src="${photoUrl}" 
-             style="width:34px;height:34px;border-radius:8px;object-fit:cover;
-               background:rgba(13,28,58,0.8);border:1px solid rgba(255,255,255,0.1);"
-             onerror="this.style.display='none'">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:700;color:#fff;
-            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${escHtml(p.fullName)}${active}
+function _loadingHTML() {
+  return '<div style="padding:10px 14px;color:var(--text-dim);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;letter-spacing:1px;text-transform:uppercase">Searching…</div>';
+}
+
+async function _doSearch(query) {
+  const box = document.getElementById('psearch-results');
+  if (!box) return;
+
+  try {
+    const res    = await fetch(`/api/mlb?path=/people/search&names=${encodeURIComponent(query)}&limit=10`);
+    const data   = await res.json();
+    const people = data.people || [];
+
+    _dropdownIndex = -1;
+
+    if (!people.length) {
+      box.innerHTML = `<div style="padding:10px 14px;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1px">No results for "${query}"</div>`;
+      return;
+    }
+
+    box.innerHTML = people.map((p, i) => {
+      const pos   = p.primaryPosition?.abbreviation || '—';
+      const team  = p.currentTeam?.name || p.lastTeam?.name || '';
+      const photo = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_40,q_auto:best/v1/people/${p.id}/headshot/67/current`;
+      const inactive = p.active === false
+        ? '<span style="color:var(--red);font-size:9px;letter-spacing:1px;margin-left:5px">INACTIVE</span>'
+        : '';
+
+      return `
+        <div class="sr-item" data-idx="${i}" data-name="${_escAttr(p.fullName)}"
+             onclick="_pickPlayer(${JSON.stringify(p.fullName)})">
+          <img src="${photo}"
+               style="width:32px;height:32px;border-radius:7px;object-fit:cover;flex-shrink:0"
+               onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0">
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:700">
+              ${_escHtml(p.fullName)}${inactive}
+            </div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:1px;font-family:'Barlow',sans-serif;font-weight:400">
+              ${_escHtml(team)}
+            </div>
           </div>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:1px;">
-            <span style="background:rgba(232,114,42,0.2);color:var(--orange);
-              padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;
-              letter-spacing:1px;margin-right:6px;">${escHtml(pos)}</span>
-            ${escHtml(team)}
-          </div>
-        </div>
-      </div>`;
-  }).join("") + `
-    <div style="padding:8px 14px; color:rgba(160,180,204,0.4);
-      font-family:'Barlow Condensed',sans-serif; font-size:10px;
-      letter-spacing:1px; text-align:right; border-top:1px solid rgba(255,255,255,0.05);">
-      ${people.length} result${people.length !== 1 ? "s" : ""} — press Enter to load first
+          <span class="sr-pos">${_escHtml(pos)}</span>
+        </div>`;
+    }).join('') +
+    `<div style="padding:7px 14px;color:rgba(160,180,204,.4);font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;border-top:1px solid rgba(255,255,255,.05);text-align:right">
+      ${people.length} result${people.length !== 1 ? 's' : ''} · ↑↓ navigate · Enter to load
     </div>`;
 
-  currentDropdown.style.display = "block";
-
-  // Wire up click handlers
-  currentDropdown.querySelectorAll(".ac-item").forEach(item => {
-    item.addEventListener("mouseenter", () => {
-      currentDropdown.querySelectorAll(".ac-item").forEach(i => i.classList.remove("active"));
-      item.classList.add("active");
-      dropdownIndex = Array.from(currentDropdown.querySelectorAll(".ac-item")).indexOf(item);
-    });
-    item.addEventListener("click", () => {
-      const name = item.dataset.name;
-      const input = document.querySelector(".cmd-bar input");
-      if (input) input.value = name;
-      hideDropdown();
-      loadPlayer();
-    });
-  });
-
-  // Hover style injection (once)
-  if (!document.getElementById("ac-style")) {
-    const s = document.createElement("style");
-    s.id = "ac-style";
-    s.textContent = `.ac-item:hover, .ac-item.active { background: rgba(232,114,42,0.12) !important; }`;
-    document.head.appendChild(s);
+  } catch (err) {
+    console.error('Search error:', err);
+    box.style.display = 'none';
   }
 }
 
-function escHtml(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-function escAttr(s) {
-  return String(s || "").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+function _pickPlayer(name) {
+  const input = document.getElementById('psearch');
+  if (input) input.value = name;
+  _hideDropdown();
+  loadPlayer();
 }
 
-/* ============================================================
-   KEYBOARD SHORTCUTS
-   ============================================================ */
+function _hideDropdown() {
+  const box = document.getElementById('psearch-results');
+  if (box) box.style.display = 'none';
+  _dropdownIndex = -1;
+}
+
+function _moveCursor(dir) {
+  const box   = document.getElementById('psearch-results');
+  const items = box?.querySelectorAll('.sr-item');
+  if (!items?.length) return;
+
+  items.forEach(i => i.style.background = '');
+  _dropdownIndex = Math.max(0, Math.min(items.length - 1, _dropdownIndex + dir));
+  const active = items[_dropdownIndex];
+  if (active) {
+    active.style.background = 'rgba(232,114,42,.15)';
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function _escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _escAttr(s) {
+  return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ── KEYBOARD SHORTCUTS ─────────────────────────────────────── */
 function initKeyboardShortcuts() {
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
+  document.addEventListener('keydown', (e) => {
+    const inInput = document.activeElement.tagName === 'INPUT';
+    const box     = document.getElementById('psearch-results');
+    const isOpen  = box?.style.display !== 'none';
+
+    // / — focus search
+    if (e.key === '/' && !inInput) {
       e.preventDefault();
-      document.querySelector(".cmd-bar input")?.focus();
+      document.getElementById('psearch')?.focus();
+      return;
     }
-    if (e.key === "Escape") {
-      document.querySelector(".cmd-bar input")?.blur();
-      hideDropdown();
+
+    // Escape — close dropdown / blur
+    if (e.key === 'Escape') {
+      _hideDropdown();
+      document.getElementById('psearch')?.blur();
+      return;
     }
-    const tabMap = { "1":"overview","2":"batting","3":"advanced","4":"scouting","5":"gamelog","6":"team" };
-    if (tabMap[e.key] && document.activeElement.tagName !== "INPUT") {
-      switchTab(tabMap[e.key]);
+
+    // Arrow navigation inside dropdown
+    if (isOpen && e.key === 'ArrowDown') { e.preventDefault(); _moveCursor(1);  return; }
+    if (isOpen && e.key === 'ArrowUp')   { e.preventDefault(); _moveCursor(-1); return; }
+
+    // Enter — load highlighted result or current input
+    if (e.key === 'Enter' && inInput) {
+      const items  = box?.querySelectorAll('.sr-item');
+      const active = items?.[_dropdownIndex];
+      if (active) {
+        const name = active.dataset.name;
+        const input = document.getElementById('psearch');
+        if (input) input.value = name;
+        _hideDropdown();
+        loadPlayer();
+      } else {
+        _hideDropdown();
+        loadPlayer();
+      }
+      return;
+    }
+
+    // Number keys 1–6 to switch tabs (when not typing)
+    if (!inInput) {
+      const tabMap = { '1':'overview','2':'batting','3':'advanced','4':'scouting','5':'gamelog','6':'team' };
+      if (tabMap[e.key]) switchTab(tabMap[e.key]);
     }
   });
 }
 
-/* ============================================================
-   LEGACY DROPDOWN (kept for compatibility — now hidden via CSS)
-   ============================================================ */
-function initDropdown() {
-  const select = document.getElementById("player-select");
-  if (!select) return;
-  select.addEventListener("change", () => {
-    const input = document.querySelector(".cmd-bar input");
-    if (select.value && input) input.value = "";
+/* ── CLOSE DROPDOWN ON OUTSIDE CLICK ───────────────────────── */
+function initDropdownDismiss() {
+  document.addEventListener('click', (e) => {
+    const wrap = document.querySelector('.psearch-wrap');
+    if (wrap && !wrap.contains(e.target)) _hideDropdown();
   });
 }
 
-/* ============================================================
-   INIT
-   ============================================================ */
-document.addEventListener("DOMContentLoaded", () => {
-  initSearch();
-  initDropdown();
+/* ── INIT ───────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
-  switchTab("overview");
-  console.log("MLB Intelligence Terminal initialized.");
+  initDropdownDismiss();
+
+  // Wire psearch input if not already handled inline
+  const psearch = document.getElementById('psearch');
+  if (psearch && !psearch.dataset.wired) {
+    psearch.dataset.wired = '1';
+    psearch.addEventListener('input',   () => handlePlayerSearch(psearch.value));
+    psearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.stopPropagation(); }
+    });
+  }
+
+  console.log('MLB Intelligence Terminal — UI initialized.');
 });

@@ -3,425 +3,577 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Terminal</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%2307102d'/><text y='72' x='50' text-anchor='middle' font-size='55' font-family='Arial Black' fill='%23e8722a'>JV</text></svg>">
+  <title>MLB Analytics Dashboard — JARVIS</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/variables.css">
-  <link rel="stylesheet" href="css/animations.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/responsive.css">
   <style>
-    /* Hide legacy dropdown — search bar handles everything */
-    #player-select { display: none; }
-
-    /* Autocomplete hint text */
-    .search-hint {
+    /* ════════════════════════════════════════════════════════════ */
+    /* BASE & COLOR SYSTEM */
+    /* ════════════════════════════════════════════════════════════ */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --navy: #07102D;
+      --navy-mid: #0D1C3A;
+      --navy-light: #0F2040;
+      --navy-border: #1E3055;
+      
+      --orange: #E8722A;           /* Primary — updates with team */
+      --orange-dim: rgba(232, 114, 42, 0.15);
+      --blue-bright: #5AB4F5;      /* Secondary — updates with team */
+      
+      --green: #4DCE8A;
+      --red: #E85A5A;
+      --gold: #F5C842;
+      --text-dim: #A0B4CC;
+      
+      --safe: #4DCE8A;
+      --caution: #F5C842;
+      --danger: #E85A5A;
+      --avoid: #2471A3;
+    }
+    
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--navy);
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* HEADER */
+    /* ════════════════════════════════════════════════════════════ */
+    .hdr {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(3, 8, 20, 0.95);
+      border-bottom: 2px solid rgba(232, 114, 42, 0.35);
+      backdrop-filter: blur(18px);
+      padding: 12px 24px;
+    }
+    
+    .hdr-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    
+    .logo-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .season-label {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--orange);
+    }
+    
+    .dash-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, #fff 40%, var(--orange));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .v-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      background: rgba(232, 114, 42, 0.18);
+      border: 1px solid rgba(232, 114, 42, 0.4);
+      border-radius: 5px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--orange);
+    }
+    
+    .hdr-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .team-select {
+      background: rgba(13, 28, 58, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 14px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
       letter-spacing: 1px;
-      color: rgba(160,180,204,0.45);
-      padding: 0 4px;
+      cursor: pointer;
+      min-width: 180px;
+    }
+    
+    .team-select:focus {
+      outline: none;
+      border-color: var(--orange);
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* TABS */
+    /* ════════════════════════════════════════════════════════════ */
+    .tabs-wrap {
+      background: rgba(3, 8, 20, 0.72);
+      border-bottom: 1px solid var(--navy-border);
+      overflow-x: auto;
+      position: relative;
+      z-index: 99;
+    }
+    
+    .tabs {
+      display: flex;
+      min-width: max-content;
+      padding: 0 24px;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    
+    .tab {
+      padding: 12px 16px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
       white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s;
     }
-
-    /* Load button gets a subtle update */
-    .load-btn {
-      min-width: 120px;
+    
+    .tab:hover {
+      color: #fff;
+      border-bottom-color: rgba(255, 255, 255, 0.15);
     }
-
-    /* Scouting tab */
-    .scout-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 4px;
+    
+    .tab.on {
+      color: var(--orange);
+      border-bottom-color: var(--orange);
     }
-    .scout-tool {
-      background: rgba(13,28,58,0.5);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 10px;
-      padding: 14px 16px;
+    
+    .tab-divider {
+      width: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 9px 4px;
+      flex-shrink: 0;
     }
-    .scout-tool-label {
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* LAYOUT */
+    /* ════════════════════════════════════════════════════════════ */
+    .body {
+      padding: 20px 24px;
+      position: relative;
+      z-index: 1;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+    
+    .pg {
+      display: none;
+    }
+    
+    .pg.on {
+      display: block;
+      animation: fadeIn 0.2s;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* PANELS */
+    /* ════════════════════════════════════════════════════════════ */
+    .panel {
+      background: rgba(6, 14, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 20px;
+      padding: 22px 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+      margin-bottom: 18px;
+    }
+    
+    .panel-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 3px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .pt-badge {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 2px;
-      text-transform: uppercase;
+      color: var(--orange);
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* GRID LAYOUTS */
+    /* ════════════════════════════════════════════════════════════ */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    
+    .grid3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* RESPONSIVE */
+    /* ════════════════════════════════════════════════════════════ */
+    @media (max-width: 1200px) {
+      .grid3 { grid-template-columns: 1fr 1fr; }
+    }
+    
+    @media (max-width: 900px) {
+      .grid2, .grid3 { grid-template-columns: 1fr; }
+      .body { padding: 12px; }
+      .tab { padding: 9px 11px; font-size: 9px; }
+    }
+    
+    @media (max-width: 600px) {
+      .hdr-inner { flex-direction: column; align-items: flex-start; }
+      .hdr-right { width: 100%; }
+      .team-select { width: 100%; }
+      .tabs { padding: 0 12px; }
+    }
+    
+    /* ════════════════════════════════════════════════════════════ */
+    /* PLACEHOLDER */
+    /* ════════════════════════════════════════════════════════════ */
+    .placeholder {
+      padding: 60px 20px;
+      text-align: center;
       color: var(--text-dim);
-      margin-bottom: 8px;
     }
-    .scout-grade-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .scout-grade {
+    
+    .placeholder h2 {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 36px;
-      letter-spacing: 1px;
-      line-height: 1;
-      min-width: 42px;
+      font-size: 28px;
+      margin-bottom: 12px;
+      color: #fff;
     }
-    .scout-bar-wrap {
-      flex: 1;
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .scout-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      background: var(--orange);
-      transition: width 0.6s ease;
-    }
-
-    /* Gamelog table */
-    #gamelog-container table { font-size: 12px; }
   </style>
 </head>
 <body>
 
-  <!-- COMMAND BAR -->
-  <div class="cmd-bar">
-    <div>
-      <div class="wordmark">JARVIS</div>
-      <div class="subtext">MLB Intelligence Terminal</div>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- HEADER -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="hdr">
+  <div class="hdr-inner">
+    <div class="logo-block">
+      <div>
+        <div class="season-label">2026 SEASON</div>
+        <div class="dash-title">MLB ANALYTICS DASHBOARD</div>
+      </div>
+      <span class="v-badge">JARVIS v4</span>
     </div>
-
-    <!-- SEARCH WITH AUTOCOMPLETE -->
-    <div class="cmd-search-wrap">
-      <div class="cmd-search-icon">🔍</div>
-      <input type="text" class="cmd-bar input" placeholder="Search any MLB player…" autocomplete="off" spellcheck="false">
-      <!-- Dropdown injected by ui.js -->
+    
+    <div class="hdr-right">
+      <select class="team-select" id="team-select" onchange="loadTeam(this.value)">
+        <option value="">— Select Team —</option>
+        <option value="110">Baltimore Orioles</option>
+        <option value="111">Boston Red Sox</option>
+        <option value="147">New York Yankees</option>
+        <option value="139">Tampa Bay Rays</option>
+        <option value="141">Toronto Blue Jays</option>
+        <option value="145">Chicago White Sox</option>
+        <option value="114">Cleveland Guardians</option>
+        <option value="116">Detroit Tigers</option>
+        <option value="118">Kansas City Royals</option>
+        <option value="142">Minnesota Twins</option>
+        <option value="117">Houston Astros</option>
+        <option value="108">Los Angeles Angels</option>
+        <option value="133">Oakland Athletics</option>
+        <option value="136">Seattle Mariners</option>
+        <option value="140">Texas Rangers</option>
+        <option value="144">Atlanta Braves</option>
+        <option value="146">Miami Marlins</option>
+        <option value="121">New York Mets</option>
+        <option value="143">Philadelphia Phillies</option>
+        <option value="120">Washington Nationals</option>
+        <option value="112">Chicago Cubs</option>
+        <option value="113">Cincinnati Reds</option>
+        <option value="158">Milwaukee Brewers</option>
+        <option value="134">Pittsburgh Pirates</option>
+        <option value="138">St. Louis Cardinals</option>
+        <option value="109">Arizona Diamondbacks</option>
+        <option value="115">Colorado Rockies</option>
+        <option value="119">Los Angeles Dodgers</option>
+        <option value="135">San Diego Padres</option>
+        <option value="137">San Francisco Giants</option>
+      </select>
     </div>
+  </div>
+</div>
 
-    <span class="search-hint">/ to focus · ↑↓ navigate · Enter to load</span>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- TABS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <div class="tab on" data-tab="dash" onclick="switchTab('dash')">Dashboard</div>
+    <div class="tab" data-tab="personnel" onclick="switchTab('personnel')">Personnel</div>
+    <div class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</div>
+    <div class="tab" data-tab="profile" onclick="switchTab('profile')">Player Profile</div>
+    <div class="tab" data-tab="prospects" onclick="switchTab('prospects')">Top Prospects</div>
+    <div class="tab" data-tab="notes" onclick="switchTab('notes')">Scout Notes</div>
+    <div class="tab-divider"></div>
+    <div class="tab" data-tab="about" onclick="switchTab('about')">About</div>
+  </div>
+</div>
 
-    <!-- Hidden legacy select kept for JS compatibility -->
-    <select id="player-select"></select>
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- BODY -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="body">
 
-    <button class="load-btn" onclick="loadPlayer()">LOAD PLAYER</button>
-    <div class="badge badge-green">
-      <span class="live-dot">●</span> LIVE
+  <!-- ── DASHBOARD ──────────────────────────────────────────────── -->
+  <div class="pg on" id="pg-dash">
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Division Standings</div>
+        <div class="placeholder" id="dash-standings-placeholder">
+          <p>Select a team to view division standings</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Win Projection</div>
+        <div class="placeholder" id="dash-winprojection-placeholder">
+          <p>Win projection chart will appear here</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Team Offense <span class="pt-badge">2026</span></div>
+        <div class="placeholder" id="dash-offense-placeholder">
+          <p>Offensive stats loading…</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Team Pitching <span class="pt-badge">2026</span></div>
+        <div class="placeholder" id="dash-pitching-placeholder">
+          <p>Pitching stats loading…</p>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- PAGE BODY -->
-  <div class="body">
-
-    <!-- HERO SECTION -->
-    <div class="hero" id="hero">
-      <img class="hero-photo" src="" alt="Player Photo" id="hero-photo">
-      <div class="hero-bio">
-        <div class="team-label" id="hero-team">SELECT A PLAYER</div>
-        <div class="player-name" id="hero-name">MLB INTELLIGENCE</div>
-        <div style="display:flex; gap:14px; font-size:12px; color:var(--text-dim); margin-top:8px;">
-          <span id="hero-pos">—</span>
-          <span>|</span>
-          <span id="hero-age">—</span>
-          <span>|</span>
-          <span id="hero-bats">—</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB NAVIGATION -->
-    <div class="tab-nav">
-      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-      <button class="tab-btn" onclick="switchTab('batting')">Batting</button>
-      <button class="tab-btn" onclick="switchTab('advanced')">Advanced</button>
-      <button class="tab-btn" onclick="switchTab('scouting')">Scouting</button>
-      <button class="tab-btn" onclick="switchTab('gamelog')">Game Log</button>
-      <button class="tab-btn" onclick="switchTab('team')">Team</button>
-    </div>
-
-    <!-- OVERVIEW TAB -->
-    <div id="tab-overview" class="tab-content">
-      <div class="grid-4" id="quick-stats">
-        <div class="stat-cell">
-          <div class="stat-label">AVG</div>
-          <div class="stat-value" id="stat-avg">.000</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-label">HR</div>
-          <div class="stat-value" id="stat-hr">0</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-label">RBI</div>
-          <div class="stat-value" id="stat-rbi">0</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-label">OPS</div>
-          <div class="stat-value" id="stat-ops">.000</div>
-        </div>
-      </div>
-
-      <div class="grid-2" style="margin-top:14px;">
-        <div class="panel">
-          <div class="panel-title">Season Stats</div>
-          <table class="data-table" id="season-stats-table">
-            <thead>
-              <tr><th>STAT</th><th>VALUE</th><th>RANK</th></tr>
-            </thead>
-            <tbody id="season-stats-body">
-              <tr><td colspan="3" style="text-align:center; color:var(--text-dim);">Load a player to view stats</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title">Intelligence Flags</div>
-          <div id="flags-container">
-            <div class="flag-card">
-              <div class="flag-icon">⚡</div>
-              <div>
-                <div class="flag-title">No Player Loaded</div>
-                <div class="flag-desc">Search any MLB player above to view intelligence flags and insights.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BATTING TAB -->
-    <div id="tab-batting" class="tab-content" style="display:none;">
+  <!-- ── PERSONNEL ──────────────────────────────────────────────── -->
+  <div class="pg" id="pg-personnel">
+    <div class="grid2">
       <div class="panel">
-        <div class="panel-title">Batting Statistics</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>YEAR</th><th>G</th><th>AB</th><th>H</th>
-              <th>2B</th><th>HR</th><th>RBI</th>
-              <th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th>
-            </tr>
-          </thead>
-          <tbody id="batting-stats-body">
-            <tr><td colspan="11" style="text-align:center; color:var(--text-dim);">Load a player to view batting stats</td></tr>
-          </tbody>
-        </table>
+        <div class="panel-title">Projected Lineup</div>
+        <div class="placeholder">
+          <p>Lineup data for selected team</p>
+        </div>
       </div>
-    </div>
-
-    <!-- ADVANCED TAB -->
-    <div id="tab-advanced" class="tab-content" style="display:none;">
       <div class="panel">
-        <div class="panel-title">Advanced Metrics</div>
-        <div id="advanced-stats-container" style="color:var(--text-dim); text-align:center; padding:20px;">
-          Load a player to view advanced metrics
+        <div class="panel-title">Pitching Staff</div>
+        <div class="placeholder">
+          <p>Pitcher roster and stats</p>
         </div>
       </div>
     </div>
-
-    <!-- SCOUTING TAB -->
-    <div id="tab-scouting" class="tab-content" style="display:none;">
+    
+    <div class="grid2">
       <div class="panel">
-        <div class="panel-title">Scouting Report</div>
-        <div id="scouting-container" style="color:var(--text-dim); text-align:center; padding:20px;">
-          Load a player to view scouting report
-        </div>
-      </div>
-    </div>
-
-    <!-- GAME LOG TAB -->
-    <div id="tab-gamelog" class="tab-content" style="display:none;">
-      <div class="panel">
-        <div class="panel-title">Game Log</div>
-        <div id="gamelog-container" style="color:var(--text-dim); text-align:center; padding:20px;">
-          Load a player to view game log
-        </div>
-      </div>
-    </div>
-
-    <!-- TEAM TAB -->
-    <div id="tab-team" class="tab-content" style="display:none;">
-
-      <!-- TEAM PICKER — all 30 MLB teams -->
-      <div class="panel" style="margin-bottom:14px;">
-        <div class="panel-title" style="margin-bottom:12px;">Browse by Team</div>
-        <div id="team-picker-grid" style="
-          display:grid;
-          grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-          gap:8px;">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-
-      <div class="grid-2" style="margin-top:14px;">
-        <div class="panel">
-          <div class="panel-title">Division Standings</div>
-          <table class="data-table" id="standings-table">
-            <thead>
-              <tr><th>TEAM</th><th>W</th><th>L</th><th>PCT</th><th>GB</th></tr>
-            </thead>
-            <tbody id="standings-body">
-              <tr><td colspan="5" style="text-align:center; color:var(--text-dim);">Load a player to view standings</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="panel">
-          <div class="panel-title">Team Offense</div>
-          <table class="data-table" id="team-offense-table">
-            <thead><tr><th>STAT</th><th>VALUE</th></tr></thead>
-            <tbody id="team-offense-body">
-              <tr><td colspan="2" style="text-align:center; color:var(--text-dim);">Load a player to view team stats</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:14px;">
         <div class="panel-title">Active Roster</div>
-        <table class="data-table" id="roster-table">
-          <thead>
-            <tr><th>#</th><th>NAME</th><th>POS</th><th>STATUS</th></tr>
-          </thead>
-          <tbody id="roster-body">
-            <tr><td colspan="4" style="text-align:center; color:var(--text-dim);">Load a player to view roster</td></tr>
-          </tbody>
-        </table>
+        <div class="placeholder">
+          <p>26 active players</p>
+        </div>
       </div>
-
-      <div class="panel" style="margin-top:14px;">
-        <div class="panel-title">Team Pitching</div>
-        <table class="data-table" id="team-pitching-table">
-          <thead><tr><th>STAT</th><th>VALUE</th></tr></thead>
-          <tbody id="team-pitching-body">
-            <tr><td colspan="2" style="text-align:center; color:var(--text-dim);">Load a player to view pitching stats</td></tr>
-          </tbody>
-        </table>
+      <div class="panel">
+        <div class="panel-title">Injured List</div>
+        <div class="placeholder" id="il-placeholder">
+          <p style="color: var(--green);">✅ No IL entries</p>
+        </div>
       </div>
+    </div>
+    
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Hot/Cold</div>
+        <div class="placeholder">
+          <p>Last-10 batting splits</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Starting Pitching Stats</div>
+        <div class="placeholder">
+          <p>SP statistics table</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    </div><!-- end tab-team -->
+  <!-- ── ANALYSIS ────────────────────────────────────────────────– -->
+  <div class="pg" id="pg-analysis">
+    <div class="grid3">
+      <div class="panel">
+        <div class="panel-title">Hitting Leaders</div>
+        <div class="placeholder">
+          <p>Top hitters with switchable stats</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Shared Metrics</div>
+        <div class="placeholder">
+          <p>WAR, Fantasy Points, wRC+</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Pitching Leaders</div>
+        <div class="placeholder">
+          <p>Top pitchers with switchable stats</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  </div><!-- end .body -->
+  <!-- ── PLAYER PROFILE ─────────────────────────────────────────– -->
+  <div class="pg" id="pg-profile">
+    <div class="placeholder">
+      <h2>Player Profile</h2>
+      <p>Select a player to view detailed profile with Savant data, splits, and scouting grades</p>
+    </div>
+  </div>
 
-  <script src="js/data.js"></script>
-  <script src="js/player.js"></script>
-  <script src="js/ui.js"></script>
-  <script>
-  /* ============================================================
-     ALL 30 MLB TEAMS — team picker for Team tab
-     ============================================================ */
-  const MLB_TEAMS = [
-    // AL East
-    { id: 110, abbr: "BAL", name: "Baltimore Orioles",      div: "AL East" },
-    { id: 111, abbr: "BOS", name: "Boston Red Sox",         div: "AL East" },
-    { id: 147, abbr: "NYY", name: "New York Yankees",       div: "AL East" },
-    { id: 139, abbr: "TB",  name: "Tampa Bay Rays",         div: "AL East" },
-    { id: 141, abbr: "TOR", name: "Toronto Blue Jays",      div: "AL East" },
-    // AL Central
-    { id: 145, abbr: "CWS", name: "Chicago White Sox",      div: "AL Central" },
-    { id: 114, abbr: "CLE", name: "Cleveland Guardians",    div: "AL Central" },
-    { id: 116, abbr: "DET", name: "Detroit Tigers",         div: "AL Central" },
-    { id: 118, abbr: "KC",  name: "Kansas City Royals",     div: "AL Central" },
-    { id: 142, abbr: "MIN", name: "Minnesota Twins",        div: "AL Central" },
-    // AL West
-    { id: 117, abbr: "HOU", name: "Houston Astros",         div: "AL West" },
-    { id: 108, abbr: "LAA", name: "Los Angeles Angels",     div: "AL West" },
-    { id: 133, abbr: "OAK", name: "Oakland Athletics",      div: "AL West" },
-    { id: 136, abbr: "SEA", name: "Seattle Mariners",       div: "AL West" },
-    { id: 140, abbr: "TEX", name: "Texas Rangers",          div: "AL West" },
-    // NL East
-    { id: 144, abbr: "ATL", name: "Atlanta Braves",         div: "NL East" },
-    { id: 146, abbr: "MIA", name: "Miami Marlins",          div: "NL East" },
-    { id: 121, abbr: "NYM", name: "New York Mets",          div: "NL East" },
-    { id: 143, abbr: "PHI", name: "Philadelphia Phillies",  div: "NL East" },
-    { id: 120, abbr: "WSH", name: "Washington Nationals",   div: "NL East" },
-    // NL Central
-    { id: 112, abbr: "CHC", name: "Chicago Cubs",           div: "NL Central" },
-    { id: 113, abbr: "CIN", name: "Cincinnati Reds",        div: "NL Central" },
-    { id: 158, abbr: "MIL", name: "Milwaukee Brewers",      div: "NL Central" },
-    { id: 134, abbr: "PIT", name: "Pittsburgh Pirates",     div: "NL Central" },
-    { id: 138, abbr: "STL", name: "St. Louis Cardinals",    div: "NL Central" },
-    // NL West
-    { id: 109, abbr: "ARI", name: "Arizona Diamondbacks",   div: "NL West" },
-    { id: 115, abbr: "COL", name: "Colorado Rockies",       div: "NL West" },
-    { id: 119, abbr: "LAD", name: "Los Angeles Dodgers",    div: "NL West" },
-    { id: 135, abbr: "SD",  name: "San Diego Padres",       div: "NL West" },
-    { id: 137, abbr: "SF",  name: "San Francisco Giants",   div: "NL West" },
-  ];
+  <!-- ── PROSPECTS ──────────────────────────────────────────────– -->
+  <div class="pg" id="pg-prospects">
+    <div class="placeholder">
+      <h2>Top Prospects</h2>
+      <p>Baseball America-style prospect cards with FV grades and scouting summaries</p>
+    </div>
+  </div>
 
-  /* Build the team picker grid */
-  document.addEventListener("DOMContentLoaded", () => {
-    const grid = document.getElementById("team-picker-grid");
-    if (!grid) return;
+  <!-- ── SCOUT NOTES ────────────────────────────────────────────– -->
+  <div class="pg" id="pg-notes">
+    <div class="placeholder">
+      <h2>Scout Notes</h2>
+      <p>Add/edit personal scouting notes with priority tags (Watch, Target, Buy, Sell, Hold)</p>
+    </div>
+  </div>
 
-    // Group by division
-    const divs = {};
-    MLB_TEAMS.forEach(t => {
-      if (!divs[t.div]) divs[t.div] = [];
-      divs[t.div].push(t);
-    });
+  <!-- ── ABOUT ──────────────────────────────────────────────────– -->
+  <div class="pg" id="pg-about">
+    <div class="panel">
+      <div class="panel-title">About Luke Rumpler</div>
+      <div class="placeholder">
+        <p>Bio and personal information</p>
+      </div>
+    </div>
+  </div>
 
-    // Render division headers + team chips
-    Object.entries(divs).forEach(([divName, teams]) => {
-      const header = document.createElement("div");
-      header.style.cssText = `
-        grid-column: 1 / -1;
-        font-family: 'Barlow Condensed', sans-serif;
-        font-size: 10px; font-weight: 700; letter-spacing: 2px;
-        text-transform: uppercase; color: var(--text-dim);
-        border-bottom: 1px solid rgba(255,255,255,0.07);
-        padding-bottom: 4px; margin-top: 8px;
-      `;
-      header.textContent = divName;
-      grid.appendChild(header);
+</div>
 
-      teams.forEach(team => {
-        const chip = document.createElement("button");
-        chip.style.cssText = `
-          background: rgba(13,28,58,0.7);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 8px; color: #fff; cursor: pointer;
-          padding: 8px 10px;
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
-          text-align: left; transition: all 0.15s;
-          display: flex; align-items: center; gap: 8px;
-        `;
-        chip.innerHTML = `
-          <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;
-            color:var(--orange);min-width:32px;">${team.abbr}</span>
-          <span style="font-size:11px;color:var(--text-dim);line-height:1.3;">${team.name.replace(team.abbr + " ", "").replace(/^(.*) (\S+)$/, "$1<br><strong>$2</strong>")}</span>
-        `;
-        chip.addEventListener("mouseenter", () => {
-          chip.style.background = "rgba(232,114,42,0.15)";
-          chip.style.borderColor = "rgba(232,114,42,0.4)";
-        });
-        chip.addEventListener("mouseleave", () => {
-          if (!chip.classList.contains("selected")) {
-            chip.style.background = "rgba(13,28,58,0.7)";
-            chip.style.borderColor = "rgba(255,255,255,0.1)";
-          }
-        });
-        chip.addEventListener("click", () => {
-          // Deselect others
-          grid.querySelectorAll("button.selected").forEach(b => {
-            b.classList.remove("selected");
-            b.style.background = "rgba(13,28,58,0.7)";
-            b.style.borderColor = "rgba(255,255,255,0.1)";
-          });
-          chip.classList.add("selected");
-          chip.style.background = "rgba(232,114,42,0.2)";
-          chip.style.borderColor = "var(--orange)";
-          loadTeamById(team.id);
-        });
-        grid.appendChild(chip);
-      });
-    });
-  });
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<script>
+  const SEASON = 2026;
+  let currentTeam = null;
 
-  /* Load a team directly by MLB team ID */
-  async function loadTeamById(teamId) {
-    // Update standings/roster/stats panels for this team
-    // We pass a fake player object with just the team id
-    const fakePlayer = { currentTeam: { id: teamId } };
-    renderTeam(fakePlayer);
+  /**
+   * Switch between tabs
+   */
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+    document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+    
+    document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('on');
+    document.getElementById(`pg-${tabName}`)?.classList.add('on');
   }
-  </script>
+
+  /**
+   * Load team data
+   * CRITICAL: Call updateThemeColors() first
+   */
+  async function loadTeam(teamId) {
+    if (!teamId) return;
+    
+    currentTeam = parseInt(teamId);
+    
+    // Update theme FIRST
+    updateThemeColors(currentTeam);
+    
+    console.log(`📊 Loading team ${currentTeam}…`);
+    
+    // Load dashboard, personnel, analysis data
+    // (Implementation in next section)
+  }
+
+  /**
+   * Fetch from MLB API via proxy
+   */
+  async function fetchJSON(endpoint) {
+    try {
+      const res = await fetch(`/api/mlb?path=${endpoint}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.error('Fetch error:', err);
+      return null;
+    }
+  }
+
+  console.log('✅ Dashboard initialized');
+</script>
+
+<!-- Load support modules -->
+<script src="js/team-colors.js"></script>
+<script src="api/jarvis.js"></script>
+
 </body>
 </html>
