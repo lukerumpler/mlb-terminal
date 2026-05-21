@@ -182,8 +182,8 @@ function renderFlags(player, statcast) {
   const stats = player?.stats?.[0]?.splits?.[0]?.stat || {};
 
   // Generate smart flags based on actual data
-  if (statcast?.xwoba && statcast.xwoba > 0.400) {
-    flags.push({ icon: "🔥", title: "Elite xwOBA", desc: `${statcast.xwoba} xwOBA ranks in the top tier league-wide.` });
+  if (statcast?.est_woba && statcast.est_woba > 0.400) {
+    flags.push({ icon: "🔥", title: "Elite xwOBA", desc: `${statcast.est_woba} xwOBA ranks in the top tier league-wide.` });
   }
   if (stats.homeRuns >= 30) {
     flags.push({ icon: "💣", title: "Power Threat", desc: `${stats.homeRuns} home runs this season.` });
@@ -254,15 +254,15 @@ function renderAdvanced(statcast) {
     <div class="grid-4">
       <div class="stat-cell">
         <div class="stat-label">xBA</div>
-        <div class="stat-value">${statcast.xba ? Number(statcast.xba).toFixed(3) : "—"}</div>
+        <div class="stat-value">${statcast.est_ba ? Number(statcast.est_ba).toFixed(3) : "—"}</div>
       </div>
       <div class="stat-cell">
         <div class="stat-label">xSLG</div>
-        <div class="stat-value">${statcast.xslg ? Number(statcast.xslg).toFixed(3) : "—"}</div>
+        <div class="stat-value">${statcast.est_slug ? Number(statcast.est_slug).toFixed(3) : "—"}</div>
       </div>
       <div class="stat-cell">
         <div class="stat-label">xwOBA</div>
-        <div class="stat-value">${statcast.xwoba ? Number(statcast.xwoba).toFixed(3) : "—"}</div>
+        <div class="stat-value">${statcast.est_woba ? Number(statcast.est_woba).toFixed(3) : "—"}</div>
       </div>
       <div class="stat-cell">
         <div class="stat-label">Barrel %</div>
