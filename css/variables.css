@@ -1,0 +1,53 @@
+/* ============================================================
+   MLB INTELLIGENCE TERMINAL - CSS VARIABLES
+   All colors, fonts, spacing, and design tokens
+   ============================================================ */
+
+:root {
+  /* Primary Colors */
+  --orange: #e8722a;
+  --orange-dim: rgba(232,114,42,.15);
+  --orange-hover: rgba(232,114,42,.25);
+
+  /* Status Colors */
+  --blue-bright: #5ab4f5;
+  --green: #4dce8a;
+  --red: #e85a5a;
+  --gold: #f5c842;
+
+  /* Navy Palette */
+  --navy: #07102d;
+  --navy-mid: #0d1c3a;
+  --navy-light: #0f2040;
+  --navy-lighter: #1a2540;
+  --navy-border: #1e3055;
+
+  /* Text Colors */
+  --text-bright: #fff;
+  --text-dim: #a0b4cc;
+  --text-subdim: #7a8fa8;
+
+  /* Shadows */
+  --shadow-outer: 0 8px 32px rgba(0,0,0,.4);
+  --shadow-hover: 0 12px 40px rgba(232,114,42,.15);
+  --shadow-inset: inset 0 2px 4px rgba(0,0,0,.3);
+
+  /* Transitions */
+  --transition-fast: .15s ease;
+  --transition-normal: .3s cubic-bezier(.4,0,.2,1);
+  --transition-smooth: .5s ease-out;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+}

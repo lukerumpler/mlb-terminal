@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Intelligence Terminal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <!-- COMMAND BAR -->
+  <div class="cmd-bar">
+    <div>
+      <div class="wordmark">JARVIS</div>
+      <div class="subtext">MLB Intelligence Terminal</div>
+    </div>
+    <input type="text" placeholder="Search players...">
+    <select id="player-select">
+      <option value="">Select Player</option>
+      <option value="judge">Aaron Judge</option>
+      <option value="ohtani">Shohei Ohtani</option>
+      <option value="acuna">Ronald Acuña Jr.</option>
+    </select>
+    <button class="load-btn" onclick="loadPlayer()">LOAD PLAYER</button>
+    <div class="badge badge-green">
+      <span class="live-dot">●</span> LIVE
+    </div>
+  </div>
+
+  <!-- PAGE BODY -->
+  <div class="body">
+
+    <!-- HERO SECTION -->
+    <div class="hero" id="hero">
+      <img class="hero-photo" src="" alt="Player Photo" id="hero-photo">
+      <div class="hero-bio">
+        <div class="team-label" id="hero-team">SELECT A PLAYER</div>
+        <div class="player-name" id="hero-name">MLB INTELLIGENCE</div>
+        <div style="display:flex; gap:14px; font-size:12px; color:var(--text-dim); margin-top:8px;">
+          <span id="hero-pos">—</span>
+          <span>|</span>
+          <span id="hero-age">—</span>
+          <span>|</span>
+          <span id="hero-bats">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB NAVIGATION -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('batting')">Batting</button>
+      <button class="tab-btn" onclick="switchTab('advanced')">Advanced</button>
+      <button class="tab-btn" onclick="switchTab('scouting')">Scouting</button>
+      <button class="tab-btn" onclick="switchTab('gamelog')">Game Log</button>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div id="tab-overview" class="tab-content">
+
+      <!-- QUICK STATS ROW -->
+      <div class="grid-4" id="quick-stats">
+        <div class="stat-cell">
+          <div class="stat-label">AVG</div>
+          <div class="stat-value" id="stat-avg">.000</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">HR</div>
+          <div class="stat-value" id="stat-hr">0</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">RBI</div>
+          <div class="stat-value" id="stat-rbi">0</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">OPS</div>
+          <div class="stat-value" id="stat-ops">.000</div>
+        </div>
+      </div>
+
+      <!-- TWO COLUMN LAYOUT -->
+      <div class="grid-2" style="margin-top:14px;">
+
+        <!-- LEFT: SEASON STATS -->
+        <div class="panel">
+          <div class="panel-title">Season Stats</div>
+          <table class="data-table" id="season-stats-table">
+            <thead>
+              <tr>
+                <th>STAT</th>
+                <th>VALUE</th>
+                <th>RANK</th>
+              </tr>
+            </thead>
+            <tbody id="season-stats-body">
+              <tr><td colspan="3" style="text-align:center; color:var(--text-dim);">Load a player to view stats</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- RIGHT: INSIGHTS -->
+        <div class="panel">
+          <div class="panel-title">Intelligence Flags</div>
+          <div id="flags-container">
+            <div class="flag-card">
+              <div class="flag-icon">⚡</div>
+              <div>
+                <div class="flag-title">No Player Loaded</div>
+                <div class="flag-desc">Select a player from the dropdown above to view intelligence flags and insights.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- BATTING TAB (hidden by default) -->
+    <div id="tab-batting" class="tab-content" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">Batting Statistics</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>YEAR</th>
+              <th>G</th>
+              <th>AB</th>
+              <th>H</th>
+              <th>2B</th>
+              <th>HR</th>
+              <th>RBI</th>
+              <th>AVG</th>
+              <th>OBP</th>
+              <th>SLG</th>
+              <th>OPS</th>
+            </tr>
+          </thead>
+          <tbody id="batting-stats-body">
+            <tr><td colspan="11" style="text-align:center; color:var(--text-dim);">Load a player to view batting stats</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ADVANCED TAB (hidden by default) -->
+    <div id="tab-advanced" class="tab-content" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">Advanced Metrics</div>
+        <div id="advanced-stats-container" style="color:var(--text-dim); text-align:center; padding:20px;">
+          Load a player to view advanced metrics
+        </div>
+      </div>
+    </div>
+
+    <!-- SCOUTING TAB (hidden by default) -->
+    <div id="tab-scouting" class="tab-content" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">Scouting Report</div>
+        <div id="scouting-container" style="color:var(--text-dim); text-align:center; padding:20px;">
+          Load a player to view scouting report
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME LOG TAB (hidden by default) -->
+    <div id="tab-gamelog" class="tab-content" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">Game Log</div>
+        <div id="gamelog-container" style="color:var(--text-dim); text-align:center; padding:20px;">
+          Load a player to view game log
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end .body -->
+
+  <script src="js/data.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
