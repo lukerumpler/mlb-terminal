@@ -921,3 +921,154 @@
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Intelligence Terminal — JARVIS v10 PRO</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── LIVE SCOREBOARD ── -->
+  <div class="scoreboard">
+    <div class="score-track" id="score-track">
+      <div class="score-item">LOADING LIVE MLB SCORES...</div>
+    </div>
+  </div>
+
+  <!-- ── HEADER ── -->
+  <header class="hdr">
+    <div class="hdr-inner">
+      <div class="logo-block">
+        <div class="season-label">2026 SEASON</div>
+        <h1 class="dash-title">MLB INTELLIGENCE TERMINAL</h1>
+      </div>
+      
+      <div class="hdr-right">
+        <div class="psearch-wrap">
+          <input type="text" id="psearch" placeholder="Search player... (or press /)">
+          <div id="psearch-results" class="search-dd"></div>
+        </div>
+        <select id="team-select" class="tpick" onchange="selectTeam(this.value)">
+          <option value="">— SELECT TEAM —</option>
+          <!-- Populated by js/data.js -->
+        </select>
+        <button class="refresh-btn" onclick="refreshData()">REFRESH</button>
+        <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── TABS NAVIGATION ── -->
+  <nav class="tabs-wrap">
+    <div class="tabs">
+      <div class="tab on" data-tab="overview">OVERVIEW</div>
+      <div class="tab" data-tab="personnel">PERSONNEL</div>
+      <div class="tab" data-tab="analysis">ANALYSIS</div>
+      <div class="tab" data-tab="profile">PLAYER PROFILE</div>
+      <div class="tab" data-tab="prospects">TOP PROSPECTS</div>
+      <div class="tab" data-tab="scouting">SCOUT NOTES</div>
+      <div class="tab" data-tab="settings">SETTINGS</div>
+    </div>
+  </nav>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="body">
+    
+    <!-- PAGE: OVERVIEW (Dashboard) -->
+    <section id="pg-overview" class="pg on">
+      <div class="grid2">
+        <div class="panel">
+          <h2 class="panel-title">DIVISION STANDINGS <span class="pt-badge">LIVE</span></h2>
+          <table class="tbl">
+            <thead><tr><th>TEAM</th><th>W</th><th>L</th><th>PCT</th><th>GB</th></tr></thead>
+            <tbody id="standings-body">
+              <tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Select a team to load standings</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">ACTIVE ROSTER</h2>
+          <table class="tbl">
+            <thead><tr><th>#</th><th>NAME</th><th>POS</th><th>STATUS</th></tr></thead>
+            <tbody id="roster-body">
+              <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Select a team to load roster</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <h2 class="panel-title">TEAM OFFENSE <span class="pt-badge">2026</span></h2>
+          <div id="team-offense-body" style="color:var(--text-dim); text-align:center; padding:20px;">No team data loaded</div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">TEAM PITCHING <span class="pt-badge">2026</span></h2>
+          <div id="team-pitching-body" style="color:var(--text-dim); text-align:center; padding:20px;">No team data loaded</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: PLAYER PROFILE -->
+    <section id="pg-profile" class="pg">
+      <div class="panel">
+        <div id="player-hero-content">
+          <!-- Hero Section from Indexpart1.html logic -->
+          <div style="display:flex; gap:20px; align-items:center;">
+            <div style="width:100px; height:100px; background:var(--navy-mid); border-radius:10px;"></div>
+            <div>
+              <h2 style="font-family:'Bebas Neue'; font-size:42px;">SEARCH PLAYER</h2>
+              <p style="color:var(--orange); font-weight:700;">ENTER NAME IN THE COMMAND BAR OR SEARCH BOX</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="panel"><h2 class="panel-title">SEASON STATS</h2><div id="season-stats-body"></div></div>
+        <div class="panel"><h2 class="panel-title">ADVANCED METRICS</h2><div id="advanced-stats-container"></div></div>
+        <div class="panel"><h2 class="panel-title">FLAGS & ALERTS</h2><div id="flags-container"></div></div>
+      </div>
+    </section>
+
+    <!-- PAGE: SCOUT NOTES -->
+    <section id="pg-scouting" class="pg">
+      <div class="panel">
+        <h2 class="panel-title">INTELLIGENCE LOGS <span class="pt-badge">SECURE</span></h2>
+        <div id="notes-container">
+          <p style="color:var(--text-dim)">No intelligence logs recorded for this session.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: ANALYSIS -->
+    <section id="pg-analysis" class="pg">
+      <div class="panel">
+        <h2 class="panel-title">WIN PROJECTIONS</h2>
+        <div id="projections-content" style="height:300px; background:rgba(255,255,255,0.02); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--text-dim);">
+          Run Expectancy & Win Probability Engine Ready
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── COMMAND TERMINAL ── -->
+  <div class="command-bar">
+    <span class="cmd-prompt">JARVIS ></span>
+    <input type="text" class="cmd-input" placeholder="Enter command (e.g., 'search Judge', 'switch team', or 'help')" onkeydown="handleCommand(event)">
+    <span class="cmd-help">CTRL+K to focus · v10.0.4</span>
+  </div>
+
+  <!-- ── SCRIPTS ── -->
+  <script src="js/data.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/team.js"></script>
+
+</body>
+</html>
