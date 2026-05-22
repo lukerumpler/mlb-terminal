@@ -10,28 +10,28 @@
     /* BASE & COLOR SYSTEM */
     /* ════════════════════════════════════════════════════════════ */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
+
     :root {
       --navy: #07102D;
       --navy-mid: #0D1C3A;
       --navy-light: #0F2040;
       --navy-border: #1E3055;
-      
-      --orange: #E8722A;           /* Primary — updates with team */
+
+      --orange: #E8722A;
       --orange-dim: rgba(232, 114, 42, 0.15);
-      --blue-bright: #5AB4F5;      /* Secondary — updates with team */
-      
+      --blue-bright: #5AB4F5;
+
       --green: #4DCE8A;
       --red: #E85A5A;
       --gold: #F5C842;
       --text-dim: #A0B4CC;
-      
+
       --safe: #4DCE8A;
       --caution: #F5C842;
       --danger: #E85A5A;
       --avoid: #2471A3;
     }
-    
+
     body {
       font-family: 'Barlow', sans-serif;
       background: var(--navy);
@@ -39,7 +39,7 @@
       min-height: 100vh;
       overflow-x: hidden;
     }
-    
+
     body::before {
       content: '';
       position: fixed;
@@ -51,7 +51,7 @@
       pointer-events: none;
       z-index: 0;
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
     /* HEADER */
     /* ════════════════════════════════════════════════════════════ */
@@ -64,7 +64,7 @@
       backdrop-filter: blur(18px);
       padding: 12px 24px;
     }
-    
+
     .hdr-inner {
       display: flex;
       align-items: center;
@@ -74,13 +74,13 @@
       max-width: 1800px;
       margin: 0 auto;
     }
-    
+
     .logo-block {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-    
+
     .season-label {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 10px;
@@ -89,7 +89,7 @@
       text-transform: uppercase;
       color: var(--orange);
     }
-    
+
     .dash-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 32px;
@@ -99,7 +99,7 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    
+
     .v-badge {
       display: inline-flex;
       align-items: center;
@@ -113,14 +113,75 @@
       letter-spacing: 1.5px;
       color: var(--orange);
     }
-    
+
     .hdr-right {
       display: flex;
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
     }
-    
+
+    /* Player search */
+    .psearch-wrap { position: relative; }
+
+    #psearch {
+      background: rgba(13, 28, 58, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 14px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      width: 220px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #psearch:focus { border-color: var(--orange); }
+    #psearch::placeholder { color: var(--text-dim); }
+
+    #psearch-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 320px;
+      background: #0d1c3a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      z-index: 999;
+      max-height: 360px;
+      overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .sr-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: background 0.15s;
+    }
+
+    .sr-item:hover { background: rgba(232, 114, 42, 0.12); }
+
+    .sr-pos {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--blue-bright);
+      background: rgba(90, 180, 245, 0.1);
+      padding: 2px 7px;
+      border-radius: 5px;
+      flex-shrink: 0;
+    }
+
     .team-select {
       background: rgba(13, 28, 58, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -134,12 +195,12 @@
       cursor: pointer;
       min-width: 180px;
     }
-    
+
     .team-select:focus {
       outline: none;
       border-color: var(--orange);
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
     /* TABS */
     /* ════════════════════════════════════════════════════════════ */
@@ -150,7 +211,7 @@
       position: relative;
       z-index: 99;
     }
-    
+
     .tabs {
       display: flex;
       min-width: max-content;
@@ -158,7 +219,7 @@
       max-width: 1800px;
       margin: 0 auto;
     }
-    
+
     .tab {
       padding: 12px 16px;
       font-family: 'Barlow Condensed', sans-serif;
@@ -173,24 +234,24 @@
       flex-shrink: 0;
       transition: all 0.2s;
     }
-    
+
     .tab:hover {
       color: #fff;
       border-bottom-color: rgba(255, 255, 255, 0.15);
     }
-    
+
     .tab.on {
       color: var(--orange);
       border-bottom-color: var(--orange);
     }
-    
+
     .tab-divider {
       width: 1px;
       background: rgba(255, 255, 255, 0.1);
       margin: 9px 4px;
       flex-shrink: 0;
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
     /* LAYOUT */
     /* ════════════════════════════════════════════════════════════ */
@@ -201,21 +262,15 @@
       max-width: 1800px;
       margin: 0 auto;
     }
-    
-    .pg {
-      display: none;
-    }
-    
-    .pg.on {
-      display: block;
-      animation: fadeIn 0.2s;
-    }
-    
+
+    .pg { display: none; }
+    .pg.on { display: block; animation: fadeIn 0.2s; }
+
     @keyframes fadeIn {
       from { opacity: 0; }
-      to { opacity: 1; }
+      to   { opacity: 1; }
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
     /* PANELS */
     /* ════════════════════════════════════════════════════════════ */
@@ -228,7 +283,7 @@
       box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
       margin-bottom: 18px;
     }
-    
+
     .panel-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 28px;
@@ -240,7 +295,7 @@
       justify-content: space-between;
       align-items: center;
     }
-    
+
     .pt-badge {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 10px;
@@ -248,7 +303,7 @@
       letter-spacing: 2px;
       color: var(--orange);
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
     /* GRID LAYOUTS */
     /* ════════════════════════════════════════════════════════════ */
@@ -258,34 +313,192 @@
       gap: 18px;
       margin-bottom: 18px;
     }
-    
+
     .grid3 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 18px;
       margin-bottom: 18px;
     }
-    
+
     /* ════════════════════════════════════════════════════════════ */
-    /* RESPONSIVE */
+    /* TABLES */
     /* ════════════════════════════════════════════════════════════ */
-    @media (max-width: 1200px) {
-      .grid3 { grid-template-columns: 1fr 1fr; }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
     }
-    
-    @media (max-width: 900px) {
-      .grid2, .grid3 { grid-template-columns: 1fr; }
-      .body { padding: 12px; }
-      .tab { padding: 9px 11px; font-size: 9px; }
+
+    .data-table th {
+      text-align: left;
+      padding: 6px 8px;
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-weight: 700;
+      text-transform: uppercase;
     }
-    
-    @media (max-width: 600px) {
-      .hdr-inner { flex-direction: column; align-items: flex-start; }
-      .hdr-right { width: 100%; }
-      .team-select { width: 100%; }
-      .tabs { padding: 0 12px; }
+
+    .data-table td {
+      padding: 8px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
-    
+
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
+
+    /* ════════════════════════════════════════════════════════════ */
+    /* HERO */
+    /* ════════════════════════════════════════════════════════════ */
+    .hero-panel {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    #hero-photo {
+      width: 110px;
+      height: 110px;
+      border-radius: 14px;
+      object-fit: cover;
+      background: rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .hero-info { flex: 1; min-width: 160px; }
+
+    #hero-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 42px;
+      letter-spacing: 3px;
+      line-height: 1;
+    }
+
+    #hero-team {
+      color: var(--orange);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .hero-meta {
+      display: flex;
+      gap: 18px;
+      margin-top: 8px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .hero-stat-cell { text-align: center; }
+
+    .hero-stat-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 40px;
+      line-height: 1;
+      color: #fff;
+    }
+
+    .hero-stat-lbl {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ════════════════════════════════════════════════════════════ */
+    /* FLAGS */
+    /* ════════════════════════════════════════════════════════════ */
+    .flag-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 12px 16px;
+      flex: 1 1 260px;
+    }
+
+    .flag-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+
+    .flag-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    .flag-desc {
+      font-family: 'Barlow', sans-serif;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    /* ════════════════════════════════════════════════════════════ */
+    /* STAT GRID (advanced) */
+    /* ════════════════════════════════════════════════════════════ */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-cell {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .stat-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: #fff;
+      margin: 4px 0 2px;
+    }
+
+    .stat-rank {
+      font-family: 'Barlow', sans-serif;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* ════════════════════════════════════════════════════════════ */
+    /* ROSTER ROW */
+    /* ════════════════════════════════════════════════════════════ */
+    .roster-row:hover td { background: rgba(232,114,42,0.06); cursor: pointer; }
+
     /* ════════════════════════════════════════════════════════════ */
     /* PLACEHOLDER */
     /* ════════════════════════════════════════════════════════════ */
@@ -294,12 +507,34 @@
       text-align: center;
       color: var(--text-dim);
     }
-    
+
     .placeholder h2 {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 28px;
       margin-bottom: 12px;
       color: #fff;
+    }
+
+    /* ════════════════════════════════════════════════════════════ */
+    /* RESPONSIVE */
+    /* ════════════════════════════════════════════════════════════ */
+    @media (max-width: 1200px) {
+      .grid3 { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .grid2, .grid3 { grid-template-columns: 1fr; }
+      .body { padding: 12px; }
+      .tab { padding: 9px 11px; font-size: 9px; }
+    }
+
+    @media (max-width: 600px) {
+      .hdr-inner { flex-direction: column; align-items: flex-start; }
+      .hdr-right { width: 100%; }
+      .team-select, #psearch { width: 100%; }
+      .tabs { padding: 0 12px; }
+      .hero-panel { flex-direction: column; }
+      .hero-stats { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -317,8 +552,16 @@
       </div>
       <span class="v-badge">JARVIS v4</span>
     </div>
-    
+
     <div class="hdr-right">
+      <!-- Player Search -->
+      <div class="psearch-wrap">
+        <input id="psearch" type="text" placeholder="Search player… (or press /)"
+          oninput="handlePlayerSearch(this.value)">
+        <div id="psearch-results"></div>
+      </div>
+
+      <!-- Team Select -->
       <select class="team-select" id="team-select" onchange="loadTeam(this.value)">
         <option value="">— Select Team —</option>
         <option value="110">Baltimore Orioles</option>
@@ -361,14 +604,14 @@
 <!-- ══════════════════════════════════════════════════════════════ -->
 <div class="tabs-wrap">
   <div class="tabs">
-    <div class="tab on" data-tab="dash" onclick="switchTab('dash')">Dashboard</div>
-    <div class="tab" data-tab="personnel" onclick="switchTab('personnel')">Personnel</div>
-    <div class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</div>
-    <div class="tab" data-tab="profile" onclick="switchTab('profile')">Player Profile</div>
-    <div class="tab" data-tab="prospects" onclick="switchTab('prospects')">Top Prospects</div>
-    <div class="tab" data-tab="notes" onclick="switchTab('notes')">Scout Notes</div>
+    <div class="tab on" data-tab="dash"      onclick="switchTab('dash')">Dashboard</div>
+    <div class="tab"    data-tab="personnel" onclick="switchTab('personnel')">Personnel</div>
+    <div class="tab"    data-tab="analysis"  onclick="switchTab('analysis')">Analysis</div>
+    <div class="tab"    data-tab="profile"   onclick="switchTab('profile')">Player Profile</div>
+    <div class="tab"    data-tab="prospects" onclick="switchTab('prospects')">Top Prospects</div>
+    <div class="tab"    data-tab="notes"     onclick="switchTab('notes')">Scout Notes</div>
     <div class="tab-divider"></div>
-    <div class="tab" data-tab="about" onclick="switchTab('about')">About</div>
+    <div class="tab"    data-tab="about"     onclick="switchTab('about')">About</div>
   </div>
 </div>
 
@@ -382,30 +625,51 @@
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Division Standings</div>
-        <div class="placeholder" id="dash-standings-placeholder">
-          <p>Select a team to view division standings</p>
-        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Team</th>
+              <th>W</th><th>L</th><th>PCT</th><th>GB</th>
+            </tr>
+          </thead>
+          <tbody id="standings-body">
+            <tr><td colspan="5" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+          </tbody>
+        </table>
       </div>
+
       <div class="panel">
-        <div class="panel-title">Win Projection</div>
-        <div class="placeholder" id="dash-winprojection-placeholder">
-          <p>Win projection chart will appear here</p>
-        </div>
+        <div class="panel-title">Active Roster</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th><th style="text-align:left">Name</th><th>Pos</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="roster-body">
+            <tr><td colspan="4" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
-    
+
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Team Offense <span class="pt-badge">2026</span></div>
-        <div class="placeholder" id="dash-offense-placeholder">
-          <p>Offensive stats loading…</p>
-        </div>
+        <table class="data-table">
+          <tbody id="team-offense-body">
+            <tr><td colspan="2" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+          </tbody>
+        </table>
       </div>
+
       <div class="panel">
         <div class="panel-title">Team Pitching <span class="pt-badge">2026</span></div>
-        <div class="placeholder" id="dash-pitching-placeholder">
-          <p>Pitching stats loading…</p>
-        </div>
+        <table class="data-table">
+          <tbody id="team-pitching-body">
+            <tr><td colspan="2" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -415,82 +679,135 @@
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Projected Lineup</div>
-        <div class="placeholder">
-          <p>Lineup data for selected team</p>
-        </div>
+        <div class="placeholder"><p>Select a team on the Dashboard tab first</p></div>
       </div>
       <div class="panel">
         <div class="panel-title">Pitching Staff</div>
-        <div class="placeholder">
-          <p>Pitcher roster and stats</p>
-        </div>
+        <div class="placeholder"><p>Pitcher roster and stats</p></div>
       </div>
     </div>
-    
     <div class="grid2">
       <div class="panel">
-        <div class="panel-title">Active Roster</div>
-        <div class="placeholder">
-          <p>26 active players</p>
-        </div>
+        <div class="panel-title">Hot / Cold</div>
+        <div class="placeholder"><p>Last-10 batting splits</p></div>
       </div>
       <div class="panel">
         <div class="panel-title">Injured List</div>
         <div class="placeholder" id="il-placeholder">
-          <p style="color: var(--green);">✅ No IL entries</p>
-        </div>
-      </div>
-    </div>
-    
-    <div class="grid2">
-      <div class="panel">
-        <div class="panel-title">Hot/Cold</div>
-        <div class="placeholder">
-          <p>Last-10 batting splits</p>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">Starting Pitching Stats</div>
-        <div class="placeholder">
-          <p>SP statistics table</p>
+          <p style="color:var(--green)">✅ No IL entries</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── ANALYSIS ────────────────────────────────────────────────– -->
+  <!-- ── ANALYSIS ────────────────────────────────────────────────── -->
   <div class="pg" id="pg-analysis">
     <div class="grid3">
       <div class="panel">
         <div class="panel-title">Hitting Leaders</div>
-        <div class="placeholder">
-          <p>Top hitters with switchable stats</p>
-        </div>
+        <div class="placeholder"><p>Top hitters with switchable stats</p></div>
       </div>
       <div class="panel">
         <div class="panel-title">Shared Metrics</div>
-        <div class="placeholder">
-          <p>WAR, Fantasy Points, wRC+</p>
-        </div>
+        <div class="placeholder"><p>WAR, Fantasy Points, wRC+</p></div>
       </div>
       <div class="panel">
         <div class="panel-title">Pitching Leaders</div>
-        <div class="placeholder">
-          <p>Top pitchers with switchable stats</p>
-        </div>
+        <div class="placeholder"><p>Top pitchers with switchable stats</p></div>
       </div>
     </div>
   </div>
 
-  <!-- ── PLAYER PROFILE ─────────────────────────────────────────– -->
+  <!-- ── PLAYER PROFILE ─────────────────────────────────────────── -->
   <div class="pg" id="pg-profile">
-    <div class="placeholder">
-      <h2>Player Profile</h2>
-      <p>Select a player to view detailed profile with Savant data, splits, and scouting grades</p>
-    </div>
-  </div>
 
-  <!-- ── PROSPECTS ──────────────────────────────────────────────– -->
+    <!-- Hero card -->
+    <div class="panel hero-panel">
+      <img id="hero-photo" src="" alt="Player photo">
+      <div class="hero-info">
+        <div id="hero-name">— SELECT A PLAYER —</div>
+        <div id="hero-team">Search above to load a player</div>
+        <div class="hero-meta">
+          <span id="hero-pos">—</span>
+          <span id="hero-age">—</span>
+          <span id="hero-bats">—</span>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat-cell">
+          <div class="hero-stat-val" id="stat-avg">.000</div>
+          <div class="hero-stat-lbl">AVG</div>
+        </div>
+        <div class="hero-stat-cell">
+          <div class="hero-stat-val" id="stat-hr">0</div>
+          <div class="hero-stat-lbl">HR</div>
+        </div>
+        <div class="hero-stat-cell">
+          <div class="hero-stat-val" id="stat-rbi">0</div>
+          <div class="hero-stat-lbl">RBI</div>
+        </div>
+        <div class="hero-stat-cell">
+          <div class="hero-stat-val" id="stat-ops">.000</div>
+          <div class="hero-stat-lbl">OPS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Intel flags -->
+    <div class="panel">
+      <div class="panel-title">Intel Flags</div>
+      <div id="flags-container" style="display:flex;flex-wrap:wrap;gap:12px">
+        <div class="flag-card">
+          <div class="flag-icon">🔍</div>
+          <div>
+            <div class="flag-title">Awaiting Player</div>
+            <div class="flag-desc">Search for a player to generate intel flags.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Season stats + Advanced -->
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Season Stats <span class="pt-badge">2026</span></div>
+        <table class="data-table">
+          <tbody id="season-stats-body">
+            <tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px">No player loaded</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Statcast / Advanced</div>
+        <div id="advanced-stats-container">
+          <p style="color:var(--text-dim);text-align:center;padding:20px">No player loaded</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Batting splits -->
+    <div class="panel">
+      <div class="panel-title">Batting Splits</div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>YR</th><th>G</th><th>AB</th><th>H</th>
+              <th>2B</th><th>HR</th><th>RBI</th>
+              <th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th>
+            </tr>
+          </thead>
+          <tbody id="batting-stats-body">
+            <tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:20px">No player loaded</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /pg-profile -->
+
+  <!-- ── PROSPECTS ──────────────────────────────────────────────── -->
   <div class="pg" id="pg-prospects">
     <div class="placeholder">
       <h2>Top Prospects</h2>
@@ -498,7 +815,7 @@
     </div>
   </div>
 
-  <!-- ── SCOUT NOTES ────────────────────────────────────────────– -->
+  <!-- ── SCOUT NOTES ─────────────────────────────────────────────── -->
   <div class="pg" id="pg-notes">
     <div class="placeholder">
       <h2>Scout Notes</h2>
@@ -506,7 +823,7 @@
     </div>
   </div>
 
-  <!-- ── ABOUT ──────────────────────────────────────────────────– -->
+  <!-- ── ABOUT ──────────────────────────────────────────────────── -->
   <div class="pg" id="pg-about">
     <div class="panel">
       <div class="panel-title">About Luke Rumpler</div>
@@ -516,54 +833,76 @@
     </div>
   </div>
 
-</div>
+</div><!-- /body -->
 
 <!-- ══════════════════════════════════════════════════════════════ -->
-<!-- SCRIPTS -->
+<!-- INLINE CORE SCRIPT -->
 <!-- ══════════════════════════════════════════════════════════════ -->
 <script>
   const SEASON = 2026;
   let currentTeam = null;
 
-  /**
-   * Switch between tabs
-   */
+  /* ── TAB SWITCHING ── */
   function switchTab(tabName) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
     document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
-    
     document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('on');
     document.getElementById(`pg-${tabName}`)?.classList.add('on');
   }
 
-  /**
-   * Load team data
-   * CRITICAL: Call updateThemeColors() first
-   */
+  /* ── LOAD TEAM ── */
   async function loadTeam(teamId) {
     if (!teamId) return;
-    
     currentTeam = parseInt(teamId);
-    
-    // Update theme FIRST
+
+    // Apply team colors (defined in js/team-colors.js)
     updateThemeColors(currentTeam);
-    
+
     console.log(`📊 Loading team ${currentTeam}…`);
-    
-    // Load dashboard, personnel, analysis data
-    // (Implementation in next section)
+
+    // Show loading state
+    ['standings-body','roster-body','team-offense-body','team-pitching-body'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">Loading…</td></tr>`;
+    });
+
+    try {
+      const [standingsRes, rosterRes, hittingRes, pitchingRes] = await Promise.all([
+        fetch(`/api/mlb?path=/standings&leagueId=103,104&season=${SEASON}`),
+        fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`),
+        fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=hitting&season=${SEASON}&stats=season&gameType=R`),
+        fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=pitching&season=${SEASON}&stats=season&gameType=R`)
+      ]);
+
+      const [standings, roster, hitting, pitching] = await Promise.all([
+        standingsRes.json(),
+        rosterRes.json(),
+        hittingRes.json(),
+        pitchingRes.json()
+      ]);
+
+      renderStandings(standings, currentTeam);
+      renderRoster(roster);
+      renderTeamOffense(hitting);
+      renderTeamPitching(pitching);
+
+    } catch (err) {
+      console.error('loadTeam error:', err);
+      ['standings-body','roster-body','team-offense-body','team-pitching-body'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px">Error loading data</td></tr>`;
+      });
+    }
   }
 
-  /**
-   * Fetch from MLB API via proxy
-   */
-  async function fetchJSON(endpoint) {
+  /* ── GENERIC FETCH ── */
+  async function fetchJSON(path) {
     try {
-      const res = await fetch(`/api/mlb?path=${endpoint}`);
+      const res = await fetch(`/api/mlb?path=${path}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.error('Fetch error:', err);
+      console.error('fetchJSON error:', err);
       return null;
     }
   }
@@ -571,9 +910,14 @@
   console.log('✅ Dashboard initialized');
 </script>
 
-<!-- Load support modules -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- SUPPORT MODULES — order matters -->
+<!-- ══════════════════════════════════════════════════════════════ -->
 <script src="js/team-colors.js"></script>
-<script src="api/jarvis.js"></script>
+<script src="js/data.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/player.js"></script>
+<script src="js/jarvis.js"></script>
 
 </body>
 </html>
