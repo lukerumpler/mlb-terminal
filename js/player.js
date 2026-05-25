@@ -31,13 +31,19 @@ async function fetchPlayerData(mlbId, year = 2026) {
 /* ── FETCH STATCAST ──────────────────────────────────────────── */
 async function fetchStatcastData(year = 2026) {
   try {
-    const [expectedRes, statcastRes] = await Promise.all([
+    const [expectedRes, statcastRes, batTrackingRes, sprintSpeedRes, oaaRes] = await Promise.all([
       fetch(`/api/savant?endpoint=expected_statistics&year=${year}`),
-      fetch(`/api/savant?endpoint=statcast_leaderboard&year=${year}`)
+      fetch(`/api/savant?endpoint=statcast_leaderboard&year=${year}`),
+      fetch(`/api/savant?endpoint=bat-tracking&seasonStart=${year}&seasonEnd=${year}`),
+      fetch(`/api/savant?endpoint=sprint_speed&year=${year}`),
+      fetch(`/api/savant?endpoint=oaa&year=${year}`)
     ]);
     const expected = await expectedRes.json();
     const statcast = await statcastRes.json();
-    return { expected, statcast };
+    const batTracking = await batTrackingRes.json();
+    const sprintSpeed = await sprintSpeedRes.json();
+    const oaa = await oaaRes.json();
+    return { expected, statcast, batTracking, sprintSpeed, oaa };
   } catch (err) {
     console.error("Statcast fetch failed:", err);
     return { expected: [], statcast: [] };
@@ -53,7 +59,16 @@ function findStatcastPlayer(data, mlbId) {
   const statcast = Array.isArray(data.statcast)
     ? data.statcast.find(p => String(p.player_id) === id) || null
     : null;
-  return { expected, statcast };
+  const batTracking = Array.isArray(data.batTracking)
+    ? data.batTracking.find(p => String(p.player_id) === id) || null
+    : null;
+  const sprintSpeed = Array.isArray(data.sprintSpeed)
+    ? data.sprintSpeed.find(p => String(p.player_id) === id) || null
+    : null;
+  const oaa = Array.isArray(data.oaa)
+    ? data.oaa.find(p => String(p.player_id) === id) || null
+    : null;
+  return { expected, statcast, batTracking, sprintSpeed, oaa };
 }
 
 /* ── MAIN LOAD ───────────────────────────────────────────────── */
@@ -92,19 +107,28 @@ async function loadPlayer() {
 
     if (!playerData) { setHeroError("DATA UNAVAILABLE", ""); return; }
 
-    const { expected, statcast } = findStatcastPlayer(savantData, mlbId);
+    const { expected, statcast, batTracking, sprintSpeed, oaa } = findStatcastPlayer(savantData, mlbId);
+    const scoutingGrades = calculateScoutingGrades(statcast, sprintSpeed, oaa);
+    // Placeholder for actual WAR data, for now using a dummy value
+    const playerStatsForContract = { war: 3.5 }; // This would ideally come from a projection system
+    const contractProjection = projectContract(playerData, playerStatsForContract);
 
     console.log("Player:", playerData?.fullName);
     console.log("Stats:", playerData?.stats?.[0]?.splits?.[0]?.stat);
     console.log("Statcast:", statcast ? "FOUND" : "NOT FOUND");
     console.log("Expected:", expected ? "FOUND" : "NOT FOUND");
+    console.log("Scouting Grades:", scoutingGrades);
+    console.log("Contract Projection:", contractProjection);
 
     renderHero(playerData, statcast);
     renderQuickStats(playerData, statcast);
     renderSeasonStats(playerData);
-    renderFlags(playerData, expected, statcast);
+    renderFlags(playerData, expected, statcast, oaa);
     renderBattingTable(playerData);
     renderAdvanced(expected, statcast);
+    renderScoutingGrades(scoutingGrades);
+    renderContractProjection(contractProjection);
+    renderSeasonProjections(playerData);
     renderTeam(playerData);
 
   } catch (err) {
@@ -181,7 +205,7 @@ function renderSeasonStats(player) {
 }
 
 /* ── FLAGS ───────────────────────────────────────────────────── */
-function renderFlags(player, expected, statcast) {
+function renderFlags(player, expected, statcast, oaa) {
   const container = document.getElementById("flags-container");
   if (!container) return;
   const s = player?.stats?.[0]?.splits?.[0]?.stat || {};
@@ -202,6 +226,12 @@ function renderFlags(player, expected, statcast) {
   if ((s.stolenBases ?? 0) >= 15)
     flags.push({ icon: "🏃", title: "Speed Weapon",
       desc: `${s.stolenBases} stolen bases this season.` });
+  if (oaa?.oaa && oaa.oaa >= 10)
+    flags.push({ icon: "🧤", title: "Elite Defender",
+      desc: `${oaa.oaa} Outs Above Average (OAA) ranks among the league's best.` });
+  else if (oaa?.oaa && oaa.oaa <= -5)
+    flags.push({ icon: "⚠️", title: "Defensive Liability",
+      desc: `${oaa.oaa} Outs Above Average (OAA) indicates below-average defense.` });
   if (expected?.est_ba_minus_ba_diff && expected.est_ba_minus_ba_diff > 0.020)
     flags.push({ icon: "📈", title: "Due For Regression Up",
       desc: `xBA is ${Number(expected.est_ba_minus_ba_diff).toFixed(3)} above actual BA — expect improvement.` });
@@ -240,8 +270,73 @@ function renderBattingTable(player) {
   }).join("");
 }
 
+/* ── 20-80 SCOUTING GRADES ───────────────────────────────────── */
+function calculateScoutingGrades(statcast, sprintSpeed, oaa) {
+  const grades = {};
+  // Example thresholds for 20-80 scale (these are illustrative and can be refined)
+  // Exit Velocity (based on avg_hit_speed)
+  if (statcast?.avg_hit_speed) {
+    if (statcast.avg_hit_speed >= 95) grades.exitVelo = 80;
+    else if (statcast.avg_hit_speed >= 92) grades.exitVelo = 70;
+    else if (statcast.avg_hit_speed >= 89) grades.exitVelo = 60;
+    else if (statcast.avg_hit_speed >= 86) grades.exitVelo = 50;
+    else if (statcast.avg_hit_speed >= 83) grades.exitVelo = 40;
+    else grades.exitVelo = 30;
+  }
+  // Sprint Speed
+  if (sprintSpeed?.sprint_speed) {
+    if (sprintSpeed.sprint_speed >= 30) grades.sprintSpeed = 80;
+    else if (sprintSpeed.sprint_speed >= 29) grades.sprintSpeed = 70;
+    else if (sprintSpeed.sprint_speed >= 28) grades.sprintSpeed = 60;
+    else if (sprintSpeed.sprint_speed >= 27) grades.sprintSpeed = 50;
+    else if (sprintSpeed.sprint_speed >= 26) grades.sprintSpeed = 40;
+    else grades.sprintSpeed = 30;
+  }
+  // Outs Above Average (OAA) - for fielding grade
+  if (oaa?.oaa) {
+    if (oaa.oaa >= 15) grades.fielding = 80;
+    else if (oaa.oaa >= 10) grades.fielding = 70;
+    else if (oaa.oaa >= 5) grades.fielding = 60;
+    else if (oaa.oaa >= 0) grades.fielding = 50;
+    else if (oaa.oaa >= -5) grades.fielding = 40;
+    else grades.fielding = 30;
+  }
+
+  // Other potential grades: Arm Strength, Fielding, Hit Tool, Power, Run, Field
+  // These would require more specific Statcast data or external scouting data.
+
+  return grades;
+}
+
+/* ── CONTRACT PROJECTION ─────────────────────────────────────── */
+function projectContract(player, stats) {
+  // Simplified model: WAR-based projection
+  // This is a very basic model and would need significant refinement for accuracy.
+  const currentAge = player?.currentAge || 25; // Default to 25 if age not available
+  const warPerYear = stats?.war || 2.0; // Placeholder WAR, ideally from a projection system
+  const dollarsPerWar = 8000000; // $8M per WAR, a common estimate
+
+  // Basic aging curve effect (example: WAR declines after age 29)
+  let projectedWar = warPerYear;
+  if (currentAge > 29) {
+    projectedWar = Math.max(0.5, warPerYear - ((currentAge - 29) * 0.2)); // Decline by 0.2 WAR per year after 29
+  }
+
+  const projectedAAV = projectedWar * dollarsPerWar;
+  const years = Math.max(1, 6 - Math.floor((currentAge - 25) / 2)); // Example: longer contracts for younger players
+  const totalValue = projectedAAV * years;
+
+  return {
+    projectedAAV: projectedAAV.toFixed(0),
+    years: years,
+    totalValue: totalValue.toFixed(0),
+    estimatedWar: projectedWar.toFixed(1)
+  };
+}
+
+
 /* ── ADVANCED METRICS ────────────────────────────────────────── */
-function renderAdvanced(expected, statcast) {
+function renderAdvanced(expected, statcast, scoutingGrades, contractProjection) {
   const container = document.getElementById("advanced-stats-container");
   if (!container) return;
   if (!expected && !statcast) {
@@ -274,7 +369,24 @@ function renderAdvanced(expected, statcast) {
       <div class="stat-cell"><div class="stat-label">BB%</div>
         <div class="stat-val">${statcast?.bb_percent != null ? statcast.bb_percent + "%" : "—"}</div>
         <div class="stat-rank">Walk Rate</div></div>
-    </div>`;
+    </div>
+    <div class="panel" style="margin-top: 20px;">
+      <h3 class="panel-title">SCOUTING GRADES (20-80 Scale)</h3>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="stat-label">Exit Velo</div><div class="stat-val">${scoutingGrades?.exitVelo || '—'}</div><div class="stat-rank">Raw Power</div></div>
+        <div class="stat-cell"><div class="stat-label">Sprint Speed</div><div class="stat-val">${scoutingGrades?.sprintSpeed || '—'}</div><div class="stat-rank">Speed</div></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top: 20px;">
+      <h3 class="panel-title">CONTRACT PROJECTION</h3>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="stat-label">Est. AAV</div><div class="stat-val">$${(parseInt(contractProjection?.projectedAAV) / 1000000).toFixed(1)}M</div><div class="stat-rank">Annual Average Value</div></div>
+        <div class="stat-cell"><div class="stat-label">Years</div><div class="stat-val">${contractProjection?.years || '—'}</div><div class="stat-rank">Projected Years</div></div>
+        <div class="stat-cell"><div class="stat-label">Total Value</div><div class="stat-val">$${(parseInt(contractProjection?.totalValue) / 1000000).toFixed(1)}M</div><div class="stat-rank">Total Contract Value</div></div>
+        <div class="stat-cell"><div class="stat-label">Est. WAR</div><div class="stat-val">${contractProjection?.estimatedWar || '—'}</div><div class="stat-rank">Projected WAR per Season</div></div>
+      </div>
+    </div>
+    `;
 }
 
 /* ── TEAM STATS — FIXED API CALLS ────────────────────────────── */
@@ -400,4 +512,54 @@ function selectPlayerByName(fullName) {
   const input = document.querySelector("#psearch, .cmd-bar input");
   if (input) input.value = fullName;
   loadPlayer();
+}
+
+/* ── RENDER SCOUTING GRADES ──────────────────────────────────── */
+function renderScoutingGrades(scoutingGrades) {
+  const container = document.getElementById("scouting-grades-container");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="stat-cell"><div class="stat-label">Exit Velo</div><div class="stat-val">${scoutingGrades?.exitVelo || '—'}</div><div class="stat-rank">Raw Power</div></div>
+    <div class="stat-cell"><div class="stat-label">Sprint Speed</div><div class="stat-val">${scoutingGrades?.sprintSpeed || '—'}</div><div class="stat-rank">Speed</div></div>
+    <div class="stat-cell"><div class="stat-label">Fielding</div><div class="stat-val">${scoutingGrades?.fielding || '—'}</div><div class="stat-rank">Defense (OAA)</div></div>
+  `;
+}
+
+/* ── RENDER CONTRACT PROJECTION ──────────────────────────────── */
+function renderContractProjection(contractProjection) {
+  const container = document.getElementById("contract-projection-container");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="stat-cell"><div class="stat-label">Est. AAV</div><div class="stat-val">$${(parseInt(contractProjection?.projectedAAV) / 1000000).toFixed(1)}M</div><div class="stat-rank">Annual Average Value</div></div>
+    <div class="stat-cell"><div class="stat-label">Years</div><div class="stat-val">${contractProjection?.years || '—'}</div><div class="stat-rank">Projected Years</div></div>
+    <div class="stat-cell"><div class="stat-label">Total Value</div><div class="stat-val">$${(parseInt(contractProjection?.totalValue) / 1000000).toFixed(1)}M</div><div class="stat-rank">Total Contract Value</div></div>
+    <div class="stat-cell"><div class="stat-label">Est. WAR</div><div class="stat-val">${contractProjection?.estimatedWar || '—'}</div><div class="stat-rank">Projected WAR per Season</div></div>
+  `;
+}
+
+/* ── RENDER SEASON PROJECTIONS ───────────────────────────────── */
+function renderSeasonProjections(playerData) {
+  const container = document.getElementById("season-projections-container");
+  if (!container) return;
+
+  // Placeholder for actual season projection data. For now, using dummy values.
+  const dummyProjections = {
+    avg: ".290",
+    hr: "45",
+    rbi: "110",
+    war: "6.5"
+  };
+
+  container.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="stat-label">2026 AVG</div><div class="stat-val">${dummyProjections.avg}</div><div class="stat-rank">↑ +10 pts</div></div>
+      <div class="stat-cell"><div class="stat-label">2026 HR</div><div class="stat-val">${dummyProjections.hr}</div><div class="stat-rank">+3 vs last</div></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="stat-label">2026 RBI</div><div class="stat-val">${dummyProjections.rbi}</div><div class="stat-rank">+5 RBIs</div></div>
+      <div class="stat-cell"><div class="stat-label">2026 WAR</div><div class="stat-val">${dummyProjections.war}</div><div class="stat-rank">All-Star Range</div></div>
+    </div>
+  `;
 }
