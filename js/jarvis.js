@@ -1,14 +1,11 @@
 /* JARVIS v5 — Ticker, Logo, Favicon */
 
-// Use a longer interval (5 minutes) to save data, unless the user manually refreshes
-const TICKER_INTERVAL = 300000; 
+const TICKER_INTERVAL = 300000; // 5 minutes
 
 async function loadScoreTicker() {
   try {
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-    
-    // Only fetch if the tab is visible to save data
     if (document.hidden) return;
 
     const res  = await fetch(`/api/mlb?path=/schedule&sportId=1&date=${today}&hydrate=team,linescore`);
@@ -18,7 +15,7 @@ async function loadScoreTicker() {
     if (!track) return;
     
     if (!games.length) { 
-      track.innerHTML = `<span class="score-item">NO GAMES TODAY</span>`; 
+      track.innerHTML = `<span class="score-item" style="color:var(--text-dim)">NO GAMES TODAY</span>`; 
       return; 
     }
     
@@ -27,13 +24,17 @@ async function loadScoreTicker() {
       const home  = g.teams?.home?.team?.abbreviation || "—";
       const awayR = g.teams?.away?.score ?? "";
       const homeR = g.teams?.home?.score ?? "";
-      const score = (awayR !== "" && homeR !== "") ? `<strong>${awayR}–${homeR}</strong>` : "vs";
+      const score = (awayR !== "" && homeR !== "") 
+        ? `<strong style="color:var(--orange)">${awayR}–${homeR}</strong>` 
+        : `<span style="color:var(--text-dim)">vs</span>`;
+      
       const state = g.status?.detailedState === "Final"
-        ? `<span style="color:var(--text-dim)">F</span>`
+        ? `<span style="color:var(--text-dim);font-size:10px;margin-left:4px">F</span>`
         : g.linescore?.currentInningOrdinal
-          ? `<span style="color:var(--green)">${g.linescore.currentInningOrdinal}</span>` : "";
-      return `<span class="score-item">${away} ${score} ${home} ${state}</span>`;
-    }).join('<span class="score-item" style="opacity:.3">·</span>');
+          ? `<span style="color:var(--green);font-size:10px;margin-left:4px">${g.linescore.currentInningOrdinal}</span>` : "";
+      
+      return `<span class="score-item" style="color:#fff;font-weight:600">${away} ${score} ${home}${state}</span>`;
+    }).join('<span class="score-item" style="opacity:.2"> | </span>');
     
     track.innerHTML = items + items;
   } catch(e) { 
@@ -55,7 +56,6 @@ function refreshData() {
   loadScoreTicker();
 }
 
-/* Favicon — kills the 404 */
 (function() {
   const l = document.createElement("link");
   l.rel = "icon";
@@ -65,7 +65,16 @@ function refreshData() {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadScoreTicker();
-  // Optimized interval: 5 minutes instead of 1 minute
   setInterval(loadScoreTicker, TICKER_INTERVAL);
-  console.log("✅ JARVIS ticker initialized (Optimized)");
+  
+  // AUTO-SELECT PADRES (Team ID: 135)
+  setTimeout(() => {
+    const sel = document.getElementById("team-select");
+    if (sel) {
+      sel.value = "135";
+      if (typeof loadTeam === "function") loadTeam("135");
+    }
+  }, 500);
+
+  console.log("✅ JARVIS ticker initialized (High Visibility)");
 });

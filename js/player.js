@@ -3,6 +3,14 @@
    PLAYER LOGIC: search, fetch, render, advanced metrics
    ============================================================ */
 
+/* ── UTILS ─────────────────────────────────────────────────── */
+function formatStat(val, decimals = 3) {
+  if (val === null || val === undefined || isNaN(val)) return "—";
+  const num = Number(val).toFixed(decimals);
+  // Remove leading zero for batting averages (e.g., 0.300 -> .300)
+  return num.startsWith("0.") ? num.substring(1) : num;
+}
+
 /* ── SEARCH ─────────────────────────────────────────────────── */
 async function searchPlayer(name) {
   try {
@@ -30,12 +38,10 @@ async function fetchPlayerData(mlbId, year = 2026) {
 }
 
 /* ── FETCH STATCAST ──────────────────────────────────────────── */
-// Global cache to avoid re-fetching heavy Statcast data multiple times in one session
 let _statcastCache = null;
 
 async function fetchStatcastData(year = 2026) {
   if (_statcastCache) return _statcastCache;
-  
   try {
     const [expectedRes, statcastRes, batTrackingRes, sprintSpeedRes, oaaRes] = await Promise.all([
       fetch(`/api/savant?endpoint=expected_statistics&year=${year}`),
@@ -104,12 +110,9 @@ async function loadPlayer() {
 
     const { expected, statcast, batTracking, sprintSpeed, oaa } = findStatcastPlayer(savantData, mlbId);
     
-    // Calculate Advanced Metrics
     const advancedMetrics = calculateAdvancedMetrics(playerData, expected, statcast, oaa);
     const scoutingGrades    = calculateScoutingGrades(statcast, sprintSpeed, oaa);
     const contractProjection = projectContract(playerData, { war: advancedMetrics.projWar });
-
-    console.log("✅ Player:", playerData?.fullName);
 
     renderHero(playerData, statcast);
     renderQuickStats(playerData, statcast);
@@ -132,8 +135,7 @@ async function loadPlayer() {
 function calculateAdvancedMetrics(player, expected, statcast, oaa) {
   const s = player?.stats?.[0]?.splits?.[0]?.stat || {};
   
-  // 1. Fantasy Points (Standard 5x5 or Points League approximation)
-  // (1pt/TB, 1pt/R, 1pt/RBI, 1pt/BB, 1pt/SB, -0.5pt/K)
+  // Fantasy Points (Standard Points League)
   const hits = s.hits || 0;
   const dbls = s.doubles || 0;
   const trpl = s.triples || 0;
@@ -141,11 +143,10 @@ function calculateAdvancedMetrics(player, expected, statcast, oaa) {
   const tb   = (hits - dbls - trpl - hr) + (dbls * 2) + (trpl * 3) + (hr * 4);
   const fantasyPoints = (tb) + (s.runs || 0) + (s.rbi || 0) + (s.baseOnBalls || 0) + (s.stolenBases || 0) - ((s.strikeOuts || 0) * 0.5);
   
-  // 2. Projected WAR (Simple regression based on xwOBA and Defense)
-  // Base WAR from xwOBA (League avg is ~0.320)
+  // Projected WAR (xwOBA + Defense regression)
   const xwOBA = expected?.est_woba || 0.320;
-  const defensiveValue = (oaa?.oaa || 0) * 0.5; // OAA to WAR weight
-  let projWar = ((xwOBA - 0.320) * 20) + defensiveValue + 2.0; // 2.0 is baseline for regular
+  const defensiveValue = (oaa?.oaa || 0) * 0.5;
+  let projWar = ((xwOBA - 0.320) * 20) + defensiveValue + 2.0;
   projWar = Math.max(0, projWar);
 
   return {
@@ -155,46 +156,28 @@ function calculateAdvancedMetrics(player, expected, statcast, oaa) {
   };
 }
 
-/* ── HERO STATE HELPERS ──────────────────────────────────────── */
-function setHeroLoading() {
-  const n = document.getElementById("hero-name");
-  const t = document.getElementById("hero-team");
-  if (n) n.textContent = "LOADING...";
-  if (t) t.textContent = "FETCHING DATA";
-}
-function setHeroError(msg, sub) {
-  const n = document.getElementById("hero-name");
-  const t = document.getElementById("hero-team");
-  if (n) n.textContent = msg;
-  if (t) t.textContent = sub;
-}
-
 /* ── HERO ────────────────────────────────────────────────────── */
 function renderHero(player, statcast) {
   if (!player) return;
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-
   set("hero-name", player.fullName?.toUpperCase() || "UNKNOWN");
   set("hero-team", player.currentTeam?.name?.toUpperCase() || "—");
   set("hero-pos",  player.primaryPosition?.abbreviation || "—");
   set("hero-age",  player.currentAge ? `AGE ${player.currentAge}` : "—");
   set("hero-bats", (player.batSide?.code && player.pitchHand?.code)
     ? `B/T: ${player.batSide.code}/${player.pitchHand.code}` : "—");
-
   const photo = document.getElementById("hero-photo");
-  if (photo) {
-    photo.src = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${player.id}/headshot/67/current`;
-  }
+  if (photo) photo.src = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${player.id}/headshot/67/current`;
 }
 
 /* ── QUICK STATS ─────────────────────────────────────────────── */
 function renderQuickStats(player, statcast) {
   const s   = player?.stats?.[0]?.splits?.[0]?.stat || {};
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set("stat-avg", s.avg       ? Number(s.avg).toFixed(3) : ".000");
+  set("stat-avg", formatStat(s.avg));
   set("stat-hr",  s.homeRuns  ?? "0");
   set("stat-rbi", s.rbi       ?? "0");
-  set("stat-ops", s.ops       ? Number(s.ops).toFixed(3) : ".000");
+  set("stat-ops", formatStat(s.ops));
 }
 
 /* ── SEASON STATS TABLE ──────────────────────────────────────── */
@@ -206,43 +189,16 @@ function renderSeasonStats(player) {
     ["Games",        s.gamesPlayed  ?? "—"],
     ["At Bats",      s.atBats       ?? "—"],
     ["Hits",         s.hits         ?? "—"],
-    ["Doubles",      s.doubles      ?? "—"],
     ["Home Runs",    s.homeRuns     ?? "—"],
     ["RBI",          s.rbi          ?? "—"],
-    ["AVG",          s.avg          ? Number(s.avg).toFixed(3)  : "—"],
-    ["OBP",          s.obp          ? Number(s.obp).toFixed(3)  : "—"],
-    ["SLG",          s.slg          ? Number(s.slg).toFixed(3)  : "—"],
-    ["OPS",          s.ops          ? Number(s.ops).toFixed(3)  : "—"]
+    ["AVG",          formatStat(s.avg)],
+    ["OBP",          formatStat(s.obp)],
+    ["SLG",          formatStat(s.slg)],
+    ["OPS",          formatStat(s.ops)]
   ];
   tbody.innerHTML = rows.map(([label, value]) =>
     `<tr><td>${label}</td><td style="font-family:'Bebas Neue',sans-serif;font-size:18px">${value}</td><td style="color:var(--text-dim)">—</td></tr>`
   ).join("");
-}
-
-/* ── FLAGS ───────────────────────────────────────────────────── */
-function renderFlags(player, expected, statcast, oaa) {
-  const container = document.getElementById("flags-container");
-  if (!container) return;
-  const s     = player?.stats?.[0]?.splits?.[0]?.stat || {};
-  const flags = [];
-
-  if (expected?.est_woba && expected.est_woba > 0.400)
-    flags.push({ icon: "🔥", title: "Elite xwOBA", desc: `${Number(expected.est_woba).toFixed(3)} xwOBA.` });
-  if (statcast?.avg_hit_speed && statcast.avg_hit_speed > 92)
-    flags.push({ icon: "💥", title: "Hard Contact", desc: `${statcast.avg_hit_speed} mph Avg EV.` });
-  if (statcast?.brl_percent && statcast.brl_percent > 10)
-    flags.push({ icon: "🎯", title: "Barrel Rate", desc: `${statcast.brl_percent}% barrel rate.` });
-  if ((s.homeRuns ?? 0) >= 20)
-    flags.push({ icon: "💣", title: "Power Threat", desc: `${s.homeRuns} HRs.` });
-
-  container.innerHTML = flags.map(f => `
-    <div class="flag-card">
-      <div class="flag-icon">${f.icon}</div>
-      <div>
-        <div class="flag-title">${f.title}</div>
-        <div class="flag-desc">${f.desc}</div>
-      </div>
-    </div>`).join("");
 }
 
 /* ── BATTING TABLE ───────────────────────────────────────────── */
@@ -260,10 +216,24 @@ function renderBattingTable(player) {
       <td>${split.season || "—"}</td>
       <td>${s.gamesPlayed ?? "—"}</td><td>${s.atBats ?? "—"}</td>
       <td>${s.hits ?? "—"}</td><td>${s.homeRuns ?? "—"}</td>
-      <td>${s.avg ? Number(s.avg).toFixed(3) : "—"}</td>
-      <td>${s.ops ? Number(s.ops).toFixed(3) : "—"}</td>
+      <td>${formatStat(s.avg)}</td>
+      <td>${formatStat(s.ops)}</td>
     </tr>`;
   }).join("");
+}
+
+/* ── HERO HELPERS ────────────────────────────────────────────── */
+function setHeroLoading() {
+  const n = document.getElementById("hero-name");
+  const t = document.getElementById("hero-team");
+  if (n) n.textContent = "LOADING...";
+  if (t) t.textContent = "FETCHING DATA";
+}
+function setHeroError(msg, sub) {
+  const n = document.getElementById("hero-name");
+  const t = document.getElementById("hero-team");
+  if (n) n.textContent = msg;
+  if (t) t.textContent = sub;
 }
 
 /* ── 20-80 SCOUTING GRADES ───────────────────────────────────── */
@@ -298,7 +268,7 @@ function projectContract(player, stats) {
   };
 }
 
-/* ── ADVANCED METRICS RENDER ─────────────────────────────────── */
+/* ── RENDERERS ───────────────────────────────────────────────── */
 function renderAdvanced(expected, statcast, scoutingGrades, contractProjection, advanced) {
   const container = document.getElementById("advanced-stats-container");
   if (!container) return;
@@ -311,7 +281,6 @@ function renderAdvanced(expected, statcast, scoutingGrades, contractProjection, 
     </div>`;
 }
 
-/* ── SCOUTING GRADES RENDER ──────────────────────────────────── */
 function renderScoutingGrades(scoutingGrades) {
   const container = document.getElementById("scouting-grades-container");
   if (!container) return;
@@ -322,7 +291,6 @@ function renderScoutingGrades(scoutingGrades) {
     <div class="stat-cell"><div class="stat-label">Defense</div><div class="stat-val" style="color:${color(scoutingGrades.fielding)}">${scoutingGrades.fielding}</div></div>`;
 }
 
-/* ── CONTRACT PROJECTION RENDER ──────────────────────────────── */
 function renderContractProjection(contractProjection) {
   const container = document.getElementById("contract-projection-container");
   if (!container) return;
@@ -332,7 +300,6 @@ function renderContractProjection(contractProjection) {
     <div class="stat-cell"><div class="stat-label">Total</div><div class="stat-val">$${(contractProjection.totalValue/1e6).toFixed(0)}M</div></div>`;
 }
 
-/* ── SEASON PROJECTIONS RENDER ───────────────────────────────── */
 function renderSeasonProjections(playerData, advanced) {
   const container = document.getElementById("season-projections-container");
   if (!container) return;
@@ -343,22 +310,44 @@ function renderSeasonProjections(playerData, advanced) {
     </div>`;
 }
 
-/* ── TEAM STATS ──────────────────────────────────────────────── */
+function renderFlags(player, expected, statcast, oaa) {
+  const container = document.getElementById("flags-container");
+  if (!container) return;
+  const s = player?.stats?.[0]?.splits?.[0]?.stat || {};
+  const flags = [];
+  if (expected?.est_woba && expected.est_woba > 0.400) flags.push({ icon: "🔥", title: "Elite xwOBA", desc: `${formatStat(expected.est_woba)} xwOBA.` });
+  if (statcast?.avg_hit_speed && statcast.avg_hit_speed > 92) flags.push({ icon: "💥", title: "Hard Contact", desc: `${statcast.avg_hit_speed} mph Avg EV.` });
+  if (statcast?.brl_percent && statcast.brl_percent > 10) flags.push({ icon: "🎯", title: "Barrel Rate", desc: `${statcast.brl_percent}% barrel rate.` });
+  container.innerHTML = flags.map(f => `<div class="flag-card"><div class="flag-icon">${f.icon}</div><div><div class="flag-title">${f.title}</div><div class="flag-desc">${f.desc}</div></div></div>`).join("");
+}
+
 async function renderTeam(player) {
   if (!player) return;
   const teamId = player.currentTeam?.id;
-  if (!teamId) return;
-
-  // This calls the global loadTeam in index.html to populate Personnel/Analysis tabs
-  if (typeof loadTeam === "function") {
-    loadTeam(teamId);
-  }
+  if (teamId && typeof loadTeam === "function") loadTeam(teamId);
 }
 
-/* ── SELECT PLAYER BY NAME ───────────────────────────────────── */
 function selectPlayerByName(fullName) {
   const input = document.getElementById("psearch");
   if (input) input.value = fullName;
   if (typeof switchTab === "function") switchTab("profile");
   loadPlayer();
+}
+
+/* ── FUTURE FRAMEWORK: COLLEGE & MINOR LEAGUES ──────────────── */
+// Framework for college data
+async function getCollegeMatches() {
+  if (typeof rapidFetch !== "function") return [];
+  return await rapidFetch("/matches");
+}
+
+// Framework for minor league data
+async function getMinorLeagueStats(playerId, year = 2026) {
+  try {
+    const res = await fetch(`/api/mlb?path=/people/${playerId}/stats?stats=season&group=hitting&season=${year}&sportId=11,12,13,14`);
+    return await res.json();
+  } catch (err) {
+    console.error("Minor league fetch failed:", err);
+    return null;
+  }
 }

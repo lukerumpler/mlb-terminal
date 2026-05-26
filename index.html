@@ -238,10 +238,9 @@
             <button class="ldr-tab on" data-lstat="avg">AVG</button>
             <button class="ldr-tab" data-lstat="hr">HR</button>
             <button class="ldr-tab" data-lstat="rbi">RBI</button>
-            <button class="ldr-tab" data-lstat="hits">HITS</button>
-            <button class="ldr-tab" data-lstat="sb">SB</button>
             <button class="ldr-tab" data-lstat="ops">OPS</button>
-            <button class="ldr-tab" data-lstat="obp">OBP</button>
+            <button class="ldr-tab" data-lstat="fpts">FPTS</button>
+            <button class="ldr-tab" data-lstat="pwar">WAR</button>
             <button class="ldr-tab" data-lstat="wins">WINS</button>
             <button class="ldr-tab" data-lstat="era">ERA</button>
             <button class="ldr-tab" data-lstat="so">SO</button>
@@ -493,14 +492,10 @@
 </div><!-- /body -->
 
 <!-- ══════════════════════════════════════════════════════════════
-     COMMAND BAR
+     DEVELOPER CONSOLE
 ══════════════════════════════════════════════════════════════ -->
-<div class="command-bar">
-  <span class="cmd-prompt">JARVIS ></span>
-  <input type="text" class="cmd-input"
-         placeholder="Enter command (e.g., 'search Judge', 'help')"
-         onkeydown="handleCommand(event)">
-  <span class="cmd-help">CTRL+K to focus · v5.0</span>
+<div id="dev-console" style="display:none;padding:10px;background:rgba(0,0,0,0.8);border-top:1px solid var(--orange);font-family:monospace;font-size:12px;color:var(--green)">
+  JARVIS v5 Dev Console: Framework Loaded.
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -586,14 +581,14 @@ async function loadTeam(teamId) {
 function renderTeamOffenseCards(hittingData) {
   const s = hittingData?.stats?.[0]?.splits?.[0]?.stat || {};
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set('off-avg',  s.avg        ? Number(s.avg).toFixed(3)  : '—');
-  set('off-ops',  s.ops        ? Number(s.ops).toFixed(3)  : '—');
+  set('off-avg',  fmt(s.avg, 3));
+  set('off-ops',  fmt(s.ops, 3));
   set('off-hr',   s.homeRuns   ?? '—');
   set('off-rbi',  s.rbi        ?? '—');
-  set('off-obp',  s.obp        ? Number(s.obp).toFixed(3)  : '—');
+  set('off-obp',  fmt(s.obp, 3));
   set('off-runs', s.runs       ?? '—');
   set('off-sb',   s.stolenBases ?? '—');
-  set('off-slg',  s.slg        ? Number(s.slg).toFixed(3)  : '—');
+  set('off-slg',  fmt(s.slg, 3));
 }
 
 function renderTeamPitchingCards(pitchingData) {
@@ -658,7 +653,7 @@ async function renderLeaders(rosterData, stat) {
     container.innerHTML = valid.map((p, i) => {
       const photo = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${p.id}/headshot/67/current`;
       const displayVal = ['avg','obp','slg','era'].includes(stat) && !['era'].includes(stat)
-        ? (parseFloat(p.stat) ? Number(p.stat).toFixed(3) : p.stat)
+        ? fmt(p.stat, 3)
         : p.stat;
       const isFirst = i === 0;
       return `
@@ -680,12 +675,32 @@ async function renderLeaders(rosterData, stat) {
 }
 
 function getLeaderStat(s, stat) {
+  // Fantasy Points Calculation
+  const hits = s.hits || 0;
+  const dbls = s.doubles || 0;
+  const trpl = s.triples || 0;
+  const hr   = s.homeRuns || 0;
+  const tb   = (hits - dbls - trpl - hr) + (dbls * 2) + (trpl * 3) + (hr * 4);
+  const fpts = (tb) + (s.runs || 0) + (s.rbi || 0) + (s.baseOnBalls || 0) + (s.stolenBases || 0) - ((s.strikeOuts || 0) * 0.5);
+  
+  // Simple Projected WAR for leaders
+  const pwar = (s.ops || 0) > 0 ? ((s.ops - 0.750) * 10) + 1.0 : 0;
+
   const map = {
     avg: s.avg, hr: s.homeRuns, rbi: s.rbi, hits: s.hits,
     sb: s.stolenBases, ops: s.ops, obp: s.obp,
+    fpts: fpts.toFixed(0),
+    pwar: pwar.toFixed(1),
     wins: s.wins, era: s.era, so: s.strikeOuts
   };
   return map[stat] ?? null;
+}
+
+// Helper to format numbers (remove leading zero)
+function fmt(val, decimals = 3) {
+  if (val === null || val === undefined) return '—';
+  let s = Number(val).toFixed(decimals);
+  return s.startsWith('0.') ? s.substring(1) : s;
 }
 
 // Wire leaders tabs
