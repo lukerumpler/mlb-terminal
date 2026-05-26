@@ -552,11 +552,11 @@ async function loadTeam(teamId) {
 
   try {
     const [standingsRes, rosterRes, hittingRes, pitchingRes, teamRes] = await Promise.all([
-      fetch(`/api/mlb?path=/standings&leagueId=103,104&season=${SEASON}`),
-      fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`),
-      fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=hitting&season=${SEASON}&stats=season&gameType=R`),
-      fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=pitching&season=${SEASON}&stats=season&gameType=R`),
-      fetch(`/api/mlb?path=/teams/${currentTeam}?season=${SEASON}`)
+      fetch(`https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=${SEASON}`),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${currentTeam}/roster?rosterType=active&season=${SEASON}`),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${currentTeam}/stats?group=hitting&season=${SEASON}&stats=season&gameType=R`),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${currentTeam}/stats?group=pitching&season=${SEASON}&stats=season&gameType=R`),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${currentTeam}?season=${SEASON}`)
     ]);
 
     const [standings, roster, hitting, pitching, teamData] = await Promise.all([
@@ -644,7 +644,7 @@ async function renderLeaders(rosterData, stat) {
 
     const results = await Promise.all(players.map(async p => {
       try {
-        const res = await fetch(`/api/mlb?path=/people/${p.person.id}&hydrate=stats(type=season,group=${statGroup},season=${SEASON}),currentTeam`);
+        const res = await fetch(`https://statsapi.mlb.com/api/v1/people/${p.person.id}?hydrate=stats(type=season,group=${statGroup},season=${SEASON}),currentTeam`);
         const data = await res.json();
         const person = data.people?.[0];
         const s = person?.stats?.[0]?.splits?.[0]?.stat || {};
@@ -724,13 +724,56 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.ldr-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       if (!currentTeam) return;
-      // Re-use stored roster - fetch again
-      fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`)
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${currentTeam}/roster?rosterType=active&season=${SEASON}`)
         .then(r => r.json())
         .then(data => renderLeaders(data, btn.dataset.lstat))
         .catch(console.error);
     });
   });
+
+  // ── Live Score Ticker ──────────────────────────────────────────
+  async function loadScoreTicker() {
+    const track = document.getElementById('score-track');
+    if (!track) return;
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=linescore`);
+      const data = await res.json();
+      const games = data.dates?.[0]?.games || [];
+      if (!games.length) {
+        track.innerHTML = '<span class="score-item">NO MLB GAMES TODAY</span>';
+        return;
+      }
+      const items = games.map(g => {
+        const away = g.teams?.away;
+        const home = g.teams?.home;
+        const st   = g.status?.detailedState || '';
+        const aName = away?.team?.abbreviation || away?.team?.name || '—';
+        const hName = home?.team?.abbreviation || home?.team?.name || '—';
+        const aScore = away?.score ?? '';
+        const hScore = home?.score ?? '';
+        const inning = g.linescore?.currentInningOrdinal || '';
+        const half   = g.linescore?.inningHalf?.slice(0,3).toUpperCase() || '';
+        const stl    = st.toLowerCase();
+        const stLabel = stl.includes('final')    ? 'FINAL'
+                      : stl.includes('progress') ? `${half} ${inning}`.trim()
+                      : stl.includes('warmup') || stl.includes('pre-game') ? 'PRE'
+                      : st.toUpperCase().slice(0, 12);
+        const scoreStr = (aScore !== '' && hScore !== '') ? `${aScore}–${hScore}` : '';
+        const display = scoreStr
+          ? `<strong>${aName}</strong> ${scoreStr} <strong>${hName}</strong>`
+          : `${aName} vs ${hName}`;
+        return `<span class="score-item">${display} <span style="color:var(--orange);font-size:10px">${stLabel}</span></span>`;
+      });
+      track.innerHTML = items.join('<span class="score-item" style="color:var(--orange);padding:0 8px">·</span>');
+    } catch (e) {
+      console.warn('Score ticker error:', e);
+      const track = document.getElementById('score-track');
+      if (track) track.innerHTML = '<span class="score-item">SCORES UNAVAILABLE</span>';
+    }
+  }
+  loadScoreTicker();
+  setInterval(loadScoreTicker, 60000); // refresh every 60s
 });
 
 function renderStandings(data, currentTeamId) {
@@ -797,7 +840,7 @@ async function renderPersonnel(rosterData) {
   // Fetch quick stats for each personnel member
   const results = await Promise.all(hitters.concat(pitchers).map(async p => {
     try {
-      const res = await fetch(`/api/mlb?path=/people/${p.person.id}&hydrate=stats(type=season,group=${p.position.type==='Pitcher'?'pitching':'hitting'},season=${SEASON})`);
+      const res = await fetch(`https://statsapi.mlb.com/api/v1/people/${p.person.id}?hydrate=stats(type=season,group=${p.position.type==='Pitcher'?'pitching':'hitting'},season=${SEASON})`);
       const data = await res.json();
       const s = data.people?.[0]?.stats?.[0]?.splits?.[0]?.stat || {};
       return { id: p.person.id, name: p.person.fullName, pos: p.position.abbreviation, isP: p.position.type==='Pitcher', s };
@@ -811,32 +854,96 @@ async function renderPersonnel(rosterData) {
       <td>${fmt(r.s.avg, 3)}</td><td>${fmt(r.s.ops, 3)}</td>
     </tr>`).join('');
 
-  sBody.innerHTML = results.filter(r => r && r.isP).map(r => `
+  sBody.innerHTML = results.filter(r => r && r.isP).map(r => {
+    const k9 = r.s.strikeoutsPer9Inn ? Number(r.s.strikeoutsPer9Inn).toFixed(2) : '—';
+    return `
     <tr class="roster-row" onclick="selectPlayerByName('${r.name.replace(/'/g,"\\'")}')">
       <td>${r.pos}</td>
       <td><strong>${r.name}</strong></td>
-      <td>${r.s.era ? r.s.era.toFixed(2) : '—.——'}</td><td>${fmt(r.s.whip, 3)}</td>
-    </tr>`).join('');
+      <td>${r.s.era ? Number(r.s.era).toFixed(2) : '—.——'}</td>
+      <td>${k9}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function renderAnalysis(rosterData) {
   const hContainer = document.getElementById('adv-hitting-leaders');
   const pContainer = document.getElementById('adv-pitching-leaders');
   if (!hContainer || !pContainer) return;
-  
-  hContainer.innerHTML = `
-    <div style="padding:15px;background:rgba(255,255,255,0.03);border-radius:8px">
-      <div style="color:var(--orange);font-weight:bold;margin-bottom:10px">Statcast Analysis</div>
-      <p style="font-size:12px;color:var(--text-dim)">Aggregating exit velocity, barrel rates, and xwOBA for current roster...</p>
-    </div>`;
-    
-  pContainer.innerHTML = `
-    <div style="padding:15px;background:rgba(255,255,255,0.03);border-radius:8px">
-      <div style="color:var(--orange);font-weight:bold;margin-bottom:10px">Pitching Metrics</div>
-      <p style="font-size:12px;color:var(--text-dim)">Calculating Stuff+, Location+, and Pitch Movement deltas...</p>
-    </div>`;
 
-  // Future: Fetch from /players/batch to get advanced metrics for all
+  hContainer.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-dim)">Loading hitting metrics…</div>';
+  pContainer.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-dim)">Loading pitching metrics…</div>';
+
+  const roster = rosterData.roster || [];
+  const hitters  = roster.filter(p => p.position?.type !== 'Pitcher').slice(0, 10);
+  const pitchers = roster.filter(p => p.position?.type === 'Pitcher').slice(0, 10);
+
+  async function fetchStat(personId, group) {
+    try {
+      const res = await fetch(`https://statsapi.mlb.com/api/v1/people/${personId}?hydrate=stats(type=season,group=${group},season=${SEASON})`);
+      const data = await res.json();
+      return data.people?.[0]?.stats?.[0]?.splits?.[0]?.stat || {};
+    } catch { return {}; }
+  }
+
+  // Hitting: OPS, FPTS, Proj. WAR
+  const hResults = await Promise.all(hitters.map(async p => {
+    const s = await fetchStat(p.person.id, 'hitting');
+    const hits = s.hits||0, dbls=s.doubles||0, trpl=s.triples||0, hr=s.homeRuns||0;
+    const tb   = (hits-dbls-trpl-hr)+(dbls*2)+(trpl*3)+(hr*4);
+    const fpts = tb+(s.runs||0)+(s.rbi||0)+(s.baseOnBalls||0)+(s.stolenBases||0)-((s.strikeOuts||0)*0.5);
+    const ops  = parseFloat(s.ops)||0;
+    const pwar = ops>0 ? ((ops-0.750)*10)+1.0 : 0;
+    return { id:p.person.id, name:p.person.fullName, pos:p.position?.abbreviation||'—',
+             ops, fpts:fpts.toFixed(0), pwar:pwar.toFixed(1),
+             avg:s.avg, hr:s.homeRuns||0 };
+  }));
+
+  const topByOps = [...hResults].filter(r=>r.ops>0).sort((a,b)=>b.ops-a.ops).slice(0,6);
+  const makeHRow = (r,i,stat,val) => {
+    const photo = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_40,q_auto:best/v1/people/${r.id}/headshot/67/current`;
+    return `<div class="leader-row" onclick="selectPlayerByName('${r.name.replace(/'/g,"\\'")}')">
+      <div class="leader-rank">${i+1}</div>
+      <img class="leader-photo" src="${photo}" onerror="this.style.display='none'">
+      <div class="leader-info"><div class="leader-name">${r.name}</div><div class="leader-pos">${r.pos}</div></div>
+      <div class="leader-val">${val}</div>
+    </div>`;
+  };
+
+  hContainer.innerHTML = `
+    <div style="color:var(--orange);font-size:11px;font-weight:700;padding:8px 12px 4px;letter-spacing:1px">OPS LEADERS</div>
+    ${topByOps.map((r,i) => makeHRow(r,i,'ops',fmt(r.ops,3))).join('')}
+    <div style="color:var(--orange);font-size:11px;font-weight:700;padding:12px 12px 4px;letter-spacing:1px">PROJ. WAR LEADERS</div>
+    ${[...hResults].filter(r=>parseFloat(r.pwar)>0).sort((a,b)=>parseFloat(b.pwar)-parseFloat(a.pwar)).slice(0,4)
+        .map((r,i) => makeHRow(r,i,'pwar',r.pwar)).join('')}
+  `;
+
+  // Pitching: ERA, K/9, WHIP
+  const pResults = await Promise.all(pitchers.map(async p => {
+    const s = await fetchStat(p.person.id, 'pitching');
+    return { id:p.person.id, name:p.person.fullName, pos:p.position?.abbreviation||'—',
+             era:parseFloat(s.era)||null, whip:parseFloat(s.whip)||null,
+             k9:parseFloat(s.strikeoutsPer9Inn)||null, wins:s.wins||0 };
+  }));
+
+  const topEra = [...pResults].filter(r=>r.era!==null&&r.era>0).sort((a,b)=>a.era-b.era).slice(0,4);
+  const topK9  = [...pResults].filter(r=>r.k9!==null&&r.k9>0).sort((a,b)=>b.k9-a.k9).slice(0,4);
+  const makePRow = (r,i,val) => {
+    const photo = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_40,q_auto:best/v1/people/${r.id}/headshot/67/current`;
+    return `<div class="leader-row" onclick="selectPlayerByName('${r.name.replace(/'/g,"\\'")}')">
+      <div class="leader-rank">${i+1}</div>
+      <img class="leader-photo" src="${photo}" onerror="this.style.display='none'">
+      <div class="leader-info"><div class="leader-name">${r.name}</div><div class="leader-pos">${r.pos}</div></div>
+      <div class="leader-val">${val}</div>
+    </div>`;
+  };
+
+  pContainer.innerHTML = `
+    <div style="color:var(--orange);font-size:11px;font-weight:700;padding:8px 12px 4px;letter-spacing:1px">ERA LEADERS (lowest)</div>
+    ${topEra.map((r,i) => makePRow(r,i, r.era!==null ? r.era.toFixed(2) : '—')).join('')}
+    <div style="color:var(--orange);font-size:11px;font-weight:700;padding:12px 12px 4px;letter-spacing:1px">K/9 LEADERS</div>
+    ${topK9.map((r,i) => makePRow(r,i, r.k9!==null ? r.k9.toFixed(2) : '—')).join('')}
+  `;
 }
 
 async function renderProspects() {
@@ -866,7 +973,7 @@ function refreshData() {
 
 async function fetchJSON(path) {
   try {
-    const res = await fetch(`/api/mlb?path=${path}`);
+    const res = await fetch(`https://statsapi.mlb.com/api/v1${path}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
