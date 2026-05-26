@@ -3,683 +3,291 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MLB Analytics Dashboard — JARVIS</title>
+  <title>MLB Analytics Dashboard — JARVIS v5</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    /* ════════════════════════════════════════════════════════════ */
-    /* BASE & COLOR SYSTEM */
-    /* ════════════════════════════════════════════════════════════ */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --navy: #07102D;
-      --navy-mid: #0D1C3A;
-      --navy-light: #0F2040;
-      --navy-border: #1E3055;
-
-      --orange: #E8722A;
-      --orange-dim: rgba(232, 114, 42, 0.15);
-      --blue-bright: #5AB4F5;
-
-      --green: #4DCE8A;
-      --red: #E85A5A;
-      --gold: #F5C842;
-      --text-dim: #A0B4CC;
-
-      --safe: #4DCE8A;
-      --caution: #F5C842;
-      --danger: #E85A5A;
-      --avoid: #2471A3;
-    }
-
-    body {
-      font-family: 'Barlow', sans-serif;
-      background: var(--navy);
-      color: #fff;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-      background-size: 28px 28px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* HEADER */
-    /* ════════════════════════════════════════════════════════════ */
-    .hdr {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(3, 8, 20, 0.95);
-      border-bottom: 2px solid rgba(232, 114, 42, 0.35);
-      backdrop-filter: blur(18px);
-      padding: 12px 24px;
-    }
-
-    .hdr-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      max-width: 1800px;
-      margin: 0 auto;
-    }
-
-    .logo-block {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .season-label {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--orange);
-    }
-
-    .dash-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 32px;
-      letter-spacing: 3px;
-      background: linear-gradient(135deg, #fff 40%, var(--orange));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .v-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      background: rgba(232, 114, 42, 0.18);
-      border: 1px solid rgba(232, 114, 42, 0.4);
-      border-radius: 5px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      color: var(--orange);
-    }
-
-    .hdr-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    /* Player search */
-    .psearch-wrap { position: relative; }
-
-    #psearch {
-      background: rgba(13, 28, 58, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      color: #fff;
-      padding: 8px 14px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      width: 220px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    #psearch:focus { border-color: var(--orange); }
-    #psearch::placeholder { color: var(--text-dim); }
-
-    #psearch-results {
-      display: none;
-      position: absolute;
-      top: calc(100% + 6px);
-      right: 0;
-      width: 320px;
-      background: #0d1c3a;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      z-index: 999;
-      max-height: 360px;
-      overflow-y: auto;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-    }
-
-    .sr-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-weight: 600;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      transition: background 0.15s;
-    }
-
-    .sr-item:hover { background: rgba(232, 114, 42, 0.12); }
-
-    .sr-pos {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: var(--blue-bright);
-      background: rgba(90, 180, 245, 0.1);
-      padding: 2px 7px;
-      border-radius: 5px;
-      flex-shrink: 0;
-    }
-
-    .team-select {
-      background: rgba(13, 28, 58, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      color: #fff;
-      padding: 8px 14px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      min-width: 180px;
-    }
-
-    .team-select:focus {
-      outline: none;
-      border-color: var(--orange);
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* TABS */
-    /* ════════════════════════════════════════════════════════════ */
-    .tabs-wrap {
-      background: rgba(3, 8, 20, 0.72);
-      border-bottom: 1px solid var(--navy-border);
-      overflow-x: auto;
-      position: relative;
-      z-index: 99;
-    }
-
-    .tabs {
-      display: flex;
-      min-width: max-content;
-      padding: 0 24px;
-      max-width: 1800px;
-      margin: 0 auto;
-    }
-
-    .tab {
-      padding: 12px 16px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      white-space: nowrap;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-
-    .tab:hover {
-      color: #fff;
-      border-bottom-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .tab.on {
-      color: var(--orange);
-      border-bottom-color: var(--orange);
-    }
-
-    .tab-divider {
-      width: 1px;
-      background: rgba(255, 255, 255, 0.1);
-      margin: 9px 4px;
-      flex-shrink: 0;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* LAYOUT */
-    /* ════════════════════════════════════════════════════════════ */
-    .body {
-      padding: 20px 24px;
-      position: relative;
-      z-index: 1;
-      max-width: 1800px;
-      margin: 0 auto;
-    }
-
-    .pg { display: none; }
-    .pg.on { display: block; animation: fadeIn 0.2s; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* PANELS */
-    /* ════════════════════════════════════════════════════════════ */
-    .panel {
-      background: rgba(6, 14, 42, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.09);
-      border-radius: 20px;
-      padding: 22px 24px;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
-      margin-bottom: 18px;
-    }
-
-    .panel-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      letter-spacing: 3px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 12px;
-      margin-bottom: 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .pt-badge {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: var(--orange);
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* GRID LAYOUTS */
-    /* ════════════════════════════════════════════════════════════ */
-    .grid2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .grid3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* TABLES */
-    /* ════════════════════════════════════════════════════════════ */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 13px;
-    }
-
-    .data-table th {
-      text-align: left;
-      padding: 6px 8px;
-      color: var(--text-dim);
-      font-size: 10px;
-      letter-spacing: 1px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .data-table td {
-      padding: 8px 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* HERO */
-    /* ════════════════════════════════════════════════════════════ */
-    .hero-panel {
-      display: flex;
-      gap: 24px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-
-    #hero-photo {
-      width: 110px;
-      height: 110px;
-      border-radius: 14px;
-      object-fit: cover;
-      background: rgba(255,255,255,0.05);
-      flex-shrink: 0;
-    }
-
-    .hero-info { flex: 1; min-width: 160px; }
-
-    #hero-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 42px;
-      letter-spacing: 3px;
-      line-height: 1;
-    }
-
-    #hero-team {
-      color: var(--orange);
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-top: 4px;
-    }
-
-    .hero-meta {
-      display: flex;
-      gap: 18px;
-      margin-top: 8px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 12px;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-    }
-
-    .hero-stats {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .hero-stat-cell { text-align: center; }
-
-    .hero-stat-val {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 40px;
-      line-height: 1;
-      color: #fff;
-    }
-
-    .hero-stat-lbl {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: var(--text-dim);
-      margin-top: 2px;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* FLAGS */
-    /* ════════════════════════════════════════════════════════════ */
-    .flag-card {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 12px;
-      padding: 12px 16px;
-      flex: 1 1 260px;
-    }
-
-    .flag-icon { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
-
-    .flag-title {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: #fff;
-    }
-
-    .flag-desc {
-      font-family: 'Barlow', sans-serif;
-      font-size: 11px;
-      color: var(--text-dim);
-      margin-top: 3px;
-      line-height: 1.4;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* STAT GRID (advanced) */
-    /* ════════════════════════════════════════════════════════════ */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 12px;
-    }
-
-    .stat-cell {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 10px;
-      padding: 12px;
-      text-align: center;
-    }
-
-    .stat-label {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-
-    .stat-val {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      color: #fff;
-      margin: 4px 0 2px;
-    }
-
-    .stat-rank {
-      font-family: 'Barlow', sans-serif;
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* ROSTER ROW */
-    /* ════════════════════════════════════════════════════════════ */
-    .roster-row:hover td { background: rgba(232,114,42,0.06); cursor: pointer; }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* PLACEHOLDER */
-    /* ════════════════════════════════════════════════════════════ */
-    .placeholder {
-      padding: 60px 20px;
-      text-align: center;
-      color: var(--text-dim);
-    }
-
-    .placeholder h2 {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      margin-bottom: 12px;
-      color: #fff;
-    }
-
-    /* ════════════════════════════════════════════════════════════ */
-    /* RESPONSIVE */
-    /* ════════════════════════════════════════════════════════════ */
-    @media (max-width: 1200px) {
-      .grid3 { grid-template-columns: 1fr 1fr; }
-    }
-
-    @media (max-width: 900px) {
-      .grid2, .grid3 { grid-template-columns: 1fr; }
-      .body { padding: 12px; }
-      .tab { padding: 9px 11px; font-size: 9px; }
-    }
-
-    @media (max-width: 600px) {
-      .hdr-inner { flex-direction: column; align-items: flex-start; }
-      .hdr-right { width: 100%; }
-      .team-select, #psearch { width: 100%; }
-      .tabs { padding: 0 12px; }
-      .hero-panel { flex-direction: column; }
-      .hero-stats { justify-content: flex-start; }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- HEADER -->
-<!-- ══════════════════════════════════════════════════════════════ -->
-<div class="hdr">
+<!-- ══════════════════════════════════════════════════════════════
+     LIVE SCORE TICKER
+══════════════════════════════════════════════════════════════ -->
+<div class="scoreboard">
+  <div class="score-label">LIVE</div>
+  <div class="score-track-wrap">
+    <div class="score-track" id="score-track">
+      <span class="score-item">LOADING LIVE MLB SCORES...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════ -->
+<header class="hdr">
   <div class="hdr-inner">
+
     <div class="logo-block">
       <div>
         <div class="season-label">2026 SEASON</div>
-        <div class="dash-title">MLB ANALYTICS DASHBOARD</div>
+        <h1 class="dash-title">MLB <span style="-webkit-text-fill-color:var(--orange)">ANALYTICS</span> DASHBOARD</h1>
       </div>
-      <span class="v-badge">JARVIS v4</span>
+      <span class="v-badge">JARVIS v5</span>
     </div>
 
     <div class="hdr-right">
+      <!-- Team Selector -->
+      <select id="team-select" class="team-select" onchange="loadTeam(this.value)">
+        <option value="">— SELECT TEAM —</option>
+        <optgroup label="AL East">
+          <option value="110">Baltimore Orioles</option>
+          <option value="111">Boston Red Sox</option>
+          <option value="147">New York Yankees</option>
+          <option value="139">Tampa Bay Rays</option>
+          <option value="141">Toronto Blue Jays</option>
+        </optgroup>
+        <optgroup label="AL Central">
+          <option value="145">Chicago White Sox</option>
+          <option value="114">Cleveland Guardians</option>
+          <option value="116">Detroit Tigers</option>
+          <option value="118">Kansas City Royals</option>
+          <option value="142">Minnesota Twins</option>
+        </optgroup>
+        <optgroup label="AL West">
+          <option value="117">Houston Astros</option>
+          <option value="108">Los Angeles Angels</option>
+          <option value="133">Oakland Athletics</option>
+          <option value="136">Seattle Mariners</option>
+          <option value="140">Texas Rangers</option>
+        </optgroup>
+        <optgroup label="NL East">
+          <option value="144">Atlanta Braves</option>
+          <option value="146">Miami Marlins</option>
+          <option value="121">New York Mets</option>
+          <option value="143">Philadelphia Phillies</option>
+          <option value="120">Washington Nationals</option>
+        </optgroup>
+        <optgroup label="NL Central">
+          <option value="112">Chicago Cubs</option>
+          <option value="113">Cincinnati Reds</option>
+          <option value="158">Milwaukee Brewers</option>
+          <option value="134">Pittsburgh Pirates</option>
+          <option value="138">St. Louis Cardinals</option>
+        </optgroup>
+        <optgroup label="NL West">
+          <option value="109">Arizona Diamondbacks</option>
+          <option value="115">Colorado Rockies</option>
+          <option value="119">Los Angeles Dodgers</option>
+          <option value="135">San Diego Padres</option>
+          <option value="137">San Francisco Giants</option>
+        </optgroup>
+      </select>
+
       <!-- Player Search -->
       <div class="psearch-wrap">
-        <input id="psearch" type="text" placeholder="Search player… (or press /)"
-          oninput="handlePlayerSearch(this.value)">
+        <input type="text" id="psearch" class="psearch-input"
+               placeholder="PLAYER SEARCH  ·  press /"
+               oninput="handlePlayerSearch(this.value)"
+               autocomplete="off">
         <div id="psearch-results"></div>
       </div>
 
-      <!-- Team Select -->
-      <select class="team-select" id="team-select" onchange="loadTeam(this.value)">
-        <option value="">— Select Team —</option>
-        <option value="110">Baltimore Orioles</option>
-        <option value="111">Boston Red Sox</option>
-        <option value="147">New York Yankees</option>
-        <option value="139">Tampa Bay Rays</option>
-        <option value="141">Toronto Blue Jays</option>
-        <option value="145">Chicago White Sox</option>
-        <option value="114">Cleveland Guardians</option>
-        <option value="116">Detroit Tigers</option>
-        <option value="118">Kansas City Royals</option>
-        <option value="142">Minnesota Twins</option>
-        <option value="117">Houston Astros</option>
-        <option value="108">Los Angeles Angels</option>
-        <option value="133">Oakland Athletics</option>
-        <option value="136">Seattle Mariners</option>
-        <option value="140">Texas Rangers</option>
-        <option value="144">Atlanta Braves</option>
-        <option value="146">Miami Marlins</option>
-        <option value="121">New York Mets</option>
-        <option value="143">Philadelphia Phillies</option>
-        <option value="120">Washington Nationals</option>
-        <option value="112">Chicago Cubs</option>
-        <option value="113">Cincinnati Reds</option>
-        <option value="158">Milwaukee Brewers</option>
-        <option value="134">Pittsburgh Pirates</option>
-        <option value="138">St. Louis Cardinals</option>
-        <option value="109">Arizona Diamondbacks</option>
-        <option value="115">Colorado Rockies</option>
-        <option value="119">Los Angeles Dodgers</option>
-        <option value="135">San Diego Padres</option>
-        <option value="137">San Francisco Giants</option>
-      </select>
+      <button class="refresh-btn" onclick="refreshData()">REFRESH</button>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
     </div>
-  </div>
-</div>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- TABS -->
-<!-- ══════════════════════════════════════════════════════════════ -->
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TABS
+══════════════════════════════════════════════════════════════ -->
 <div class="tabs-wrap">
   <div class="tabs">
-    <div class="tab on" data-tab="dash"      onclick="switchTab('dash')">Dashboard</div>
-    <div class="tab"    data-tab="personnel" onclick="switchTab('personnel')">Personnel</div>
-    <div class="tab"    data-tab="analysis"  onclick="switchTab('analysis')">Analysis</div>
-    <div class="tab"    data-tab="profile"   onclick="switchTab('profile')">Player Profile</div>
-    <div class="tab"    data-tab="prospects" onclick="switchTab('prospects')">Top Prospects</div>
-    <div class="tab"    data-tab="notes"     onclick="switchTab('notes')">Scout Notes</div>
+    <div class="tab on"  data-tab="dash"      onclick="switchTab('dash')">TEAM STATS</div>
+    <div class="tab"     data-tab="personnel" onclick="switchTab('personnel')">PERSONNEL</div>
+    <div class="tab"     data-tab="analysis"  onclick="switchTab('analysis')">METRIC LEADERS</div>
+    <div class="tab"     data-tab="profile"   onclick="switchTab('profile')">PLAYER PROFILE</div>
+    <div class="tab"     data-tab="prospects" onclick="switchTab('prospects')">TOP PROSPECTS</div>
+    <div class="tab"     data-tab="notes"     onclick="switchTab('notes')">SCOUT NOTES</div>
     <div class="tab-divider"></div>
-    <div class="tab"    data-tab="about"     onclick="switchTab('about')">About</div>
+    <div class="tab"     data-tab="about"     onclick="switchTab('about')">ABOUT</div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- BODY -->
-<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════ -->
 <div class="body">
 
-  <!-- ── DASHBOARD ──────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: TEAM STATS (Dashboard)
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg on" id="pg-dash">
+
+    <!-- Team Record Banner -->
+    <div class="record-banner" id="record-banner" style="display:none">
+      <div class="rb-name" id="rb-team-name">—</div>
+      <div class="rb-stats" id="rb-stats"></div>
+    </div>
+
+    <!-- THREE COLUMN MAIN DASHBOARD -->
+    <div class="dash-three-col">
+
+      <!-- OFFENSE CARD -->
+      <div class="stat-card" id="offense-card">
+        <h2 class="card-heading">OFFENSE</h2>
+        <div class="card-stat-list">
+          <div class="csl-row">
+            <span class="csl-label">AVG</span>
+            <span class="csl-value" id="off-avg">.---</span>
+            <span class="csl-rank" id="off-avg-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">OPS</span>
+            <span class="csl-value" id="off-ops">.---</span>
+            <span class="csl-rank" id="off-ops-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">HOME RUNS</span>
+            <span class="csl-value" id="off-hr">—</span>
+            <span class="csl-rank" id="off-hr-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">RBI</span>
+            <span class="csl-value" id="off-rbi">—</span>
+            <span class="csl-rank" id="off-rbi-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">OBP</span>
+            <span class="csl-value" id="off-obp">.---</span>
+            <span class="csl-rank" id="off-obp-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">RUNS</span>
+            <span class="csl-value" id="off-runs">—</span>
+            <span class="csl-rank" id="off-runs-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">SB</span>
+            <span class="csl-value" id="off-sb">—</span>
+            <span class="csl-rank" id="off-sb-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">SLG</span>
+            <span class="csl-value" id="off-slg">.---</span>
+            <span class="csl-rank" id="off-slg-rank"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PITCHING CARD -->
+      <div class="stat-card" id="pitching-stat-card">
+        <h2 class="card-heading">PITCHING</h2>
+        <div class="card-stat-list">
+          <div class="csl-row">
+            <span class="csl-label">ERA</span>
+            <span class="csl-value" id="pit-era">—.——</span>
+            <span class="csl-rank" id="pit-era-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">WHIP</span>
+            <span class="csl-value" id="pit-whip">—.——</span>
+            <span class="csl-rank" id="pit-whip-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">STRIKEOUTS</span>
+            <span class="csl-value" id="pit-k">—</span>
+            <span class="csl-rank" id="pit-k-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">OPP AVG</span>
+            <span class="csl-value" id="pit-opp">.---</span>
+            <span class="csl-rank" id="pit-opp-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">WINS</span>
+            <span class="csl-value" id="pit-wins">—</span>
+            <span class="csl-rank" id="pit-wins-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">SAVES</span>
+            <span class="csl-value" id="pit-saves">—</span>
+            <span class="csl-rank" id="pit-saves-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">K/9</span>
+            <span class="csl-value" id="pit-k9">—</span>
+            <span class="csl-rank" id="pit-k9-rank"></span>
+          </div>
+          <div class="csl-row">
+            <span class="csl-label">BB/9</span>
+            <span class="csl-value" id="pit-bb9">—</span>
+            <span class="csl-rank" id="pit-bb9-rank"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERS CARD -->
+      <div class="stat-card leaders-card">
+        <div class="leaders-top">
+          <h2 class="card-heading">LEADERS</h2>
+          <div class="ldr-tabs" id="ldr-tabs">
+            <button class="ldr-tab on" data-lstat="avg">AVG</button>
+            <button class="ldr-tab" data-lstat="hr">HR</button>
+            <button class="ldr-tab" data-lstat="rbi">RBI</button>
+            <button class="ldr-tab" data-lstat="hits">HITS</button>
+            <button class="ldr-tab" data-lstat="sb">SB</button>
+            <button class="ldr-tab" data-lstat="ops">OPS</button>
+            <button class="ldr-tab" data-lstat="obp">OBP</button>
+            <button class="ldr-tab" data-lstat="wins">WINS</button>
+            <button class="ldr-tab" data-lstat="era">ERA</button>
+            <button class="ldr-tab" data-lstat="so">SO</button>
+          </div>
+        </div>
+        <div id="leaders-list" class="leaders-list">
+          <div style="padding:30px;text-align:center;color:var(--text-dim)">Select a team above</div>
+        </div>
+      </div>
+
+    </div><!-- /dash-three-col -->
+
+    <!-- STANDINGS + BATTING SPLITS ROW -->
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Division Standings</div>
         <table class="data-table">
           <thead>
-            <tr>
-              <th style="text-align:left">Team</th>
-              <th>W</th><th>L</th><th>PCT</th><th>GB</th>
-            </tr>
+            <tr><th>Team</th><th>W</th><th>L</th><th>PCT</th><th>GB</th></tr>
           </thead>
           <tbody id="standings-body">
-            <tr><td colspan="5" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:24px">Select a team above</td></tr>
           </tbody>
         </table>
       </div>
-
       <div class="panel">
         <div class="panel-title">Active Roster</div>
         <table class="data-table">
           <thead>
-            <tr>
-              <th>#</th><th style="text-align:left">Name</th><th>Pos</th><th>Status</th>
-            </tr>
+            <tr><th>#</th><th>Name</th><th>Pos</th><th>Status</th></tr>
           </thead>
           <tbody id="roster-body">
-            <tr><td colspan="4" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px">Select a team above</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="grid2">
-      <div class="panel">
-        <div class="panel-title">Team Offense <span class="pt-badge">2026</span></div>
-        <table class="data-table">
-          <tbody id="team-offense-body">
-            <tr><td colspan="2" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
-          </tbody>
-        </table>
-      </div>
+  </div><!-- /pg-dash -->
 
-      <div class="panel">
-        <div class="panel-title">Team Pitching <span class="pt-badge">2026</span></div>
-        <table class="data-table">
-          <tbody id="team-pitching-body">
-            <tr><td colspan="2" class="placeholder" style="padding:30px;text-align:center">Select a team above</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PERSONNEL ──────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: PERSONNEL
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-personnel">
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Projected Lineup</div>
-        <div class="placeholder"><p>Select a team on the Dashboard tab first</p></div>
+        <div class="placeholder"><p>Select a team on the Team Stats tab first</p></div>
       </div>
       <div class="panel">
         <div class="panel-title">Pitching Staff</div>
@@ -700,7 +308,9 @@
     </div>
   </div>
 
-  <!-- ── ANALYSIS ────────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: METRIC LEADERS (Analysis)
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-analysis">
     <div class="grid3">
       <div class="panel">
@@ -718,12 +328,18 @@
     </div>
   </div>
 
-  <!-- ── PLAYER PROFILE ─────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: PLAYER PROFILE
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-profile">
 
-    <!-- Hero card -->
+    <!-- ── HERO ── -->
     <div class="panel hero-panel">
-      <img id="hero-photo" src="" alt="Player photo">
+      <div class="hero-photo-wrap">
+        <img id="hero-photo" src="" alt="Player photo"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22><rect fill=%22%230d1c3a%22 width=%22120%22 height=%22120%22 rx=%2210%22/><text fill=%22%232a3f60%22 font-family=%22Arial%22 font-size=%2248%22 x=%2260%22 y=%2278%22 text-anchor=%22middle%22>?</text></svg>'">
+        <div class="hero-team-stripe" id="hero-team-stripe"></div>
+      </div>
       <div class="hero-info">
         <div id="hero-name">— SELECT A PLAYER —</div>
         <div id="hero-team">Search above to load a player</div>
@@ -753,7 +369,7 @@
       </div>
     </div>
 
-    <!-- Intel flags -->
+    <!-- ── INTEL FLAGS ── -->
     <div class="panel">
       <div class="panel-title">Intel Flags</div>
       <div id="flags-container" style="display:flex;flex-wrap:wrap;gap:12px">
@@ -767,7 +383,7 @@
       </div>
     </div>
 
-    <!-- Season stats + Advanced -->
+    <!-- ── STATS + ADVANCED ── -->
     <div class="grid2">
       <div class="panel">
         <div class="panel-title">Season Stats <span class="pt-badge">2026</span></div>
@@ -777,7 +393,6 @@
           </tbody>
         </table>
       </div>
-
       <div class="panel">
         <div class="panel-title">Statcast / Advanced</div>
         <div id="advanced-stats-container">
@@ -786,7 +401,7 @@
       </div>
     </div>
 
-    <!-- Batting splits -->
+    <!-- ── BATTING SPLITS ── -->
     <div class="panel">
       <div class="panel-title">Batting Splits</div>
       <div style="overflow-x:auto">
@@ -805,270 +420,348 @@
       </div>
     </div>
 
+    <!-- ── SCOUTING + CONTRACT ── -->
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Scouting Grades <span class="pt-badge">20–80 SCALE</span></div>
+        <div id="scouting-grades-container" class="stat-grid">
+          <p style="color:var(--text-dim);text-align:center;padding:20px">No player loaded</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Contract Projection</div>
+        <div id="contract-projection-container" class="stat-grid">
+          <p style="color:var(--text-dim);text-align:center;padding:20px">No player loaded</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SEASON PROJECTIONS ── -->
+    <div class="panel">
+      <div class="panel-title">Season Projections <span class="pt-badge">2026</span></div>
+      <div id="season-projections-container">
+        <p style="color:var(--text-dim);text-align:center;padding:20px">No player loaded</p>
+      </div>
+    </div>
+
   </div><!-- /pg-profile -->
 
-  <!-- ── PROSPECTS ──────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: TOP PROSPECTS
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-prospects">
-    <div class="placeholder">
-      <h2>Top Prospects</h2>
-      <p>Baseball America-style prospect cards with FV grades and scouting summaries</p>
+    <div class="panel">
+      <div class="panel-title">Top Prospects</div>
+      <div class="placeholder"><p>Baseball America-style prospect cards with FV grades and scouting summaries</p></div>
     </div>
   </div>
 
-  <!-- ── SCOUT NOTES ─────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: SCOUT NOTES
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-notes">
-    <div class="placeholder">
-      <h2>Scout Notes</h2>
-      <p>Add/edit personal scouting notes with priority tags (Watch, Target, Buy, Sell, Hold)</p>
+    <div class="panel">
+      <div class="panel-title">Scout Notes</div>
+      <div class="placeholder"><p>Add/edit personal scouting notes with priority tags (Watch, Target, Buy, Sell, Hold)</p></div>
     </div>
   </div>
 
-  <!-- ── ABOUT ──────────────────────────────────────────────────── -->
+  <!-- ─────────────────────────────────────────────────────────────
+       PAGE: ABOUT
+  ───────────────────────────────────────────────────────────── -->
   <div class="pg" id="pg-about">
     <div class="panel">
       <div class="panel-title">About Luke Rumpler</div>
-      <div class="placeholder">
-        <p>Bio and personal information</p>
-      </div>
+      <div class="placeholder"><p>Bio and personal information</p></div>
     </div>
   </div>
 
 </div><!-- /body -->
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- INLINE CORE SCRIPT -->
-<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════════
+     COMMAND BAR
+══════════════════════════════════════════════════════════════ -->
+<div class="command-bar">
+  <span class="cmd-prompt">JARVIS ></span>
+  <input type="text" class="cmd-input"
+         placeholder="Enter command (e.g., 'search Judge', 'help')"
+         onkeydown="handleCommand(event)">
+  <span class="cmd-help">CTRL+K to focus · v5.0</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     INLINE BOOTSTRAP — tab switching + team load
+══════════════════════════════════════════════════════════════ -->
 <script>
-  const SEASON = 2026;
-  let currentTeam = null;
+const SEASON = 2026;
+let currentTeam = null;
+let currentLeadersRoster = [];
+let currentLeaderStat = 'avg';
 
-  /* ── TAB SWITCHING ── */
-  function switchTab(tabName) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
-    document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
-    document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('on');
-    document.getElementById(`pg-${tabName}`)?.classList.add('on');
+function switchTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.querySelector(`.tab[data-tab="${tabName}"]`)?.classList.add('on');
+  document.getElementById(`pg-${tabName}`)?.classList.add('on');
+}
+
+async function loadTeam(teamId) {
+  if (!teamId) return;
+  currentTeam = parseInt(teamId);
+  if (typeof updateThemeColors === 'function') updateThemeColors(currentTeam);
+
+  // Show banner
+  const banner = document.getElementById('record-banner');
+  if (banner) banner.style.display = 'flex';
+
+  // Loading states
+  ['standings-body','roster-body'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">Loading…</td></tr>`;
+  });
+  ['off-avg','off-ops','off-hr','off-rbi','off-obp','off-runs','off-sb','off-slg',
+   'pit-era','pit-whip','pit-k','pit-opp','pit-wins','pit-saves','pit-k9','pit-bb9'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '…';
+  });
+
+  try {
+    const [standingsRes, rosterRes, hittingRes, pitchingRes, teamRes] = await Promise.all([
+      fetch(`/api/mlb?path=/standings&leagueId=103,104&season=${SEASON}`),
+      fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`),
+      fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=hitting&season=${SEASON}&stats=season&gameType=R`),
+      fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=pitching&season=${SEASON}&stats=season&gameType=R`),
+      fetch(`/api/mlb?path=/teams/${currentTeam}?season=${SEASON}`)
+    ]);
+
+    const [standings, roster, hitting, pitching, teamData] = await Promise.all([
+      standingsRes.json(), rosterRes.json(), hittingRes.json(), pitchingRes.json(), teamRes.json()
+    ]);
+
+    const team = teamData?.teams?.[0];
+    // Record banner
+    const rec = standings.records?.flatMap(d => d.teamRecords)?.find(r => r.team?.id == currentTeam);
+    const nameEl = document.getElementById('rb-team-name');
+    const statsEl = document.getElementById('rb-stats');
+    if (nameEl) nameEl.textContent = team?.name?.toUpperCase() || '—';
+    if (statsEl && rec) {
+      const diff = (rec.runsScored || 0) - (rec.runsAllowed || 0);
+      statsEl.innerHTML = `
+        <span>RECORD: <strong>${rec.wins}-${rec.losses}</strong></span>
+        <span>RUNS: <strong>${rec.runsScored || '—'}</strong></span>
+        <span>RA: <strong>${rec.runsAllowed || '—'}</strong></span>
+        <span style="color:${diff >= 0 ? 'var(--green)' : 'var(--red)'}">DIFF: <strong>${diff >= 0 ? '+' : ''}${diff}</strong></span>
+        <span>L10: <strong>${rec.records?.lastTen?.map(r => r.isWin ? 'W' : 'L').join('-') || rec.leagueRecord?.wins + '-' + rec.leagueRecord?.losses || '—'}</strong></span>
+      `;
+    }
+
+    renderStandings(standings, currentTeam);
+    renderRoster(roster);
+    renderTeamOffenseCards(hitting);
+    renderTeamPitchingCards(pitching);
+    renderLeaders(roster, currentLeaderStat);
+
+  } catch (err) {
+    console.error('loadTeam error:', err);
+  }
+}
+
+function renderTeamOffenseCards(hittingData) {
+  const s = hittingData?.stats?.[0]?.splits?.[0]?.stat || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('off-avg',  s.avg        ? Number(s.avg).toFixed(3)  : '—');
+  set('off-ops',  s.ops        ? Number(s.ops).toFixed(3)  : '—');
+  set('off-hr',   s.homeRuns   ?? '—');
+  set('off-rbi',  s.rbi        ?? '—');
+  set('off-obp',  s.obp        ? Number(s.obp).toFixed(3)  : '—');
+  set('off-runs', s.runs       ?? '—');
+  set('off-sb',   s.stolenBases ?? '—');
+  set('off-slg',  s.slg        ? Number(s.slg).toFixed(3)  : '—');
+}
+
+function renderTeamPitchingCards(pitchingData) {
+  const s = pitchingData?.stats?.[0]?.splits?.[0]?.stat || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('pit-era',   s.era                  ? Number(s.era).toFixed(2)               : '—');
+  set('pit-whip',  s.whip                 ? Number(s.whip).toFixed(3)              : '—');
+  set('pit-k',     s.strikeOuts           ?? '—');
+  set('pit-opp',   s.avg                  ? Number(s.avg).toFixed(3)               : '—');
+  set('pit-wins',  s.wins                 ?? '—');
+  set('pit-saves', s.saves                ?? '—');
+  set('pit-k9',    s.strikeoutsPer9Inn    ? Number(s.strikeoutsPer9Inn).toFixed(2)  : '—');
+  set('pit-bb9',   s.walksPer9Inn         ? Number(s.walksPer9Inn).toFixed(2)       : '—');
+}
+
+async function renderLeaders(rosterData, stat) {
+  currentLeaderStat = stat;
+  const container = document.getElementById('leaders-list');
+  if (!container) return;
+
+  // Update active tab
+  document.querySelectorAll('.ldr-tab').forEach(t => {
+    t.classList.toggle('on', t.dataset.lstat === stat);
+  });
+
+  if (!rosterData || !rosterData.roster?.length) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim)">Select a team above</div>';
+    return;
   }
 
-  /* ── LOAD TEAM ── */
-  async function loadTeam(teamId) {
-    if (!teamId) return;
-    currentTeam = parseInt(teamId);
+  container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-dim)">Loading leaders…</div>';
 
-    // Apply team colors (defined in js/team-colors.js)
-    updateThemeColors(currentTeam);
+  try {
+    // Fetch stats for each roster player (batch with Promise.all, limit to 10)
+    const players = rosterData.roster.slice(0, 15);
+    const statGroup = ['wins','era','so'].includes(stat) ? 'pitching' : 'hitting';
 
-    console.log(`📊 Loading team ${currentTeam}…`);
+    const results = await Promise.all(players.map(async p => {
+      try {
+        const res = await fetch(`/api/mlb?path=/people/${p.person.id}&hydrate=stats(type=season,group=${statGroup},season=${SEASON}),currentTeam`);
+        const data = await res.json();
+        const person = data.people?.[0];
+        const s = person?.stats?.[0]?.splits?.[0]?.stat || {};
+        const statVal = getLeaderStat(s, stat);
+        return { id: p.person.id, name: p.person.fullName, pos: p.position?.abbreviation || '—', stat: statVal };
+      } catch { return null; }
+    }));
 
-    // Show loading state
-    ['standings-body','roster-body','team-offense-body','team-pitching-body'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">Loading…</td></tr>`;
+    const valid = results
+      .filter(r => r && r.stat !== null && r.stat !== undefined)
+      .sort((a, b) => {
+        if (['era','whip'].includes(stat)) return (parseFloat(a.stat) || 999) - (parseFloat(b.stat) || 999);
+        return (parseFloat(b.stat) || 0) - (parseFloat(a.stat) || 0);
+      })
+      .slice(0, 6);
+
+    if (!valid.length) {
+      container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim)">No data available</div>';
+      return;
+    }
+
+    container.innerHTML = valid.map((p, i) => {
+      const photo = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_60,q_auto:best/v1/people/${p.id}/headshot/67/current`;
+      const displayVal = ['avg','obp','slg','era'].includes(stat) && !['era'].includes(stat)
+        ? (parseFloat(p.stat) ? Number(p.stat).toFixed(3) : p.stat)
+        : p.stat;
+      const isFirst = i === 0;
+      return `
+        <div class="leader-row" onclick="selectPlayerByName('${p.name.replace(/'/g,"\\'")}')">
+          <div class="leader-rank">${i + 1}</div>
+          <img class="leader-photo" src="${photo}"
+               onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><rect fill=%22%230d1c3a%22 width=%2240%22 height=%2240%22 rx=%225%22/></svg>'">
+          <div class="leader-info">
+            <div class="leader-name${isFirst ? ' leader-name-top' : ''}">${p.name}</div>
+            <div class="leader-pos">${p.pos}</div>
+          </div>
+          <div class="leader-val${isFirst ? ' leader-val-top' : ''}">${displayVal ?? '—'}</div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('renderLeaders error:', err);
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red)">Error loading leaders</div>';
+  }
+}
+
+function getLeaderStat(s, stat) {
+  const map = {
+    avg: s.avg, hr: s.homeRuns, rbi: s.rbi, hits: s.hits,
+    sb: s.stolenBases, ops: s.ops, obp: s.obp,
+    wins: s.wins, era: s.era, so: s.strikeOuts
+  };
+  return map[stat] ?? null;
+}
+
+// Wire leaders tabs
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ldr-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!currentTeam) return;
+      // Re-use stored roster - fetch again
+      fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`)
+        .then(r => r.json())
+        .then(data => renderLeaders(data, btn.dataset.lstat))
+        .catch(console.error);
     });
+  });
+});
 
-    try {
-      const [standingsRes, rosterRes, hittingRes, pitchingRes] = await Promise.all([
-        fetch(`/api/mlb?path=/standings&leagueId=103,104&season=${SEASON}`),
-        fetch(`/api/mlb?path=/teams/${currentTeam}/roster&rosterType=active&season=${SEASON}`),
-        fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=hitting&season=${SEASON}&stats=season&gameType=R`),
-        fetch(`/api/mlb?path=/teams/${currentTeam}/stats&group=pitching&season=${SEASON}&stats=season&gameType=R`)
-      ]);
-
-      const [standings, roster, hitting, pitching] = await Promise.all([
-        standingsRes.json(),
-        rosterRes.json(),
-        hittingRes.json(),
-        pitchingRes.json()
-      ]);
-
-      renderStandings(standings, currentTeam);
-      renderRoster(roster);
-      renderTeamOffense(hitting);
-      renderTeamPitching(pitching);
-
-    } catch (err) {
-      console.error('loadTeam error:', err);
-      ['standings-body','roster-body','team-offense-body','team-pitching-body'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px">Error loading data</td></tr>`;
-      });
-    }
+function renderStandings(data, currentTeamId) {
+  const tbody = document.getElementById('standings-body');
+  if (!tbody) return;
+  const division = data.records?.find(div =>
+    div.teamRecords?.some(t => t.team?.id == currentTeamId)
+  );
+  if (!division?.teamRecords?.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No standings data</td></tr>`;
+    return;
   }
+  tbody.innerHTML = division.teamRecords.map(record => {
+    const isCurrent = record.team?.id == currentTeamId;
+    const gb = record.gamesBack;
+    return `<tr${isCurrent ? ' class="standings-current"' : ''}>
+      <td style="${isCurrent ? 'color:var(--orange);font-weight:700' : ''}">${record.team?.name || '—'}</td>
+      <td>${record.wins ?? '—'}</td>
+      <td>${record.losses ?? '—'}</td>
+      <td>${record.winningPercentage ? Number(record.winningPercentage).toFixed(3) : '—'}</td>
+      <td>${!gb || gb === '0' || gb === 0 ? '—' : gb}</td>
+    </tr>`;
+  }).join('');
+}
 
-  /* ── GENERIC FETCH ── */
-  async function fetchJSON(path) {
-    try {
-      const res = await fetch(`/api/mlb?path=${path}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.error('fetchJSON error:', err);
-      return null;
-    }
+function renderRoster(rosterData) {
+  const tbody = document.getElementById('roster-body');
+  if (!tbody) return;
+  const roster = rosterData.roster || [];
+  if (!roster.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No roster data</td></tr>`;
+    return;
   }
+  tbody.innerHTML = roster.map(p => {
+    const num    = p.jerseyNumber ?? '—';
+    const name   = p.person?.fullName || '—';
+    const pos    = p.position?.abbreviation || '—';
+    const status = p.status?.description || 'Active';
+    const photo  = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_40,q_auto:best/v1/people/${p.person.id}/headshot/67/current`;
+    return `<tr class="roster-row" onclick="selectPlayerByName('${name.replace(/'/g,"\\'")}')">
+      <td style="color:var(--orange);font-family:'Bebas Neue',sans-serif">${num}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <img src="${photo}" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0"
+               onerror="this.style.display='none'">
+          <span style="font-weight:700">${name}</span>
+        </div>
+      </td>
+      <td><span class="pos-badge">${pos}</span></td>
+      <td style="color:var(--text-dim);font-size:10px">${status}</td>
+    </tr>`;
+  }).join('');
+}
 
-  console.log('✅ Dashboard initialized');
+function refreshData() {
+  const sel = document.getElementById('team-select');
+  if (sel?.value) loadTeam(sel.value);
+}
+
+async function fetchJSON(path) {
+  try {
+    const res = await fetch(`/api/mlb?path=${path}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('fetchJSON error:', err);
+    return null;
+  }
+}
+
+console.log('✅ JARVIS v5 Dashboard initialized');
 </script>
 
-<!-- ══════════════════════════════════════════════════════════════ -->
-<!-- SUPPORT MODULES — order matters -->
-<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- Scripts — order matters -->
 <script src="js/team-colors.js"></script>
 <script src="js/data.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/player.js"></script>
 <script src="js/jarvis.js"></script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MLB Intelligence Terminal — JARVIS v10 PRO</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-  <!-- ── LIVE SCOREBOARD ── -->
-  <div class="scoreboard">
-    <div class="score-track" id="score-track">
-      <div class="score-item">LOADING LIVE MLB SCORES...</div>
-    </div>
-  </div>
-
-  <!-- ── HEADER ── -->
-  <header class="hdr">
-    <div class="hdr-inner">
-      <div class="logo-block">
-        <div class="season-label">2026 SEASON</div>
-        <h1 class="dash-title">MLB INTELLIGENCE TERMINAL</h1>
-      </div>
-      
-      <div class="hdr-right">
-        <div class="psearch-wrap">
-          <input type="text" id="psearch" placeholder="Search player... (or press /)">
-          <div id="psearch-results" class="search-dd"></div>
-        </div>
-        <select id="team-select" class="tpick" onchange="selectTeam(this.value)">
-          <option value="">— SELECT TEAM —</option>
-          <!-- Populated by js/data.js -->
-        </select>
-        <button class="refresh-btn" onclick="refreshData()">REFRESH</button>
-        <div class="live-badge"><div class="live-dot"></div> LIVE</div>
-      </div>
-    </div>
-  </header>
-
-  <!-- ── TABS NAVIGATION ── -->
-  <nav class="tabs-wrap">
-    <div class="tabs">
-      <div class="tab on" data-tab="overview">OVERVIEW</div>
-      <div class="tab" data-tab="personnel">PERSONNEL</div>
-      <div class="tab" data-tab="analysis">ANALYSIS</div>
-      <div class="tab" data-tab="profile">PLAYER PROFILE</div>
-      <div class="tab" data-tab="prospects">TOP PROSPECTS</div>
-      <div class="tab" data-tab="scouting">SCOUT NOTES</div>
-      <div class="tab" data-tab="settings">SETTINGS</div>
-    </div>
-  </nav>
-
-  <!-- ── MAIN CONTENT ── -->
-  <main class="body">
-    
-    <!-- PAGE: OVERVIEW (Dashboard) -->
-    <section id="pg-overview" class="pg on">
-      <div class="grid2">
-        <div class="panel">
-          <h2 class="panel-title">DIVISION STANDINGS <span class="pt-badge">LIVE</span></h2>
-          <table class="tbl">
-            <thead><tr><th>TEAM</th><th>W</th><th>L</th><th>PCT</th><th>GB</th></tr></thead>
-            <tbody id="standings-body">
-              <tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Select a team to load standings</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="panel">
-          <h2 class="panel-title">ACTIVE ROSTER</h2>
-          <table class="tbl">
-            <thead><tr><th>#</th><th>NAME</th><th>POS</th><th>STATUS</th></tr></thead>
-            <tbody id="roster-body">
-              <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Select a team to load roster</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="panel">
-          <h2 class="panel-title">TEAM OFFENSE <span class="pt-badge">2026</span></h2>
-          <div id="team-offense-body" style="color:var(--text-dim); text-align:center; padding:20px;">No team data loaded</div>
-        </div>
-        <div class="panel">
-          <h2 class="panel-title">TEAM PITCHING <span class="pt-badge">2026</span></h2>
-          <div id="team-pitching-body" style="color:var(--text-dim); text-align:center; padding:20px;">No team data loaded</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PAGE: PLAYER PROFILE -->
-    <section id="pg-profile" class="pg">
-      <div class="panel">
-        <div id="player-hero-content">
-          <!-- Hero Section from Indexpart1.html logic -->
-          <div style="display:flex; gap:20px; align-items:center;">
-            <div style="width:100px; height:100px; background:var(--navy-mid); border-radius:10px;"></div>
-            <div>
-              <h2 style="font-family:'Bebas Neue'; font-size:42px;">SEARCH PLAYER</h2>
-              <p style="color:var(--orange); font-weight:700;">ENTER NAME IN THE COMMAND BAR OR SEARCH BOX</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid3">
-        <div class="panel"><h2 class="panel-title">SEASON STATS</h2><div id="season-stats-body"></div></div>
-        <div class="panel"><h2 class="panel-title">ADVANCED METRICS</h2><div id="advanced-stats-container"></div></div>
-        <div class="panel"><h2 class="panel-title">FLAGS & ALERTS</h2><div id="flags-container"></div></div>
-      </div>
-    </section>
-
-    <!-- PAGE: SCOUT NOTES -->
-    <section id="pg-scouting" class="pg">
-      <div class="panel">
-        <h2 class="panel-title">INTELLIGENCE LOGS <span class="pt-badge">SECURE</span></h2>
-        <div id="notes-container">
-          <p style="color:var(--text-dim)">No intelligence logs recorded for this session.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- PAGE: ANALYSIS -->
-    <section id="pg-analysis" class="pg">
-      <div class="panel">
-        <h2 class="panel-title">WIN PROJECTIONS</h2>
-        <div id="projections-content" style="height:300px; background:rgba(255,255,255,0.02); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--text-dim);">
-          Run Expectancy & Win Probability Engine Ready
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ── COMMAND TERMINAL ── -->
-  <div class="command-bar">
-    <span class="cmd-prompt">JARVIS ></span>
-    <input type="text" class="cmd-input" placeholder="Enter command (e.g., 'search Judge', 'switch team', or 'help')" onkeydown="handleCommand(event)">
-    <span class="cmd-help">CTRL+K to focus · v10.0.4</span>
-  </div>
-
-  <!-- ── SCRIPTS ── -->
-  <script src="js/data.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/player.js"></script>
-  <script src="js/team.js"></script>
 
 </body>
 </html>
