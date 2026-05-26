@@ -1,0 +1,47 @@
+/* ============================================================
+   MLB INTELLIGENCE TERMINAL - ANIMATIONS
+   All keyframes and transition definitions
+   ============================================================ */
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.7); opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  from { background-position: -1000px 0; }
+  to { background-position: 1000px 0; }
+}
+
+@keyframes barFill {
+  from { width: 0; }
+  to { width: var(--fill-width, 100%); }
+}
+
+/* Apply slide in to all major page elements on load */
+.panel,
+.hero-section,
+.tab-content {
+  animation: slideInDown 0.4s ease-out;
+}
+
+/* Live indicator pulse */
+.live-dot {
+  animation: pulse 1.6s infinite;
+}

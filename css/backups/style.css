@@ -1,0 +1,253 @@
+
+Turn on browser notifications when tasks complete.
+
+
+Share
+Lite
+I have completed the reorganization of your website!
+I have created a clean, modular structure that keeps your files organized and easy to manage, just as you requested. I've combined the "v10" features from Indexpart1.html with the professional UI and animations from indexpart2.html.
+What I've created for you:
+index.html: The main "frame" of your site. It's now very clean and points to your other files.
+style.css: A single file that handles all the professional colors, "slide-in" animations, and the tactical dark theme.
+js/ui.js: An updated version of your UI file that now supports the Command Terminal (at the bottom) and keyboard shortcuts.
+js/team.js: A new file specifically for the Live Scoreboard and team data.
+How to use these files:
+Main Folder: Replace your existing index.html with the new one, and add the style.css file to this same folder.
+js Folder: Update your ui.js file with the new code I provided, and add the new team.js file to this folder.
+Your website will now have a professional "Intelligence Terminal" feel with a live scoreboard, advanced player search, and a command-line interface!
+One final tip: I noticed your player.js was already quite good, so you can keep using your existing one as long as it's in the js folder.
+Let me know if you need help with any other parts!
+index.html
+Code · 3.11 KB
+style.css
+Code · 5.12 KB
+ui.js
+Code · 3.88 KB
+team.js
+Code · 1.47 KB
+View all files in this task
+How was this result?
+the data file is empty currentyl for me suggest how I should incoporate it
+Lite
+That's a great question! A "data file" (like js/data.js) is the perfect place to store information that doesn't change often, such as Team IDs, Colors, and API Settings.
+By putting this info in a dedicated data file, your other files (like ui.js and team.js) stay "thin" and easy to read.
+I've designed a js/data.js file for you that includes:
+Team Registry: All 30 MLB Team IDs so your search works perfectly.
+Color System: The official colors for teams so your UI can change color based on the team you select.
+App Constants: Settings like the current season year.
+I'll prepare this file for you now!
+I combined all CSS into a single style.css, created a clean index.html, and organized JavaScript files. I also added a data.js with team info and colors, ensuring a professional, modular website.
+
+Lite
+I've created the js/data.js file for you!
+How to use this file:
+Place it in your js folder: Save the attached data.js code into your js folder.
+Update your index.html: I've updated your index.html (attached) to include a reference to this new file. Important: It must be listed before your other script files so they can use the information inside it.
+Why this makes your site "work better":
+Team Knowledge: Your website now "knows" every MLB team's ID and official color.
+Central Control: If you ever want to change the season from 2026 to 2027, you only have to change it in one place (data.js) instead of in every single file.
+Clean Code: Your other files (like ui.js) can now just ask data.js for information, which makes them much shorter and easier for you to read.
+You're now set up with a professional, modular website structure! Let me know if you'd like to add any specific features next.
+data.js
+Code · 2.55 KB
+index.html
+Code · 3.15 KB
+View all files in this task
+Task completed
+How was this result?
+Suggested follow-ups
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Intelligence Terminal — JARVIS v10</title>
+  <link href="https://fonts.googleapis.
+
+
+Google Drive
+
+
+style.css
+/* ══════════════════════════════════════════════════════════════════════════
+   MLB INTELLIGENCE TERMINAL - PROFESSIONAL GRADE DESIGN SYSTEM
+   ========================================================================== */
+
+:root {
+  --orange: #e8722a;
+  --orange-dim: rgba(232, 114, 42, 0.15);
+  --orange-hover: rgba(232, 114, 42, 0.25);
+  --blue-bright: #5ab4f5;
+  --green: #4dce8a;
+  --red: #e85a5a;
+  --gold: #f5c842;
+  --navy: #07102d;
+  --navy-mid: #0d1c3a;
+  --navy-light: #0f2040;
+  --navy-border: #1e3055;
+  --text-bright: #fff;
+  --text-dim: #a0b4cc;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-outer: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+/* --- BASE STYLES --- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Barlow', sans-serif;
+  background: radial-gradient(ellipse at top, #c94e10 0%, #1a0800 30%, #030a1a 65%, #01050f 100%);
+  color: var(--text-bright);
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-bottom: 60px; /* Space for command bar */
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- ANIMATIONS --- */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes livepulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.8); } }
+
+/* --- HEADER --- */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(3,8,20,.95);
+  border-bottom: 2px solid rgba(232,114,42,.35);
+  backdrop-filter: blur(20px);
+  padding: 12px 24px;
+  animation: slideInDown 0.4s ease-out;
+}
+
+.hdr-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+.logo-block .dash-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, var(--text-bright) 40%, var(--orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --- SCOREBOARD TICKER --- */
+.scoreboard {
+  background: #000;
+  color: #fff;
+  padding: 4px 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--orange);
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  z-index: 101;
+}
+
+.score-track {
+  display: inline-block;
+  animation: ticker 50s linear infinite;
+}
+
+@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+.score-item { display: inline-block; padding: 0 22px; border-right: 1px solid #333; }
+.score-val { color: var(--orange); margin-left: 4px; }
+
+/* --- TABS --- */
+.tabs-wrap {
+  background: rgba(3,8,20,.72);
+  border-bottom: 1px solid var(--navy-border);
+  overflow-x: auto;
+}
+
+.tabs { display: flex; padding: 0 4px; max-width: 1800px; margin: 0 auto; }
+
+.tab {
+  padding: 12px 16px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab.on { color: var(--orange); border-bottom-color: var(--orange); }
+
+/* --- PANELS --- */
+.body { padding: 20px 24px; max-width: 1800px; margin: 0 auto; }
+.pg { display: none; animation: fadeIn 0.4s ease-out; }
+.pg.on { display: block; }
+
+.panel {
+  background: rgba(6,14,42,0.9);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-outer);
+  margin-bottom: 18px;
+}
+
+.panel-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 3px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  color: var(--orange);
+}
+
+/* --- COMMAND BAR --- */
+.command-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0,0,0,0.97);
+  border-top: 2px solid var(--orange);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 2000;
+  backdrop-filter: blur(10px);
+}
+
+.cmd-prompt { font-family: 'Bebas Neue', sans-serif; color: var(--orange); font-size: 16px; letter-spacing: 2px; }
+.cmd-input { flex: 1; background: transparent; border: none; color: #fff; font-family: 'Barlow Condensed', sans-serif; outline: none; }
+
+/* --- TABLES --- */
+.tbl { width: 100%; border-collapse: collapse; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; }
+.tbl th { text-align: left; padding: 8px; color: var(--text-dim); font-size: 10px; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.tbl td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+Uploaded File: index.html - Manus

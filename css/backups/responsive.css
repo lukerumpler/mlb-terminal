@@ -1,0 +1,71 @@
+/* ============================================================
+   MLB INTELLIGENCE TERMINAL - RESPONSIVE
+   Breakpoints for tablet and mobile
+   ============================================================ */
+
+/* --- TABLET (900px - 1199px) --- */
+@media (max-width: 1199px) {
+
+  .grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hero-bio .player-name {
+    font-size: 38px;
+  }
+
+  .body {
+    padding: 10px;
+  }
+}
+
+/* --- MOBILE (under 900px) --- */
+@media (max-width: 899px) {
+
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .hero-photo {
+    width: 80px;
+    height: 80px;
+  }
+
+  .hero-bio .player-name {
+    font-size: 32px;
+  }
+
+  .cmd-bar {
+    padding: 0 12px;
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .cmd-bar input {
+    min-width: 140px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .tab-btn {
+    padding: 7px 10px;
+    font-size: 10px;
+  }
+
+  .body {
+    padding: 8px;
+  }
+}
