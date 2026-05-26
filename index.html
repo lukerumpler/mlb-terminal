@@ -127,6 +127,7 @@
 
     <!-- Team Record Banner -->
     <div class="record-banner" id="record-banner" style="display:none">
+      <div id="team-logo-wrap" style="flex-shrink:0"></div>
       <div class="rb-name" id="rb-team-name">—</div>
       <div class="rb-stats" id="rb-stats"></div>
     </div>
@@ -509,6 +510,7 @@ async function loadTeam(teamId) {
   if (!teamId) return;
   currentTeam = parseInt(teamId);
   if (typeof updateThemeColors === 'function') updateThemeColors(currentTeam);
+  if (typeof renderTeamLogo === 'function') renderTeamLogo(currentTeam);
 
   // Show banner
   const banner = document.getElementById('record-banner');
