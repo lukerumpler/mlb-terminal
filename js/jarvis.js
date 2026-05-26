@@ -5,7 +5,7 @@ async function loadScoreTicker() {
   try {
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-    const res  = await fetch(`/api/mlb?path=/schedule?sportId=1&date=${today}&hydrate=team,linescore`);
+    const res  = await fetch(`/api/mlb?path=/schedule&sportId=1&date=${today}&hydrate=team,linescore`);
     const data = await res.json();
     const games = data.dates?.[0]?.games || [];
     const track = document.getElementById("score-track");

@@ -54,7 +54,7 @@ function getTeam(id) {
 
 const RAPID_API_KEY  = "acd7ac8ae4msh3afc19125ccc106p1021c4jsnb29d7a5829e8";
 const RAPID_API_HOST = "mlb-college-baseball-api.p.rapidapi.com";
-const RAPID_BASE     = "https://mlb-college-baseball-api.p.rapidapi.com"\;
+const RAPID_BASE     = "https://mlb-college-baseball-api.p.rapidapi.com";
 
 const rapidHeaders = {
   "Content-Type":   "application/json",
