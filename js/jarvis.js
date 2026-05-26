@@ -36,7 +36,13 @@ async function loadScoreTicker() {
       return `<span class="score-item" style="color:#fff;font-weight:600">${away} ${score} ${home}${state}</span>`;
     }).join('<span class="score-item" style="opacity:.2"> | </span>');
     
-    track.innerHTML = items + items;
+    track.innerHTML = items;
+    // Disable any CSS animation if it exists
+    track.style.animation = "none";
+    track.style.display = "flex";
+    track.style.flexWrap = "nowrap";
+    track.style.overflowX = "auto";
+    track.style.padding = "0 20px";
   } catch(e) { 
     console.warn("Ticker:", e); 
   }
