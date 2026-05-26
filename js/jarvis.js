@@ -1,5 +1,5 @@
 /* JARVIS v5 — Ticker, Logo, Favicon */
-const SEASON = 2026;
+
 
 async function loadScoreTicker() {
   try {

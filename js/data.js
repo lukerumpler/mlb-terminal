@@ -46,3 +46,45 @@ const MLB_TEAMS = {
 function getTeam(id) {
     return MLB_TEAMS[id] || { name: "Unknown", color: "#e8722a" };
 }
+
+/* ============================================================
+   RAPIDAPI — MLB College Baseball API
+   Key: acd7ac8ae4msh3afc19125ccc106p1021c4jsnb29d7a5829e8
+   ============================================================ */
+
+const RAPID_API_KEY  = "acd7ac8ae4msh3afc19125ccc106p1021c4jsnb29d7a5829e8";
+const RAPID_API_HOST = "mlb-college-baseball-api.p.rapidapi.com";
+const RAPID_BASE     = "https://mlb-college-baseball-api.p.rapidapi.com"\;
+
+const rapidHeaders = {
+  "Content-Type":   "application/json",
+  "x-rapidapi-host": RAPID_API_HOST,
+  "x-rapidapi-key":  RAPID_API_KEY
+};
+
+async function rapidFetch(endpoint) {
+  try {
+    const res  = await fetch(`${RAPID_BASE}${endpoint}`, { headers: rapidHeaders });
+    if (!res.ok) throw new Error(`RapidAPI ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error("RapidAPI error:", err);
+    return null;
+  }
+}
+
+async function getCollegeMatch(id) {
+  return await rapidFetch(`/matches/${id}`);
+}
+
+async function getCollegeMatches() {
+  return await rapidFetch(`/matches`);
+}
+
+async function getCollegePlayers() {
+  return await rapidFetch(`/players`);
+}
+
+async function getCollegeTeams() {
+  return await rapidFetch(`/teams`);
+}
