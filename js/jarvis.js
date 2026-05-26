@@ -1,16 +1,27 @@
 /* JARVIS v5 — Ticker, Logo, Favicon */
 
+// Use a longer interval (5 minutes) to save data, unless the user manually refreshes
+const TICKER_INTERVAL = 300000; 
 
 async function loadScoreTicker() {
   try {
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    
+    // Only fetch if the tab is visible to save data
+    if (document.hidden) return;
+
     const res  = await fetch(`/api/mlb?path=/schedule&sportId=1&date=${today}&hydrate=team,linescore`);
     const data = await res.json();
     const games = data.dates?.[0]?.games || [];
     const track = document.getElementById("score-track");
     if (!track) return;
-    if (!games.length) { track.innerHTML = `<span class="score-item">NO GAMES TODAY</span>`; return; }
+    
+    if (!games.length) { 
+      track.innerHTML = `<span class="score-item">NO GAMES TODAY</span>`; 
+      return; 
+    }
+    
     const items = games.map(g => {
       const away  = g.teams?.away?.team?.abbreviation || "—";
       const home  = g.teams?.home?.team?.abbreviation || "—";
@@ -23,8 +34,11 @@ async function loadScoreTicker() {
           ? `<span style="color:var(--green)">${g.linescore.currentInningOrdinal}</span>` : "";
       return `<span class="score-item">${away} ${score} ${home} ${state}</span>`;
     }).join('<span class="score-item" style="opacity:.3">·</span>');
+    
     track.innerHTML = items + items;
-  } catch(e) { console.warn("Ticker:", e); }
+  } catch(e) { 
+    console.warn("Ticker:", e); 
+  }
 }
 
 function renderTeamLogo(teamId) {
@@ -51,6 +65,7 @@ function refreshData() {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadScoreTicker();
-  setInterval(loadScoreTicker, 60000);
-  console.log("✅ JARVIS ticker initialized");
+  // Optimized interval: 5 minutes instead of 1 minute
+  setInterval(loadScoreTicker, TICKER_INTERVAL);
+  console.log("✅ JARVIS ticker initialized (Optimized)");
 });

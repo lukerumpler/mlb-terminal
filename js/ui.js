@@ -89,7 +89,7 @@ function _pickPlayer(name) {
   if (input) input.value = name;
   _hideDropdown();
   // Switch to player profile tab
-  switchTab("profile");
+  if (typeof switchTab === "function") switchTab("profile");
   if (typeof loadPlayer === "function") loadPlayer();
 }
 
