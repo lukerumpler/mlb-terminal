@@ -164,13 +164,29 @@ function findStatGroup(statsArr, groupName) {
   );
 }
 
+// A season response can contain team, league, and sport-level splits. Prefer
+// the current profile sport and an aggregate/total row before falling back to
+// the first available split. This matters for players who changed teams or
+// who are found through the MiLB-inclusive search path.
+export function selectSeasonSplit(splits, sportId) {
+  if (!Array.isArray(splits) || !splits.length) return null;
+  const sportSplits = sportId == null
+    ? splits
+    : splits.filter(split => String(split?.sport?.id) === String(sportId));
+  const candidates = sportSplits.length ? sportSplits : splits;
+  return candidates.find(split => split?.isTotal === true)
+    ?? candidates.find(split => split?.team == null)
+    ?? candidates[0]
+    ?? null;
+}
+
 // Try current season, fall back to prior year automatically
-async function getSeasonStatsSafe(id, group, season) {
+async function getSeasonStatsSafe(id, group, season, sportId) {
   const tryYear = async (yr) => {
     try {
       const data  = await mlb(`/people/${id}/stats`, { stats: 'season', group, season: yr });
       const grp   = findStatGroup(data.stats, group);
-      const split = grp?.splits?.[0];
+      const split = selectSeasonSplit(grp?.splits, sportId);
       return split?.stat && Object.keys(split.stat).length > 2 ? split.stat : null;
     } catch { return null; }
   };
@@ -234,10 +250,11 @@ export async function loadFullPlayer(person, season = SEASON) {
   const id = person.id;
 
   // All 6 requests run in parallel — contract never blocks stats
-  const [profile, hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw] = await Promise.all([
-    getPlayerProfile(id),
-    getSeasonStatsSafe(id, 'hitting',  season),
-    getSeasonStatsSafe(id, 'pitching', season),
+  const profile = await getPlayerProfile(id);
+  const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
+  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw] = await Promise.all([
+    getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
+    getSeasonStatsSafe(id, 'pitching', season, profileSportId),
     getCareerSplits(id, 'hitting'),
     getCareerSplits(id, 'pitching'),
     fetchContractData(id, person.fullName),
@@ -699,6 +716,24 @@ export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
   const data   = await mlb(`/teams/${teamId}/stats`, { stats: 'season', group, season, sportIds: 1 });
   const grp    = findStatGroup(data.stats, group);
   return grp?.splits?.[0]?.stat || {};
+}
+
+// Aggregate current-season team statistics. The MLB Stats API returns one
+// split per team when no teamId is supplied; keeping this in one helper lets
+// every team-facing view use the same authoritative snapshot rather than the
+// older static examples in data.js.
+export async function getAllTeamStats(group = 'hitting', season = SEASON) {
+  const data = await mlb('/teams/stats', { stats: 'season', group, season, sportIds: 1 });
+  const grp = findStatGroup(data.stats, group);
+  return Object.fromEntries((grp?.splits || []).map(split => [
+    split.team?.id,
+    {
+      ...split.stat,
+      teamId: split.team?.id,
+      teamAbbr: split.team?.abbreviation || '',
+      teamName: split.team?.name || '',
+    },
+  ]));
 }
 
 export async function getTeamRoster(teamId, season = SEASON, rosterType = 'active') {

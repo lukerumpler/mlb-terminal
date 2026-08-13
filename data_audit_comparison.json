@@ -1,0 +1,2105 @@
+{
+  "teamMismatches": [
+    {
+      "id": 112,
+      "abbr": "CHC",
+      "name": "Chicago Cubs",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.238,
+          "official": 0.25
+        },
+        {
+          "field": "obp",
+          "static": 0.309,
+          "official": 0.34
+        },
+        {
+          "field": "slg",
+          "static": 0.405,
+          "official": 0.421
+        },
+        {
+          "field": "ops",
+          "static": 0.714,
+          "official": 0.761
+        },
+        {
+          "field": "hr",
+          "static": 74.0,
+          "official": 155
+        },
+        {
+          "field": "sb",
+          "static": 54.0,
+          "official": 91
+        },
+        {
+          "field": "era",
+          "static": 4.07,
+          "official": 4.08
+        },
+        {
+          "field": "whip",
+          "static": 1.18,
+          "official": 1.26
+        },
+        {
+          "field": "k",
+          "static": 546.0,
+          "official": 929
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "abbr": "CIN",
+      "name": "Cincinnati Reds",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.249,
+          "official": 0.228
+        },
+        {
+          "field": "obp",
+          "static": 0.319,
+          "official": 0.308
+        },
+        {
+          "field": "slg",
+          "static": 0.416,
+          "official": 0.396
+        },
+        {
+          "field": "ops",
+          "static": 0.735,
+          "official": 0.704
+        },
+        {
+          "field": "hr",
+          "static": 68.0,
+          "official": 158
+        },
+        {
+          "field": "sb",
+          "static": 64.0,
+          "official": 86
+        },
+        {
+          "field": "era",
+          "static": 3.86,
+          "official": 4.5
+        },
+        {
+          "field": "whip",
+          "static": 1.13,
+          "official": 1.4
+        },
+        {
+          "field": "k",
+          "static": 567.0,
+          "official": 958
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "abbr": "COL",
+      "name": "Colorado Rockies",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.244,
+          "official": 0.255
+        },
+        {
+          "field": "obp",
+          "static": 0.32,
+          "official": 0.323
+        },
+        {
+          "field": "slg",
+          "static": 0.401,
+          "official": 0.421
+        },
+        {
+          "field": "ops",
+          "static": 0.721,
+          "official": 0.744
+        },
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 137
+        },
+        {
+          "field": "sb",
+          "static": 38.0,
+          "official": 82
+        },
+        {
+          "field": "era",
+          "static": 3.96,
+          "official": 5.47
+        },
+        {
+          "field": "whip",
+          "static": 1.15,
+          "official": 1.52
+        },
+        {
+          "field": "k",
+          "static": 517.0,
+          "official": 830
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "abbr": "KC",
+      "name": "Kansas City Royals",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.247,
+          "official": 0.243
+        },
+        {
+          "field": "obp",
+          "static": 0.323,
+          "official": 0.311
+        },
+        {
+          "field": "slg",
+          "static": 0.384,
+          "official": 0.394
+        },
+        {
+          "field": "ops",
+          "static": 0.707,
+          "official": 0.705
+        },
+        {
+          "field": "hr",
+          "static": 71.0,
+          "official": 122
+        },
+        {
+          "field": "sb",
+          "static": 50.0,
+          "official": 95
+        },
+        {
+          "field": "era",
+          "static": 3.91,
+          "official": 4.84
+        },
+        {
+          "field": "whip",
+          "static": 1.15,
+          "official": 1.43
+        },
+        {
+          "field": "k",
+          "static": 500.0,
+          "official": 901
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "abbr": "WSH",
+      "name": "Washington Nationals",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.247,
+          "official": 0.252
+        },
+        {
+          "field": "obp",
+          "static": 0.324,
+          "official": 0.328
+        },
+        {
+          "field": "slg",
+          "static": 0.368,
+          "official": 0.441
+        },
+        {
+          "field": "ops",
+          "static": 0.692,
+          "official": 0.769
+        },
+        {
+          "field": "hr",
+          "static": 65.0,
+          "official": 176
+        },
+        {
+          "field": "sb",
+          "static": 57.0,
+          "official": 133
+        },
+        {
+          "field": "era",
+          "static": 4.2,
+          "official": 4.76
+        },
+        {
+          "field": "whip",
+          "static": 1.18,
+          "official": 1.39
+        },
+        {
+          "field": "k",
+          "static": 559.0,
+          "official": 922
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "abbr": "NYM",
+      "name": "New York Mets",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.244,
+          "official": 0.235
+        },
+        {
+          "field": "obp",
+          "static": 0.314,
+          "official": 0.306
+        },
+        {
+          "field": "slg",
+          "static": 0.417,
+          "official": 0.388
+        },
+        {
+          "field": "ops",
+          "static": 0.731,
+          "official": 0.694
+        },
+        {
+          "field": "hr",
+          "static": 75.0,
+          "official": 148
+        },
+        {
+          "field": "sb",
+          "static": 66.0,
+          "official": 63
+        },
+        {
+          "field": "era",
+          "static": 3.61,
+          "official": 4.14
+        },
+        {
+          "field": "whip",
+          "static": 1.13,
+          "official": 1.31
+        },
+        {
+          "field": "k",
+          "static": 566.0,
+          "official": 1095
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "abbr": "PIT",
+      "name": "Pittsburgh Pirates",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.243,
+          "official": 0.255
+        },
+        {
+          "field": "obp",
+          "static": 0.314,
+          "official": 0.333
+        },
+        {
+          "field": "slg",
+          "static": 0.37,
+          "official": 0.41
+        },
+        {
+          "field": "ops",
+          "static": 0.684,
+          "official": 0.743
+        },
+        {
+          "field": "hr",
+          "static": 68.0,
+          "official": 147
+        },
+        {
+          "field": "sb",
+          "static": 55.0,
+          "official": 104
+        },
+        {
+          "field": "era",
+          "static": 4.08,
+          "official": 4.32
+        },
+        {
+          "field": "whip",
+          "static": 1.16,
+          "official": 1.32
+        },
+        {
+          "field": "k",
+          "static": 557.0,
+          "official": 1134
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "abbr": "SF",
+      "name": "San Francisco Giants",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.24,
+          "official": 0.248
+        },
+        {
+          "field": "obp",
+          "static": 0.318,
+          "official": 0.306
+        },
+        {
+          "field": "slg",
+          "static": 0.387,
+          "official": 0.406
+        },
+        {
+          "field": "ops",
+          "static": 0.705,
+          "official": 0.712
+        },
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 134
+        },
+        {
+          "field": "sb",
+          "static": 66.0,
+          "official": 56
+        },
+        {
+          "field": "era",
+          "static": 3.77,
+          "official": 4.31
+        },
+        {
+          "field": "whip",
+          "static": 1.13,
+          "official": 1.35
+        },
+        {
+          "field": "k",
+          "static": 554.0,
+          "official": 911
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "abbr": "STL",
+      "name": "St. Louis Cardinals",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.245,
+          "official": 0.241
+        },
+        {
+          "field": "obp",
+          "static": 0.324,
+          "official": 0.316
+        },
+        {
+          "field": "slg",
+          "static": 0.393,
+          "official": 0.379
+        },
+        {
+          "field": "ops",
+          "static": 0.717,
+          "official": 0.695
+        },
+        {
+          "field": "hr",
+          "static": 73.0,
+          "official": 122
+        },
+        {
+          "field": "sb",
+          "static": 65.0,
+          "official": 76
+        },
+        {
+          "field": "era",
+          "static": 3.49,
+          "official": 4.07
+        },
+        {
+          "field": "whip",
+          "static": 1.11,
+          "official": 1.34
+        },
+        {
+          "field": "k",
+          "static": 526.0,
+          "official": 923
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "abbr": "TB",
+      "name": "Tampa Bay Rays",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.241,
+          "official": 0.261
+        },
+        {
+          "field": "obp",
+          "static": 0.309,
+          "official": 0.331
+        },
+        {
+          "field": "slg",
+          "static": 0.388,
+          "official": 0.408
+        },
+        {
+          "field": "ops",
+          "static": 0.697,
+          "official": 0.739
+        },
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 128
+        },
+        {
+          "field": "sb",
+          "static": 50.0,
+          "official": 121
+        },
+        {
+          "field": "era",
+          "static": 3.76,
+          "official": 3.7
+        },
+        {
+          "field": "whip",
+          "static": 1.13,
+          "official": 1.14
+        },
+        {
+          "field": "k",
+          "static": 507.0,
+          "official": 977
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "abbr": "TOR",
+      "name": "Toronto Blue Jays",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.247,
+          "official": 0.243
+        },
+        {
+          "field": "obp",
+          "static": 0.315,
+          "official": 0.304
+        },
+        {
+          "field": "slg",
+          "static": 0.4,
+          "official": 0.377
+        },
+        {
+          "field": "ops",
+          "static": 0.715,
+          "official": 0.681
+        },
+        {
+          "field": "hr",
+          "static": 66.0,
+          "official": 115
+        },
+        {
+          "field": "sb",
+          "static": 62.0,
+          "official": 59
+        },
+        {
+          "field": "era",
+          "static": 3.93,
+          "official": 3.99
+        },
+        {
+          "field": "whip",
+          "static": 1.18,
+          "official": 1.32
+        },
+        {
+          "field": "k",
+          "static": 509.0,
+          "official": 1068
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "abbr": "MIN",
+      "name": "Minnesota Twins",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.242,
+          "official": 0.245
+        },
+        {
+          "field": "obp",
+          "static": 0.317,
+          "official": 0.319
+        },
+        {
+          "field": "slg",
+          "static": 0.411,
+          "official": 0.406
+        },
+        {
+          "field": "ops",
+          "static": 0.728,
+          "official": 0.725
+        },
+        {
+          "field": "hr",
+          "static": 81.0,
+          "official": 143
+        },
+        {
+          "field": "sb",
+          "static": 52.0,
+          "official": 73
+        },
+        {
+          "field": "era",
+          "static": 3.81,
+          "official": 4.6
+        },
+        {
+          "field": "whip",
+          "static": 1.16,
+          "official": 1.38
+        },
+        {
+          "field": "k",
+          "static": 578.0,
+          "official": 1007
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "abbr": "MIL",
+      "name": "Milwaukee Brewers",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.249,
+          "official": 0.251
+        },
+        {
+          "field": "obp",
+          "static": 0.327,
+          "official": 0.336
+        },
+        {
+          "field": "slg",
+          "static": 0.414,
+          "official": 0.395
+        },
+        {
+          "field": "ops",
+          "static": 0.741,
+          "official": 0.731
+        },
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 111
+        },
+        {
+          "field": "sb",
+          "static": 47.0,
+          "official": 120
+        },
+        {
+          "field": "era",
+          "static": 3.72,
+          "official": 3.53
+        },
+        {
+          "field": "whip",
+          "static": 1.11,
+          "official": 1.17
+        },
+        {
+          "field": "k",
+          "static": 567.0,
+          "official": 1176
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "abbr": "LAA",
+      "name": "Los Angeles Angels",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.244,
+          "official": 0.235
+        },
+        {
+          "field": "slg",
+          "static": 0.384,
+          "official": 0.376
+        },
+        {
+          "field": "ops",
+          "static": 0.695,
+          "official": 0.686
+        },
+        {
+          "field": "hr",
+          "static": 74.0,
+          "official": 124
+        },
+        {
+          "field": "sb",
+          "static": 65.0,
+          "official": 62
+        },
+        {
+          "field": "era",
+          "static": 3.99,
+          "official": 4.47
+        },
+        {
+          "field": "whip",
+          "static": 1.19,
+          "official": 1.37
+        },
+        {
+          "field": "k",
+          "static": 565.0,
+          "official": 1083
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "abbr": "DET",
+      "name": "Detroit Tigers",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.248,
+          "official": 0.243
+        },
+        {
+          "field": "slg",
+          "static": 0.382,
+          "official": 0.407
+        },
+        {
+          "field": "ops",
+          "static": 0.703,
+          "official": 0.727
+        },
+        {
+          "field": "hr",
+          "static": 79.0,
+          "official": 146
+        },
+        {
+          "field": "sb",
+          "static": 56.0,
+          "official": 36
+        },
+        {
+          "field": "era",
+          "static": 3.96,
+          "official": 3.48
+        },
+        {
+          "field": "whip",
+          "static": 1.17,
+          "official": 1.2
+        },
+        {
+          "field": "k",
+          "static": 551.0,
+          "official": 994
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "abbr": "ATH",
+      "name": "Athletics",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.237,
+          "official": 0.243
+        },
+        {
+          "field": "obp",
+          "static": 0.312,
+          "official": 0.316
+        },
+        {
+          "field": "ops",
+          "static": 0.71,
+          "official": 0.715
+        },
+        {
+          "field": "hr",
+          "static": 65.0,
+          "official": 143
+        },
+        {
+          "field": "sb",
+          "static": 50.0,
+          "official": 66
+        },
+        {
+          "field": "era",
+          "static": 3.81,
+          "official": 5.51
+        },
+        {
+          "field": "whip",
+          "static": 1.13,
+          "official": 1.51
+        },
+        {
+          "field": "k",
+          "static": 503.0,
+          "official": 1024
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "abbr": "CWS",
+      "name": "Chicago White Sox",
+      "diffs": [
+        {
+          "field": "obp",
+          "static": 0.314,
+          "official": 0.317
+        },
+        {
+          "field": "slg",
+          "static": 0.415,
+          "official": 0.407
+        },
+        {
+          "field": "ops",
+          "static": 0.729,
+          "official": 0.724
+        },
+        {
+          "field": "hr",
+          "static": 79.0,
+          "official": 157
+        },
+        {
+          "field": "sb",
+          "static": 65.0,
+          "official": 69
+        },
+        {
+          "field": "era",
+          "static": 3.86,
+          "official": 4.11
+        },
+        {
+          "field": "whip",
+          "static": 1.16,
+          "official": 1.3
+        },
+        {
+          "field": "k",
+          "static": 561.0,
+          "official": 1016
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "abbr": "MIA",
+      "name": "Miami Marlins",
+      "diffs": [
+        {
+          "field": "obp",
+          "static": 0.324,
+          "official": 0.326
+        },
+        {
+          "field": "slg",
+          "static": 0.409,
+          "official": 0.403
+        },
+        {
+          "field": "ops",
+          "static": 0.733,
+          "official": 0.729
+        },
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 123
+        },
+        {
+          "field": "sb",
+          "static": 59.0,
+          "official": 125
+        },
+        {
+          "field": "era",
+          "static": 3.42,
+          "official": 3.94
+        },
+        {
+          "field": "whip",
+          "static": 1.08,
+          "official": 1.24
+        },
+        {
+          "field": "k",
+          "static": 606.0,
+          "official": 1021
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "abbr": "ARI",
+      "name": "Arizona Diamondbacks",
+      "diffs": [
+        {
+          "field": "slg",
+          "static": 0.419,
+          "official": 0.396
+        },
+        {
+          "field": "ops",
+          "static": 0.736,
+          "official": 0.712
+        },
+        {
+          "field": "hr",
+          "static": 80.0,
+          "official": 118
+        },
+        {
+          "field": "sb",
+          "static": 57.0,
+          "official": 81
+        },
+        {
+          "field": "era",
+          "static": 3.76,
+          "official": 4.12
+        },
+        {
+          "field": "whip",
+          "static": 1.14,
+          "official": 1.29
+        },
+        {
+          "field": "k",
+          "static": 588.0,
+          "official": 828
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "abbr": "TEX",
+      "name": "Texas Rangers",
+      "diffs": [
+        {
+          "field": "avg",
+          "static": 0.241,
+          "official": 0.243
+        },
+        {
+          "field": "hr",
+          "static": 77.0,
+          "official": 136
+        },
+        {
+          "field": "sb",
+          "static": 44.0,
+          "official": 58
+        },
+        {
+          "field": "era",
+          "static": 3.62,
+          "official": 4.25
+        },
+        {
+          "field": "whip",
+          "static": 1.14,
+          "official": 1.29
+        },
+        {
+          "field": "k",
+          "static": 568.0,
+          "official": 1013
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "abbr": "LAD",
+      "name": "Los Angeles Dodgers",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 98.0,
+          "official": 155
+        },
+        {
+          "field": "sb",
+          "static": 54.0,
+          "official": 46
+        },
+        {
+          "field": "era",
+          "static": 2.98,
+          "official": 3.7
+        },
+        {
+          "field": "whip",
+          "static": 1.06,
+          "official": 1.16
+        },
+        {
+          "field": "k",
+          "static": 628.0,
+          "official": 1081
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "abbr": "NYY",
+      "name": "New York Yankees",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 104.0,
+          "official": 169
+        },
+        {
+          "field": "sb",
+          "static": 34.0,
+          "official": 114
+        },
+        {
+          "field": "era",
+          "static": 3.21,
+          "official": 3.29
+        },
+        {
+          "field": "whip",
+          "static": 1.12,
+          "official": 1.18
+        },
+        {
+          "field": "k",
+          "static": 598.0,
+          "official": 1087
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "abbr": "ATL",
+      "name": "Atlanta Braves",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 88.0,
+          "official": 164
+        },
+        {
+          "field": "sb",
+          "static": 62.0,
+          "official": 57
+        },
+        {
+          "field": "era",
+          "static": 3.44,
+          "official": 3.6
+        },
+        {
+          "field": "whip",
+          "static": 1.18,
+          "official": 1.24
+        },
+        {
+          "field": "k",
+          "static": 572.0,
+          "official": 1040
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "abbr": "HOU",
+      "name": "Houston Astros",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 82.0,
+          "official": 162
+        },
+        {
+          "field": "sb",
+          "static": 48.0,
+          "official": 38
+        },
+        {
+          "field": "era",
+          "static": 3.61,
+          "official": 4.54
+        },
+        {
+          "field": "whip",
+          "static": 1.21,
+          "official": 1.35
+        },
+        {
+          "field": "k",
+          "static": 551.0,
+          "official": 1061
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "abbr": "SEA",
+      "name": "Seattle Mariners",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 74.0,
+          "official": 142
+        },
+        {
+          "field": "sb",
+          "static": 41.0,
+          "official": 84
+        },
+        {
+          "field": "era",
+          "static": 3.48,
+          "official": 3.83
+        },
+        {
+          "field": "whip",
+          "static": 1.16,
+          "official": 1.21
+        },
+        {
+          "field": "k",
+          "static": 612.0,
+          "official": 1030
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "abbr": "CLE",
+      "name": "Cleveland Guardians",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 72.0,
+          "official": 117
+        },
+        {
+          "field": "sb",
+          "static": 44.0,
+          "official": 118
+        },
+        {
+          "field": "era",
+          "static": 3.55,
+          "official": 3.83
+        },
+        {
+          "field": "whip",
+          "static": 1.19,
+          "official": 1.27
+        },
+        {
+          "field": "k",
+          "static": 579.0,
+          "official": 1131
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "abbr": "BAL",
+      "name": "Baltimore Orioles",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 88.0,
+          "official": 143
+        },
+        {
+          "field": "sb",
+          "static": 52.0,
+          "official": 65
+        },
+        {
+          "field": "era",
+          "static": 3.81,
+          "official": 4.24
+        },
+        {
+          "field": "whip",
+          "static": 1.24,
+          "official": 1.35
+        },
+        {
+          "field": "k",
+          "static": 534.0,
+          "official": 959
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "abbr": "PHI",
+      "name": "Philadelphia Phillies",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 82.0,
+          "official": 149
+        },
+        {
+          "field": "sb",
+          "static": 38.0,
+          "official": 94
+        },
+        {
+          "field": "era",
+          "static": 3.91,
+          "official": 4.2
+        },
+        {
+          "field": "whip",
+          "static": 1.26,
+          "official": 1.3
+        },
+        {
+          "field": "k",
+          "static": 548.0,
+          "official": 1196
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "abbr": "BOS",
+      "name": "Boston Red Sox",
+      "diffs": [
+        {
+          "field": "hr",
+          "static": 91.0,
+          "official": 121
+        },
+        {
+          "field": "sb",
+          "static": 58.0,
+          "official": 93
+        },
+        {
+          "field": "era",
+          "static": 3.72,
+          "official": 3.51
+        },
+        {
+          "field": "k",
+          "static": 541.0,
+          "official": 1029
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "abbr": "SD",
+      "name": "San Diego Padres",
+      "diffs": []
+    }
+  ],
+  "teamMismatchSummary": {
+    "teamsWithAnyDifference": 29,
+    "totalComparedFieldsDifferent": 214,
+    "teamsWithNoDifference": [
+      "SD"
+    ]
+  },
+  "prospectIdentityIssues": [
+    {
+      "id": 802565.0,
+      "_error": "404 Client Error: Not Found for url: https://statsapi.mlb.com/api/v1/people/802565?hydrate=currentTeam"
+    }
+  ],
+  "officialLeaders": {
+    "homeRuns": [
+      {
+        "rank": 1,
+        "id": 670541,
+        "name": "Yordan Alvarez",
+        "team": "HOU",
+        "value": "35"
+      },
+      {
+        "rank": 1,
+        "id": 691406,
+        "name": "Junior Caminero",
+        "team": "TB",
+        "value": "35"
+      },
+      {
+        "rank": 1,
+        "id": 621566,
+        "name": "Matt Olson",
+        "team": "ATL",
+        "value": "35"
+      },
+      {
+        "rank": 1,
+        "id": 656941,
+        "name": "Kyle Schwarber",
+        "team": "PHI",
+        "value": "35"
+      },
+      {
+        "rank": 5,
+        "id": 696100,
+        "name": "Hunter Goodman",
+        "team": "COL",
+        "value": "34"
+      },
+      {
+        "rank": 6,
+        "id": 700250,
+        "name": "Ben Rice",
+        "team": "NYY",
+        "value": "32"
+      },
+      {
+        "rank": 7,
+        "id": 695578,
+        "name": "James Wood",
+        "team": "WSH",
+        "value": "30"
+      },
+      {
+        "rank": 8,
+        "id": 682928,
+        "name": "CJ Abrams",
+        "team": "WSH",
+        "value": "29"
+      },
+      {
+        "rank": 9,
+        "id": 691718,
+        "name": "Pete Crow-Armstrong",
+        "team": "CHC",
+        "value": "27"
+      },
+      {
+        "rank": 9,
+        "id": 660271,
+        "name": "Shohei Ohtani",
+        "team": "LAD",
+        "value": "27"
+      }
+    ],
+    "battingAverage": [
+      {
+        "rank": 1,
+        "id": 686563,
+        "name": "Jonathan Cannon",
+        "team": "CWS",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 664059,
+        "name": "Sam Haggerty",
+        "team": "TEX",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 643361,
+        "name": "Kevin Herget",
+        "team": "NYM",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 664731,
+        "name": "P.J. Higgins",
+        "team": "CIN",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 681520,
+        "name": "Antoine Kelly",
+        "team": "CHC",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 701780,
+        "name": "Tanner McDougal",
+        "team": "CWS",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 624512,
+        "name": "Reese McGuire",
+        "team": "CWS",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 676694,
+        "name": "Jake Meyers",
+        "team": "HOU",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 663432,
+        "name": "Tanner Rainey",
+        "team": "DET",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 605441,
+        "name": "Yacksel Ríos",
+        "team": "CHC",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 670097,
+        "name": "Zack Short",
+        "team": "NYM",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 696146,
+        "name": "Hagen Smith",
+        "team": "CWS",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 687721,
+        "name": "Cameron Weston",
+        "team": "BAL",
+        "value": ".000"
+      },
+      {
+        "rank": 1,
+        "id": 670871,
+        "name": "Guillo Zuñiga",
+        "team": "NYM",
+        "value": ".000"
+      }
+    ],
+    "onBasePlusSlugging": [
+      {
+        "rank": 1,
+        "id": 682989,
+        "name": "Victor Mederos",
+        "team": "ATL",
+        "value": "2.000"
+      },
+      {
+        "rank": 2,
+        "id": 691728,
+        "name": "Zac Veen",
+        "team": "COL",
+        "value": "1.666"
+      },
+      {
+        "rank": 3,
+        "id": 665856,
+        "name": "Jair Camargo",
+        "team": "ATL",
+        "value": "1.500"
+      },
+      {
+        "rank": 4,
+        "id": 687605,
+        "name": "Andrew Pinckney",
+        "team": "WSH",
+        "value": "1.262"
+      },
+      {
+        "rank": 5,
+        "id": 680664,
+        "name": "Eduardo Valencia",
+        "team": "DET",
+        "value": "1.254"
+      },
+      {
+        "rank": 6,
+        "id": 694224,
+        "name": "Gabriel Gonzalez",
+        "team": "MIN",
+        "value": "1.250"
+      },
+      {
+        "rank": 7,
+        "id": 678225,
+        "name": "Jihwan Bae",
+        "team": "MIL",
+        "value": "1.167"
+      },
+      {
+        "rank": 8,
+        "id": 669717,
+        "name": "Will Wilson",
+        "team": "SEA",
+        "value": "1.133"
+      },
+      {
+        "rank": 9,
+        "id": 681909,
+        "name": "Justin Dean",
+        "team": "CHC",
+        "value": "1.125"
+      },
+      {
+        "rank": 10,
+        "id": 670541,
+        "name": "Yordan Alvarez",
+        "team": "HOU",
+        "value": "1.057"
+      },
+      {
+        "rank": 10,
+        "id": 676551,
+        "name": "Brewer Hicklen",
+        "team": "ATL",
+        "value": "1.057"
+      }
+    ],
+    "earnedRunAverage": [
+      {
+        "rank": 1,
+        "id": 681084,
+        "name": "Tanner Andrews",
+        "team": "TOR",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 702352,
+        "name": "Spencer Bivens",
+        "team": "SF",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 621389,
+        "name": "Ty Blach",
+        "team": "CHC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 682997,
+        "name": "Tyler Callihan",
+        "team": "PIT",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 682769,
+        "name": "Eiberson Castellano",
+        "team": "COL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 694753,
+        "name": "Khristian Curtis",
+        "team": "PIT",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 664744,
+        "name": "Jose Espada",
+        "team": "BAL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 804668,
+        "name": "Rafael Flores Jr.",
+        "team": "PIT",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 664059,
+        "name": "Sam Haggerty",
+        "team": "TEX",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 643361,
+        "name": "Kevin Herget",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 700327,
+        "name": "Welinton Herrera",
+        "team": "COL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 664731,
+        "name": "P.J. Higgins",
+        "team": "CIN",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 695549,
+        "name": "Jackson Jobe",
+        "team": "DET",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 690829,
+        "name": "Ben Joyce",
+        "team": "LAA",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 681520,
+        "name": "Antoine Kelly",
+        "team": "CHC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 621139,
+        "name": "Brooks Kriske",
+        "team": "ATH",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 681320,
+        "name": "Nate Lavender",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 624512,
+        "name": "Reese McGuire",
+        "team": "CWS",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 676694,
+        "name": "Jake Meyers",
+        "team": "HOU",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 668716,
+        "name": "Noah Murdock",
+        "team": "PIT",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 663432,
+        "name": "Tanner Rainey",
+        "team": "DET",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 668670,
+        "name": "Jake Rogers",
+        "team": "DET",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 668942,
+        "name": "Josh Rojas",
+        "team": "KC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 605441,
+        "name": "Yacksel Ríos",
+        "team": "CHC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 680474,
+        "name": "Max Schuemann",
+        "team": "NYY",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 670097,
+        "name": "Zack Short",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 696146,
+        "name": "Hagen Smith",
+        "team": "CWS",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 668831,
+        "name": "Garrett Stallings",
+        "team": "MIL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 664702,
+        "name": "Myles Straw",
+        "team": "TOR",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 596142,
+        "name": "Gary Sánchez",
+        "team": "MIL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 663494,
+        "name": "Bryan Torres",
+        "team": "STL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 592826,
+        "name": "Vince Velasquez",
+        "team": "CHC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 676620,
+        "name": "Blake Weiman",
+        "team": "LAA",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 674073,
+        "name": "Jack Weisenburger",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 687721,
+        "name": "Cameron Weston",
+        "team": "BAL",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 670871,
+        "name": "Guillo Zuñiga",
+        "team": "NYM",
+        "value": "0.00"
+      }
+    ],
+    "strikeouts": [
+      {
+        "rank": 1,
+        "id": 694819,
+        "name": "Jacob Misiorowski",
+        "team": "MIL",
+        "value": "204"
+      },
+      {
+        "rank": 2,
+        "id": 656302,
+        "name": "Dylan Cease",
+        "team": "TOR",
+        "value": "191"
+      },
+      {
+        "rank": 3,
+        "id": 668909,
+        "name": "Gavin Williams",
+        "team": "CLE",
+        "value": "185"
+      },
+      {
+        "rank": 4,
+        "id": 693645,
+        "name": "Cam Schlittler",
+        "team": "NYY",
+        "value": "182"
+      },
+      {
+        "rank": 5,
+        "id": 650911,
+        "name": "Cristopher Sánchez",
+        "team": "PHI",
+        "value": "181"
+      },
+      {
+        "rank": 6,
+        "id": 666200,
+        "name": "Jesús Luzardo",
+        "team": "PHI",
+        "value": "176"
+      },
+      {
+        "rank": 7,
+        "id": 694973,
+        "name": "Paul Skenes",
+        "team": "PIT",
+        "value": "166"
+      },
+      {
+        "rank": 8,
+        "id": 690997,
+        "name": "Nolan McLean",
+        "team": "NYM",
+        "value": "159"
+      },
+      {
+        "rank": 9,
+        "id": 672282,
+        "name": "Reid Detmers",
+        "team": "LAA",
+        "value": "156"
+      },
+      {
+        "rank": 10,
+        "id": 677952,
+        "name": "Braxton Ashcraft",
+        "team": "PIT",
+        "value": "152"
+      },
+      {
+        "rank": 10,
+        "id": 680732,
+        "name": "Sean Burke",
+        "team": "CWS",
+        "value": "152"
+      }
+    ],
+    "wins": [
+      {
+        "rank": 1,
+        "id": 650911,
+        "name": "Cristopher Sánchez",
+        "team": "PHI",
+        "value": "15"
+      },
+      {
+        "rank": 2,
+        "id": 543243,
+        "name": "Sonny Gray",
+        "team": "BOS",
+        "value": "14"
+      },
+      {
+        "rank": 3,
+        "id": 645261,
+        "name": "Sandy Alcantara",
+        "team": "MIA",
+        "value": "13"
+      },
+      {
+        "rank": 3,
+        "id": 676879,
+        "name": "Aaron Ashby",
+        "team": "MIL",
+        "value": "13"
+      },
+      {
+        "rank": 3,
+        "id": 695505,
+        "name": "Chase Burns",
+        "team": "CIN",
+        "value": "13"
+      },
+      {
+        "rank": 3,
+        "id": 656492,
+        "name": "Foster Griffin",
+        "team": "CLE",
+        "value": "13"
+      },
+      {
+        "rank": 7,
+        "id": 607259,
+        "name": "Nick Martinez",
+        "team": "TB",
+        "value": "12"
+      },
+      {
+        "rank": 7,
+        "id": 669467,
+        "name": "Andre Pallante",
+        "team": "STL",
+        "value": "12"
+      },
+      {
+        "rank": 7,
+        "id": 656876,
+        "name": "Drew Rasmussen",
+        "team": "TB",
+        "value": "12"
+      },
+      {
+        "rank": 7,
+        "id": 519242,
+        "name": "Chris Sale",
+        "team": "ATL",
+        "value": "12"
+      },
+      {
+        "rank": 7,
+        "id": 608372,
+        "name": "Tomoyuki Sugano",
+        "team": "COL",
+        "value": "12"
+      }
+    ],
+    "saves": [
+      {
+        "rank": 1,
+        "id": 641329,
+        "name": "Bryan Baker",
+        "team": "TB",
+        "value": "34"
+      },
+      {
+        "rank": 2,
+        "id": 671922,
+        "name": "Cade Smith",
+        "team": "CLE",
+        "value": "31"
+      },
+      {
+        "rank": 3,
+        "id": 695243,
+        "name": "Mason Miller",
+        "team": "SD",
+        "value": "30"
+      },
+      {
+        "rank": 3,
+        "id": 676617,
+        "name": "Riley O'Brien",
+        "team": "STL",
+        "value": "30"
+      },
+      {
+        "rank": 5,
+        "id": 670280,
+        "name": "David Bednar",
+        "team": "NYY",
+        "value": "27"
+      },
+      {
+        "rank": 5,
+        "id": 547973,
+        "name": "Aroldis Chapman",
+        "team": "BOS",
+        "value": "27"
+      },
+      {
+        "rank": 7,
+        "id": 686973,
+        "name": "Louis Varland",
+        "team": "TOR",
+        "value": "26"
+      },
+      {
+        "rank": 8,
+        "id": 661395,
+        "name": "Jhoan Duran",
+        "team": "PHI",
+        "value": "25"
+      },
+      {
+        "rank": 9,
+        "id": 628452,
+        "name": "Raisel Iglesias",
+        "team": "ATL",
+        "value": "24"
+      },
+      {
+        "rank": 9,
+        "id": 623149,
+        "name": "Paul Sewald",
+        "team": "AZ",
+        "value": "24"
+      }
+    ],
+    "whip": [
+      {
+        "rank": 1,
+        "id": 664059,
+        "name": "Sam Haggerty",
+        "team": "TEX",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 643361,
+        "name": "Kevin Herget",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 664731,
+        "name": "P.J. Higgins",
+        "team": "CIN",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 624512,
+        "name": "Reese McGuire",
+        "team": "CWS",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 676694,
+        "name": "Jake Meyers",
+        "team": "HOU",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 605441,
+        "name": "Yacksel Ríos",
+        "team": "CHC",
+        "value": "0.00"
+      },
+      {
+        "rank": 1,
+        "id": 670097,
+        "name": "Zack Short",
+        "team": "NYM",
+        "value": "0.00"
+      },
+      {
+        "rank": 8,
+        "id": 592826,
+        "name": "Vince Velasquez",
+        "team": "CHC",
+        "value": "0.30"
+      },
+      {
+        "rank": 9,
+        "id": 621389,
+        "name": "Ty Blach",
+        "team": "CHC",
+        "value": "0.33"
+      },
+      {
+        "rank": 9,
+        "id": 670103,
+        "name": "Raymond Burgos",
+        "team": "BOS",
+        "value": "0.33"
+      }
+    ]
+  }
+}

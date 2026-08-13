@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA } from '../constants/data.js';
-import { getTodaysGames } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -120,20 +120,20 @@ function getPitchArsenal(t) {
 // Front office evaluation (seeded per team)
 function getFrontOffice(t) {
   const strengths = [
-    ['Top ' + (t.wrcPlus >= 115 ? '5' : '10') + ' offense', t.wrcPlus >= 110],
-    ['Elite baserunning', t.bsr >= 12],
-    ['Above-average defense', t.drs >= 10],
-    ['Strong starting rotation', t.era <= 3.5],
-    ['Good run prevention', t.era <= 3.8],
-    ['Deep bullpen', t.era <= 3.6],
+    ['Positive run differential', t.rs > t.ra],
+    ['Above-average offense', t.ops >= .750],
+    ['Strong run prevention', t.era <= 3.50],
+    ['High strikeout volume', t.k >= 600],
+    ['Home-run power', t.hr >= 100],
+    ['Stolen-base volume', t.sb >= 70],
   ].filter(([, ok]) => ok).map(([s]) => s).slice(0, 4);
   const weaknesses = [
-    ['Bullpen walk rate', t.era > 3.8],
-    ['Strikeout rate vs LHP', t.k < 580],
-    ['Catcher framing', true],
-    ['RISP hitting', t.ops < .760],
-    ['Inconsistent vs top teams', t.w < 50],
-    ['Power outage risk', t.hr < 85],
+    ['Negative run differential', t.rs < t.ra],
+    ['Below-average offense', t.ops < .720],
+    ['Run-prevention risk', t.era > 4.00],
+    ['Low strikeout volume', t.k < 520],
+    ['Limited home-run power', t.hr < 75],
+    ['Limited stolen-base volume', t.sb < 40],
   ].filter(([, ok]) => ok).map(([s]) => s).slice(0, 4);
   return { strengths, weaknesses };
 }
@@ -143,7 +143,32 @@ function OverviewPage() {
   const [splitTab,setSplitTab]=useState('home');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
-  const team=TEAMS[selTeam];
+  const [liveTeamData,setLiveTeamData]=useState(null);
+  const [liveTeamError,setLiveTeamError]=useState(false);
+  const teamBase=TEAMS[selTeam];
+  const team=useMemo(() => {
+    const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
+    const hitting = live?.hitting || {};
+    const pitching = live?.pitching || {};
+    return {
+      ...teamBase,
+      ...(live?.standings || {}),
+      ops: Number(hitting.ops ?? teamBase.ops),
+      obp: Number(hitting.obp ?? teamBase.obp),
+      slg: Number(hitting.slg ?? teamBase.slg),
+      avg: Number(hitting.avg ?? teamBase.avg),
+      hr: Number(hitting.homeRuns ?? teamBase.hr),
+      sb: Number(hitting.stolenBases ?? teamBase.sb),
+      era: Number(pitching.era ?? teamBase.era),
+      whip: Number(pitching.whip ?? teamBase.whip),
+      k: Number(pitching.strikeOuts ?? teamBase.k),
+      war: null,
+      wrcPlus: null,
+      fip: null,
+      drs: null,
+      bsr: null,
+    };
+  }, [liveTeamData, teamBase]);
   // Team-brand accent used for decorative/structural elements (panel accent
   // strips, chart lines/bars, badges) throughout this page. Deliberately not
   // used for small body text — some team colors (e.g. the Padres' near-black
@@ -154,18 +179,49 @@ function OverviewPage() {
   useEffect(()=>{
     let alive=true;
     getTodaysGames().then(g=>{ if(alive) setTodayGames(g.slice(0,8)); }).catch(()=>{});
+    Promise.allSettled([getStandings(), getAllTeamStats('hitting'), getAllTeamStats('pitching')]).then(([std, hitting, pitching]) => {
+      if (!alive) return;
+      const byAbbr = {};
+      const byId = {};
+      if (std.status === 'fulfilled') {
+        Object.values(std.value).flat().forEach(row => {
+          const record = { standings: row };
+          byAbbr[row.abbr] = record;
+          byId[row.id] = record;
+        });
+      }
+      if (hitting.status === 'fulfilled') {
+        Object.values(hitting.value).forEach(stat => {
+          const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
+          row.hitting = stat;
+          if (stat.teamId) byId[stat.teamId] = row;
+        });
+      }
+      if (pitching.status === 'fulfilled') {
+        Object.values(pitching.value).forEach(stat => {
+          const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
+          row.pitching = stat;
+          if (stat.teamId) byId[stat.teamId] = row;
+        });
+      }
+      if (std.status === 'fulfilled' || hitting.status === 'fulfilled' || pitching.status === 'fulfilled') {
+        setLiveTeamData({ byAbbr, byId });
+      } else {
+        setLiveTeamError(true);
+      }
+    });
     return ()=>{ alive=false; };
   },[]);
   const rd=team.rs-team.ra;
 
   const D=useMemo(()=>{
     const offenseData=[
-      {axis:'wRC+',val:Math.min(100,Math.round(team.wrcPlus/150*100))},
-      {axis:'SLG', val:Math.min(100,Math.round((team.ops-team.obp)/.3*80))},
+      {axis:'OPS', val:Math.min(100,Math.round((team.ops-.60)/.40*100))},
+      {axis:'SLG', val:Math.min(100,Math.round((team.slg-.30)/.35*100))},
       {axis:'OBP', val:Math.min(100,Math.round((team.obp-.28)/.12*100))},
-      {axis:'HR',  val:Math.min(100,Math.round(team.hr/130*100))},
-      {axis:'SB',  val:Math.min(100,Math.round(team.sb/100*100))},
-      {axis:'K-BB',val:Math.min(100,team.era<3.5?72:52)},
+      {axis:'HR',  val:Math.min(100,Math.round(team.hr/180*100))},
+      {axis:'SB',  val:Math.min(100,Math.round(team.sb/140*100))},
+      {axis:'Run Diff',val:Math.max(0,Math.min(100,50+Math.round((team.rs-team.ra)/4)))},
     ];
     const strengthData=[
       {axis:'Hitting', val:Math.min(100,Math.round((team.ops-.60)/.40*99))},
@@ -173,31 +229,33 @@ function OverviewPage() {
       {axis:'Speed',   val:Math.min(100,Math.round(team.sb/100*100))},
       {axis:'Contact', val:Math.min(100,Math.round((team.avg-.22)/.10*100))},
       {axis:'Starting',val:Math.min(100,Math.round((6-team.era)/3*100))},
-      {axis:'Defense', val:Math.min(100,Math.round(team.drs/30*100)+30)},
-      {axis:'Bullpen', val:Math.min(100,Math.round((5-team.era)/2.5*100))},
-      {axis:'BsR',     val:Math.min(100,Math.round(team.bsr/25*100))},
+      {axis:'Defense', val:50},
+      {axis:'Bullpen', val:Math.max(0,Math.min(100,Math.round((5-team.era)/2.5*100)))},
+      {axis:'Speed',   val:Math.min(100,Math.round(team.sb/140*100))},
     ];
     const divName = team.div || 'League';
-    const standings=Object.values(TEAMS).filter(t=>t.div===team.div).sort((a,b)=>b.w-a.w)
-      .map(t=>({abbr:t.abbr,w:t.w,l:t.l,pct:t.pct.toFixed(3),cur:t.abbr===team.abbr}));
+    const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
+      const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
+      return { ...t, w: live?.w ?? t.w, l: live?.l ?? t.l, pct: Number(live?.pct ?? t.pct).toFixed(3), cur:t.abbr===team.abbr };
+    }).sort((a,b)=>b.w-a.w);
     const offPct=Math.round(Math.max(1,Math.min(99,((team.ops-.60)/.40)*99)));
     const pitPct=Math.round(Math.max(1,Math.min(99,((6-team.era)/3.5)*99)));
-    const defPct=Math.round(Math.max(1,Math.min(99,(team.drs/30)*99+40)));
+    const defPct=50;
     const leagueRanks=[
-      {label:'Runs Scored',  rank:rankAmong(TEAMS,'rs')(team.rs),  val:team.rs},
-      {label:'Home Runs',    rank:rankAmong(TEAMS,'hr')(team.hr),  val:team.hr},
-      {label:'Team OPS',     rank:rankAmong(TEAMS,'ops')(team.ops),val:team.ops.toFixed(3)},
-      {label:'Team ERA',     rank:rankAmong(TEAMS,'era',true)(team.era),val:team.era.toFixed(2)},
-      {label:'WHIP',         rank:rankAmong(TEAMS,'whip',true)(team.whip),val:team.whip.toFixed(3)},
-      {label:'Strikeouts',   rank:rankAmong(TEAMS,'k')(team.k),   val:team.k},
-      {label:'DRS (Defense)',rank:rankAmong(TEAMS,'drs')(team.drs),val:`+${team.drs}`},
-      {label:'BsR (Running)',rank:rankAmong(TEAMS,'bsr')(team.bsr),val:`+${team.bsr.toFixed(1)}`},
+      {label:'Runs Scored',  rank:null, val:team.rs},
+      {label:'Home Runs',    rank:null, val:team.hr},
+      {label:'Team OPS',     rank:null, val:team.ops.toFixed(3)},
+      {label:'Team ERA',     rank:null, val:team.era.toFixed(2)},
+      {label:'WHIP',         rank:null, val:team.whip.toFixed(3)},
+      {label:'Strikeouts',   rank:null, val:team.k},
+      {label:'Defense (DRS)',rank:null,val:'—'},
+      {label:'Baserunning (BsR)',rank:null,val:'—'},
     ];
     const pctBars=[
       {lbl:'Offense',    pct:offPct,color:C.amber},
       {lbl:'Pitching',   pct:pitPct,color:C.rust},
       {lbl:'Defense',    pct:defPct,color:C.teal},
-      {lbl:'Baserunning',pct:Math.round(Math.max(5,Math.min(99,(team.bsr/25)*99+20))),color:C.navy},
+      {lbl:'Baserunning',pct:Math.round(Math.max(5,Math.min(99,(team.sb/140)*99))),color:C.navy},
     ];
     return {
       offenseData,strengthData,standings,leagueRanks,pctBars,divName,
@@ -222,21 +280,20 @@ function OverviewPage() {
     fo:      getFrontOffice(team),
     // team is TEAMS[selTeam], stable per selTeam; see D useMemo above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [selTeam]);
+  }), [selTeam, liveTeamData]);
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
-  const offRows=[['OPS',team.ops.toFixed(3)],['OBP',team.obp.toFixed(3)],['SLG',team.slg.toFixed(3)],['AVG',team.avg.toFixed(3)],['wRC+',team.wrcPlus],['HR',team.hr],['SB',team.sb]];
-  const pitRows=[['ERA',team.era.toFixed(2)],['FIP',team.fip.toFixed(2)],['WHIP',team.whip.toFixed(3)],['K',team.k],['DRS',team.drs],['BsR',team.bsr.toFixed(1)]];
+  const offRows=[['OPS',team.ops.toFixed(3)],['OBP',team.obp.toFixed(3)],['SLG',team.slg.toFixed(3)],['AVG',team.avg.toFixed(3)],['HR',team.hr],['SB',team.sb]];
+  const pitRows=[['ERA',team.era.toFixed(2)],['WHIP',team.whip.toFixed(3)],['K',team.k],['FIP','—'],['DRS','—'],['BsR','—']];
 
   // OAA position breakdown (seeded)
   const oaaPositions = useMemo(() => {
-    const seed = team.drs;
+    const seed = Number.isFinite(team.drs) ? team.drs : 0;
     const rng = (i) => { const x = Math.sin(seed * 3.1 + i * 5.7) * 43758; return x - Math.floor(x); };
     return ['C','1B','2B','SS','3B','LF','CF','RF'].map((pos, i) => ({
       pos, oaa: Math.round((rng(i) - 0.5) * 14),
     }));
-    // team.drs is fully determined by selTeam (see D useMemo above).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selTeam]);
+    // DRS is unavailable from the aggregate MLB Stats API; this panel remains explicitly illustrative.
+  }, [selTeam, liveTeamData]);
 
   // Exit velocity distribution (seeded) — previously recomputed inline in
   // the render body on every unrelated state change on this page; hoisted
@@ -260,9 +317,8 @@ function OverviewPage() {
       {mph:'115',pct:1+rng(11)*2},
       {mph:'120',pct:rng(12)*1},
     ];
-    // team.hr/team.rs are fully determined by selTeam (see D useMemo above).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selTeam]);
+    // This panel remains illustrative because aggregate Statcast distributions are not exposed here.
+  }, [selTeam, liveTeamData]);
 
   return (
     <div className="page-enter" style={{display:'flex',flexDirection:'column',gap:14}}>
@@ -274,7 +330,7 @@ function OverviewPage() {
           {Object.entries(TEAMS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
         </select>
         <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
-          {[['W–L',`${team.w}–${team.l}`],['Win%',team.pct.toFixed(3)],['RS',team.rs],['RA',team.ra],['Run Diff',(rd>0?'+':'')+rd],['Playoff Odds','74%'],['Team WAR',team.war.toFixed(1)]].map(([l,v],i)=>(
+          {[['W–L',`${team.w}–${team.l}`],['Win%',team.pct.toFixed(3)],['RS',team.rs],['RA',team.ra],['Run Diff',(rd>0?'+':'')+rd],['Playoff Odds','—'],['Team WAR','—']].map(([l,v],i)=>(
             <div key={i} style={{textAlign:'center'}}>
               <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd>0?C.teal:C.rust):i===5?C.teal:C.text})}>{v}</div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
@@ -291,7 +347,7 @@ function OverviewPage() {
         {val:team.avg.toFixed(3),lbl:'Batting Avg',sub:'Contact'},
         {val:team.k,             lbl:'Strikeouts', sub:'K'},
         {val:team.sb,            lbl:'Stolen Bases',sub:'Speed'},
-        {val:team.war.toFixed(1),lbl:'Team WAR',   sub:'Value'},
+                {val:'—',lbl:'Team WAR',   sub:'Unavailable'},
       ]}/>
 
       {/* ── ROW 1: Tables | Radars + Run Diff | Standings + Grade ── */}
@@ -499,7 +555,7 @@ function OverviewPage() {
               ))}
               <div style={{padding:'8px 12px'}}>
                 <div style={sans({fontSize:9,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:2})}>MLB Rank</div>
-                <div style={px({fontSize:15,fontWeight:800,color:C.teal})}>{ord(rankAmong(TEAMS,'era',true)(team.era))}</div>
+                <div style={px({fontSize:15,fontWeight:800,color:C.text4})}>—</div>
               </div>
             </div>
             <div style={sans({fontSize:9,color:C.text4,padding:'0 12px 8px',lineHeight:1.4})}>
@@ -529,8 +585,8 @@ function OverviewPage() {
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0,borderBottom:`0.5px solid ${C.border}`}}>
             {[
               ['SB', team.sb, C.teal],
-              ['BsR', `+${team.bsr.toFixed(1)}`, C.amber],
-              ['Extra Bases %', (45 + team.bsr * 0.3).toFixed(1)+'%', C.amber],
+              ['BsR', '—', C.amber],
+              ['Extra Bases %', '—', C.amber],
             ].map(([l,v,c],i)=>(
               <div key={l} style={{padding:'12px 10px',textAlign:'center',borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={px({fontSize:22,fontWeight:800,color:c,lineHeight:1})}>{v}</div>
@@ -543,8 +599,8 @@ function OverviewPage() {
               ['Sprint Speed',`${(27.8 + team.sb*0.01).toFixed(1)} ft/s`, C.text],
               ['Stolen Base Att.',Math.round(team.sb*1.18), C.text],
               ['Caught Stealing', Math.round(team.sb*0.18), C.rust],
-              ['MLB Rank (BsR)',  `${rankAmong(TEAMS,'bsr')(team.bsr)}th`, team.bsr>=12?C.teal:C.amber],
-              ['Extra Bases Tkn', (45 + team.bsr * 0.3).toFixed(1)+'%', C.teal],
+              ['MLB Rank (BsR)',  '—', C.text4],
+              ['Extra Bases Tkn', '—', C.text4],
             ].map(([l,v,c],i,arr)=>(
               <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',
                 borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none'}}>

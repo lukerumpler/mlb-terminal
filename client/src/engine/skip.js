@@ -168,15 +168,22 @@ const AMD_LEAGUE_AVG = 0.281;  // corrected: sqrt((0.082×.5)²+(0.685×.3)²+(0
 export function computeAMD(batTracking) {
   if (!batTracking) return null;
 
-  const squared = parseFloat(batTracking.squared_up_per_swing) || 0;
-  const blasts  = parseFloat(batTracking.blast_per_swing)      || 0;
-  const swingsCompetitive = parseFloat(batTracking.swings_competitive) || 0;
-  const swords  = swingsCompetitive > 0
-    ? (parseFloat(batTracking.swords) || 0) / swingsCompetitive
-    : 0;
+  // Empty CSV cells are not zeroes. The model needs the two rate fields and
+  // the competitive-swing denominator; otherwise it would manufacture a
+  // large miss-distance score from whichever columns happened to be present.
+  const squared = Number.parseFloat(batTracking.squared_up_per_swing);
+  const blasts  = Number.parseFloat(batTracking.blast_per_swing);
+  const swingsCompetitive = Number.parseFloat(batTracking.swings_competitive);
+  const swordsRaw = Number.parseFloat(batTracking.swords);
+  if (![squared, blasts, swingsCompetitive, swordsRaw].every(Number.isFinite)
+      || swingsCompetitive <= 0
+      || squared < 0 || squared > 1
+      || blasts < 0 || blasts > 1
+      || swordsRaw < 0) return null;
+  const swords  = swordsRaw / swingsCompetitive;
 
-  // If all inputs are zero the player has no bat-tracking data
-  if (squared === 0 && blasts === 0 && swords === 0) return null;
+  // Do not allow an impossible swords rate to distort the model.
+  if (!Number.isFinite(swords)) return null;
 
   const timingError  = Math.min(1, swords);               // 0 = perfect timing
   const contactError = Math.min(1, Math.max(0, 1 - squared)); // 0 = perfect contact

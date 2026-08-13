@@ -10894,8 +10894,51 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 
 ## Data audit and correction
 
-- [ ] Trace the data sources for Shohei Ohtani, Bryce Eldridge, and the Padres overview.
-- [ ] Identify shared data transformations or constants that may be causing systematic errors.
-- [ ] Verify player and team records against authoritative current sources (MLB Stats API, Baseball-Reference, etc.).
-- [ ] Correct confirmed inaccuracies in the application data and shared calculations.
-- [ ] Validate the corrected views and rerun the regression test suite.
+- [x] Trace the data sources for Shohei Ohtani, Bryce Eldridge, and the Padres overview.
+- [x] Identify shared data transformations or constants that may be causing systematic errors.
+- [x] Verify player and team records against authoritative current sources (MLB Stats API, Baseball-Reference, etc.).
+- [x] Correct confirmed inaccuracies in the application data and shared calculations.
+- [x] Validate the corrected views and rerun the regression test suite.
+
+## Whole-website data accuracy audit — v75 baseline
+
+- [x] Extract and compare `/home/ubuntu/upload/skip-baseball-v75.zip` with the current Manus project.
+- [x] Inventory every data-bearing page, component, static constant, derived calculation, live API adapter, fallback, mock, and seeded value in the v75 baseline.
+- [x] Build a source-to-view data map for Overview, Players, Prospects, Draft, League, Intelligence, AMD / IMD, Knowledge, Scouting Notes, Intel Feed, Follow List, and Settings.
+- [ ] Verify MLB player identities, organizations, rosters, standings, team statistics, league leaders, schedules, and transactions against authoritative current sources.
+- [ ] Verify MiLB and prospect identities, levels, organizations, and season statistics against authoritative current sources.
+- [ ] Verify NCAA records and statistics against authoritative current sources or clearly identify unavailable data.
+- [x] Verify Statcast, Savant, expected-statistics, defensive, pitch, spray, and batted-ball metrics against authoritative sources or label estimates clearly.
+- [ ] Verify contract, salary, trade, and transaction values against authoritative public records or mark unavailable instead of presenting invented values.
+- [ ] Verify Intel Feed and news metadata against the actual upstream responses and remove fabricated or stale fallback content.
+- [x] Correct shared static datasets, API normalization, fallback logic, derived formulas, and displayed labels at their source.
+- [x] Add deterministic tests for the corrected records, source normalization, and no-fabrication/unknown-value handling.
+- [x] Run the full test suite, TypeScript check, lint, production build, API smoke tests, and preview verification across data-bearing tabs.
+- [ ] Review the final diff and confirm no roadmap markdown changes.
+- [ ] Save a new checkpoint after all audit items are verified.
+- [ ] Deliver a source-based summary of what was verified, corrected, and left explicitly unavailable.
+
+## Whole-audit validation blocker
+
+- [x] Repair the malformed Shohei Ohtani entry in `client/src/constants/data.js` so Vite can parse the complete catalog after the v75 audit corrections.
+- [x] Rerun build, tests, preview, and data smoke checks after the syntax repair.
+
+## Proxy reliability blocker
+
+- [x] Make the MLB proxy resilient to non-JSON or truncated upstream responses without fabricating schedule data.
+- [x] Re-test `/api/mlb` schedule failure handling and confirm the dev server remains running.
+
+## Proxy regression coverage
+
+- [x] Add a deterministic test for the MLB proxy’s non-JSON/empty upstream response handling.
+
+## Player profile accuracy audit — all profiles
+- [x] Inventory every player profile field, source, formatter, derived metric, and fallback used by PlayersPage and profile detail components.
+- [x] Extract the complete player profile catalog and verify every player identity, MLB ID, position, organization, level, handedness, and age against authoritative MLB records.
+- [x] Verify all standard batting, pitching, fielding, and season-split values shown in player profiles against MLB Stats API responses.
+- [x] Verify Statcast, expected-statistics, pitch, batted-ball, spray, and percentile values against Baseball Savant or label them unavailable/estimated when no authoritative live response exists.
+- [x] Verify contract, transaction, injury, scouting, and editorial profile fields against authoritative sources or clearly mark them as unavailable/editorial.
+- [x] Correct shared profile data adapters, normalization, derived calculations, labels, and fallback behavior without changing the Bloomberg-terminal design.
+- [x] Add deterministic tests covering representative hitter, pitcher, prospect, unavailable-data, and live-hydration profile cases.
+- [ ] Smoke-test all player profile routes and rerun lint, TypeScript, build, API checks, and the full Vitest suite.
+- [ ] Review the final diff to confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save a checkpoint, and deliver the all-profile audit summary.

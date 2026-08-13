@@ -5,14 +5,13 @@ import {
 } from 'recharts';
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import {
-  DRAFT_BOARD, DRAFT_CLASS_2026, LEAGUE_TRENDS, INJURIES, FARM_GRADES,
-  PARITY_GAUGE, TEAMS, SEASON, BATTING_LEADERS, PITCHING_LEADERS, NOTABLE_TRADES,
+  DRAFT_BOARD, DRAFT_CLASS_2026, TEAMS, SEASON, NOTABLE_TRADES,
 } from '../constants/data.js';
 import {
   Badge, PosBadge, FVBadge,
   Panel, StatStrip, KVRow, SkeletonRows,
 } from '../components/atoms.jsx';
-import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getFirstRoundResults } from '../api/mlb.js';
+import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt } from '../lib/formatting.js';
 
@@ -416,7 +415,7 @@ function DraftPage() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr minmax(230px,260px)', gap:12, alignItems:'start' }}>
 
         {/* Big board */}
-        <Panel title="SKIP Big Board — Top 10" accent={C.amber} badge="Consensus + SKIP">
+          <Panel title="SKIP Big Board — Top 10" accent={C.amber} badge="Editorial">
           {/* FIX: overflowX on the table wrapper, not Panel itself */}
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
@@ -487,7 +486,7 @@ function DraftPage() {
 
         {/* Sidebar */}
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          <Panel title="2026 Class Overview" accent={C.rust}>
+          <Panel title="2026 Class Overview" accent={C.rust} badge="SKIP editorial">
             {[
               ['Class Strength','Elite at the top',C.teal],
               ['Top Tier (FV 60+)','5 players',C.amber],
@@ -516,7 +515,7 @@ function DraftPage() {
             ))}
           </Panel>
 
-          <Panel title="SKIP Value Picks" accent={C.teal} badge="Undervalued">
+          <Panel title="SKIP Value Picks" accent={C.teal} badge="SKIP editorial">
             {[
               ['Vahn Lackey · C',    '▲ vs slot','Elite two-way catcher — power/speed rare at the position'],
               ['Justin Lebron · SS', '▲ vs slot','High-probability college SS floor, underpriced relative to safe college track record'],
@@ -607,6 +606,7 @@ function LeaguePage() {
   const [liveGames,   setLiveGames]   = useState([]);
   const [standings,   setStandings]   = useState({});
   const [leaders,     setLeaders]     = useState({});
+  const [teamStats,   setTeamStats]   = useState({ hitting:{}, pitching:{} });
   const [gamesLoading,setGamesLoading]= useState(true);
   const [stdLoading,  setStdLoading]  = useState(true);
 
@@ -615,89 +615,111 @@ function LeaguePage() {
   const [lbSort,   setLbSort]   = useState('ops');
   const [lbFilter, setLbFilter] = useState('all');
 
-  const sortedHitters = useMemo(() => {
-    const rows = lbFilter === 'all' ? BATTING_LEADERS : BATTING_LEADERS.filter(r => r.team === lbFilter);
-    return [...rows].sort((a,b) => {
-      if (lbSort === 'ops')  return b.ops  - a.ops;
-      if (lbSort === 'avg')  return b.avg  - a.avg;
-      if (lbSort === 'hr')   return b.hr   - a.hr;
-      if (lbSort === 'war')  return b.war  - a.war;
-      if (lbSort === 'ev')   return b.ev   - a.ev;
-      if (lbSort === 'brl')  return b.brl  - a.brl;
-      if (lbSort === 'woba') return b.woba - a.woba;
-      return b.ops - a.ops;
+  const liveHitterRows = useMemo(() => {
+    const byId = new Map();
+    const add = (category, key) => (leaders[category] || []).forEach(entry => {
+      const id = entry.id || entry.name;
+      const row = byId.get(id) || { id, name:entry.name, team:entry.team, rank:entry.rank };
+      row[key] = Number(entry.value);
+      row.rank = row.rank == null ? entry.rank : Math.min(row.rank, entry.rank);
+      byId.set(id, row);
     });
-  }, [lbSort, lbFilter]);
+    add('battingAverage', 'avg');
+    add('onBasePlusSlugging', 'ops');
+    add('homeRuns', 'hr');
+    add('runsBattedIn', 'rbi');
+    add('stolenBases', 'sb');
+    return [...byId.values()];
+  }, [leaders]);
+
+  const livePitcherRows = useMemo(() => {
+    const byId = new Map();
+    const add = (category, key) => (leaders[category] || []).forEach(entry => {
+      const id = entry.id || entry.name;
+      const row = byId.get(id) || { id, name:entry.name, team:entry.team, rank:entry.rank };
+      row[key] = Number(entry.value);
+      row.rank = row.rank == null ? entry.rank : Math.min(row.rank, entry.rank);
+      byId.set(id, row);
+    });
+    add('earnedRunAverage', 'era');
+    add('whip', 'whip');
+    add('strikeouts', 'k');
+    add('wins', 'wins');
+    add('saves', 'saves');
+    return [...byId.values()];
+  }, [leaders]);
+
+  const sortedHitters = useMemo(() => {
+    const rows = lbFilter === 'all' ? liveHitterRows : liveHitterRows.filter(r => r.team === lbFilter);
+    return [...rows].sort((a,b) => {
+      if (lbSort === 'ops') return (b.ops ?? -Infinity) - (a.ops ?? -Infinity);
+      if (lbSort === 'avg') return (b.avg ?? -Infinity) - (a.avg ?? -Infinity);
+      if (lbSort === 'hr')  return (b.hr  ?? -Infinity) - (a.hr  ?? -Infinity);
+      if (lbSort === 'rbi') return (b.rbi ?? -Infinity) - (a.rbi ?? -Infinity);
+      if (lbSort === 'sb')  return (b.sb  ?? -Infinity) - (a.sb  ?? -Infinity);
+      return (b.ops ?? -Infinity) - (a.ops ?? -Infinity);
+    });
+  }, [lbSort, lbFilter, liveHitterRows]);
 
   const sortedPitchers = useMemo(() => {
-    return [...PITCHING_LEADERS].sort((a,b) => {
+    return [...livePitcherRows].sort((a,b) => {
       if (lbSort === 'era')  return a.era  - b.era;
-      if (lbSort === 'fip')  return a.fip  - b.fip;
+      if (lbSort === 'wins') return b.wins - a.wins;
+      if (lbSort === 'saves')return b.saves - a.saves;
       if (lbSort === 'whip') return a.whip - b.whip;
-      if (lbSort === 'k9')   return b.k9   - a.k9;
-      if (lbSort === 'war')  return b.war  - a.war;
-      if (lbSort === 'kBB')  return b.kBB  - a.kBB;
+      if (lbSort === 'k')    return b.k    - a.k;
       return a.era - b.era;
     });
-  }, [lbSort]);
+  }, [lbSort, livePitcherRows]);
 
-  const lbTeams = ['all', ...new Set(BATTING_LEADERS.map(r => r.team))].sort();
+  const lbTeams = ['all', ...new Set(liveHitterRows.map(r => r.team).filter(Boolean))].sort();
 
   const HIT_COLS = [
-    { key:'avg',   label:'AVG',      fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'obp',   label:'OBP',      fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'slg',   label:'SLG',      fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'ops',   label:'OPS',      fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'woba',  label:'wOBA',     fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'xwoba', label:'xwOBA',    fmt:v=>v.toFixed(3).replace('0.','.')  },
-    { key:'ev',    label:'EV (mph)', fmt:v=>v.toFixed(1)                    },
-    { key:'hh',    label:'Hard Hit%',fmt:v=>v.toFixed(1)+'%'                },
-    { key:'brl',   label:'Barrel%',  fmt:v=>v.toFixed(1)+'%'                },
-    { key:'war',   label:'WAR',      fmt:v=>v.toFixed(1)                    },
+    { key:'avg',  label:'AVG', fmt:v=>v.toFixed(3).replace('0.','.') },
+    { key:'ops',  label:'OPS', fmt:v=>v.toFixed(3).replace('0','') },
+    { key:'hr',   label:'HR',  fmt:v=>String(v) },
+    { key:'rbi',  label:'RBI', fmt:v=>String(v) },
+    { key:'sb',   label:'SB',  fmt:v=>String(v) },
   ];
 
   const PIT_COLS = [
-    { key:'era',  label:'ERA',   fmt:v=>v.toFixed(2) },
-    { key:'fip',  label:'FIP',   fmt:v=>v.toFixed(2) },
-    { key:'whip', label:'WHIP',  fmt:v=>v.toFixed(2) },
-    { key:'k9',   label:'K/9',   fmt:v=>v.toFixed(1) },
-    { key:'bb9',  label:'BB/9',  fmt:v=>v.toFixed(1) },
-    { key:'hr9',  label:'HR/9',  fmt:v=>v.toFixed(2) },
-    { key:'kBB',  label:'K/BB',  fmt:v=>v.toFixed(2) },
-    { key:'war',  label:'WAR',   fmt:v=>v.toFixed(1) },
+    { key:'era',   label:'ERA',   fmt:v=>v.toFixed(2) },
+    { key:'whip',  label:'WHIP',  fmt:v=>v.toFixed(2) },
+    { key:'k',     label:'K',     fmt:v=>String(v) },
+    { key:'wins',  label:'W',     fmt:v=>String(v) },
+    { key:'saves', label:'SV',    fmt:v=>String(v) },
   ];
 
   const { opsSorted, eraSorted, opsMin, opsMax, eraMin, eraMax } = useMemo(() => {
-    const teamBarData = Object.values(TEAMS).map(t => ({
-      team: t.abbr,
-      ops:  Math.round((t.ops || 0) * 1000),
-      era:  parseFloat((t.era || 0).toFixed(2)),
-    }));
+    const teamBarData = Object.values(TEAMS).map(t => {
+      const hitting = teamStats.hitting[t.id] || {};
+      const pitching = teamStats.pitching[t.id] || {};
+      return {
+        team: t.abbr,
+        ops: hitting.ops != null ? Math.round(Number(hitting.ops) * 1000) : null,
+        era: pitching.era != null ? Number(pitching.era) : null,
+      };
+    }).filter(t => t.ops != null || t.era != null);
     const opsSorted = [...teamBarData].sort((a,b) => b.ops - a.ops).slice(0,6);
     const eraSorted = [...teamBarData].sort((a,b) => a.era - b.era).slice(0,6);
     return {
       opsSorted, eraSorted,
-      opsMin: Math.floor(opsSorted[opsSorted.length-1].ops / 10) * 10 - 10,
-      opsMax: Math.ceil(opsSorted[0].ops / 10) * 10 + 10,
-      eraMin: Math.floor(eraSorted[0].era * 10) / 10 - 0.2,
-      eraMax: Math.ceil(eraSorted[eraSorted.length-1].era * 10) / 10 + 0.3,
+      opsMin: opsSorted.length ? Math.floor(opsSorted[opsSorted.length-1].ops / 10) * 10 - 10 : 0,
+      opsMax: opsSorted.length ? Math.ceil(opsSorted[0].ops / 10) * 10 + 10 : 1,
+      eraMin: eraSorted.length ? Math.floor(eraSorted[0].era * 10) / 10 - 0.2 : 0,
+      eraMax: eraSorted.length ? Math.ceil(eraSorted[eraSorted.length-1].era * 10) / 10 + 0.3 : 1,
     };
-  }, []);
+  }, [teamStats]);
 
-  // Fallback standings (used only if the live getStandings() call fails or
-  // returns empty) — grouped straight from TEAMS' own `div` field so every
-  // team lands in its real division, rather than a hand-typed abbreviation
-  // list that can drift out of sync with reality.
-  const fallbackDivisions = useMemo(() => {
-    const byDiv = {};
-    Object.values(TEAMS).forEach(t => {
-      if (!t.div) return;
-      (byDiv[t.div] ||= []).push(t);
-    });
-    return Object.entries(byDiv)
-      .map(([div, teams]) => [div, [...teams].sort((a, b) => b.pct - a.pct)])
-      .sort(([a], [b]) => a.localeCompare(b));
-  }, []);
+  const leagueTeamSummary = useMemo(() => {
+    const hitting = Object.values(teamStats.hitting).filter(s => s.ops != null);
+    const pitching = Object.values(teamStats.pitching).filter(s => s.era != null);
+    return {
+      avgOps: hitting.length ? (hitting.reduce((sum, s) => sum + Number(s.ops), 0) / hitting.length).toFixed(3) : '—',
+      avgEra: pitching.length ? (pitching.reduce((sum, s) => sum + Number(s.era), 0) / pitching.length).toFixed(2) : '—',
+      homeRuns: hitting.length ? hitting.reduce((sum, s) => sum + Number(s.homeRuns || 0), 0).toLocaleString() : '—',
+    };
+  }, [teamStats]);
 
   // Fetch live games
   useEffect(() => {
@@ -716,10 +738,16 @@ function LeaguePage() {
     let alive = true;
     (async () => {
       try {
-        const [std, ldr] = await Promise.allSettled([getStandings(), getAllLeaders()]);
+        const [std, ldr, hitting, pitching] = await Promise.allSettled([
+          getStandings(), getAllLeaders(), getAllTeamStats('hitting'), getAllTeamStats('pitching'),
+        ]);
         if (alive) {
           if (std.status === 'fulfilled') setStandings(std.value);
           if (ldr.status === 'fulfilled') setLeaders(ldr.value);
+          setTeamStats({
+            hitting: hitting.status === 'fulfilled' ? hitting.value : {},
+            pitching: pitching.status === 'fulfilled' ? pitching.value : {},
+          });
         }
       } catch { /* best effort */ }
       if (alive) setStdLoading(false);
@@ -742,10 +770,10 @@ function LeaguePage() {
       <StatStrip items={[
         { val:'30',     lbl:'Teams',          sub:'MLB'         },
         { val:gamesLoading ? '…' : String(liveGames.length), lbl:'Games Today', sub:'Live/Final' },
-        { val:'.762',   lbl:'Avg Team OPS',   sub:'League avg'  },
-        { val:'3.81',   lbl:'Avg ERA',        sub:'League avg'  },
-        { val:'4,814',  lbl:'Total HRs',      sub:'Season pace' },
-        { val:'28,412', lbl:'Avg Attendance', sub:'Per game'    },
+        { val:leagueTeamSummary.avgOps,  lbl:'Avg Team OPS',   sub:'Live season' },
+        { val:leagueTeamSummary.avgEra,   lbl:'Avg ERA',        sub:'Live season' },
+        { val:leagueTeamSummary.homeRuns, lbl:'Total HRs',      sub:'Live season' },
+        { val:'—',                        lbl:'Avg Attendance', sub:'Unavailable' },
       ]}/>
 
       {/* ── Live Scoreboard ── */}
@@ -857,58 +885,18 @@ function LeaguePage() {
         </div>
       )}
       {!stdLoading && !hasStandings && (
-        /* fallback: static TEAMS data sorted by win%, grouped by real division */
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:12 }}>
-          {fallbackDivisions.map(([div, divTeams])=>{
-            if(!divTeams.length) return null;
-            return (
-              <Panel key={div} title={div} accent={C.navy}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr style={{background:C.surface2}}>
-                    {['Team','W','L','PCT','RS','RA'].map(h=>(
-                      <th key={h} style={{padding:'5px 8px',fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:C.text2,textAlign:h==='Team'?'left':'right',borderBottom:`0.5px solid ${C.border}`}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {divTeams.map((t,i)=>(
-                      <tr key={t.abbr} style={{borderBottom:i<divTeams.length-1?`0.5px solid ${C.borderLight}`:'none'}}
-                        onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
-                        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                        <td style={{padding:'5px 8px',...sans({fontSize:11,fontWeight:600,color:C.text})}}>{t.abbr}</td>
-                        <td style={{padding:'5px 8px',textAlign:'right',...px({fontSize:11,fontWeight:700,color:C.teal})}}>{t.w}</td>
-                        <td style={{padding:'5px 8px',textAlign:'right',...px({fontSize:11,color:C.text})}}>{t.l}</td>
-                        <td style={{padding:'5px 8px',textAlign:'right',...px({fontSize:11,fontWeight:700,color:C.amber})}}>{t.pct.toFixed(3)}</td>
-                        <td style={{padding:'5px 8px',textAlign:'right',...px({fontSize:10,color:C.text3})}}>{t.rs}</td>
-                        <td style={{padding:'5px 8px',textAlign:'right',...px({fontSize:10,color:C.text3})}}>{t.ra}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Panel>
-            );
-          })}
-        </div>
+        <Panel title="Standings" accent={C.navy} badge="Unavailable">
+          <div style={{padding:'16px 14px',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+            Official MLB standings are unavailable right now. Static snapshots are intentionally hidden so stale records are not presented as current.
+          </div>
+        </Panel>
       )}
 
       {/* ── Stat charts row ── */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-        <Panel title="Competitive Balance Index" accent={C.amber}>
-          <div style={{ position:'relative', padding:'8px 8px 0' }}>
-            <ResponsiveContainer width="100%" height={155}>
-              <PieChart margin={{ top:0, right:0, bottom:0, left:0 }}>
-                <Pie isAnimationActive={false} data={PARITY_GAUGE} cx="50%" cy="50%" innerRadius="52%" outerRadius="72%"
-                  startAngle={90} endAngle={-270} dataKey="value" strokeWidth={0}>
-                  {PARITY_GAUGE.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',pointerEvents:'none',paddingBottom:6 }}>
-              <div style={px({ fontSize:30,fontWeight:900,color:C.amber,lineHeight:1 })}>72</div>
-              <div style={sans({ fontSize:10,color:C.text3,letterSpacing:'.05em',marginTop:3 })}>PARITY INDEX</div>
-            </div>
-          </div>
-          <div style={{ textAlign:'center',padding:'4px 8px 10px' }}>
-            <div style={sans({ fontSize:10,color:C.teal })}>↑ +0.6 vs last year</div>
+        <Panel title="Competitive Balance Index" accent={C.amber} badge="Unavailable">
+          <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+            No authoritative league-wide parity source is connected. The prior snapshot is hidden.
           </div>
         </Panel>
 
@@ -952,8 +940,8 @@ function LeaguePage() {
         </Panel>
       </div>
 
-      {/* ── Static Statcast Leaderboard ── */}
-      <Panel title="Leaderboard" accent={C.amber} badge={`2026 · Top ${lbTab === 'hitting' ? sortedHitters.length : sortedPitchers.length}`}>
+      {/* ── Live MLB Leaderboard ── */}
+      <Panel title="Leaderboard" accent={C.amber} badge={`2026 · ${hasLeaders ? 'Live' : 'Unavailable'}`}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
           borderBottom:`0.5px solid ${C.border}`, padding:'0 14px', flexWrap:'wrap', gap:8 }}>
           <div style={{ display:'flex' }}>
@@ -995,7 +983,11 @@ function LeaguePage() {
               </tr>
             </thead>
             <tbody>
-              {(lbTab === 'hitting' ? sortedHitters : sortedPitchers).map((r,i,arr) => (
+              {(lbTab === 'hitting' ? sortedHitters : sortedPitchers).length === 0 ? (
+                <tr><td colSpan={(lbTab === 'hitting' ? HIT_COLS : PIT_COLS).length + 2} style={{padding:'18px 14px',color:C.text3,textAlign:'center'}}>
+                  Live MLB leader data is unavailable; static snapshot rows are intentionally hidden.
+                </td></tr>
+              ) : (lbTab === 'hitting' ? sortedHitters : sortedPitchers).map((r,i,arr) => (
                 <tr key={r.name} style={{ background:i%2===0?C.surface:C.surface2 }}>
                   <td style={{ padding:'6px 14px', whiteSpace:'nowrap', ...sans({ fontSize:12, fontWeight:600, color:C.text }) }}>
                     <span style={{ ...px({ fontSize:10, color:C.text3 }), marginRight:8 }}>{r.rank}</span>{r.name}
@@ -1020,48 +1012,22 @@ function LeaguePage() {
 
       {/* ── Stat leaders + trends + injury + farm ── */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-        <Panel title="League Trends 2026" accent={C.amber}>
-          {LEAGUE_TRENDS.map((t, i, arr) => (
-            <div key={t.metric} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',
-              padding:'7px 14px',borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}>
-              <span style={sans({ fontSize:12,color:C.text2 })}>{t.metric}</span>
-              <span style={px({ fontSize:12,fontWeight:700,color:t.up?C.teal:C.rust })}>{t.up?'↑ ':'↓ '}{t.value}</span>
-            </div>
-          ))}
-        </Panel>
-
-        <Panel title="Injury Overview" accent={C.rust}>
-          <div style={{ padding:'6px 8px 8px' }}>
-            <ResponsiveContainer width="100%" height={175}>
-              <PieChart margin={{ top:4,right:4,bottom:0,left:4 }}>
-                <Pie isAnimationActive={false} data={INJURIES} cx="50%" cy="45%" innerRadius="35%" outerRadius="58%"
-                  dataKey="count" strokeWidth={1.5} stroke={C.surface}>
-                  {INJURIES.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip {...TT} formatter={(v,n,p)=>[v,p?.payload?.severity||n]}/>
-                <Legend iconType="circle" iconSize={7}
-                  formatter={(value, entry) => (
-                    <span style={{ fontSize:11,color:C.text2,fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
-                      {(entry?.payload?.severity||value).split('/')[0].trim()} ({(entry?.payload?.count??'')})
-                    </span>
-                  )}
-                  wrapperStyle={{ fontSize:10,paddingTop:6 }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+        <Panel title="League Trends 2026" accent={C.amber} badge="Unavailable">
+          <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+            No verified trend feed is connected. The prior editorial snapshot is hidden.
           </div>
         </Panel>
 
-        <Panel title="Farm System Rankings" accent={C.teal}>
-          {FARM_GRADES.map((f, i, arr) => (
-            <div key={f.team} style={{ display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
-              borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}>
-              <span style={px({ fontSize:11,fontWeight:700,color:C.text3,minWidth:16 })}>{i+1}</span>
-              <span style={sans({ fontSize:10.5,fontWeight:600,color:C.text,flex:1 })}>{f.team}</span>
-              <span style={px({ fontSize:13,fontWeight:700,color:f.color })}>{f.grade}</span>
-              <span style={sans({ fontSize:11,color:C.text3 })}>{f.count} Top-100</span>
-            </div>
-          ))}
+        <Panel title="Injury Overview" accent={C.rust} badge="Unavailable">
+          <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+            No authoritative injury feed is connected. Static injury counts are intentionally hidden.
+          </div>
+        </Panel>
+
+        <Panel title="Farm System Rankings" accent={C.teal} badge="Unavailable">
+          <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+            A current, source-backed farm-system ranking is not connected. The prior snapshot is hidden.
+          </div>
         </Panel>
       </div>
 

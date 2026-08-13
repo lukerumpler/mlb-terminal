@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { fmt, fmtEra, trueIP } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
-import { PROSPECT_BATTERS, PROSPECT_PITCHERS, FARM_GRADES, TEAMS, SEASON } from '../constants/data.js';
+import { PROSPECT_BATTERS, PROSPECT_PITCHERS, TEAMS, SEASON } from '../constants/data.js';
 import { getTopProspectStats, getMiLBGames } from '../api/mlb.js';
 import { PosBadge, Panel, StatStrip, SkeletonRows, FVBadge, RiskDot, WatchStar, TrendBadge } from '../components/atoms.jsx';
 import { computeFV, fvBaselines, projectedWAR, fvRiskBand, fvETA, fvETAYear } from '../engine/skip.js';
@@ -1011,19 +1011,10 @@ function ProspectsPage() {
               </div>
             </Panel>
 
-            <Panel title="Top Farm Systems" accent={C.amber}>
-              {FARM_GRADES.map(f=>(
-                <div key={f.team} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 14px',borderBottom:`0.5px solid ${C.borderLight}` }}>
-                  <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-                    <TeamLogo abbr={f.team} size={18}/>
-                    <span style={sans({ fontSize:11,fontWeight:600,color:C.text })}>{f.team}</span>
-                  </div>
-                  <div style={{ display:'flex',alignItems:'center',gap:10 }}>
-                    <span style={sans({ fontSize:10,color:C.text3 })}>{f.count} Top-100</span>
-                    <span style={px({ fontSize:13,fontWeight:700,color:f.color })}>{f.grade}</span>
-                  </div>
-                </div>
-              ))}
+            <Panel title="Top Farm Systems" accent={C.amber} badge="Unavailable">
+              <div style={{padding:'22px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
+                A current, source-backed farm-system ranking is not connected. The prior snapshot is hidden.
+              </div>
             </Panel>
 
             <Panel title="Position Scarcity" accent={C.rust}>
@@ -1068,7 +1059,7 @@ function ProspectsPage() {
 
       {view === 'breakouts' && (
         <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:14 }}>
-          <Panel title="Breakout Model — Hitters" accent={C.amber} badge="2026">
+          <Panel title="Breakout Model — Hitters" accent={C.amber} badge="SKIP editorial">
             {[
               ['Konnor Griffin','SS','PIT',91,'Bat speed elite · Chase rate improving · MLB debut on horizon',C.teal],
               ['Roman Anthony','OF','BOS',83,'Contact% improving · Exit velo 92.1 avg · Hit tool emerging',C.amber],
@@ -1085,7 +1076,7 @@ function ProspectsPage() {
               </div>
             ))}
           </Panel>
-          <Panel title="Breakout Model — Pitchers" accent={C.rust} badge="2026">
+          <Panel title="Breakout Model — Pitchers" accent={C.rust} badge="SKIP editorial">
             {[
               ['Kade Anderson','LHP','SEA',92,'1.29 ERA · 0.69 WHIP · Best prospect ERA in minors',C.teal],
               ['Anthony Eyanson','RHP','BOS',86,'1.17 ERA · Elite contact suppression · MLB ready',C.teal],
@@ -1107,7 +1098,7 @@ function ProspectsPage() {
 
       {view === 'risers' && (
         <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:14 }}>
-          <Panel title="▲ Top Risers — 2026" accent={C.teal}>
+          <Panel title="▲ Top Risers — 2026" accent={C.teal} badge="SKIP editorial">
             {[
               ['Josue De Paula OF LAD','+18 ranks','.971 OPS at AA · 10 HR · 37 BB · Dodgers pipeline star'],
               ['Eli Willits SS WSH','+14 ranks','.918 OPS · 38 walks · Elite patience at age 18'],
@@ -1124,7 +1115,7 @@ function ProspectsPage() {
               </div>
             ))}
           </Panel>
-          <Panel title="▼ Top Fallers — 2026" accent={C.rust}>
+          <Panel title="▼ Top Fallers — 2026" accent={C.rust} badge="SKIP editorial">
             {[
               ['Jordan Walker OF STL','-15 ranks','K-rate 32% · Chase rate elevated · Mechanical issues'],
               ['Druw Jones OF ARI','-11 ranks','Shoulder concern · Timeline extended to 2027'],

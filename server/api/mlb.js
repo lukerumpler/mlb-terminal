@@ -89,9 +89,14 @@ export default async function handler(req, res) {
 
   let data;
   try {
-    data = await mlbRes.json();
+    const body = await mlbRes.text();
+    if (!body.trim()) {
+      console.error('[mlb-proxy] empty response | url:', mlbUrl);
+      return res.status(502).json({ error: 'MLB API returned an empty response', url: mlbUrl });
+    }
+    data = JSON.parse(body);
   } catch (err) {
-    console.error('[mlb-proxy] JSON parse error | url:', mlbUrl);
+    console.error('[mlb-proxy] JSON parse error | url:', mlbUrl, '| detail:', err.message);
     return res.status(502).json({ error: 'MLB API returned non-JSON response', url: mlbUrl });
   }
 

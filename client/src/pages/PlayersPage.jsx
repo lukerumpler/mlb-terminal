@@ -61,12 +61,12 @@ function PlayerPhoto({ id, name, size = 96 }) {
 
 /* ─── Empty state ─────────────────────────────────────────────────── */
 const QUICK_PLAYERS = [
-  { id:592450, fullName:'Aaron Judge',     team:'NYY', pos:'OF'  },
-  { id:660271, fullName:'Shohei Ohtani',   team:'LAD', pos:'DH'  },
-  { id:665742, fullName:'Juan Soto',       team:'NYM', pos:'OF'  },
+  { id:592450, fullName:'Aaron Judge',     team:'NYY', pos:'RF'  },
+  { id:660271, fullName:'Shohei Ohtani',   team:'LAD', pos:'TWP' },
+  { id:665742, fullName:'Juan Soto',       team:'NYM', pos:'LF'  },
   { id:683002, fullName:'Gunnar Henderson',team:'BAL', pos:'SS'  },
-  { id:675911, fullName:'Spencer Strider', team:'ATL', pos:'RHP' },
-  { id:668939, fullName:'Bobby Witt Jr.',  team:'KC',  pos:'SS'  },
+  { id:675911, fullName:'Spencer Strider', team:'ATL', pos:'P'   },
+  { id:677951, fullName:'Bobby Witt Jr.',  team:'KC',  pos:'SS'  },
 ];
 
 const REPORT_SECTIONS = [
@@ -145,6 +145,19 @@ function PlayersEmptyState({ onPick }) {
 function numOr(val, def) {
   const n = parseFloat(val);
   return Number.isFinite(n) ? n : def;
+}
+
+// Profile metrics must never turn a missing live value into a plausible-looking
+// number. MLB/Savant CSVs contain both empty strings and numeric zeroes, so the
+// check is explicit and preserves a legitimate 0.
+export function profileMetricValue(value) {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function formatProfileMetric(value, digits = 1, suffix = '') {
+  const n = profileMetricValue(value);
+  return n == null ? '—' : `${n.toFixed(digits)}${suffix}`;
 }
 
 // Pure — no hooks, no rendering — so it can be reused anywhere the same
@@ -466,30 +479,32 @@ function ZoneWhiffGrid({ contactPoints }) {
 function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking }) {
   const sv = savant || {};
   const bt = batTracking || {};
-  const ops  = parseFloat(s?.ops)  || 0;
-  const avg  = parseFloat(s?.avg)  || 0;
-  const k9   = parseFloat(s?.strikeoutsPer9Inn) || 0;
-  const whip = parseFloat(s?.whip) || 0;
+  const k9   = profileMetricValue(s?.strikeoutsPer9Inn);
+  const whip = profileMetricValue(s?.whip);
+  const estBa = profileMetricValue(sv.est_ba);
+  const estSlg = profileMetricValue(sv.est_slg);
+  const expectedIso = estBa != null && estSlg != null ? estSlg - estBa : null;
+  const scoreValue = value => Number.isFinite(Number(value)) ? Number(value) : null;
 
   const hittingRows = [
-    { lbl:'xwOBA',              val: sv.est_woba    ? (+sv.est_woba).toFixed(3)     : (ops*0.35+avg*0.15+0.05).toFixed(3), max:0.500, lo:0.300 },
-    { lbl:'Bat Speed',          val: bt.avg_bat_speed ? (+bt.avg_bat_speed).toFixed(1)+' mph' : '—', raw: parseFloat(bt.avg_bat_speed)||72, max:80, lo:65 },
-    { lbl:'Sweet Spot %',       val: sv.sweet_spot_percent ? (+sv.sweet_spot_percent).toFixed(1)+'%' : '—', raw:parseFloat(sv.sweet_spot_percent)||33, max:50, lo:25 },
-    { lbl:'Barrel %',           val: sv.brl_percent ? (+sv.brl_percent).toFixed(1)+'%' : (ops*8).toFixed(1)+'%', raw:parseFloat(sv.brl_percent)||ops*8, max:20, lo:5 },
-    { lbl:'Contact Quality',    val: (kpis.CAS||50).toString(), raw:kpis.CAS||50, max:99, lo:40 },
-    { lbl:'Swing Decisions',    val: (kpis.DQS||50).toString(), raw:kpis.DQS||50, max:99, lo:40 },
-    { lbl:'Hard Hit %',         val: sv.hard_hit_percent ? (+sv.hard_hit_percent).toFixed(1)+'%' : '—', raw:parseFloat(sv.hard_hit_percent)||42, max:60, lo:30 },
-    { lbl:'Damage Rate',        val: (kpis.DPI||50).toString(), raw:kpis.DPI||50, max:99, lo:40 },
-    { lbl:'Expected ISO',       val: sv.est_slg ? ((+sv.est_slg)-(+sv.est_ba||avg)).toFixed(3) : (ops*0.18).toFixed(3), raw:ops*30, max:60, lo:15 },
-    { lbl:'Barrel Consistency', val: (Math.min(99,Math.round(kpis.CAS*0.6+kpis.DPI*0.4))).toString(), raw:Math.min(99,Math.round(kpis.CAS*0.6+kpis.DPI*0.4)), max:99, lo:40 },
+    { lbl:'xwOBA',              val: formatProfileMetric(sv.est_woba, 3), raw: profileMetricValue(sv.est_woba), max:0.500, lo:0.300 },
+    { lbl:'Bat Speed',          val: formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw: profileMetricValue(bt.avg_bat_speed), max:80, lo:65 },
+    { lbl:'Sweet Spot %',       val: formatProfileMetric(sv.sweet_spot_percent, 1, '%'), raw: profileMetricValue(sv.sweet_spot_percent), max:50, lo:25 },
+    { lbl:'Barrel %',           val: formatProfileMetric(sv.brl_percent, 1, '%'), raw: profileMetricValue(sv.brl_percent), max:20, lo:5 },
+    { lbl:'Contact Quality',    val: scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), max:99, lo:40 },
+    { lbl:'Swing Decisions',    val: scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), max:99, lo:40 },
+    { lbl:'Hard Hit %',         val: formatProfileMetric(sv.hard_hit_percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent), max:60, lo:30 },
+    { lbl:'Damage Rate',        val: scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), max:99, lo:40 },
+    { lbl:'Expected ISO',       val: formatProfileMetric(expectedIso, 3), raw:expectedIso, max:0.300, lo:0.050 },
+    { lbl:'Barrel Consistency', val: (() => { const v = scoreValue(kpis.CAS); const d = scoreValue(kpis.DPI); return v == null || d == null ? '—' : String(Math.min(99, Math.round(v * 0.6 + d * 0.4))); })(), raw: (() => { const v = scoreValue(kpis.CAS); const d = scoreValue(kpis.DPI); return v == null || d == null ? null : Math.min(99, Math.round(v * 0.6 + d * 0.4)); })(), max:99, lo:40 },
   ];
   const pitchingRows = [
-    { lbl:'K/9 Rate',     val: k9.toFixed(1),   raw:k9,   max:14, lo:6 },
-    { lbl:'WHIP',         val: whip.toFixed(3),  raw:whip, max:2,  lo:0.8, invert:true },
-    { lbl:'Stuff Score',  val: (kpis.CAS||50).toString(), raw:kpis.CAS||50, max:99, lo:40 },
-    { lbl:'Command',      val: (kpis.DQS||50).toString(), raw:kpis.DQS||50, max:99, lo:40 },
-    { lbl:'Run Prev.',    val: (kpis.DPI||50).toString(), raw:kpis.DPI||50, max:99, lo:40 },
-    { lbl:'Contact Suppr',val: sv.hard_hit_percent ? (100-parseFloat(sv.hard_hit_percent)).toFixed(1)+'%' : '—', raw:sv.hard_hit_percent?100-parseFloat(sv.hard_hit_percent):58, max:80, lo:50 },
+    { lbl:'K/9 Rate',     val: formatProfileMetric(k9, 1),   raw:k9,   max:14, lo:6 },
+    { lbl:'WHIP',         val: formatProfileMetric(whip, 3),  raw:whip, max:2,  lo:0.8, invert:true },
+    { lbl:'Stuff Score',  val: scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), max:99, lo:40 },
+    { lbl:'Command',      val: scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), max:99, lo:40 },
+    { lbl:'Run Prev.',    val: scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), max:99, lo:40 },
+    { lbl:'Contact Suppr',val: (() => { const hh = profileMetricValue(sv.hard_hit_percent); return hh == null ? '—' : `${(100 - hh).toFixed(1)}%`; })(), raw:(() => { const hh = profileMetricValue(sv.hard_hit_percent); return hh == null ? null : 100 - hh; })(), max:80, lo:50 },
   ];
   const rows = isPitcher ? pitchingRows : hittingRows;
 
@@ -735,7 +750,8 @@ function DefensiveIntel({ pos }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-      <Panel title="Defensive Intelligence" accent={C.slate}>
+                <Panel title="Defensive Intelligence" accent={C.slate} badge="Illustrative">
+
         <div style={{ padding:'4px 0 2px' }}>
           {defRows.map(({ lbl, val }) => {
             const color = val >= 70 ? C.teal : val >= 55 ? C.amber : C.slate;
@@ -751,6 +767,9 @@ function DefensiveIntel({ pos }) {
               </div>
             );
           })}
+        </div>
+        <div style={{ padding:'6px 14px', borderTop:`0.5px solid ${C.border}`, fontFamily:"'DM Mono',monospace", fontSize:8.5, color:C.text4 }}>
+          Positional proxy only · not MLB OAA, DRS, or Statcast fielding data
         </div>
       </Panel>
       <Panel title="Athletic / Biomechanical" accent={C.purple}>
@@ -822,9 +841,19 @@ function MarketIntelPanel({ kpis, ct, p }) {
 }
 
 /* ─── EV Distribution histogram ──────────────────────────────────── */
-function EVDistribution({ s, savant }) {
-  const avgEV = parseFloat(savant?.avg_hit_speed) || (parseFloat(s?.slg||0)*20+78);
-  // Deterministically seeded from avgEV, so this only ever needs
+function EVDistribution({ savant, season }) {
+  const avgEV = profileMetricValue(savant?.avg_hit_speed);
+  if (avgEV == null) {
+    return (
+      <Panel title="Exit Velocity Distribution" accent={C.amber} badge="Unavailable">
+        <div style={sans({ fontSize:11, color:C.text3, padding:'18px 14px', textAlign:'center', lineHeight:1.5 })}>
+          No Baseball Savant exit-velocity distribution is available for this player in {season || SEASON}.
+        </div>
+      </Panel>
+    );
+  }
+  // Deterministically seeded from the real Savant average exit velocity; the
+  // histogram is a visual estimate, not a raw per-batted-ball distribution.
   // recomputing when avgEV itself changes — not on every unrelated
   // re-render of the player page.
   const bins = useMemo(() => {
@@ -843,7 +872,7 @@ function EVDistribution({ s, savant }) {
   }, [avgEV]);
 
   return (
-    <Panel title="Exit Velocity Distribution" accent={C.amber} badge={`Avg ${avgEV.toFixed(1)} mph`}>
+    <Panel title="Exit Velocity Distribution" accent={C.amber} badge={`Savant ${season || SEASON} · Avg ${avgEV.toFixed(1)} mph`}>
       <div style={{ padding:'8px 4px 4px' }}>
         <ResponsiveContainer width="100%" height={100}>
           <BarChart data={bins} margin={{ top:4, right:8, bottom:0, left:0 }} barCategoryGap="10%">
@@ -872,25 +901,29 @@ function EVDistribution({ s, savant }) {
 }
 
 /* ─── Live Performance Inputs strip ─────────────────────────────── */
-function LivePerfInputs({ s, savant }) {
+export function getLivePerformanceItems(savant) {
   const sv = savant || {};
-  const items = [
-    { lbl:'Exit Velocity', val: sv.avg_hit_speed ? (+sv.avg_hit_speed).toFixed(1)+' mph' : (parseFloat(s?.slg||0)*20+78).toFixed(1)+' mph' },
-    { lbl:'Launch Angle',  val: sv.launch_angle_avg ? (+sv.launch_angle_avg).toFixed(1)+'°' : '13.2°' },
-    { lbl:'Sweet Spot %',  val: sv.sweet_spot_percent ? (+sv.sweet_spot_percent).toFixed(1)+'%' : '33.4%' },
-    { lbl:'Barrel %',      val: sv.brl_percent ? (+sv.brl_percent).toFixed(1)+'%' : (parseFloat(s?.ops||.750)*8).toFixed(1)+'%' },
-    { lbl:'Hard Hit %',    val: sv.hard_hit_percent ? (+sv.hard_hit_percent).toFixed(1)+'%' : '44.1%' },
-    { lbl:'Chase Rate',    val: sv.oz_swing_percent ? (+sv.oz_swing_percent).toFixed(1)+'%' : '28.2%' },
-    { lbl:'Zone Contact',  val: sv.z_contact_percent ? (+sv.z_contact_percent).toFixed(1)+'%' : '86.4%' },
+  return [
+    { lbl:'Exit Velocity', val: formatProfileMetric(sv.avg_hit_speed, 1, ' mph') },
+    { lbl:'Launch Angle',  val: formatProfileMetric(sv.launch_angle_avg, 1, '°') },
+    { lbl:'Sweet Spot %',  val: formatProfileMetric(sv.sweet_spot_percent, 1, '%') },
+    { lbl:'Barrel %',      val: formatProfileMetric(sv.brl_percent, 1, '%') },
+    { lbl:'Hard Hit %',    val: formatProfileMetric(sv.hard_hit_percent, 1, '%') },
+    { lbl:'Chase Rate',    val: formatProfileMetric(sv.oz_swing_percent, 1, '%') },
+    { lbl:'Zone Contact',  val: formatProfileMetric(sv.z_contact_percent, 1, '%') },
   ];
+}
+
+function LivePerfInputs({ savant, season }) {
+  const items = getLivePerformanceItems(savant);
   return (
     <div style={{ background:C.navy, borderRadius:8, overflow:'hidden' }}>
       <div style={{ padding:'7px 14px', borderBottom:'1px solid rgba(255,255,255,.1)', display:'flex', alignItems:'center', gap:8 }}>
         <div style={{ width:6, height:6, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }}/>
         <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:C.teal, letterSpacing:'.10em', fontWeight:600 }}>
-          LIVE FEED — PERFORMANCE INPUTS
+          SAVANT DATA — PERFORMANCE INPUTS
         </span>
-        <span style={{ marginLeft:'auto', fontFamily:"'DM Mono',monospace", fontSize:9, color:'rgba(255,255,255,.4)' }}>REAL-TIME DATA STREAM</span>
+        <span style={{ marginLeft:'auto', fontFamily:"'DM Mono',monospace", fontSize:9, color:'rgba(255,255,255,.4)' }}>{season || SEASON} · missing fields shown as —</span>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:0 }}>
         {items.map(({ lbl, val }, i) => (
@@ -907,7 +940,10 @@ function LivePerfInputs({ s, savant }) {
 
 
 function DevTimeline({ age }) {
-  const pct = Math.min(100, Math.max(0, ((age || 26) - 18) / (36 - 18) * 100));
+  if (age == null || !Number.isFinite(Number(age))) {
+    return <div style={sans({ fontSize:11, color:C.text3, padding:'18px 14px', textAlign:'center' })}>No current age data available for this player.</div>;
+  }
+  const pct = Math.min(100, Math.max(0, ((Number(age) - 18) / (36 - 18)) * 100));
   const phase = pct < 30 ? 'Development' : pct < 55 ? 'Prime' : pct < 75 ? 'Peak' : 'Veteran';
   const phaseColor = pct < 30 ? C.teal : pct < 55 ? C.amber : pct < 75 ? C.rust : C.slate;
   return (
@@ -1432,7 +1468,7 @@ function PlayerProfile({ player, derived }) {
             />
           )}
 
-          <EVDistribution s={s} savant={player.savant} />
+          <EVDistribution savant={player.savant} season={player.statSeason} />
 
           {/* ── Plate Discipline Heat Zone ──
                Batters get the real thing (ZoneWhiffGrid, sourced from
@@ -1501,7 +1537,7 @@ function PlayerProfile({ player, derived }) {
             <DevTimeline age={p?.currentAge} />
           </Panel>
 
-          <DefensiveIntel pos={p?.primaryPosition?.abbreviation || 'OF'} />
+          <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
 
           {/* Career OPS/ERA sparkline */}
           {sparkData.length > 1 && (
@@ -1690,7 +1726,7 @@ function PlayerProfile({ player, derived }) {
           <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} />
 
           {/* ── Comparison Engine ── */}
-          <Panel title="Comparison Engine" accent={C.purple} badge="Player Comp">
+          <Panel title="Comparison Engine" accent={C.purple} badge="Model Reference">
             <div style={{ padding:'12px 14px' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:12 }}>
@@ -1700,7 +1736,7 @@ function PlayerProfile({ player, derived }) {
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                     <div style={{ width:10, height:10, borderRadius:'50%', background:C.teal }}/>
-                    <span style={sans({ fontSize:10, fontWeight:700, color:C.text2 })}>{player.isPitcher ? 'Spencer Strider (Peak)' : 'Mike Trout (Peak)'}</span>
+                    <span style={sans({ fontSize:10, fontWeight:700, color:C.text2 })}>{player.isPitcher ? 'Peak Pitcher Reference' : 'Peak Hitter Reference'}</span>
                   </div>
                 </div>
                 <div style={{ ...px({ fontSize:12, fontWeight:800, color:C.purple }), background:C.purpleSoft, padding:'2px 10px', borderRadius:6 }}>
@@ -1728,10 +1764,11 @@ function PlayerProfile({ player, derived }) {
                   <PolarAngleAxis dataKey="axis" tick={{ fontSize:9.5, fill:C.text2, fontFamily:"'DM Mono',monospace" }} tickLine={false}/>
                   <PolarRadiusAxis domain={[0,100]} tick={false} axisLine={false}/>
                   <Radar name={`${p?.useName || ''} ${p?.useLastName || p?.lastName || ''}`} dataKey="player" stroke={C.amber} fill={C.amber} fillOpacity={0.18} strokeWidth={2} isAnimationActive={false}/>
-                  <Radar name={player.isPitcher ? 'Spencer Strider (Peak)' : 'Mike Trout (Peak)'} dataKey="comp" stroke={C.teal} fill={C.teal} fillOpacity={0.10} strokeWidth={1.5} strokeDasharray="4 2" isAnimationActive={false}/>
+                  <Radar name={player.isPitcher ? 'Peak Pitcher Reference' : 'Peak Hitter Reference'} dataKey="comp" stroke={C.teal} fill={C.teal} fillOpacity={0.10} strokeWidth={1.5} strokeDasharray="4 2" isAnimationActive={false}/>
                   <Tooltip {...TT} />
                 </RadarChart>
               </ResponsiveContainer>
+              <div style={sans({ fontSize:9, color:C.text4, margin:'-2px 0 8px', textAlign:'center' })}>Reference shape is a fixed SKIP model baseline, not a live comparison to a named player.</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:6 }}>
                 {(player.isPitcher
                   ? [['Strikeouts',kpis.CAS||55,96,C.amber],['Command',kpis.DQS||55,90,C.amber],['Run Prev.',kpis.DPI||55,97,C.amber]]
@@ -1817,7 +1854,7 @@ function PlayerProfile({ player, derived }) {
       </Panel>
 
       {/* ── Live Performance Inputs ── */}
-      <LivePerfInputs s={s} savant={player.savant} />
+      <LivePerfInputs savant={player.savant} season={player.statSeason} />
 
       {/* ── S.K.I.P. Live Feed ── */}
       <div style={{
@@ -1830,18 +1867,18 @@ function PlayerProfile({ player, derived }) {
           borderRight: '1px solid rgba(255,255,255,.12)', gap: 6,
         }}>
           <div style={{ width:6, height:6, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
-          <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:C.teal, letterSpacing:'.12em', fontWeight:600 }}>S.K.I.P. FEED</span>
+          <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:C.teal, letterSpacing:'.12em', fontWeight:600 }}>S.K.I.P. MODEL FEED</span>
         </div>
         <div style={{ overflow:'hidden', flex:1 }}>
           <div style={{ display:'flex', alignItems:'center', whiteSpace:'nowrap', animation:'scrollx 40s linear infinite', fontFamily:"'DM Mono',monospace", fontSize:11, color:'rgba(255,255,255,.72)' }}>
             {[
-              `MATCH: Similarity to elite comp ${Math.min(99, 72 + Math.round((kpis.TPVI - 50) / 2))}% — ${arch} archetype confirmed`,
-              `SKIP Score ${score}/100 — ${verd} · ${score >= 70 ? 'all signal layers confirm' : 'mixed signals across metric layers'}`,
-              `${player.isPitcher ? 'K/9 tracking ' + (kpis.CAS >= 70 ? 'elite' : 'below avg') + ' · WHIP signal ' + (kpis.DQS >= 65 ? 'clean' : 'elevated') : 'Contact ' + (kpis.CAS >= 70 ? 'elite tier' : 'below avg') + ' · Power ' + (kpis.DPI >= 70 ? 'elite tier' : 'standard')}`,
-              'Market: value ' + (score >= 70 ? 'above' : 'in line with') + ' current contract based on TPVI trajectory',
-              'Injury: no red flags in current tracking window — durability markers nominal',
-              'Plate Discipline: ' + (kpis.DQS >= 65 ? 'Elite chase suppression — top 15% league-wide' : 'Chase rate elevated — monitor approach trends'),
-              'Projection: ' + (p?.useLastName || p?.lastName || 'Player') + ' tracking ' + (score >= 70 ? 'toward top-10 WAR finish' : 'at current production pace'),
+              `SKIP MODEL · Similarity to elite comp ${Math.min(99, 72 + Math.round((kpis.TPVI - 50) / 2))}% — ${arch} archetype`,
+              `SKIP MODEL · Score ${score}/100 — ${verd} · ${score >= 70 ? 'strong composite signal' : 'mixed composite signals'}`,
+              `SKIP MODEL · ${player.isPitcher ? 'K/9 signal ' + (kpis.CAS >= 70 ? 'elite' : 'below average') + ' · WHIP signal ' + (kpis.DQS >= 65 ? 'clean' : 'elevated') : 'Contact ' + (kpis.CAS >= 70 ? 'elite tier' : 'below average') + ' · Power ' + (kpis.DPI >= 70 ? 'elite tier' : 'standard')}`,
+              'SKIP MODEL · Market value estimate based on TPVI trajectory; contract source shown separately',
+              'Injury: unavailable — no authoritative injury feed is connected to this profile',
+              'SKIP MODEL · Plate discipline signal: ' + (kpis.DQS >= 65 ? 'strong approach indicator' : 'approach risk indicator') + ' — not an official league percentile',
+              'SKIP MODEL · Projection: ' + (p?.useLastName || p?.lastName || 'Player') + ' at the current production trajectory — not a WAR forecast',
             ].map((item, i) => (
               <span key={i} style={{ padding:'0 24px', borderRight:'1px solid rgba(255,255,255,.1)' }}>· {item}</span>
             ))}
