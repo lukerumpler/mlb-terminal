@@ -156,6 +156,27 @@ describe('Prospects page — merged feature interactions', () => {
     await user.click(watchOnlyBtn);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
+
+  it('filters by position, age, ETA, and changes the sort order', async () => {
+    const user = userEvent.setup();
+    await goToProspects(user);
+
+    const position = screen.getByRole('combobox', { name: /Filter by position/ });
+    const age = screen.getByRole('combobox', { name: /Filter by age/ });
+    const eta = screen.getByRole('combobox', { name: /Filter by projected ETA/ });
+    const sort = screen.getByRole('combobox', { name: /Sort prospects/ });
+
+    expect(position.options.length).toBeGreaterThan(1);
+    await user.selectOptions(position, position.options[1].value);
+    await user.selectOptions(age, '21to22');
+    expect(eta.options.length).toBeGreaterThan(1);
+    await user.selectOptions(eta, eta.options[1].value);
+    await user.selectOptions(sort, 'fv');
+
+    expect(sort).toHaveValue('fv');
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+    expect(global.__consoleErrors.filter(e => e.includes('Error') && !e.includes('network unavailable')).length).toBe(0);
+  });
 });
 
 describe('Command palette', () => {

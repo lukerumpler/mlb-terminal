@@ -508,20 +508,37 @@ function ProspectsPage() {
   }, []);
 
   const [levelFilter, setLevelFilter] = useState('all');
+  const [positionFilter, setPositionFilter] = useState('all');
+  const [ageFilter, setAgeFilter] = useState('all');
+  const [etaFilter, setEtaFilter] = useState('all');
   const batterLevels  = useMemo(() => [...new Set(battersFV.map(b => b.level))].sort(), [battersFV]);
   const pitcherLevels = useMemo(() => [...new Set(pitchersFV.map(p => p.level))].sort(), [pitchersFV]);
+  const activeRows = batPit === 'bat' ? battersFV : pitchersFV;
+  const positionOptions = useMemo(() => [...new Set(activeRows.map(player => player.pos).filter(Boolean))].sort(), [activeRows]);
+  const etaOptions = useMemo(() => [...new Set(activeRows.map(player => player.eta).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric:true })), [activeRows]);
+  const ageMatches = (age) => {
+    const n = Number(age);
+    if (!Number.isFinite(n) || ageFilter === 'all') return ageFilter === 'all';
+    if (ageFilter === 'under21') return n < 21;
+    if (ageFilter === '21to22') return n >= 21 && n <= 22;
+    if (ageFilter === '23to24') return n >= 23 && n <= 24;
+    if (ageFilter === '25plus') return n >= 25;
+    return true;
+  };
+  const filterRows = (rows) => rows.filter(player => {
+    const levelOk = levelFilter === 'all' || player.level === levelFilter;
+    const positionOk = positionFilter === 'all' || player.pos === positionFilter;
+    const etaOk = etaFilter === 'all' || player.eta === etaFilter;
+    return levelOk && positionOk && etaOk && ageMatches(player.age) && (!watchOnly || isWatched(player.mlbId));
+  });
 
   const sortedBatters = useMemo(() => {
-    let filtered = levelFilter === 'all' ? battersFV : battersFV.filter(b => b.level === levelFilter);
-    if (watchOnly) filtered = filtered.filter(b => isWatched(b.mlbId));
-    return [...filtered].sort((a,b) => compareValues(a[sortKey] ?? 0, b[sortKey] ?? 0, sortAsc));
-  }, [battersFV, sortKey, sortAsc, levelFilter, watchOnly, isWatched]);
+    return [...filterRows(battersFV)].sort((a,b) => compareValues(a[sortKey] ?? 0, b[sortKey] ?? 0, sortAsc));
+  }, [battersFV, sortKey, sortAsc, levelFilter, positionFilter, ageFilter, etaFilter, watchOnly, isWatched]);
 
   const sortedPitchers = useMemo(() => {
-    let filtered = levelFilter === 'all' ? pitchersFV : pitchersFV.filter(p => p.level === levelFilter);
-    if (watchOnly) filtered = filtered.filter(p => isWatched(p.mlbId));
-    return [...filtered].sort((a,b) => compareValues(a[sortKey] ?? 0, b[sortKey] ?? 0, sortAsc));
-  }, [pitchersFV, sortKey, sortAsc, levelFilter, watchOnly, isWatched]);
+    return [...filterRows(pitchersFV)].sort((a,b) => compareValues(a[sortKey] ?? 0, b[sortKey] ?? 0, sortAsc));
+  }, [pitchersFV, sortKey, sortAsc, levelFilter, positionFilter, ageFilter, etaFilter, watchOnly, isWatched]);
 
   const selBatter  = useMemo(() => battersFV.find(b => b.mlbId === selId), [selId, battersFV]);
   const selPitcher = useMemo(() => pitchersFV.find(p => p.mlbId === selId), [selId, pitchersFV]);
@@ -625,7 +642,7 @@ function ProspectsPage() {
             <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
               <div style={{ display:'flex',gap:2,alignSelf:'flex-start',background:C.surface2,borderRadius:6,padding:3,border:`0.5px solid ${C.border}` }}>
                 {[['bat','Batters'],['pit','Pitchers']].map(([k,l])=>(
-                  <button key={k} onClick={()=>{ setBatPit(k); setSortKey('rank'); setSortAsc(true); setSelId(null); setCompareIds([]); setLevelFilter('all'); }}
+                  <button key={k} onClick={()=>{ setBatPit(k); setSortKey('rank'); setSortAsc(true); setSelId(null); setCompareIds([]); setLevelFilter('all'); setPositionFilter('all'); setAgeFilter('all'); setEtaFilter('all'); }}
                     style={{ padding:'5px 16px',fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700,
                       color:batPit===k?'#fff':C.text3,background:batPit===k?C.amber:'transparent',
                       border:'none',borderRadius:4,cursor:'pointer' }}>{l}</button>
@@ -639,6 +656,38 @@ function ProspectsPage() {
                 {(batPit === 'bat' ? batterLevels : pitcherLevels).map(lvl => (
                   <option key={lvl} value={lvl}>{lvl}</option>
                 ))}
+              </select>
+
+              <select aria-label="Filter by position" value={positionFilter} onChange={e => setPositionFilter(e.target.value)}
+                style={{ padding:'6px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5, cursor:'pointer' }}>
+                <option value="all">All Positions</option>
+                {positionOptions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+              </select>
+
+              <select aria-label="Filter by age" value={ageFilter} onChange={e => setAgeFilter(e.target.value)}
+                style={{ padding:'6px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5, cursor:'pointer' }}>
+                <option value="all">All Ages</option>
+                <option value="under21">Under 21</option>
+                <option value="21to22">Age 21–22</option>
+                <option value="23to24">Age 23–24</option>
+                <option value="25plus">25+</option>
+              </select>
+
+              <select aria-label="Filter by projected ETA" value={etaFilter} onChange={e => setEtaFilter(e.target.value)}
+                style={{ padding:'6px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5, cursor:'pointer' }}>
+                <option value="all">All ETAs</option>
+                {etaOptions.map(eta => <option key={eta} value={eta}>{eta}</option>)}
+              </select>
+
+              <select aria-label="Sort prospects" value={sortKey} onChange={e => { setSortKey(e.target.value); setSortAsc(true); }}
+                style={{ padding:'6px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5, cursor:'pointer' }}>
+                <option value="rank">Sort: Rank</option>
+                <option value="age">Sort: Age</option>
+                <option value="etaSort">Sort: ETA</option>
+                <option value="fv">Sort: eFV</option>
+                <option value="ops">Sort: OPS</option>
+                <option value="era">Sort: ERA</option>
+                <option value="projWar">Sort: Proj. WAR</option>
               </select>
 
               <button onClick={() => setWatchOnly(w => !w)} style={{

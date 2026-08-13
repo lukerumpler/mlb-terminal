@@ -18,7 +18,14 @@ describe('Team Overview and Prospects enhancement contract', () => {
   it('renders the decision-ready summary surfaces on both pages', () => {
     expect(overviewSource).toContain('Front Office Read');
     expect(overviewSource).toContain('Decision Lens');
+    expect(overviewSource).toContain('AI Scout Insights');
+    expect(overviewSource).toContain('AI-assisted');
+    expect(overviewSource).toContain('Local fallback');
     expect(prospectsSource).toContain('Prospect Board');
     expect(prospectsSource).toContain('Scouting Workflow');
+    expect(prospectsSource).toContain('Filter by position');
+    expect(prospectsSource).toContain('Filter by age');
+    expect(prospectsSource).toContain('Filter by projected ETA');
+    expect(prospectsSource).toContain('Sort prospects');
   });
 });

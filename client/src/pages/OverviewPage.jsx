@@ -117,6 +117,39 @@ function getFrontOffice(t) {
   return { strengths, weaknesses };
 }
 
+function buildRosterInsights(team, players) {
+  const hitters = (players?.hitting || []).filter(row => row?.stat);
+  const pitchers = (players?.pitching || []).filter(row => row?.stat);
+  const numeric = (value) => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
+  const topHitter = [...hitters].sort((a, b) => (numeric(b.stat?.ops) ?? -Infinity) - (numeric(a.stat?.ops) ?? -Infinity))[0];
+  const topPitcher = [...pitchers].sort((a, b) => (numeric(a.stat?.era) ?? Infinity) - (numeric(b.stat?.era) ?? Infinity))[0];
+  const strengths = [];
+  const weaknesses = [];
+  const add = (list, title, detail, evidence) => list.push({ title, detail, evidence });
+
+  if (numeric(team.ops) != null && team.ops >= .750) add(strengths, 'Lineup creates leverage', `${topHitter?.name || 'The lineup'} leads the roster by OPS`, `Team OPS ${formatTeamMetric(team.ops, 3)}`);
+  if (numeric(team.hr) != null && team.hr >= 100) add(strengths, 'Power is a carrying tool', 'Home-run production gives the roster a reliable extra-base path', `${formatTeamMetric(team.hr)} HR`);
+  if (numeric(team.era) != null && team.era <= 3.70) add(strengths, 'Run prevention is stable', `${topPitcher?.name || 'The staff'} anchors the current pitching group`, `Team ERA ${formatTeamMetric(team.era, 2)}`);
+  if (numeric(team.k) != null && team.k >= 700) add(strengths, 'Strikeout volume travels', 'The staff can miss bats and limit balls in play', `${formatTeamMetric(team.k)} strikeouts`);
+  if (numeric(rdForInsights(team)) != null && rdForInsights(team) > 0) add(strengths, 'Results support the profile', 'The roster is converting its run-creation and run-prevention balance into wins', `${rdForInsights(team) > 0 ? '+' : ''}${rdForInsights(team)} run differential`);
+
+  if (numeric(team.ops) != null && team.ops < .720) add(weaknesses, 'Offensive margin is thin', 'The lineup may need more on-base traffic or impact contact', `Team OPS ${formatTeamMetric(team.ops, 3)}`);
+  if (numeric(team.era) != null && team.era > 4.00) add(weaknesses, 'Run prevention needs support', 'The staff is allowing too much damage for a stable team baseline', `Team ERA ${formatTeamMetric(team.era, 2)}`);
+  if (numeric(team.whip) != null && team.whip > 1.30) add(weaknesses, 'Traffic is accumulating', 'Base runners allowed per inning are creating avoidable leverage swings', `WHIP ${formatTeamMetric(team.whip, 3)}`);
+  if (numeric(rdForInsights(team)) != null && rdForInsights(team) < 0) add(weaknesses, 'Results lag the roster signals', 'The negative run differential points to a current execution gap', `${rdForInsights(team)} run differential`);
+
+  return {
+    strengths: strengths.slice(0, 3),
+    weaknesses: weaknesses.slice(0, 3),
+    source: hitters.length || pitchers.length ? 'Current roster leaders + live team aggregates' : 'Current team aggregates; roster leaders are still loading',
+  };
+}
+
+function rdForInsights(team) {
+  const rs = Number(team?.rs), ra = Number(team?.ra);
+  return Number.isFinite(rs) && Number.isFinite(ra) ? rs - ra : null;
+}
+
 function OverviewPage() {
   const [selTeam,setSelTeam]=useState('lad');
   const [splitTab,setSplitTab]=useState('home');
@@ -148,6 +181,36 @@ function OverviewPage() {
   // brown) would fail contrast as text against a themed background, but read
   // fine as a bar fill or a 3px accent strip.
   const teamAccent = team?.color || C.amber;
+  const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiInsightsState, setAiInsightsState] = useState('idle');
+
+  useEffect(() => {
+    if (!liveTeamData) return;
+    let alive = true;
+    const input = {
+      team: {
+        name: team.name, abbr: team.abbr, w: team.w, l: team.l, pct: team.pct,
+        rs: team.rs, ra: team.ra, ops: team.ops, hr: team.hr, era: team.era,
+        whip: team.whip, k: team.k, sb: team.sb,
+      },
+      roster: {
+        hitting: liveTeamPlayers.hitting.slice(0, 12),
+        pitching: liveTeamPlayers.pitching.slice(0, 12),
+      },
+    };
+    setAiInsightsState('loading');
+    fetch('/api/trpc/ai.rosterInsights?batch=1', {
+      method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({0:{json:input}}),
+    }).then(response => response.json().then(payload => ({ ok:response.ok, payload })))
+      .then(({ ok, payload }) => {
+        const data = payload?.[0]?.result?.data?.json;
+        if (!ok || !data) throw new Error('AI insights unavailable');
+        if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
+      }).catch(() => { if (alive) setAiInsightsState('error'); });
+    return () => { alive = false; };
+  }, [liveTeamData, team, liveTeamPlayers]);
+  const displayedInsights = aiInsights || rosterInsights;
 
   useEffect(()=>{
     let alive=true;
@@ -360,6 +423,32 @@ function OverviewPage() {
               ) : <div style={sans({fontSize:10,color:C.text3,marginTop:5,lineHeight:1.4})}>{item.detail}</div>}
             </div>
           ))}
+        </div>
+      </Panel>
+
+      <Panel title="AI Scout Insights" accent={C.teal} badge={aiInsightsState === 'loading' ? 'Analyzing roster…' : aiInsightsState === 'ready' ? 'AI-assisted' : 'Local fallback'}>
+        <div style={{padding:'8px 14px 0',...sans({fontSize:10,color:C.text3,lineHeight:1.45})}}>
+          Automated read of the selected team using current aggregate stats and roster leaders. It updates when the team or live feed changes.
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:8}}>
+          {[
+            {label:'Strengths', items:displayedInsights.strengths, color:C.teal, soft:C.tealSoft, empty:'No qualifying strength signal yet.'},
+            {label:'Weaknesses', items:displayedInsights.weaknesses, color:C.rust, soft:C.rustSoft, empty:'No qualifying weakness signal yet.'},
+          ].map((group, groupIndex) => (
+            <div key={group.label} style={{padding:'8px 14px 12px',borderRight:groupIndex===0?`0.5px solid ${C.borderLight}`:'none'}}>
+              <div style={sans({fontSize:9.5,fontWeight:800,color:group.color,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:7})}>{group.label}</div>
+              {group.items.length ? group.items.map(item => (
+                <div key={item.title} style={{padding:'8px 9px',marginBottom:6,borderRadius:6,background:group.soft,border:`0.5px solid ${group.color}33`}}>
+                  <div style={sans({fontSize:11.5,fontWeight:800,color:C.text})}>{item.title}</div>
+                  <div style={sans({fontSize:10,color:C.text2,lineHeight:1.4,marginTop:3})}>{item.detail}</div>
+                  <div style={px({fontSize:9.5,color:group.color,fontWeight:700,marginTop:5})}>{item.evidence}</div>
+                </div>
+              )) : <div style={sans({fontSize:10,color:C.text3,fontStyle:'italic'})}>{group.empty}</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{padding:'8px 14px',borderTop:`0.5px solid ${C.borderLight}`,...sans({fontSize:9.5,color:C.text4})}}>
+          Source: {displayedInsights.source}. {aiInsightsState === 'error' ? 'AI service unavailable; showing local roster analysis. ' : ''}This is decision support, not a replacement for staff scouting review.
         </div>
       </Panel>
 

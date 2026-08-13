@@ -7,3 +7,9 @@
 - [x] Add or update Vitest coverage for the new feature behavior and run the project checks.
 - [x] Verify desktop and mobile presentation with screenshots and refine any visual issues.
 - [x] Save a checkpoint with all completed items marked complete.
+
+- [x] Add an AI-powered Team Overview insights section grounded in current roster and team statistics, clearly labeling the source context.
+- [x] Add Prospects filters for position, age, and projected ETA.
+- [x] Add Prospects sorting controls for rank, age, ETA, future value, and performance metrics.
+- [x] Add focused Vitest coverage for roster insights and Prospects filtering/sorting behavior.
+- [x] Verify the new controls and insights on desktop and mobile, then save a published checkpoint.
