@@ -1299,7 +1299,8 @@ function PlayersPage() {
 
 /* ─── Contract panel (stable component — not IIFE) ─────────────────── */
 function ContractPanel({ contractData: ct }) {
-  const statusColor = !ct                                    ? C.text3
+  const hasVerifiedContract = Boolean(ct?.contractAvailable);
+  const statusColor = !ct || !hasVerifiedContract             ? C.text3
     : ct.status === 'Under Contract'                         ? C.teal
     : ct.status === 'Expired'                                ? C.rust
     : (ct.status === 'Free Agent Eligible'
@@ -1323,17 +1324,22 @@ function ContractPanel({ contractData: ct }) {
           borderBottom:`0.5px solid ${C.borderLight}`, marginBottom:8 }}>
           <div style={{ width:8, height:8, borderRadius:'50%', background: ct ? statusColor : C.border, flexShrink:0 }} />
           <span style={sans({ fontSize:12, fontWeight:800, color: ct ? statusColor : C.text3 })}>
-            {ct ? ct.status : 'No contract data'}
+            {ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
           </span>
         </div>
         {rows.map(([lbl, val], i) => (
           <KVRow key={lbl} label={lbl} value={val} last={i === rows.length - 1} />
         ))}
+        {ct && !hasVerifiedContract && (
+          <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
+            Connected sources resolved the player identity, but no verified contract dollar fields were returned.
+          </div>
+        )}
         {ct && rows.length === 0 && (
           <div style={sans({ fontSize:11, color:C.text3 })}>No detail available</div>
         )}
         <div style={{ marginTop:8, fontFamily:"'DM Mono',monospace", fontSize:8.5, color:C.text4, letterSpacing:'.03em' }}>
-          Source: {ct?.source || 'MLB Stats API'}
+          Source: {ct?.source || 'MLB Stats API'}{ct && !hasVerifiedContract ? ' · identity/service metadata only' : ''}
         </div>
       </div>
     </Panel>

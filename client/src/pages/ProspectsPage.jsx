@@ -967,7 +967,7 @@ function ProspectsPage() {
 
           {/* ── Right sidebar ── */}
           <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
-            <Panel title="MiLB Standouts" accent={C.teal} badge="Statcast">
+            <Panel title="MiLB Standouts" accent={C.teal} badge="SKIP editorial">
               {MILB_STANDOUTS.map((s,i)=>(
                 <div key={i} style={{ padding:'12px 14px',borderBottom:i<MILB_STANDOUTS.length-1?`0.5px solid ${C.borderLight}`:'none' }}>
                   <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6 }}>
@@ -991,7 +991,7 @@ function ProspectsPage() {
                 </div>
               ))}
               <div style={{ padding:'8px 14px',borderTop:`0.5px solid ${C.borderLight}` }}>
-                <div style={sans({ fontSize:9.5,color:C.text3,lineHeight:1.5 })}>SKIP tracks every batted ball across all MiLB levels using Statcast technology.</div>
+                <div style={sans({ fontSize:9.5,color:C.text3,lineHeight:1.5 })}>Editorial scouting snapshot. Live MLB.com stats appear in the table above; connected MiLB Statcast batted-ball coverage is unavailable.</div>
               </div>
             </Panel>
 

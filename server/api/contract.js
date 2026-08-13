@@ -96,6 +96,19 @@ function deriveStatus(expiry, svcStatus) {
   return 'Under Contract';
 }
 
+// A resolved MLB person is not the same thing as a verified contract record.
+// Spotrac/Baseball-Reference may fail or return only a player match, while the
+// official MLB person response can still provide debut/service metadata. Keep
+// those states separate so the UI never turns identity data into a salary claim.
+export function hasVerifiedContractData(scraped, mlbData) {
+  const scrapedFields = scraped && [scraped.salary, scraped.aav, scraped.total, scraped.years, scraped.expiry];
+  const mlbFields = mlbData && [mlbData.mlbSalary, mlbData.mlbAav, mlbData.mlbYears, mlbData.mlbExpiry];
+  return Boolean(
+    (scrapedFields && scrapedFields.some(value => value != null))
+    || (mlbFields && mlbFields.some(value => value != null))
+  );
+}
+
 // Lightweight HTML tag stripper — mirrors BeautifulSoup .get_text()
 function stripTags(html) {
   return (html || '')
@@ -321,6 +334,7 @@ export default async function handler(req, res) {
   // Merge MLB API service-time data with scraped contract data
   const svcStatus = mlbData?.serviceStatus || null;
   const expiry    = scraped?.expiry || mlbData?.mlbExpiry || null;
+  const contractAvailable = hasVerifiedContractData(scraped, mlbData);
 
   if (!scraped && !mlbData) {
     return res.status(200).json({ found: false });
@@ -328,6 +342,7 @@ export default async function handler(req, res) {
 
   const result = {
     found:         true,
+    contractAvailable,
     source:        scraped?.source || 'MLB Stats API',
     player:        scraped?.player || name,
     team:          scraped?.team   || null,

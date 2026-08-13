@@ -10967,3 +10967,6 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Enhance player and team spray charts with hover tooltips for exit velocity, launch angle, distance, and batted-ball event type.
 - [x] Implement filtering and sorting controls on the Draft board for SKIP rank and position.
 - [ ] Run release checks (lint, TypeScript, build, all 130+ tests), verify ROADMAP_REFERENCE_FEATURES.md is unchanged, save checkpoint, and deliver the skill and project.
+
+- [x] Make contract responses distinguish verified contract dollar data from MLB identity/service metadata when the scraped money sources return no match.
+- [ ] Re-run the full release checks after the final source-audit corrections and save the final checkpoint.

@@ -113,3 +113,28 @@ The player spray chart now consumes Baseball Savant field-contact `hc_x`/`hc_y` 
 The Overview smoke test confirmed live Dodgers standings, team hitting and pitching totals, team leaders, and proper 93rd/77th percentile labels. Unsupported team-level Statcast panels remain explicitly unavailable. The Draft tab rendered a canonical SKIP rank order shared by the Big Board, movers, and class directory, with SKIP editorial fields separated from official round results.
 
 A 375px mobile preview was also checked. The terminal now collapses the navigation rail to icons, stacks major Overview grids, and converts the shared metric strip to two columns so the data cards remain readable on a narrow screen while desktop layout remains unchanged.
+
+
+## Final 2026 source verification — 2026-08-13
+
+### Live probes and decisions
+
+- MLB identity, standings, and transaction probes succeeded against the official Stats API: `https://statsapi.mlb.com/api/v1/people/660271?hydrate=currentTeam,stats(type=season,group=hitting,season=2026)`, `https://statsapi.mlb.com/api/v1/standings?leagueId=104&season=2026&standingsTypes=regularSeason`, and `https://statsapi.mlb.com/api/v1/transactions?startDate=2026-08-01&endDate=2026-08-13&sportId=1`. The project proxy forwards these endpoints and does not create a static fallback when an upstream response is unreadable.
+- The NCAA proxy’s upstream `https://ncaa-api.henrygd.me/standings/baseball/d1` returned HTTP 500 with `Could not parse data` during the audit. `NcaaWatchPanel` renders a readable error/unavailable state when both the scoreboard and ranking requests fail; no NCAA snapshot rows are substituted.
+- The contract route returned `found:true` for Shohei Ohtani with the official MLB service/debut path and null money fields when the Spotrac/Baseball-Reference scrapes did not produce a match. Its source caveat remains visible in the handler and UI; dollar values are not represented as official MLB salary data.
+- The Intel Feed route returned `items:[]` with `error:"Feed unavailable"` when the public RSS/Nitter hosts were unavailable. No canned posts or stale metadata are supplied.
+
+### Prospect identity audit
+
+- Audited all 95 curated prospect records against `https://statsapi.mlb.com/api/v1/people/{mlbId}?hydrate=currentTeam`. After correction, all 95 IDs resolved, all names matched diacritic-insensitively, and no record lacked a current team object.
+- Corrected stale person IDs in `client/src/constants/data.js`: Brandon Sproat `687075` (was `803997`), Kyle Harrison `690986` (was `802565`), and Ricky Tiedemann `694357` (was `807028`). Normalized official names to `Pedro Ramírez` and `Elmer Rodríguez`.
+- The live prospect adapter remains authoritative for current AAA/AA stats; curated rank, level, and scouting fields remain editorial baseline context and are surfaced with the page’s `LIVE STATS` / `STATIC` status instead of being silently presented as live MLB figures.
+
+### Remaining source limitations
+
+- Contract dollar values are not official MLB Stats API fields in this implementation; Spotrac and Baseball-Reference are scraped public reference sources, while service time/debut are MLB-backed. Null values remain explicit when scrapes fail.
+- Current NCAA data and Intel Feed posts were unavailable at audit time; the UI displays explicit unavailable/error states rather than fallback data.
+- `ROADMAP_REFERENCE_FEATURES.md` was not modified.
+
+
+The same parent-organization audit corrected 11 current organization labels in the curated prospect catalog: Leo De Vries to ATH, Zyhir Hope to DET, Arjun Nimmala to LAA, Jefferson Rojas to NYM, Jamie Arnold to ATH, Gage Jump to ATH, Anthony Eyanson to BAL, River Ryan to DET, Kyson Witherspoon to BAL, Brandon Sproat to MIL, and Kyle Harrison to MIL. These are current MLB organization affiliations derived from the live person record’s `currentTeam.parentOrgId`; the table’s level and editorial rank fields remain separate from the live affiliation check.
