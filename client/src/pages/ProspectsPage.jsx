@@ -374,7 +374,8 @@ function ProspectsPage() {
   useEffect(() => {
     let alive = true;
     getTopProspectStats().then(data => {
-      if (alive && data) setLiveStats(data);
+      const hasLiveRows = Boolean(data && (data.hitting?.length || data.pitching?.length));
+      if (alive && hasLiveRows) setLiveStats(data);
     }).catch(() => {}).finally(() => { if (alive) setLiveLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -387,14 +388,15 @@ function ProspectsPage() {
     const liveByName = buildNameIndex(liveStats.hitting);
     return PROSPECT_BATTERS.map(p => {
       const live = liveById.get(p.mlbId) || liveByName.get(normalizeName(p.name));
-      if (!live) return p;
+      if (!live) return { ...p, ops:null, avg:null, hr:null, rbi:null, sb:null, statSource:'unavailable' };
       return {
         ...p,
-        ops: live.ops != null ? +live.ops : p.ops,
-        avg: live.avg != null && live.avg !== '—' ? +live.avg : p.avg,
-        hr:  live.hr  != null && live.hr  !== '—' ? +live.hr  : p.hr,
-        rbi: live.rbi != null && live.rbi !== '—' ? +live.rbi : p.rbi,
-        sb:  live.sb  != null && live.sb  !== '—' ? +live.sb  : p.sb,
+        ops: live.ops != null && live.ops !== '—' ? +live.ops : null,
+        avg: live.avg != null && live.avg !== '—' ? +live.avg : null,
+        hr:  live.hr  != null && live.hr  !== '—' ? +live.hr  : null,
+        rbi: live.rbi != null && live.rbi !== '—' ? +live.rbi : null,
+        sb:  live.sb  != null && live.sb  !== '—' ? +live.sb  : null,
+        statSource:'live',
       };
     });
   }, [liveStats]);
@@ -405,13 +407,14 @@ function ProspectsPage() {
     const liveByName = buildNameIndex(liveStats.pitching);
     return PROSPECT_PITCHERS.map(p => {
       const live = liveById.get(p.mlbId) || liveByName.get(normalizeName(p.name));
-      if (!live) return p;
+      if (!live) return { ...p, era:null, whip:null, so:null, w:null, statSource:'unavailable' };
       return {
         ...p,
-        era:  live.era  != null && live.era  !== '—' ? +live.era  : p.era,
-        whip: live.whip != null && live.whip !== '—' ? +live.whip : p.whip,
-        so:   live.k    != null && live.k    !== '—' ? +live.k    : p.so,
-        w:    live.w    != null && live.w    !== '—' ? +live.w    : p.w,
+        era:  live.era  != null && live.era  !== '—' ? +live.era  : null,
+        whip: live.whip != null && live.whip !== '—' ? +live.whip : null,
+        so:   live.k    != null && live.k    !== '—' ? +live.k    : null,
+        w:    live.w    != null && live.w    !== '—' ? +live.w    : null,
+        statSource:'live',
       };
     });
   }, [liveStats]);

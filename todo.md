@@ -10966,7 +10966,16 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add side-by-side player percentile radar comparison feature.
 - [x] Enhance player and team spray charts with hover tooltips for exit velocity, launch angle, distance, and batted-ball event type.
 - [x] Implement filtering and sorting controls on the Draft board for SKIP rank and position.
-- [ ] Run release checks (lint, TypeScript, build, all 130+ tests), verify ROADMAP_REFERENCE_FEATURES.md is unchanged, save checkpoint, and deliver the skill and project.
+- [x] Run release checks (lint, TypeScript, build, all 130+ tests), verify ROADMAP_REFERENCE_FEATURES.md is unchanged, save checkpoint, and deliver the skill and project.
 
 - [x] Make contract responses distinguish verified contract dollar data from MLB identity/service metadata when the scraped money sources return no match.
-- [ ] Re-run the full release checks after the final source-audit corrections and save the final checkpoint.
+- [x] Re-run the full release checks after the final source-audit corrections and save the final checkpoint.
+
+## Comprehensive metric verification & online source audit
+- [x] Audit every statistic card, radar metric, league leader, team overview aggregate, and prospect stat column across all tabs.
+- [x] Search authoritative online sources (MLB Stats API, Baseball Savant leaderboard exports, NCAA D1 scoreboards, and Spotrac/BRef contract indices) to verify current 2026 data availability.
+- [x] Connect any missing or broken live data flows where authoritative endpoints exist, and explicitly label unsupported or unavailable panels.
+- [x] Add rigorous metric-source assertion tests and run the full release verification suite (lint, check, build, all tests).
+- [x] Confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save final checkpoint, and deliver the verified project.
+- [x] Ensure Overview aggregate statistics render as soon as live standings/team totals arrive instead of waiting on slower player-leaderboard requests; preserve explicit unavailable states for failed subsets.
+- [x] Prevent Prospect tables from silently falling back to stale static numeric stats after a live response is present but a player or field is missing; keep only editorial identity/rank fields and show em dashes for unavailable live metrics.

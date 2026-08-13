@@ -151,48 +151,64 @@ function OverviewPage() {
 
   useEffect(()=>{
     let alive=true;
+    setLiveTeamData(null);
+    setLiveTeamPlayers({ hitting:[], pitching:[] });
+    setLiveTeamError(false);
     getTodaysGames().then(g=>{ if(alive) setTodayGames(g.slice(0,8)); }).catch(()=>{});
+
+    // Aggregate standings and team totals are the critical Overview path. They
+    // must render independently of the slower per-player leaderboard calls,
+    // otherwise one delayed pitching request leaves every visible team card on
+    // an em dash even when the authoritative aggregate responses succeeded.
     Promise.allSettled([
       getStandings(),
       getAllTeamStats('hitting'),
       getAllTeamStats('pitching'),
-      getTeamPlayerStats(teamBase.id, 'hitting'),
-      getTeamPlayerStats(teamBase.id, 'pitching'),
-    ]).then(([std, hitting, pitching, teamHitters, teamPitchers]) => {
+    ]).then(([std, hitting, pitching]) => {
       if (!alive) return;
       const byAbbr = {};
       const byId = {};
       if (std.status === 'fulfilled') {
         Object.values(std.value).flat().forEach(row => {
           const record = { standings: row };
-          byAbbr[row.abbr] = record;
-          byId[row.id] = record;
+          if (row.abbr) byAbbr[row.abbr] = record;
+          if (row.id != null) byId[row.id] = record;
         });
       }
       if (hitting.status === 'fulfilled') {
         Object.values(hitting.value).forEach(stat => {
           const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
           row.hitting = stat;
-          if (stat.teamId) byId[stat.teamId] = row;
+          if (stat.teamId != null) byId[stat.teamId] = row;
         });
       }
       if (pitching.status === 'fulfilled') {
         Object.values(pitching.value).forEach(stat => {
           const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
           row.pitching = stat;
-          if (stat.teamId) byId[stat.teamId] = row;
+          if (stat.teamId != null) byId[stat.teamId] = row;
         });
       }
-      if (std.status === 'fulfilled' || hitting.status === 'fulfilled' || pitching.status === 'fulfilled') {
+      if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
         setLiveTeamData({ byAbbr, byId });
       } else {
         setLiveTeamError(true);
       }
+    });
+
+    // Team leaders are useful but non-critical. A timeout or upstream failure
+    // should only make the leader rows unavailable, not block the aggregates.
+    Promise.allSettled([
+      getTeamPlayerStats(teamBase.id, 'hitting'),
+      getTeamPlayerStats(teamBase.id, 'pitching'),
+    ]).then(([teamHitters, teamPitchers]) => {
+      if (!alive) return;
       setLiveTeamPlayers({
         hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : [],
         pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : [],
       });
     });
+
     return ()=>{ alive=false; };
   },[teamBase?.id]);
   const rd = team.rs == null || team.ra == null || !Number.isFinite(Number(team.rs)) || !Number.isFinite(Number(team.ra))

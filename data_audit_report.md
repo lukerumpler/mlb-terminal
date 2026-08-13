@@ -138,3 +138,17 @@ A 375px mobile preview was also checked. The terminal now collapses the navigati
 
 
 The same parent-organization audit corrected 11 current organization labels in the curated prospect catalog: Leo De Vries to ATH, Zyhir Hope to DET, Arjun Nimmala to LAA, Jefferson Rojas to NYM, Jamie Arnold to ATH, Gage Jump to ATH, Anthony Eyanson to BAL, River Ryan to DET, Kyson Witherspoon to BAL, Brandon Sproat to MIL, and Kyle Harrison to MIL. These are current MLB organization affiliations derived from the live person record’s `currentTeam.parentOrgId`; the table’s level and editorial rank fields remain separate from the live affiliation check.
+
+
+## Comprehensive metric verification — source research phase
+
+Authoritative online documentation was rechecked on 2026-08-13. Baseball Savant's 2026 Percentile Rankings page documents the batting and pitching qualifiers of 2.1 PA per team game and 1.25 PA per team game, and defines the relevant Statcast metrics including EV, launch angle, barrels, hard-hit rate, sweet-spot rate, xBA, xwOBA, sprint speed, pitch velocity, movement, spin, extension, xERA, arm strength, and OAA. The Statcast CSV documentation identifies `hc_x` and `hc_y` as batted-ball hit coordinates, `hit_distance` as projected hit distance, `launch_speed` as exit velocity, and `launch_angle` as launch angle. Baseball Savant's Statcast Search page confirms that the underlying database can be queried by player, team, season, event, and batted-ball fields. Sources: https://baseballsavant.mlb.com/leaderboard/percentile-rankings, https://baseballsavant.mlb.com/csv-docs, https://baseballsavant.mlb.com/statcast_search.
+
+The NCAA.com Division I baseball rankings page was also read as an authoritative current-season reference. It identifies the D1Baseball.com Top 25 through games on June 23, 2026 and reports rank, team, overall record, and previous rank. The existing NCAA adapter is therefore treated as a live provider path only when it returns data; NCAA.com rankings are a corroborating reference, not a fabricated fallback. Source: https://www.ncaa.com/rankings/baseball/d1/d1baseballcom-top-25.
+
+
+### Live endpoint probe results — 2026-08-13
+
+The connected routes were probed after the Overview remount. MLB person identity for Shohei Ohtani, MLB team player stats for the Dodgers, and MLB leader categories returned HTTP 200 JSON from the official Stats API. Baseball Savant expected-statistics and Statcast leaderboard CSV routes returned HTTP 200 with current 2026 rows. The NCAA standings route returned HTTP 500 from `ncaa-api.henrygd.me` with an explicit proxy error, while the current-week scoreboard route returned HTTP 200 with an empty scoreboard response. This confirms the app can display live MLB/Savant data and must retain explicit unavailable states for NCAA standings when the provider fails.
+
+The Overview issue was traced to one `Promise.allSettled` block that waited for slow per-player leader requests before committing successful aggregate standings/team-total responses. The loader now commits the three critical aggregate requests independently and handles team-leader requests in a separate non-blocking promise. A fresh clean remount then displayed live Dodgers values including 73–48, .603, 606 runs scored, 464 runs allowed, +142 run differential, .768 OPS, 155 HR, 3.70 ERA, 1.160 WHIP, .261 AVG, 1081 strikeouts, and 46 stolen bases from the live responses.
