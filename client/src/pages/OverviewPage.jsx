@@ -345,6 +345,24 @@ function OverviewPage() {
         {val:'—',lbl:'Team WAR',   sub:'Unavailable'},
       ]}/>
 
+      <Panel title="Front Office Read" accent={teamAccent} badge="Decision Lens">
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
+          {[
+            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust},
+            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy},
+            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
+          ].map((item, i) => (
+            <div key={item.label} style={{padding:'12px 14px',borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
+              <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
+              <div style={sans({fontSize:13,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
+              {item.action ? (
+                <button onClick={item.action} style={{marginTop:5,padding:0,border:'none',background:'transparent',fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:10,color:C.purple,cursor:'pointer',textAlign:'left',textDecoration:'underline',textUnderlineOffset:2}}>{item.detail} →</button>
+              ) : <div style={sans({fontSize:10,color:C.text3,marginTop:5,lineHeight:1.4})}>{item.detail}</div>}
+            </div>
+          ))}
+        </div>
+      </Panel>
+
       {/* ── ROW 1: Tables | Radars + Run Diff | Standings + Grade ── */}
       <div className="overview-responsive-grid" style={{display:'grid',gridTemplateColumns:'minmax(160px,190px) 1fr minmax(168px,210px)',gap:14,alignItems:'start'}}>
 

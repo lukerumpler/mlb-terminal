@@ -107,6 +107,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const onNavigate = e => {
+      const nextTab = e.detail?.tab;
+      if (TABS.some(item => item.key === nextTab)) setTab(nextTab);
+    };
+    window.addEventListener('skip-navigate', onNavigate);
+    return () => window.removeEventListener('skip-navigate', onNavigate);
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     const refresh = () => {
       getTodaysGames().then(games => {

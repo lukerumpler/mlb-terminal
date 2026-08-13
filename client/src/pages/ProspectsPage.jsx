@@ -551,6 +551,14 @@ function ProspectsPage() {
     topK:   bestBy(pitchersFV, 'so'),
   }), [pitchersFV]);
 
+  const pipelineSummary = useMemo(() => {
+    const all = [...battersFV, ...pitchersFV];
+    const nearTerm = all.filter(player => player.eta && /2026|2027/.test(player.eta)).length;
+    const highRisk = all.filter(player => player.risk === 'High').length;
+    const topSystem = [...all].sort((a, b) => (b.fv || 0) - (a.fv || 0))[0];
+    return { nearTerm, highRisk, topSystem };
+  }, [battersFV, pitchersFV]);
+
   return (
     <>
     <div className="page-enter" style={{ display:'flex',flexDirection:'column',gap:14 }}>
@@ -564,6 +572,23 @@ function ProspectsPage() {
         { val:topAVG  ? fmt(topAVG.avg)   : '—', lbl:'Top AVG',  sub:topAVG?.name?.split(' ').slice(-1)[0]||'' },
         { val:topK    ? topK.so            : '—', lbl:'Top K',    sub:topK?.name?.split(' ').slice(-1)[0]||''   },
       ]}/>
+
+      <Panel title="Prospect Board" accent={C.purple} badge="Scouting Workflow">
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:0}}>
+          {[
+            {label:'Near-term ETA', value:pipelineSummary.nearTerm, detail:'2026–27 arrivals', color:C.teal},
+            {label:'High risk', value:pipelineSummary.highRisk, detail:'Requires monitoring', color:pipelineSummary.highRisk ? C.rust : C.text3},
+            {label:'Top future value', value:pipelineSummary.topSystem?.fv ? `${pipelineSummary.topSystem.fv} FV` : '—', detail:pipelineSummary.topSystem?.name || 'Data pending', color:C.amber},
+            {label:'Tracking pool', value:battersFV.length + pitchersFV.length, detail:'Players in board', color:C.navy},
+          ].map((item, i) => (
+            <div key={item.label} style={{padding:'12px 14px',borderRight:i<3?`0.5px solid ${C.borderLight}`:'none'}}>
+              <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
+              <div style={px({fontSize:20,fontWeight:900,color:item.color,lineHeight:1})}>{item.value}</div>
+              <div style={sans({fontSize:10,color:C.text3,marginTop:5,lineHeight:1.35,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'})}>{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </Panel>
 
       <FVMoversPanel movers={fvMovers} loading={liveLoading} />
 
