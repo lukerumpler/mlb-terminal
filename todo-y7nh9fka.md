@@ -22,3 +22,11 @@
 - [x] Add concrete responsive layout hooks to the Players page for mobile profile and metric sections.
 - [x] Add concrete responsive layout hooks to the Prospects page for mobile board and filter sections.
 - [x] Verify the Players and Prospects mobile hooks through focused source-and-style tests plus mobile shell inspection.
+- [x] Inspect the latest roster-insights panel and its current data shape.
+- [x] Add position filtering and selectable-stat sorting controls to roster insights.
+- [x] Preserve loading, error, empty, and fallback behavior while filtering results.
+- [x] Add automated interaction and transformation coverage for roster-insight filters.
+- [x] Verify the controls responsively and save a checkpoint.
+- [x] Distinguish roster-leader loading, unavailable, and no-match states in the filtered panel.
+- [x] Add rendered UI interaction coverage for position and stat sorting controls.
+- [x] Save a new checkpoint after resolving the roster-insights filter gaps.

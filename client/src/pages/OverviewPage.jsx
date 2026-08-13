@@ -150,6 +150,47 @@ function rdForInsights(team) {
   return Number.isFinite(rs) && Number.isFinite(ra) ? rs - ra : null;
 }
 
+const ROSTER_SORT_OPTIONS = [
+  { key:'ops', label:'OPS', group:'hitting', digits:3, direction:'desc' },
+  { key:'homeRuns', label:'Home Runs', group:'hitting', digits:0, direction:'desc' },
+  { key:'avg', label:'AVG', group:'hitting', digits:3, direction:'desc' },
+  { key:'rbi', label:'RBI', group:'hitting', digits:0, direction:'desc' },
+  { key:'stolenBases', label:'Stolen Bases', group:'hitting', digits:0, direction:'desc' },
+  { key:'era', label:'ERA', group:'pitching', digits:2, direction:'asc' },
+  { key:'whip', label:'WHIP', group:'pitching', digits:3, direction:'asc' },
+  { key:'strikeOuts', label:'Strikeouts', group:'pitching', digits:0, direction:'desc' },
+];
+
+export function rosterStatValue(row, key) {
+  const stat = row?.stat || {};
+  const aliases = { avg:['avg','battingAverage'], homeRuns:['homeRuns','hr'], rbi:['rbi','runsBattedIn'], stolenBases:['stolenBases','sb'], strikeOuts:['strikeOuts','strikeouts','so'] };
+  for (const candidate of (aliases[key] || [key])) {
+    const value = Number(stat[candidate]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function formatRosterStat(row, option) {
+  const value = rosterStatValue(row, option.key);
+  return value == null ? '—' : value.toFixed(option.digits);
+}
+
+export function buildRosterRows(players, position, sortKey) {
+  const option = ROSTER_SORT_OPTIONS.find(item => item.key === sortKey) || ROSTER_SORT_OPTIONS[0];
+  return [
+    ...(players?.hitting || []).map(row => ({ ...row, group:'hitting' })),
+    ...(players?.pitching || []).map(row => ({ ...row, group:'pitching' })),
+  ].filter(row => row?.stat && (position === 'all' || row.position === position) && row.group === option.group)
+    .sort((a, b) => {
+      const av = rosterStatValue(a, option.key), bv = rosterStatValue(b, option.key);
+      if (av == null && bv == null) return a.name.localeCompare(b.name);
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return option.direction === 'asc' ? av - bv : bv - av;
+    });
+}
+
 function OverviewPage() {
   const [selTeam,setSelTeam]=useState('lad');
   const [splitTab,setSplitTab]=useState('home');
@@ -158,6 +199,10 @@ function OverviewPage() {
   const [liveTeamData,setLiveTeamData]=useState(null);
   const [liveTeamPlayers,setLiveTeamPlayers]=useState({ hitting:[], pitching:[] });
   const [liveTeamError,setLiveTeamError]=useState(false);
+  const [teamPlayersLoading, setTeamPlayersLoading] = useState(true);
+  const [teamPlayersError, setTeamPlayersError] = useState(false);
+  const [rosterPosition, setRosterPosition] = useState('all');
+  const [rosterSort, setRosterSort] = useState('ops');
   const teamBase=TEAMS[selTeam];
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
@@ -211,12 +256,20 @@ function OverviewPage() {
     return () => { alive = false; };
   }, [liveTeamData, team, liveTeamPlayers]);
   const displayedInsights = aiInsights || rosterInsights;
+  const rosterPositions = useMemo(() => [...new Set([
+    ...(liveTeamPlayers.hitting || []).map(row => row.position),
+    ...(liveTeamPlayers.pitching || []).map(row => row.position),
+  ].filter(Boolean))].sort(), [liveTeamPlayers]);
+  const rosterSortOption = ROSTER_SORT_OPTIONS.find(item => item.key === rosterSort) || ROSTER_SORT_OPTIONS[0];
+  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, rosterPosition, rosterSort), [liveTeamPlayers, rosterPosition, rosterSort]);
 
   useEffect(()=>{
     let alive=true;
     setLiveTeamData(null);
     setLiveTeamPlayers({ hitting:[], pitching:[] });
     setLiveTeamError(false);
+    setTeamPlayersLoading(true);
+    setTeamPlayersError(false);
     getTodaysGames().then(g=>{ if(alive) setTodayGames(g.slice(0,8)); }).catch(()=>{});
 
     // Aggregate standings and team totals are the critical Overview path. They
@@ -266,10 +319,13 @@ function OverviewPage() {
       getTeamPlayerStats(teamBase.id, 'pitching'),
     ]).then(([teamHitters, teamPitchers]) => {
       if (!alive) return;
+      const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
       setLiveTeamPlayers({
         hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : [],
         pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : [],
       });
+      setTeamPlayersError(bothFailed);
+      setTeamPlayersLoading(false);
     });
 
     return ()=>{ alive=false; };
@@ -429,6 +485,36 @@ function OverviewPage() {
       <Panel title="AI Scout Insights" accent={C.teal} badge={aiInsightsState === 'loading' ? 'Analyzing roster…' : aiInsightsState === 'ready' ? 'AI-assisted' : 'Local fallback'}>
         <div style={{padding:'8px 14px 0',...sans({fontSize:10,color:C.text3,lineHeight:1.45})}}>
           Automated read of the selected team using current aggregate stats and roster leaders. It updates when the team or live feed changes.
+        </div>
+        <div className="roster-insight-controls" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'10px 14px 2px'}}>
+          <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
+            <span>Position</span>
+            <select aria-label="Filter roster insights by position" value={rosterPosition} onChange={e=>setRosterPosition(e.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+              <option value="all">All positions</option>
+              {rosterPositions.map(position => <option key={position} value={position}>{position}</option>)}
+            </select>
+          </label>
+          <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
+            <span>Sort by</span>
+            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+              {ROSTER_SORT_OPTIONS.map(option => <option key={option.key} value={option.key}>{option.label}{option.direction === 'asc' ? ' ↑' : ' ↓'}</option>)}
+            </select>
+          </label>
+          <span style={{marginLeft:'auto',...px({fontSize:9.5,color:C.text4})}}>{filteredRosterRows.length} {filteredRosterRows.length === 1 ? 'player' : 'players'} · {rosterSortOption.label}</span>
+        </div>
+        <div className="roster-insight-leaders" style={{padding:'6px 14px 2px',display:'flex',gap:6,flexWrap:'wrap'}}>
+          {filteredRosterRows.slice(0,6).map(row => (
+            <div key={`${row.group}-${row.id}`} style={{minWidth:150,flex:'1 1 150px',padding:'7px 9px',borderRadius:6,background:C.surface2,border:`0.5px solid ${C.borderLight}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={sans({fontSize:10.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})}>{row.name}</span>
+                <span style={{marginLeft:'auto',...px({fontSize:8.5,color:C.text3})}}>{row.position || '—'}</span>
+              </div>
+              <div style={{marginTop:3,...px({fontSize:10,color:C.teal,fontWeight:700})}}>{formatRosterStat(row, rosterSortOption)} {rosterSortOption.label}</div>
+            </div>
+          ))}
+          {teamPlayersLoading && <div role="status" style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>Loading roster leaders…</div>}
+          {!teamPlayersLoading && teamPlayersError && <div role="alert" style={sans({fontSize:10,color:C.rust,fontStyle:'italic',padding:'5px 0'})}>Roster leader data is unavailable right now.</div>}
+          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <div style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>No roster players match this position/stat view.</div>}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:8}}>
           {[
