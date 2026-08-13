@@ -561,7 +561,7 @@ function ProspectsPage() {
 
   return (
     <>
-    <div className="page-enter" style={{ display:'flex',flexDirection:'column',gap:14 }}>
+    <div className="page-enter skip-prospects-page" style={{ display:'flex',flexDirection:'column',gap:14 }}>
       <StatStrip items={[
         { val:battersFV.length,  lbl:'Batter Prospects', sub:'Top 100 2026' },
         { val:pitchersFV.length, lbl:'Pitcher Prospects', sub:'Top 100 2026' },
@@ -574,7 +574,7 @@ function ProspectsPage() {
       ]}/>
 
       <Panel title="Prospect Board" accent={C.purple} badge="Scouting Workflow">
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:0}}>
+        <div className="skip-prospect-summary-grid" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:0}}>
           {[
             {label:'Near-term ETA', value:pipelineSummary.nearTerm, detail:'2026–27 arrivals', color:C.teal},
             {label:'High risk', value:pipelineSummary.highRisk, detail:'Requires monitoring', color:pipelineSummary.highRisk ? C.rust : C.text3},
@@ -618,7 +618,7 @@ function ProspectsPage() {
       </div>
 
       {view === 'top100' && (
-        <div style={{ display:'grid',gridTemplateColumns:'1fr 260px',gap:14,alignItems:'start' }}>
+        <div className="skip-prospect-workspace-grid" style={{ display:'grid',gridTemplateColumns:'1fr 260px',gap:14,alignItems:'start' }}>
           <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
 
             {/* ── Batter / Pitcher toggle ── */}

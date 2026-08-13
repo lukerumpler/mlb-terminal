@@ -59,18 +59,18 @@ class PageErrorBoundary extends React.Component {
 }
 
 const TABS = [
-  { key:'overview',     icon:'⊞', label:'Overview'     },
-  { key:'players',      icon:'◷', label:'Players'      },
-  { key:'prospects',    icon:'↑', label:'Prospects'    },
-  { key:'draft',        icon:'◈', label:'Draft'        },
-  { key:'league',       icon:'◎', label:'League'       },
-  { key:'intelligence', icon:'◆', label:'Intelligence' },
-  { key:'amd',          icon:'⊛', label:'AMD / IMD'    },
-  { key:'knowledge',    icon:'◉', label:'Knowledge'    },
-  { key:'notes',        icon:'✎', label:'Scouting Notes' },
-  { key:'feed',         icon:'▤', label:'Intel Feed'     },
-  { key:'follows',      icon:'⤴', label:'Follow List'    },
-  { key:'settings',     icon:'⚙', label:'Settings'     },
+  { key:'overview',     icon:'⊞', label:'Overview',       section:'Overview' },
+  { key:'players',      icon:'◷', label:'Players',        section:'Evaluation' },
+  { key:'prospects',    icon:'↑', label:'Prospects',      section:'Evaluation' },
+  { key:'draft',        icon:'◈', label:'Draft',          section:'Evaluation' },
+  { key:'amd',          icon:'⊛', label:'AMD / IMD',      section:'Evaluation' },
+  { key:'league',       icon:'◎', label:'League',         section:'Monitor' },
+  { key:'intelligence', icon:'◆', label:'Intelligence',   section:'Monitor' },
+  { key:'feed',         icon:'▤', label:'Intel Feed',     section:'Monitor' },
+  { key:'follows',      icon:'⤴', label:'Follow List',    section:'Workflow' },
+  { key:'notes',        icon:'✎', label:'Scouting Notes', section:'Workflow' },
+  { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
+  { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
 ];
 
 export default function App() {
@@ -177,14 +177,19 @@ export default function App() {
         </div>
 
         {/* Nav */}
-        <div style={{ flex:1, padding:'8px 8px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} aria-current={tab===t.key ? 'page' : undefined}
+        <nav aria-label="SKIP workspace navigation" style={{ flex:1, padding:'8px 8px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
+          {TABS.map((t, i) => (
+            <React.Fragment key={t.key}>
+            {(i === 0 || TABS[i - 1].section !== t.section) && (
+              <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
+            )}
+            <button title={t.label} onClick={() => setTab(t.key)} aria-current={tab===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:12, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
               {tab === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
+            </React.Fragment>
           ))}
 
           <button onClick={() => setShowPalette(true)} title="Search everything"
@@ -196,7 +201,7 @@ export default function App() {
 
           <div style={{ height:1, background:C.border, margin:'6px 2px' }} />
 
-          <button onClick={() => setShowAlerts(s => !s)} aria-expanded={showAlerts}
+          <button onClick={() => setShowAlerts(s => !s)} title="View alerts" aria-expanded={showAlerts}
             style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
             <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>Alerts</span>
             <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:C.rust, borderRadius:10, padding:'1px 7px' }}>
@@ -209,7 +214,7 @@ export default function App() {
             <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{theme === 'dark' ? '☀' : '☾'}</span>
             <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
-        </div>
+        </nav>
 
         <div className="skip-sidebar-insight" style={{ padding:'10px 12px', borderTop:`1px solid ${C.border}` }}>
           <div style={{ marginBottom:5, fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700, color:C.amber, letterSpacing:'.08em' }}>SKIP INSIGHT</div>
@@ -310,6 +315,30 @@ export default function App() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: ${C.bg}; overflow: hidden; }
 
+        /* Shared interaction language: quick enough for dense analysis work,
+           but with enough lift to make controls feel responsive. */
+        button, select, input, textarea, [role="button"], a {
+          transition: transform .16s cubic-bezier(.23,1,.32,1),
+            filter .16s ease, background-color .16s ease, border-color .16s ease,
+            box-shadow .16s ease, color .16s ease, opacity .16s ease;
+        }
+        button:hover, [role="button"]:hover, a:hover { filter: brightness(.98); }
+        button:active, [role="button"]:active { transform: scale(.98); }
+        select:hover, input:hover, textarea:hover { border-color:${C.amber} !important; }
+        button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+          outline:2px solid ${C.amber}; outline-offset:2px;
+        }
+        .skip-nav-section { padding:10px 10px 4px; color:${C.text4}; font:700 9px/1.2 'DM Mono', monospace; letter-spacing:.14em; text-transform:uppercase; }
+        .skip-sidebar button:hover { transform: translateX(2px); }
+        .skip-sidebar button[aria-current="page"]:hover { transform: translateX(1px); }
+        .skip-topbar { transition: box-shadow .2s ease, background-color .2s ease; }
+        .skip-panel { transition: box-shadow .2s cubic-bezier(.23,1,.32,1), transform .2s cubic-bezier(.23,1,.32,1), border-color .2s ease; }
+        .skip-panel:hover { transform: translateY(-2px); border-color: color-mix(in srgb, ${C.amber} 32%, ${C.border}) !important; box-shadow:0 12px 28px color-mix(in srgb, ${C.navy} 10%, transparent) !important; }
+        .skip-stat-strip { transition: box-shadow .2s ease, transform .2s ease; }
+        .skip-stat-strip:hover { transform: translateY(-1px); box-shadow:0 12px 28px color-mix(in srgb, ${C.navy} 10%, transparent) !important; }
+        tbody tr:hover { background: color-mix(in srgb, ${C.amber} 9%, transparent) !important; }
+
+
         @keyframes scrollx { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         @keyframes pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
         @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
@@ -320,14 +349,17 @@ export default function App() {
            button hover treatment and the input focus halo, which are
            specific enough to this app's look that they don't belong in
            the generic page-level stylesheet. */
-        button:hover { filter: brightness(0.97); }
-        input:focus  { outline:none; border-color:${C.amber} !important; box-shadow:0 0 0 2px ${C.amberSoft}; }
+        input:focus, textarea:focus  { outline:none; border-color:${C.amber} !important; box-shadow:0 0 0 3px ${C.amberSoft}; }
 
-        tr { transition:background .1s ease; }
-        .page-enter { animation: fadeUp .22s ease-out; }
+        tr { transition:background .16s ease; }
+        .page-enter { animation: fadeUp .22s cubic-bezier(.23,1,.32,1); }
+        .skip-content > * { animation: fadeUp .24s cubic-bezier(.23,1,.32,1) both; }
+        .skip-content > *:nth-child(2) { animation-delay: .03s; }
+        .skip-content > *:nth-child(3) { animation-delay: .06s; }
 
         @media (prefers-reduced-motion: reduce) {
-          .page-enter { animation: none; }
+          .page-enter, .skip-content > * { animation: none !important; }
+          *, *::before, *::after { transition-duration: .001ms !important; scroll-behavior: auto !important; }
           *[style*="animation"] { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
         }
       `}</style>

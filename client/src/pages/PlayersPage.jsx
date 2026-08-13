@@ -1226,7 +1226,7 @@ function PlayersPage() {
   }, [player]);
 
   return (
-    <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="page-enter skip-player-page" style={{ display:'flex', flexDirection:'column', gap:12 }}>
 
       {/* ── Search ── */}
       <div style={{ position:'relative' }}>
@@ -1412,7 +1412,7 @@ function PlayerProfile({ player, derived, onCompare }) {
   return (
     <>
       {/* ══ HERO ══════════════════════════════════════════════════════════ */}
-      <div style={{ background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:12,
+      <div className="skip-player-hero" style={{ background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:12,
         display:'flex', alignItems:'stretch', overflow:'hidden', overflowX:'auto' }}>
 
         {/* Visually-hidden page heading — this page has no semantic <h1>-<h6>
@@ -1521,7 +1521,7 @@ function PlayerProfile({ player, derived, onCompare }) {
       )}
 
       {/* ══ MAIN 4-COL GRID ═══════════════════════════════════════════════ */}
-      <div style={{ display:'grid', gridTemplateColumns:'minmax(175px,210px) 1fr 1fr minmax(200px,250px)', gap:12, alignItems:'start' }}>
+      <div className="skip-player-main-grid" style={{ display:'grid', gridTemplateColumns:'minmax(175px,210px) 1fr 1fr minmax(200px,250px)', gap:12, alignItems:'start' }}>
 
         {/* ── COL 1: At-a-glance — season line + SKIP composite grades ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>

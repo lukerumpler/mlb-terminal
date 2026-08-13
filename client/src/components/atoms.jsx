@@ -110,7 +110,7 @@ export function VerdictBadge({ verdict }) {
 
 export function Panel({ title, accent = C.amber, badge, children, style = {} }) {
   return (
-    <div style={{
+    <div className="skip-panel" style={{
       background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
       overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`, ...style,
     }}>

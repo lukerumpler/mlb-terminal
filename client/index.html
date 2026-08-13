@@ -97,6 +97,7 @@
         .skip-sidebar > div:first-child > div span { font-size: 8px !important; letter-spacing: 0 !important; }
         .skip-sidebar > div:nth-child(2) { padding: 8px 6px !important; }
         .skip-sidebar > div:nth-child(2) > button { justify-content: center; gap: 0 !important; padding: 8px 4px !important; }
+        .skip-sidebar .skip-nav-section,
         .skip-sidebar .skip-nav-label,
         .skip-sidebar .skip-nav-shortcut,
         .skip-sidebar .skip-utility-label { display: none; }
@@ -107,9 +108,26 @@
         .skip-sidebar-insight { display: none; }
         .skip-topbar { padding: 0 12px !important; }
         .skip-topbar > div:nth-child(3), .skip-topbar > div:nth-child(4) { display: none; }
-        .skip-content { padding: 12px 12px 20px !important; }
+        .skip-content { padding: 12px 12px 20px !important; overflow-x:hidden !important; }
+        .skip-content > * { min-width:0; }
+        .skip-topbar { height:50px !important; }
+        .skip-topbar > div:first-child { font-size:13px !important; }
+        .skip-topbar button, .skip-sidebar button, .skip-content button, .skip-content select { min-height:36px; }
+        .skip-content select { max-width:100%; }
         .overview-responsive-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+        .overview-responsive-grid > * { min-width:0; }
         .skip-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .skip-stat-strip > div { min-height:78px; }
+        .skip-sidebar button:hover { transform:none !important; }
+        .skip-player-hero { flex-direction:column !important; overflow-x:hidden !important; }
+        .skip-player-hero > div { min-width:0 !important; width:100% !important; border-right:0 !important; border-bottom:1px solid var(--border-light); }
+        .skip-player-hero > div:last-child { border-bottom:0; }
+        .skip-player-main-grid { grid-template-columns:1fr !important; gap:10px !important; }
+        .skip-player-main-grid > * { min-width:0; }
+        .skip-prospect-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+        .skip-prospect-summary-grid > div { min-height:82px; border-bottom:1px solid var(--border-light); }
+        .skip-prospect-workspace-grid { grid-template-columns:1fr !important; gap:10px !important; }
+        .skip-prospect-workspace-grid > * { min-width:0; }
       }
     </style>
     <script>

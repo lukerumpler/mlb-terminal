@@ -8,3 +8,17 @@
 - [x] Review and update automated tests for the UI changes.
 - [x] Run type checks, tests, and visual verification.
 - [x] Save a checkpoint with all completed changes marked as complete.
+- [x] Add smooth, reduced-motion-aware transitions for interactive controls and shared UI primitives.
+- [x] Add consistent hover, focus, and active feedback across navigation, buttons, cards, tables, and controls.
+- [x] Refine responsive layouts for mobile widths across the shell and main data views.
+- [x] Add or update tests for interaction and responsive behavior.
+- [x] Run checks and visual verification at desktop and mobile breakpoints.
+- [x] Save a checkpoint with the completed animation and responsive changes.
+- [x] Audit and refine mobile layouts across dense Players and Prospects views.
+- [x] Add automated coverage for the new motion and responsive interaction hooks.
+- [x] Review the attached pasted guidance for recommendations relevant to SKIP UI motion and responsive behavior.
+- [x] Apply only the useful, compatible recommendations from the attached guidance.
+- [x] Re-run tests and visual verification after applying the guidance.
+- [x] Add concrete responsive layout hooks to the Players page for mobile profile and metric sections.
+- [x] Add concrete responsive layout hooks to the Prospects page for mobile board and filter sections.
+- [x] Verify the Players and Prospects mobile hooks through focused source-and-style tests plus mobile shell inspection.
