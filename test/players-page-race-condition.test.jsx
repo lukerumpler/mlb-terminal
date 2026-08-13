@@ -1,5 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -64,6 +66,14 @@ afterEach(() => {
 });
 
 describe('PlayersPage — player comparison and race conditions', () => {
+  it('keeps the profile layout breathable and collapses it at responsive breakpoints', () => {
+    const css = readFileSync(join(process.cwd(), 'client/src/index.css'), 'utf8');
+    expect(css).toContain('.skip-player-page { --profile-ease:');
+    expect(css).toContain('.skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; }');
+    expect(css).toContain('.skip-player-main-grid { grid-template-columns: 1fr !important; gap: 10px !important; }');
+    expect(css).toContain('.skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important;');
+  });
+
   it('opens the side-by-side comparison modal and loads a second player through the live adapter', async () => {
     const user = userEvent.setup();
     const primary = { id: 1, fullName: 'Primary Player' };
@@ -88,6 +98,29 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await waitFor(() => expect(screen.getByText('AI Profile Summary')).toBeInTheDocument());
     expect(screen.getByText(/Primary Player owns the clearest percentile edge/)).toBeInTheDocument();
     expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
+  });
+
+  it('updates the selected metric when a profile KPI is clicked', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Interactive Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Interactive Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Interactive');
+    await waitFor(() => expect(screen.getByText('Interactive Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Interactive Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name:/TPVI True Value/i })).toBeInTheDocument());
+    expect(document.querySelector('.skip-profile-photo-frame')).toBeInTheDocument();
+    expect(screen.getByText(/Focus: Value/i)).toBeInTheDocument();
+
+    const casButton = screen.getByRole('button', { name:/CAS Contact Auth/i });
+    await user.click(casButton);
+
+    expect(casButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('CAS');
+    expect(screen.getByText(/Focus: Contact/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name:/TPVI True Value/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {

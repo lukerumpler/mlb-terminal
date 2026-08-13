@@ -273,3 +273,54 @@
   .skip-compare-dialog,
   .skip-compare-panel-enter { animation: none; }
 }
+
+/* Focused player-profile polish: compact rhythm, richer image framing, and
+   obvious but quiet interaction states that stay inside the profile page. */
+.skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); }
+.skip-profile-photo-frame {
+  position: relative; width: 112px; height: 140px; flex: 0 0 112px;
+  display: grid; place-items: end center; isolation: isolate;
+}
+.skip-profile-photo-frame img {
+  position: relative; z-index: 1; width: 112px !important; height: 140px !important;
+  border-radius: 12px !important;
+  border: 1px solid color-mix(in srgb, #d49a35 45%, transparent) !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition: transform 180ms var(--profile-ease), box-shadow 180ms var(--profile-ease);
+}
+.skip-profile-photo-frame:hover img {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 16px 30px rgba(0,0,0,.24), 0 0 0 4px rgba(212,154,53,.08);
+}
+.skip-profile-photo-glow {
+  position: absolute; z-index: 0; width: 96px; height: 42px; bottom: -3px;
+  border-radius: 50%; background: radial-gradient(ellipse, rgba(212,154,53,.22), transparent 68%); filter: blur(4px);
+}
+.skip-profile-kpi { transition: background 160ms var(--profile-ease), transform 160ms var(--profile-ease), box-shadow 160ms var(--profile-ease); }
+.skip-profile-kpi:hover, .skip-profile-kpi:focus-visible {
+  background: color-mix(in srgb, #d49a35 10%, transparent) !important;
+  transform: translateY(-1px); outline: none;
+}
+.skip-profile-kpi:focus-visible, .skip-profile-metric-row:focus-visible {
+  box-shadow: inset 0 0 0 1px #d49a35, 0 0 0 2px rgba(212,154,53,.22);
+}
+.skip-profile-kpi.is-active { box-shadow: inset 0 -2px 0 #d49a35; }
+.skip-profile-metric-row { transition: background 160ms var(--profile-ease), transform 160ms var(--profile-ease); }
+.skip-profile-metric-row:hover { background: color-mix(in srgb, #d49a35 8%, transparent) !important; transform: translateX(2px); }
+.skip-profile-selection { min-height: 34px; }
+@media (max-width: 1100px) {
+  .skip-player-hero { flex-wrap: wrap; overflow-x: visible !important; }
+  .skip-profile-identity { flex: 1 1 100%; border-right: 0 !important; border-bottom: 0.5px solid rgba(255,255,255,.1); }
+  .skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; }
+}
+@media (max-width: 720px) {
+  .skip-player-page { gap: 10px !important; }
+  .skip-profile-identity { min-width: 0 !important; padding: 12px !important; }
+  .skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important; flex-basis: 92px; }
+  .skip-player-main-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .skip-profile-selection { align-items: flex-start !important; }
+  .skip-profile-selection span:last-child { line-height: 1.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-profile-photo-frame img, .skip-profile-kpi, .skip-profile-metric-row { transition: none; }
+}

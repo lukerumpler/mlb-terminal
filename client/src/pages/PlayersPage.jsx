@@ -184,23 +184,32 @@ function computeGeometryAxes(kpis, isPitcher) {
       ];
 }
 
-function GeometryRadar({ kpis, isPitcher }) {
+function GeometryRadar({ kpis, isPitcher, focusMetric = 'TPVI' }) {
   // kpis is a stable reference from the parent's useMemo, so this only
   // recomputes when the underlying player/stat line actually changes —
   // otherwise recharts treats a fresh array as new data and redoes its
   // layout/scale work on every unrelated re-render of this page.
   const axes = useMemo(() => computeGeometryAxes(kpis, isPitcher), [kpis, isPitcher]);
+  const selectedAxis = ({ TPVI:'Value', CAS:'Contact', DQS:isPitcher ? 'Decision' : 'Patience', DPI:'Damage',
+    'K/9':'Stuff', WHIP:'Control', ERA:'Results', Value:'Value' })[focusMetric] || 'Value';
+  const chartData = useMemo(() => axes.map(axis => ({ ...axis, focus: axis.axis === selectedAxis ? axis.val : 0 })), [axes, selectedAxis]);
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <RadarChart data={axes} margin={{ top:16, right:24, bottom:16, left:24 }}>
+    <div style={{ position:'relative' }}>
+      <div className="skip-radar-focus-label" style={sans({ fontSize:9.5, color:C.amber, textTransform:'uppercase', letterSpacing:'.08em', textAlign:'center', marginBottom:-8 })}>
+        Focus: {selectedAxis}
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+      <RadarChart data={chartData} margin={{ top:16, right:24, bottom:16, left:24 }}>
         <PolarGrid stroke={C.border} />
         <PolarAngleAxis dataKey="axis"
           tick={{ fontSize:9.5, fill:C.text2, fontFamily:"'DM Mono',monospace" }} tickLine={false} />
         <PolarRadiusAxis domain={[0,100]} tick={false} axisLine={false} />
         <Radar isAnimationActive={false} dataKey="val" stroke={C.amber} fill={C.amber} fillOpacity={0.18} strokeWidth={2} dot={{ r:3, fill:C.amber }} />
+        <Radar isAnimationActive={false} dataKey="focus" stroke={C.teal} fill={C.teal} fillOpacity={0.30} strokeWidth={3} dot={{ r:4, fill:C.teal, stroke:C.surface, strokeWidth:1 }} />
         <Tooltip {...TT} formatter={v => [v,'Score']} />
       </RadarChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -1353,6 +1362,7 @@ function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
+  const [selectedMetric, setSelectedMetric] = useState('TPVI');
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -1429,9 +1439,12 @@ function PlayerProfile({ player, derived, onCompare }) {
         </h1>
 
         {/* Photo + nameplate */}
-        <div style={{ display:'flex', alignItems:'center', gap:18, padding:'16px 20px',
-          borderRight:`0.5px solid ${C.border}`, minWidth:268, flexShrink:0 }}>
-          <PlayerPhoto id={player.id} name={p.fullName} size={96} />
+        <div className="skip-profile-identity" style={{ display:'flex', alignItems:'center', gap:16, padding:'14px 18px',
+          borderRight:`0.5px solid ${C.border}`, minWidth:290, flexShrink:0 }}>
+          <div className="skip-profile-photo-frame" aria-label={`${p.fullName} player photo`}>
+            <PlayerPhoto id={player.id} name={p.fullName} size={112} />
+            <span className="skip-profile-photo-glow" aria-hidden="true" />
+          </div>
           <div style={{ minWidth:0 }}>
             <div style={sans({ fontSize:12, fontWeight:500, color:C.text3, letterSpacing:'.04em', textTransform:'uppercase', lineHeight:1, marginBottom:2 })}>
               {p.useName || p.firstName || ''}
@@ -1459,13 +1472,19 @@ function PlayerProfile({ player, derived, onCompare }) {
 
         {/* SKIP KPI scores */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(76px,1fr))', borderRight:`0.5px solid ${C.border}`, flexShrink:0 }}>
-          {[['TPVI','True Value',kpis.TPVI],['CAS','Contact Auth',kpis.CAS],['DQS','Decision Qual',kpis.DQS],['DPI','Damage Pot',kpis.DPI]].map(([lbl,desc,val],i) => (
-            <div key={i} style={{ padding:'14px 12px', textAlign:'center', borderRight:i<3?`0.5px solid ${C.borderLight}`:'none', display:'flex', flexDirection:'column', justifyContent:'center' }}>
-              <div style={px({ fontSize:32, fontWeight:800, lineHeight:1, color:val>=70?C.teal:val>=55?C.amber:val>=40?C.slate:C.rust })}>{val}</div>
-              <div style={sans({ fontSize:9.5, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:C.text2, marginTop:6 })}>{lbl}</div>
-              <div style={px({ fontSize:9, color:C.text3, marginTop:2 })}>{desc}</div>
-            </div>
-          ))}
+          {[['TPVI','True Value',kpis.TPVI],['CAS','Contact Auth',kpis.CAS],['DQS','Decision Qual',kpis.DQS],['DPI','Damage Pot',kpis.DPI]].map(([lbl,desc,val],i) => {
+            const active = selectedMetric === lbl;
+            const metricColor = val>=70?C.teal:val>=55?C.amber:val>=40?C.slate:C.rust;
+            return (
+              <button key={i} className={`skip-profile-kpi ${active ? 'is-active' : ''}`} aria-pressed={active}
+                onClick={() => setSelectedMetric(lbl)}
+                style={{ padding:'12px 11px', textAlign:'center', border:0, borderRight:i<3?`0.5px solid ${C.borderLight}`:'none', display:'flex', flexDirection:'column', justifyContent:'center', background:active?`color-mix(in srgb, ${metricColor} 8%, ${C.surface})`:C.surface, cursor:'pointer', minWidth:0 }}>
+                <div style={px({ fontSize:30, fontWeight:800, lineHeight:1, color:metricColor })}>{val}</div>
+                <div style={sans({ fontSize:9.5, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:active?metricColor:C.text2, marginTop:6 })}>{lbl}</div>
+                <div style={px({ fontSize:9, color:C.text3, marginTop:2 })}>{desc}</div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Quick stats */}
@@ -1488,6 +1507,13 @@ function PlayerProfile({ player, derived, onCompare }) {
           <div style={px({ fontSize:11, color:C.text3 })}>SKIP&rsquo;s score: <strong style={{ color:C.text }}>{score}</strong></div>
           <div style={px({ fontSize:9.5, color:C.text4 })}>{seasonLabel}</div>
         </div>
+      </div>
+
+      {/* ── Selected metric readout ── */}
+      <div className="skip-profile-selection" role="status" aria-live="polite" style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8 }}>
+        <span style={{ width:7, height:7, borderRadius:'50%', background:teamAccent, boxShadow:`0 0 0 4px color-mix(in srgb, ${teamAccent} 12%, transparent)`, flexShrink:0 }} />
+        <span style={sans({ fontSize:10, fontWeight:800, color:C.text2, letterSpacing:'.07em', textTransform:'uppercase' })}>{selectedMetric}</span>
+        <span style={sans({ fontSize:10.5, color:C.text3 })}>Selected metric — click a score above or a metric bar below to keep it in focus.</span>
       </div>
 
       {/* ── Savant-style percentile profile ── */}
@@ -1537,12 +1563,15 @@ function PlayerProfile({ player, derived, onCompare }) {
             <div style={{ padding:'8px 14px', display:'flex', flexDirection:'column', gap:6 }}>
               {metricBars.map(m => {
                 const pct = Math.max(0, Math.min(100, ((m.val - 20) / 60) * 100));
+                const active = selectedMetric === m.lbl || (selectedMetric === 'TPVI' && m.lbl === 'Value');
                 return (
-                  <div key={m.lbl} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <button key={m.lbl} className={`skip-profile-metric-row ${active ? 'is-active' : ''}`} aria-pressed={active}
+                    onClick={() => setSelectedMetric(m.lbl === 'Value' ? 'TPVI' : m.lbl)}
+                    style={{ display:'flex', alignItems:'center', gap:8, width:'100%', border:0, borderRadius:5, padding:'4px 3px', background:active?C.surface2:'transparent', cursor:'pointer', textAlign:'left' }}>
                     <span style={sans({ fontSize:10, fontWeight:600, color:C.text2, width:58, flexShrink:0 })}>{m.lbl}</span>
                     {pctBar(pct, m.color)}
                     <span style={px({ fontSize:11, fontWeight:700, color:m.color, width:24, textAlign:'right' })}>{m.val}</span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -1560,7 +1589,7 @@ function PlayerProfile({ player, derived, onCompare }) {
              top-to-bottom hits "real" before "stylized/derived". ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <Panel title="Player Geometry Engine" accent={C.amber} badge="SKIP Model">
-            <GeometryRadar kpis={kpis} isPitcher={player.isPitcher} />
+            <GeometryRadar kpis={kpis} isPitcher={player.isPitcher} focusMetric={selectedMetric} />
           </Panel>
 
           <AnalyticsLayers
