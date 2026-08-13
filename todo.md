@@ -10891,3 +10891,11 @@
 - [x] Add and run targeted localStorage tests for Watchlist stars and Scouting Notes persistence across remount.
 - [x] Add and run targeted interaction tests for Cmd/Ctrl+K, CompareModal’s multi-player workflow, and ProspectCard behavior.
 LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB proxy requests returned HTTP 200 with expected Express, CORS, cache-control, and proxy-source headers.
+
+## Data audit and correction
+
+- [ ] Trace the data sources for Shohei Ohtani, Bryce Eldridge, and the Padres overview.
+- [ ] Identify shared data transformations or constants that may be causing systematic errors.
+- [ ] Verify player and team records against authoritative current sources (MLB Stats API, Baseball-Reference, etc.).
+- [ ] Correct confirmed inaccuracies in the application data and shared calculations.
+- [ ] Validate the corrected views and rerun the regression test suite.

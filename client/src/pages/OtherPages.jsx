@@ -1313,7 +1313,7 @@ function IntelligencePage() {
 
   const hitters = [
     ['Aaron Judge','RF','.285',48,115,'1.018',8.4],
-    ['Shohei Ohtani','DH','.292',45,112,'.989',8.1],
+    ['Shohei Ohtani','DH','.292',27,74,'.937',6.4],
     ['Freddie Freeman','1B','.306',24,96,'.921',6.2],
     ['Juan Soto','RF','.291',31,98,'.967',7.1],
     ['Gunnar Henderson','SS','.272',36,98,'.918',6.8],

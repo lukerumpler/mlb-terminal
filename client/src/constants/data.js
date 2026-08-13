@@ -11,7 +11,7 @@ export const TEAMS = {
   bos: { name:'Boston Red Sox',       abbr:'BOS', color:'#BD3039', id:111,  w:47, l:39, pct:.547, rs:355, ra:322, era:3.72, ops:.749, hr:91,  avg:.258, obp:.334, slg:.441, whip:1.23, k:541, sb:58, wrcPlus:108, fip:3.81, drs:6,  bsr:15.1, war:14.8, div:'AL East' },
   cle: { name:'Cleveland Guardians',  abbr:'CLE', color:'#E31937', id:114,  w:46, l:40, pct:.535, rs:338, ra:319, era:3.55, ops:.731, hr:72,  avg:.249, obp:.318, slg:.413, whip:1.19, k:579, sb:44, wrcPlus:101, fip:3.61, drs:16, bsr:11.8, war:13.9, div:'AL Central' },
   bal: { name:'Baltimore Orioles',    abbr:'BAL', color:'#DF4601', id:110,  w:45, l:41, pct:.523, rs:342, ra:331, era:3.81, ops:.742, hr:88,  avg:.252, obp:.320, slg:.422, whip:1.24, k:534, sb:52, wrcPlus:104, fip:3.92, drs:10, bsr:14.4, war:13.2, div:'AL East' },
-  sd:  { name:'San Diego Padres',     abbr:'SD',  color:'#2F241D', id:135,  w:44, l:42, pct:.512, rs:328, ra:314, era:3.64, ops:.728, hr:78,  avg:.245, obp:.316, slg:.412, whip:1.21, k:562, sb:60, wrcPlus:99,  fip:3.72, drs:14, bsr:16.2, war:12.8, div:'NL West' },
+  sd:  { name:'San Diego Padres',     abbr:'SD',  color:'#2F241D', id:135,  w:65, l:57, pct:.533, rs:522, ra:521, era:4.10, ops:.702, hr:134, avg:.238, obp:.314, slg:.388, whip:1.32, k:992, sb:123, wrcPlus:100, fip:4.12, drs:14, bsr:16.2, war:24.5, div:'NL West' },
   phi: { name:'Philadelphia Phillies',abbr:'PHI', color:'#E81828', id:143,  w:43, l:43, pct:.500, rs:322, ra:324, era:3.91, ops:.724, hr:82,  avg:.248, obp:.314, slg:.410, whip:1.26, k:548, sb:38, wrcPlus:98,  fip:3.98, drs:8,  bsr:10.4, war:12.1, div:'NL East' },
   laa: { name:'Los Angeles Angels', abbr:'LAA', color:'#003263', id:108,  w:30, l:56, pct:0.349, rs:291, ra:359, era:3.99, ops:0.695, hr:74,  avg:0.244, obp:0.311, slg:0.384, whip:1.19, k:565, sb:65, wrcPlus:88, fip:3.93, drs:-11, bsr:7.1, war:1.8, div:'AL West' },
   ari: { name:'Arizona Diamondbacks', abbr:'ARI', color:'#A71930', id:109,  w:38, l:46, pct:0.452, rs:326, ra:343, era:3.76, ops:0.736, hr:80,  avg:0.243, obp:0.317, slg:0.419, whip:1.14, k:588, sb:57, wrcPlus:97, fip:3.82, drs:-8, bsr:8.7, war:6.4, div:'NL West' },
@@ -41,7 +41,8 @@ export const TEAMS = {
 // Last updated: June 2026
 
 export const PROSPECT_BATTERS = [
-  { rank:1,  mlbId:815908, name:'Jesús Made',        pos:'SS', team:'MIL', age:19, level:'AA',      pa:234, ab:207, r:36, h:57,  d:8,  t:4, hr:6,  rbi:40, bb:25, so:33, sb:19, avg:.275, obp:.350, slg:.440, ops:.790 },
+  { rank:1,  mlbId:805811, name:'Bryce Eldridge',    pos:'DH', team:'SF',  age:21, level:'MLB/AAA', pa:318, ab:277, r:38, h:68,  d:15, t:0, hr:12, rbi:29, bb:40, so:85, sb:1,  avg:.245, obp:.340, slg:.430, ops:.770 },
+  { rank:3,  mlbId:815908, name:'Jesús Made',        pos:'SS', team:'MIL', age:19, level:'AA',      pa:234, ab:207, r:36, h:57,  d:8,  t:4, hr:6,  rbi:40, bb:25, so:33, sb:19, avg:.275, obp:.350, slg:.440, ops:.790 },
   { rank:2,  mlbId:815888, name:'Leo De Vries',       pos:'SS', team:'OAK', age:19, level:'AA',      pa:223, ab:192, r:33, h:55,  d:6,  t:0, hr:5,  rbi:22, bb:23, so:46, sb:18, avg:.286, obp:.371, slg:.396, ops:.767 },
   { rank:4,  mlbId:816113, name:'Eli Willits',        pos:'SS', team:'WSH', age:18, level:'A',       pa:232, ab:190, r:48, h:57,  d:14, t:3, hr:6,  rbi:37, bb:38, so:54, sb:29, avg:.300, obp:.418, slg:.500, ops:.918 },
   { rank:5,  mlbId:806068, name:'Colt Emerson',       pos:'SS', team:'SEA', age:20, level:'A+/AA',   pa:238, ab:207, r:35, h:52,  d:13, t:2, hr:11, rbi:36, bb:22, so:67, sb:10, avg:.251, obp:.339, slg:.493, ops:.832 },
@@ -458,7 +459,7 @@ export const PARITY_GAUGE = [
 ];
 
 export const BATTING_LEADERS = [
-  { rank:1,  name:'Shohei Ohtani',     team:'LAD', pos:'DH',  pa:352, avg:.310, obp:.412, slg:.641, ops:1.053, woba:.452, xwoba:.441, ev:93.2, hh:56.7, brl:18.0, xba:.291, xslg:.648, bbPct:15.9, kPct:17.0, war:5.8 },
+  { rank:1,  name:'Shohei Ohtani',     team:'LAD', pos:'DH',  pa:509, avg:.292, obp:.393, slg:.544, ops:.937, woba:.412, xwoba:.405, ev:94.8, hh:56.5, brl:18.2, xba:.289, xslg:.538, bbPct:13.6, kPct:23.0, war:6.4 },
   { rank:2,  name:'Aaron Judge',       team:'NYY', pos:'RF',  pa:341, avg:.298, obp:.415, slg:.622, ops:1.037, woba:.448, xwoba:.468, ev:95.1, hh:61.8, brl:21.4, xba:.304, xslg:.672, bbPct:18.2, kPct:24.1, war:5.5 },
   { rank:3,  name:'Freddie Freeman',   team:'LAD', pos:'1B',  pa:348, avg:.318, obp:.404, slg:.528, ops:.932,  woba:.411, xwoba:.396, ev:89.4, hh:44.8, brl:10.9, xba:.283, xslg:.490, bbPct:13.2, kPct:15.6, war:4.9 },
   { rank:4,  name:'Juan Soto',         team:'NYM', pos:'RF',  pa:362, avg:.294, obp:.421, slg:.504, ops:.925,  woba:.412, xwoba:.408, ev:90.6, hh:47.1, brl:13.2, xba:.279, xslg:.491, bbPct:17.8, kPct:16.8, war:4.8 },
