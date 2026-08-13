@@ -111,11 +111,11 @@ export function VerdictBadge({ verdict }) {
 export function Panel({ title, accent = C.amber, badge, children, style = {} }) {
   return (
     <div style={{
-      background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:10,
-      overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,.06)', ...style,
+      background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
+      overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`, ...style,
     }}>
       <div style={{
-        padding:'8px 14px', borderBottom:`0.5px solid ${C.border}`, background:C.surface2,
+        padding:'10px 14px', borderBottom:`1px solid ${C.borderLight}`, background:`linear-gradient(180deg, ${C.surface2}, ${C.surface})`,
         display:'flex', alignItems:'center', justifyContent:'space-between',
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -140,12 +140,12 @@ export function StatStrip({ items }) {
     <div className="skip-stat-strip" style={{
       display:'grid',
       gridTemplateColumns:`repeat(${Math.min(items.length, 8)}, minmax(64px, 1fr))`,
-      background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:10,
-      overflow:'hidden', boxShadow:'0 1px 4px rgba(0,0,0,.06)',
+      background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
+      overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`,
     }}>
       {items.map((it, i) => (
         <div key={i} style={{
-          padding:'11px 10px', textAlign:'center',
+          padding:'13px 10px', textAlign:'center',
           borderRight: i < items.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
           display:'flex', flexDirection:'column', gap:3,
         }}>

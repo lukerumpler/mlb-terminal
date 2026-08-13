@@ -289,11 +289,25 @@ function OverviewPage() {
     <div className="page-enter" style={{display:'flex',flexDirection:'column',gap:14}}>
 
       {/* ── Selector + headline ── */}
+      <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
+        <div>
+          <div style={px({fontSize:10,fontWeight:700,color:C.amber,letterSpacing:'.14em',textTransform:'uppercase',marginBottom:5})}>TEAM COMMAND CENTER</div>
+          <h1 style={sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1})}>Season overview</h1>
+          <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
+        </div>
+        <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:liveTeamError?C.rustSoft:liveTeamData?C.tealSoft:C.amberSoft,border:`1px solid ${liveTeamError?C.rustMid:liveTeamData?C.tealMid:C.amberMid}`}}>
+          <span style={{width:6,height:6,borderRadius:'50%',background:liveTeamError?C.rust:liveTeamData?C.teal:C.amber,animation:liveTeamData||liveTeamError?'none':'pulse 1.2s ease-in-out infinite'}} />
+          <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'DATA UNAVAILABLE':liveTeamData?'LIVE MLB DATA':'LOADING MLB DATA'}</span>
+        </div>
+      </div>
       <div style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
-        <select value={selTeam} onChange={e=>setSelTeam(e.target.value)}
+        <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className="sr-only">Select team</span>
+          <select aria-label="Select team" value={selTeam} onChange={e=>setSelTeam(e.target.value)}
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
-          {Object.entries(TEAMS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
-        </select>
+            {Object.entries(TEAMS).map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
+          </select>
+        </label>
         <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds','—'],['Team WAR','—']].map(([l,v],i)=>(
             <div key={i} style={{textAlign:'center'}}>

@@ -142,13 +142,13 @@ export default function App() {
 
   return (
     <>
-    <div className="skip-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:C.bg, fontFamily:"'Plus Jakarta Sans', sans-serif" }}>
+    <div className="skip-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:C.bg, fontFamily:"'Plus Jakarta Sans', sans-serif", color:C.text }}>
 
       {/* ── SIDEBAR ── */}
-      <div className="skip-sidebar" style={{ width:200, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div className="skip-sidebar" style={{ width:232, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
 
         {/* Logo */}
-        <div style={{ padding:'14px 14px 12px', borderBottom:`1px solid ${C.border}` }}>
+        <div style={{ padding:'18px 16px 15px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
           <svg className="skip-sidebar-logo" viewBox="0 0 200 78" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', maxWidth:172, height:'auto', display:'block', marginBottom:10 }}>
             <path d="M 18 28 Q 95 -8 168 18" stroke={C.text4} strokeWidth="2" fill="none" strokeLinecap="round"/>
             <circle cx="168" cy="18" r="9" fill="none" stroke={C.text3} strokeWidth="1.5"/>
@@ -214,7 +214,7 @@ export default function App() {
       <div className="skip-workspace" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
 
         {/* Top bar */}
-        <div className="skip-topbar" style={{ height:42, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 20px', gap:16 }}>
+        <div className="skip-topbar" style={{ height:56, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 24px', gap:16, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
           <div style={sans({ fontSize:14, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
@@ -224,7 +224,7 @@ export default function App() {
         </div>
 
         {/* Scrollable content */}
-        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 20px 20px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
+        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'22px 24px 28px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
           {showAlerts && (
             <div style={{ marginBottom:16 }}>
@@ -268,7 +268,7 @@ export default function App() {
         </div>
 
         {/* Live ticker */}
-        <div style={{ height:28, flexShrink:0, background:C.navy, borderTop:`1px solid rgba(255,255,255,.1)`, display:'flex', alignItems:'center', overflow:'hidden' }}>
+        <div style={{ height:32, flexShrink:0, background:C.navy, borderTop:`1px solid rgba(255,255,255,.1)`, display:'flex', alignItems:'center', overflow:'hidden' }}>
           <div style={{ flexShrink:0, padding:'0 14px', height:'100%', display:'flex', alignItems:'center', borderRight:'1px solid rgba(255,255,255,.12)', gap:6 }}>
             <div style={{
               width:6, height:6, borderRadius:'50%',
