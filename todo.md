@@ -10905,12 +10905,12 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Extract and compare `/home/ubuntu/upload/skip-baseball-v75.zip` with the current Manus project.
 - [x] Inventory every data-bearing page, component, static constant, derived calculation, live API adapter, fallback, mock, and seeded value in the v75 baseline.
 - [x] Build a source-to-view data map for Overview, Players, Prospects, Draft, League, Intelligence, AMD / IMD, Knowledge, Scouting Notes, Intel Feed, Follow List, and Settings.
-- [ ] Verify MLB player identities, organizations, rosters, standings, team statistics, league leaders, schedules, and transactions against authoritative current sources.
-- [ ] Verify MiLB and prospect identities, levels, organizations, and season statistics against authoritative current sources.
-- [ ] Verify NCAA records and statistics against authoritative current sources or clearly identify unavailable data.
+- [x] Verify MLB player identities, organizations, rosters, standings, team statistics, league leaders, schedules, and transactions against authoritative current sources.
+- [x] Verify MiLB and prospect identities, levels, organizations, and season statistics against authoritative current sources.
+- [x] Verify NCAA records and statistics against authoritative current sources or clearly identify unavailable data.
 - [x] Verify Statcast, Savant, expected-statistics, defensive, pitch, spray, and batted-ball metrics against authoritative sources or label estimates clearly.
-- [ ] Verify contract, salary, trade, and transaction values against authoritative public records or mark unavailable instead of presenting invented values.
-- [ ] Verify Intel Feed and news metadata against the actual upstream responses and remove fabricated or stale fallback content.
+- [x] Verify contract, salary, trade, and transaction values against authoritative public records or mark unavailable instead of presenting invented values.
+- [x] Verify Intel Feed and news metadata against the actual upstream responses and remove fabricated or stale fallback content.
 - [x] Correct shared static datasets, API normalization, fallback logic, derived formulas, and displayed labels at their source.
 - [x] Add deterministic tests for the corrected records, source normalization, and no-fabrication/unknown-value handling.
 - [x] Run the full test suite, TypeScript check, lint, production build, API smoke tests, and preview verification across data-bearing tabs.
@@ -10984,4 +10984,4 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add an AI-generated summary to the side-by-side player comparison modal using only the two players' source-backed Savant percentile profiles.
 - [x] Add smooth modal transition states and accessible loading spinners while comparison players and the summary are fetching.
 - [x] Add authoritative three-season historical trend sparklines for each Draft board player's key metrics, with explicit unavailable states when history is missing.
-- [ ] Add regression tests, run lint/check/build/full Vitest, visually verify the new interactions, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+- [x] Add regression tests, run lint/check/build/full Vitest, visually verify the new interactions, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
