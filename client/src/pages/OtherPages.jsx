@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, memo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts';
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import {
@@ -11,7 +11,7 @@ import {
   Badge, PosBadge, FVBadge,
   Panel, StatStrip, KVRow, SkeletonRows,
 } from '../components/atoms.jsx';
-import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults } from '../api/mlb.js';
+import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt } from '../lib/formatting.js';
 
@@ -366,12 +366,47 @@ function normName(s) {
   return (s || '').toLowerCase().replace(/[.'’]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+export function normalizeDraftTrend(splits, isPitcher) {
+  const seasons = new Set([SEASON - 2, SEASON - 1, SEASON]);
+  const bySeason = new Map();
+  (splits || []).forEach(split => {
+    const season = Number(split?.season || split?.stat?.season);
+    const stat = split?.stat || {};
+    const raw = isPitcher
+      ? stat.era ?? stat.earnedRunAverage
+      : stat.ops ?? stat.onBasePlusSlugging;
+    const value = Number(raw);
+    if (!seasons.has(season) || !Number.isFinite(value) || bySeason.has(season)) return;
+    bySeason.set(season, { season, value });
+  });
+  return Array.from(bySeason.values()).sort((a, b) => a.season - b.season);
+}
+
+function DraftTrendSparkline({ history = [], loading = false, isPitcher = false }) {
+  const metric = isPitcher ? 'ERA' : 'OPS';
+  if (loading) return <span role="status" aria-label="Loading three-season history" style={px({ fontSize:10, color:C.text4 })}>…</span>;
+  if (history.length < 3) return <span title="No complete source-backed three-season history is available for this player" style={px({ fontSize:10, color:C.text4 })}>—</span>;
+  const values = history.map(point => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return (
+    <div title={`${metric} history: ${history.map(point => `${point.season} ${point.value.toFixed(3)}`).join(' · ')}`} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+      <LineChart width={76} height={28} data={history} margin={{ top:3, right:2, bottom:3, left:2 }}>
+        <Line type="monotone" dataKey="value" stroke={isPitcher ? C.teal : C.amber} strokeWidth={2} dot={{ r:2, fill:isPitcher ? C.teal : C.amber }} isAnimationActive={false} />
+      </LineChart>
+      <span style={px({ fontSize:8.5, color:C.text3, fontWeight:700 })}>{metric} {min === max ? min.toFixed(3) : `${min.toFixed(3)}–${max.toFixed(3)}`}</span>
+    </div>
+  );
+}
+
 function DraftPage() {
   const [officialPicks, setOfficialPicks] = useState([]);
   const [officialLoading, setOfficialLoading] = useState(true);
   const [officialError, setOfficialError] = useState(false);
   const [boardPosition, setBoardPosition] = useState('all');
   const [boardSort, setBoardSort] = useState('rank-asc');
+  const [draftTrends, setDraftTrends] = useState({});
+  const [draftTrendLoading, setDraftTrendLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -394,6 +429,32 @@ function DraftPage() {
     officialPicks.forEach(p => m.set(normName(p.name), p));
     return m;
   }, [officialPicks]);
+
+  useEffect(() => {
+    let alive = true;
+    const rowsWithIds = DRAFT_BOARD.filter(row => officialByName.get(normName(row.name))?.id);
+    if (!rowsWithIds.length) {
+      setDraftTrends({});
+      setDraftTrendLoading(false);
+      return () => { alive = false; };
+    }
+    setDraftTrendLoading(true);
+    Promise.all(rowsWithIds.map(async row => {
+      const official = officialByName.get(normName(row.name));
+      const isPitcher = row.pos.includes('P');
+      try {
+        const splits = await getCareerSplits(official.id, isPitcher ? 'pitching' : 'hitting');
+        return [row.name, normalizeDraftTrend(splits, isPitcher)];
+      } catch {
+        return [row.name, []];
+      }
+    })).then(entries => {
+      if (alive) setDraftTrends(Object.fromEntries(entries));
+    }).finally(() => {
+      if (alive) setDraftTrendLoading(false);
+    });
+    return () => { alive = false; };
+  }, [officialByName]);
 
   // Real signing bonuses by pick number, for the slot-value panel — replaces
   // the pre-draft estimates with actuals once results are in.
@@ -450,7 +511,7 @@ function DraftPage() {
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
               <thead>
                 <tr style={{ background:C.surface2 }}>
-                  {['Rk','Player','Pos','School / Org','FV','Risk','ETA','Actual'].map(h => (
+                  {['Rk','Player','Pos','School / Org','FV','Risk','ETA','Trend','Actual'].map(h => (
                     <th key={h} style={{
                       padding:'7px 10px', fontSize:10, fontWeight:700,
                       textTransform:'uppercase', letterSpacing:'.07em', color:C.text3,
@@ -484,6 +545,7 @@ function DraftPage() {
                       >{d.risk}</Badge>
                     </td>
                     <td style={{ padding:'7px 10px', textAlign:'center', ...px({ fontSize:10 }) }}>{d.eta}</td>
+                    <td style={{ padding:'7px 10px', textAlign:'center', minWidth:115 }}><DraftTrendSparkline history={draftTrends[d.name]} loading={draftTrendLoading && Boolean(officialByName.get(normName(d.name))?.id)} isPitcher={d.pos.includes('P')} /></td>
                     <td style={{ padding:'7px 10px', textAlign:'center' }}>
                       {officialLoading ? (
                         <span style={px({ fontSize:10, color:C.text4 })}>…</span>
@@ -507,7 +569,7 @@ function DraftPage() {
           {draftComplete && (
             <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
               <span style={sans({ fontSize:9.5, color:C.text4 })}>
-                SKIP ranks are editorial scouting opinions. Use the controls above to filter by position or sort by rank. The Actual column is live from MLB's official draft results; green = earlier than the SKIP rank, amber = close, red = later.
+                SKIP ranks are editorial scouting opinions. Use the controls above to filter by position or sort by rank. Trend uses MLB Stats year-by-year history only when the official draft feed provides a player ID; rows without a source-backed history show —. The Actual column is live from MLB's official draft results; green = earlier than the SKIP rank, amber = close, red = later.
               </span>
             </div>
           )}

@@ -7,6 +7,7 @@ import { C, px, sans } from '../constants/colors.js';
 import { SEASON } from '../constants/data.js';
 import { searchPlayers, loadFullPlayer } from '../api/mlb.js';
 import { percentileColor, percentileLabel } from '../lib/percentile.js';
+import { Spinner } from './ui/spinner.tsx';
 
 function displayName(player) {
   return player?.profile?.fullName || player?.fullName || 'Player';
@@ -83,6 +84,9 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
   const [secondary, setSecondary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
   const timerRef = useRef(null);
   const mountedRef = useRef(true);
   const requestRef = useRef(0);
@@ -150,9 +154,39 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
   const primaryAxes = useMemo(() => getAxes(primary, isPitcher), [getAxes, primary, isPitcher]);
   const secondaryAxes = useMemo(() => secondary ? getAxes(secondary, isPitcher) : [], [getAxes, secondary, isPitcher]);
 
+  useEffect(() => {
+    if (!secondary || !secondaryAxes.length || !primaryAxes.length) {
+      setSummary(null);
+      setSummaryError(null);
+      setSummaryLoading(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    setSummary(null);
+    setSummaryError(null);
+    setSummaryLoading(true);
+    const payload = {
+      players: [
+        { name: displayName(primary), position: identityLine(primary), playerType: isPitcher ? 'pitcher' : 'hitter', axes: primaryAxes.map(axis => ({ axis: axis.axis, pct: axis.pct, rawLabel: axis.rawLabel })) },
+        { name: displayName(secondary), position: identityLine(secondary), playerType: isPitcher ? 'pitcher' : 'hitter', axes: secondaryAxes.map(axis => ({ axis: axis.axis, pct: axis.pct, rawLabel: axis.rawLabel })) },
+      ],
+    };
+    fetch('/api/comparison-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+      .then(response => response.ok ? response.json() : response.json().catch(() => ({})).then(body => Promise.reject(new Error(body.error || 'Summary unavailable'))))
+      .then(data => setSummary(data))
+      .catch(err => { if (err.name !== 'AbortError') setSummaryError(err.message || 'Summary unavailable'); })
+      .finally(() => { if (!controller.signal.aborted) setSummaryLoading(false); });
+    return () => controller.abort();
+  }, [getAxes, isPitcher, primary, primaryAxes, secondary, secondaryAxes]);
+
   return (
-    <div onClick={onClose} role="presentation" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.56)', zIndex:200, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'28px 16px', overflowY:'auto' }}>
-      <div ref={dialogRef} onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Compare ${displayName(primary)} with another player`} style={{ width:'min(1080px,100%)', background:C.surface, borderRadius:12, overflow:'hidden', border:`0.5px solid ${C.border}`, boxShadow:'0 24px 60px rgba(0,0,0,.38)' }}>
+    <div className="skip-compare-backdrop" onClick={onClose} role="presentation" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.56)', zIndex:200, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'28px 16px', overflowY:'auto' }}>
+      <div className="skip-compare-dialog" ref={dialogRef} onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Compare ${displayName(primary)} with another player`} style={{ width:'min(1080px,100%)', background:C.surface, borderRadius:12, overflow:'hidden', border:`0.5px solid ${C.border}`, boxShadow:'0 24px 60px rgba(0,0,0,.38)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, padding:'14px 18px', borderBottom:`0.5px solid ${C.border}` }}>
           <div>
             <div style={sans({ fontSize:14, fontWeight:800, color:C.text })}>Player Comparison</div>
@@ -174,7 +208,7 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
               ))}
             </div>
           )}
-          {loading && <div role="status" style={px({ fontSize:9.5, color:C.text3, marginTop:6 })}>Loading live MLB and Savant data…</div>}
+          {loading && <div role="status" aria-live="polite" style={{ display:'flex', alignItems:'center', gap:7, marginTop:7, ...px({ fontSize:9.5, color:C.text3 }) }}><Spinner style={{ width:14, height:14, color:C.amber }} /> Loading live MLB and Savant data…</div>}
           {error && <div role="alert" style={sans({ fontSize:10.5, color:C.rust, marginTop:6 })}>{error}</div>}
         </div>
 
@@ -185,11 +219,34 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
           </div>
           <div style={{ padding:'14px 18px 16px' }}>
             <div style={sans({ fontSize:9.5, fontWeight:800, color:C.teal, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 })}>Player B</div>
-            {secondary ? <PlayerRadar player={secondary} axes={secondaryAxes} accent={C.teal} /> : (
+            {secondary ? <div className="skip-compare-panel-enter"><PlayerRadar player={secondary} axes={secondaryAxes} accent={C.teal} /></div> : loading ? (
+              <div role="status" aria-live="polite" style={sans({ minHeight:330, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10, textAlign:'center', padding:20, color:C.text3, fontSize:11, lineHeight:1.5 })}><Spinner style={{ width:22, height:22, color:C.teal }} /><span>Loading the second player’s live percentile profile…</span></div>
+            ) : (
               <div style={sans({ minHeight:330, display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center', padding:20, color:C.text3, fontSize:11, lineHeight:1.5 })}>Search for a second player above to view two Savant percentile radars side-by-side.</div>
             )}
           </div>
         </div>
+
+        {secondary && (
+          <section aria-live="polite" className="skip-compare-summary" style={{ margin:'0 18px 14px', padding:'12px 14px', border:`0.5px solid ${C.border}`, borderLeft:`3px solid ${C.amber}`, borderRadius:8, background:C.surface2 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:8 }}>
+              <div style={sans({ fontSize:10, fontWeight:800, color:C.text, textTransform:'uppercase', letterSpacing:'.08em' })}>AI Profile Summary</div>
+              <div style={px({ fontSize:8.5, color:summary?.generated ? C.teal : C.text4, textTransform:'uppercase', letterSpacing:'.06em' })}>{summary?.generated ? 'Generated from supplied Savant axes' : 'Source-grounded fallback'}</div>
+            </div>
+            {summaryLoading ? (
+              <div role="status" aria-label="Generating comparison summary" style={{ display:'flex', alignItems:'center', gap:8, ...sans({ fontSize:10.5, color:C.text3 }) }}><Spinner style={{ width:15, height:15, color:C.amber }} /> Comparing percentile edges…</div>
+            ) : summaryError ? (
+              <div role="alert" style={sans({ fontSize:10.5, color:C.rust, lineHeight:1.5 })}>The AI summary is unavailable right now. The radar profiles above remain source-backed.</div>
+            ) : summary ? (
+              <>
+                <div style={sans({ fontSize:12, fontWeight:800, color:C.text, lineHeight:1.35 })}>{summary.headline}</div>
+                <div style={sans({ fontSize:10.5, color:C.text2, lineHeight:1.5, marginTop:4 })}>{summary.summary}</div>
+                {Array.isArray(summary.edges) && summary.edges.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:9 }}>{summary.edges.map((edge, index) => <span key={`${edge.axis}-${index}`} style={px({ fontSize:9, color:edge.leader === 'Even' ? C.text3 : C.teal, background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:999, padding:'4px 7px' })}>{edge.axis}: {edge.leader}{edge.margin == null ? '' : ` +${edge.margin}`}</span>)}</div>}
+                <div style={sans({ fontSize:9.5, color:C.text4, lineHeight:1.45, marginTop:8 })}>{summary.caveat}</div>
+              </>
+            ) : null}
+          </section>
+        )}
 
         <div style={{ padding:'10px 18px', borderTop:`0.5px solid ${C.border}` }}>
           <div style={sans({ fontSize:10, color:C.text3, lineHeight:1.5 })}>Radar widths are percentile ranks against the live qualified Baseball Savant population. Raw values are shown only as context; unavailable fields remain unfilled.</div>

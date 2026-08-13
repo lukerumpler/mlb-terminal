@@ -247,3 +247,29 @@
     padding: 12px 12px 20px !important;
   }
 }
+
+
+@keyframes skipCompareBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes skipCompareDialogIn {
+  from { opacity: 0; transform: translateY(12px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes skipComparePanelIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.skip-compare-backdrop { animation: skipCompareBackdropIn 180ms cubic-bezier(.23,1,.32,1) both; }
+.skip-compare-dialog { animation: skipCompareDialogIn 240ms cubic-bezier(.23,1,.32,1) both; }
+.skip-compare-panel-enter { animation: skipComparePanelIn 220ms cubic-bezier(.23,1,.32,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-compare-backdrop,
+  .skip-compare-dialog,
+  .skip-compare-panel-enter { animation: none; }
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -22,7 +22,12 @@ const { default: PlayersPage } = await import('../client/src/pages/PlayersPage.j
 function mockPlayer(id, fullName) {
   return {
     id, profile: { fullName, primaryPosition: { abbreviation: 'OF' }, pitchHand: { code: 'R' }, batSide: { code: 'R' } },
-    savant: null, batTracking: null, statcastPopulation: null, isPitcher: false,
+    savant: { est_woba: 0.350, avg_hit_speed: 92, est_slg: 0.500, whiff_percent: 20, oz_swing_percent: 28 },
+    batTracking: { avg_bat_speed: 72 },
+    expectedStatisticsPopulation: [{ est_woba: 0.280, est_slg: 0.400 }, { est_woba: 0.320, est_slg: 0.460 }, { est_woba: 0.380, est_slg: 0.560 }],
+    statcastPopulation: [{ avg_hit_speed: 86, whiff_percent: 28, oz_swing_percent: 35 }, { avg_hit_speed: 90, whiff_percent: 23, oz_swing_percent: 30 }, { avg_hit_speed: 96, whiff_percent: 17, oz_swing_percent: 24 }],
+    batTrackingPopulation: [{ avg_bat_speed: 68 }, { avg_bat_speed: 72 }, { avg_bat_speed: 76 }],
+    isPitcher: false,
     pitchArsenal: null, pitchArsenalPopulation: null, contactPoints: null, pitcherPitches: null,
     stats: {}, statSeason: 2026, isFallback: false, careerStats: null, splits: null, comps: [],
   };
@@ -36,10 +41,26 @@ function deferred() {
   return { promise, resolve };
 }
 
+const originalFetch = global.fetch;
+
 beforeEach(() => {
   cleanup();
   searchPlayers.mockReset();
   loadFullPlayer.mockReset();
+  global.fetch = vi.fn(async url => {
+    if (url === '/api/comparison-summary') return { ok: true, json: async () => ({
+      headline: 'Primary Player owns the clearest percentile edge',
+      summary: 'Power: Primary Player by 14 percentile points.',
+      edges: [{ axis: 'Power', leader: 'Primary Player', margin: 14 }],
+      caveat: 'Generated only from the supplied Savant axes.',
+      generated: true,
+    }) };
+    return originalFetch(url);
+  });
+});
+
+afterEach(() => {
+  global.fetch = originalFetch;
 });
 
 describe('PlayersPage — player comparison and race conditions', () => {
@@ -64,6 +85,8 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await waitFor(() => expect(screen.getByText('Second Player')).toBeInTheDocument());
     await user.click(screen.getByText('Second Player'));
     await waitFor(() => expect(screen.getByText('Player B')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('AI Profile Summary')).toBeInTheDocument());
+    expect(screen.getByText(/Primary Player owns the clearest percentile edge/)).toBeInTheDocument();
     expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
   });
 

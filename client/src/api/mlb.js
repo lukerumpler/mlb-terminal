@@ -198,7 +198,7 @@ async function getSeasonStatsSafe(id, group, season, sportId) {
 }
 
 // Career year-by-year splits across ALL levels (includes MiLB years)
-async function getCareerSplits(id, group) {
+export async function getCareerSplits(id, group) {
   try {
     const data = await mlb(`/people/${id}/stats`, { stats: 'yearByYear', group });
     const grp  = findStatGroup(data.stats, group);

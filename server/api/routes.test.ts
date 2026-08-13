@@ -9,6 +9,7 @@ describe("legacy API route registration", () => {
       "/api/savant",
       "/api/feed",
       "/api/contract",
+      "/api/comparison-summary",
     ]);
   });
 });

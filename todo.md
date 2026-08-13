@@ -10979,3 +10979,9 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save final checkpoint, and deliver the verified project.
 - [x] Ensure Overview aggregate statistics render as soon as live standings/team totals arrive instead of waiting on slower player-leaderboard requests; preserve explicit unavailable states for failed subsets.
 - [x] Prevent Prospect tables from silently falling back to stale static numeric stats after a live response is present but a player or field is missing; keep only editorial identity/rank fields and show em dashes for unavailable live metrics.
+
+## AI comparison and Draft trend enhancements
+- [x] Add an AI-generated summary to the side-by-side player comparison modal using only the two players' source-backed Savant percentile profiles.
+- [x] Add smooth modal transition states and accessible loading spinners while comparison players and the summary are fetching.
+- [x] Add authoritative three-season historical trend sparklines for each Draft board player's key metrics, with explicit unavailable states when history is missing.
+- [ ] Add regression tests, run lint/check/build/full Vitest, visually verify the new interactions, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
