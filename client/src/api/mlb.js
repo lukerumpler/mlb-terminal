@@ -1,0 +1,869 @@
+// SKIP — MLB + MiLB Stats API Client
+// All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
+// Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
+//
+// SPORT / LEVEL IDs:
+//   1     = MLB          11 = Triple-A     12 = Double-A
+//   13    = High-A       14 = Single-A     15 = Low-A
+//   5442  = Rookie Adv.  16 = Rookie       17 = Winter League
+//
+// KEY ENDPOINTS:
+//   /schedule?sportId=1&date=YYYY-MM-DD&hydrate=linescore,team   → today's games
+//   /schedule?sportIds=11,12&date=YYYY-MM-DD                     → MiLB games
+//   /standings?leagueId=103,104&season=YYYY                      → MLB standings
+//   /standings?leagueId=117,112&season=YYYY                      → Triple-A standings
+//   /stats/leaders?leaderCategories=homeRuns&sportId=1           → MLB leaders
+//   /stats/leaders?leaderCategories=homeRuns&sportId=11          → Triple-A leaders
+//   /people/search?names=QUERY                                    → player search
+//   /people/{id}?hydrate=currentTeam                             → player profile
+//   /people/{id}/stats?stats=season&group=hitting&season=YYYY    → season stats
+//   /people/{id}/stats?stats=yearByYear&group=hitting            → career (all levels)
+//   /teams?sportId=1                                             → all MLB teams
+//   /teams/{id}/affiliates                                        → farm system
+//   /game/{gamePk}/linescore                                     → live linescore
+//   /game/{gamePk}/boxscore                                      → full boxscore
+//   /game/{gamePk}/playByPlay                                    → PBP (MLB + MiLB)
+
+const BASE   = '/api/mlb';
+export const SEASON = 2026;
+
+// MiLB league IDs for standings calls
+export const MILB_LEAGUES = {
+  tripleA: { ids: '117,112', name: 'Triple-A'  }, // International + Pacific Coast
+  doubleA: { ids: '113,110,111', name: 'Double-A' },
+  highA:   { ids: '214,215,223', name: 'High-A'  },
+  singleA: { ids: '302,303',     name: 'Single-A' },
+};
+
+// MiLB sportId values
+export const MILB_LEVELS = {
+  tripleA: 11, doubleA: 12, highA: 13,
+  singleA: 14, lowA: 15, rookie: 16, winter: 17,
+};
+
+// ─── Request cache / in-flight de-dupe ─────────────────────────────────────
+// Several pages (App's live ticker, OverviewPage, LeaguePage) independently
+// call the same endpoints — e.g. getTodaysGames() — within milliseconds of
+// each other on mount, and tab-switching re-triggers the same fetches again
+// shortly after. A tiny TTL cache with in-flight de-duping collapses those
+// into a single network request without any page needing to know about it.
+// Not a correctness concern: MLB Stats API data doesn't change faster than
+// this TTL matters for a scouting dashboard.
+const CACHE_TTL_MS = 20_000;
+const cache    = new Map(); // key -> { data, expires }
+const inFlight = new Map(); // key -> Promise
+
+function cacheGet(key) {
+  const hit = cache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.data;
+  if (hit) cache.delete(key);
+  return undefined;
+}
+
+// ─── Core fetcher ─────────────────────────────────────────────────────────
+// Keeps commas unencoded in hydrate strings so MLB receives them intact.
+export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS } = {}) {
+  const extraQs = Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
+    .join('&');
+  const url = `${BASE}?path=${encodeURIComponent(path)}${extraQs ? '&' + extraQs : ''}`;
+
+  if (useCache) {
+    const cached = cacheGet(url);
+    if (cached !== undefined) return cached;
+    const pending = inFlight.get(url);
+    if (pending) return pending;
+  }
+
+  const request = (async () => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[mlb] proxy error', res.status, url, body.slice(0, 200));
+      throw new Error(`MLB API ${res.status} — ${path}`);
+    }
+    // A 200 with a non-JSON body (misconfigured proxy, a dev-only routing
+    // quirk, an unexpected upstream change) used to throw a raw SyntaxError
+    // straight out of res.json() — and that error's own .message ends up
+    // shown to the user verbatim (PlayersPage.jsx: `Could not load ${name}.
+    // ${err.message}`), so it surfaced as literal parser noise like
+    // `Unexpected token '/', "/**..." is not valid JSON` instead of a
+    // readable message. Found via a debug pass. Not a production failure
+    // mode this reproduces on its own, but the missing defensive handling
+    // was real regardless of what triggers it.
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`MLB API returned an unreadable response — ${path}`);
+    }
+    if (useCache) cache.set(url, { data, expires: Date.now() + ttl });
+    return data;
+  })();
+
+  if (useCache) {
+    inFlight.set(url, request);
+    // .finally() returns a *new* derived promise that also rejects when
+    // `request` does — and since nothing else references or catches that
+    // specific derived promise, it surfaces as an unhandled rejection on
+    // every failed request, independent of and in addition to whatever the
+    // caller does with the `request` reference actually returned below.
+    request.finally(() => inFlight.delete(url)).catch(() => {});
+  }
+  return request;
+}
+
+// Full-roster leaderboard endpoints (Savant expected_statistics, bat-tracking,
+// statcast_leaderboard, sprint_speed, oaa) return every player's row just so
+// the caller can pick out one — hundreds of rows parsed and transferred to
+// find a single match. Worse, every one of those calls previously used a raw
+// fetch() instead of the cache above, so searching for 5 different players
+// within a few seconds of each other re-fetched and re-parsed the exact same
+// multi-hundred-row CSV response 5 separate times. These leaderboards don't
+// meaningfully change more than every few minutes, so a longer TTL than the
+// live-game 20s default is both safe and worth a lot more here.
+const LEADERBOARD_TTL_MS = 5 * 60_000;
+async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
+  const cached = cacheGet(url);
+  if (cached !== undefined) return cached;
+  const pending = inFlight.get(url);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return null;
+    // Same defensive fix as mlb() above, same reason — most callers of
+    // fetchLeaderboard() already wrap the whole promise in .catch(() =>
+    // null), so a thrown SyntaxError here was already being swallowed
+    // functionally, but throwing a real Error first (rather than letting
+    // a raw parser SyntaxError propagate) keeps behavior consistent and
+    // makes any future caller that doesn't catch blindly fail safely too.
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      return null;
+    }
+    cache.set(url, { data, expires: Date.now() + LEADERBOARD_TTL_MS });
+    return data;
+  })();
+
+  inFlight.set(url, request);
+  // See the matching comment in mlb() above — same fix, same reason.
+  request.finally(() => inFlight.delete(url)).catch(() => {});
+  return request;
+}
+
+// Find the correct stats group by displayName — never assume [0]
+function findStatGroup(statsArr, groupName) {
+  if (!Array.isArray(statsArr)) return null;
+  return (
+    statsArr.find(s => s.group?.displayName?.toLowerCase() === groupName.toLowerCase())
+    ?? statsArr[0]
+    ?? null
+  );
+}
+
+// Try current season, fall back to prior year automatically
+async function getSeasonStatsSafe(id, group, season) {
+  const tryYear = async (yr) => {
+    try {
+      const data  = await mlb(`/people/${id}/stats`, { stats: 'season', group, season: yr });
+      const grp   = findStatGroup(data.stats, group);
+      const split = grp?.splits?.[0];
+      return split?.stat && Object.keys(split.stat).length > 2 ? split.stat : null;
+    } catch { return null; }
+  };
+  const current = await tryYear(season);
+  if (current) return { stat: current, season, isFallback: false };
+  const prev = await tryYear(season - 1);
+  if (prev)    return { stat: prev, season: season - 1, isFallback: true };
+  return { stat: {}, season, isFallback: false };
+}
+
+// Career year-by-year splits across ALL levels (includes MiLB years)
+async function getCareerSplits(id, group) {
+  try {
+    const data = await mlb(`/people/${id}/stats`, { stats: 'yearByYear', group });
+    const grp  = findStatGroup(data.stats, group);
+    return grp?.splits || [];
+  } catch { return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLAYER API
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function searchPlayers(query, limit = 12) {
+  try {
+    // Search both MLB and MiLB players by including all sportIds
+    const data = await mlb('/people/search', { 
+      names: query, 
+      limit,
+      sportId: '1,11,12,13,14,15,16,17,5442'
+    });
+    return data.people || [];
+  } catch { return []; }
+}
+
+export async function getPlayerProfile(id) {
+  const data = await mlb(`/people/${id}`, { hydrate: 'currentTeam' });
+  return data.people?.[0] || null;
+}
+
+/**
+ * Fetch contract data via /api/contract (Spotrac + BRef + MLB Stats API).
+ * Ports github.com/Robbiedudz34/mlb-contract-data to serverless Node.js.
+ * Passes both name (for HTML scraping) and id (for MLB API service time).
+ * Returns null on any failure — never throws.
+ */
+export async function fetchContractData(playerId, fullName) {
+  try {
+    const params = new URLSearchParams({ id: String(playerId) });
+    if (fullName) params.set('name', fullName);
+    const res = await fetch(`/api/contract?${params}`, {
+      signal: AbortSignal.timeout(14_000),  // BRef can be slow
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.found ? data : null;
+  } catch { return null; }
+}
+
+export async function loadFullPlayer(person, season = SEASON) {
+  const id = person.id;
+
+  // All 6 requests run in parallel — contract never blocks stats
+  const [profile, hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw] = await Promise.all([
+    getPlayerProfile(id),
+    getSeasonStatsSafe(id, 'hitting',  season),
+    getSeasonStatsSafe(id, 'pitching', season),
+    getCareerSplits(id, 'hitting'),
+    getCareerSplits(id, 'pitching'),
+    fetchContractData(id, person.fullName),
+  ]);
+
+  // Savant & bat-tracking are optional — never block. Each tries current season then prior year
+  // independently so batTracking can fall back to yr-1 even when savant has current-year data.
+  let savant = null;
+  let batTracking = null;
+  let statcastPopulation = null;
+
+  // isPitcher needs to be known *before* the optional-Savant block below so
+  // pitch_arsenal (Roadmap #1) — a pitcher-only, per-pitch-type leaderboard —
+  // is only ever fetched for pitchers, not on every single player load.
+  // Moved up from where this used to be computed (just before the return),
+  // past the point everything it depends on (profile, hitting/pitchingResult)
+  // is already available from the Promise.all above.
+  const posType = profile?.primaryPosition?.type || '';
+  const posAbbr = profile?.primaryPosition?.abbreviation || '';
+  const hasPitchStats = pitchingResult?.stat && !!pitchingResult.stat.era;
+  const hasHitStats   = hittingResult?.stat  && !!hittingResult.stat.atBats;
+
+  let isPitcher = posType === 'Pitcher' || posAbbr === 'SP' || posAbbr === 'RP' || posAbbr === 'P';
+  if (isPitcher && hasHitStats && !hasPitchStats) isPitcher = false; // two-way override
+
+  // Fired off now, not after the tryYear() round trip(s) below — these two
+  // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
+  // any way (only the merge step a few lines down needs `savant` to exist),
+  // so waiting for those to resolve first was purely wasted latency: a whole
+  // extra sequential network round trip for no reason, doubly so when the
+  // current season comes back empty and tryYear falls back to season - 1.
+  const speedPromise = fetchLeaderboard(`/api/savant?endpoint=sprint_speed&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
+  const oaaPromise   = fetchLeaderboard(`/api/savant?endpoint=oaa&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
+
+  // pitch_arsenal (Roadmap #1) — unlike the batter leaderboards above, a
+  // pitcher has *multiple* rows in this one (one per pitch type), so this
+  // collects all matches rather than the single-row findByPlayerId() below.
+  // Tries current season, falls back to season-1 on its own, independent of
+  // the savant/batTracking fallback logic (different leaderboard, no reason
+  // to couple their retry timing together).
+  //
+  // Also retains the full unfiltered population (`population` below), not
+  // just this pitcher's own rows — added for the pitcher side of Roadmap
+  // #2 (plate-discipline percentiles), which needs something to rank a
+  // pitcher's aggregate Whiff% against. Same shape of fix as the batter
+  // statcastPopulation field a few lines below: the array's already sitting
+  // in memory from the fetch, discarding everything but one player's rows
+  // after filtering was throwing away data a caller would need again.
+  const pitchArsenalPromise = (async () => {
+    if (!isPitcher) return { rows: null, population: null };
+    const tryPitchYear = async (yr) => {
+      const arr = await fetchLeaderboard(`/api/savant?endpoint=pitch_arsenal&year=${yr}`, { timeoutMs: 7_000 }).catch(() => null);
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const rows = arr.filter(p => String(p.player_id ?? p.pitcher_id ?? p.id) === String(id));
+      return { rows: rows.length ? rows : null, population: arr };
+    };
+    const cur = await tryPitchYear(season);
+    if (cur?.rows) return cur;
+    const prev = await tryPitchYear(season - 1);
+    return prev || { rows: null, population: null };
+  })();
+
+  // contact_points (Roadmap #3) — supersedes the batting_stance fetch this
+  // used to be (see api/savant.js's comment for the full reasoning): real
+  // per-swing intercept-point data instead of a season-average leaderboard
+  // row. Batter-only, structurally different from every fetch above:
+  // Statcast Search is inherently player-scoped server-side (a
+  // `batters_lookup[]` param, not something filtered down after the fact),
+  // so there's no "population" to also retain the way pitchArsenalPromise
+  // does above — just this player's own competitive-swing rows. Runs a
+  // longer timeout than any other endpoint on this page: it's the one
+  // genuinely pitch-level fetch, not a compact season-aggregate row.
+  const contactPointsPromise = (async () => {
+    if (isPitcher) return null;
+    const tryYearCP = (yr) => fetchLeaderboard(
+      `/api/savant?endpoint=contact_points&year=${yr}&playerId=${id}`,
+      { timeoutMs: 20_000 },
+    ).catch(() => null);
+    const cur = await tryYearCP(season);
+    if (Array.isArray(cur) && cur.length) return cur;
+    const prev = await tryYearCP(season - 1);
+    return Array.isArray(prev) && prev.length ? prev : null;
+  })();
+
+  // pitcher_pitches (Roadmap #1, added 2026-08-08) — the pitcher-side
+  // mirror of contactPointsPromise directly above, same reasoning and same
+  // structural shape (Statcast Search is player-scoped server-side via
+  // `pitchers_lookup[]`, so there's no population to retain here either —
+  // just this pitcher's own pitches). This is what closes the two gaps
+  // PitchShapePanel.jsx's own comment has documented since #1 was first
+  // built: a true velocity distribution (real per-pitch `release_speed`
+  // values, not a single season-average bar) and a real LHH/RHH usage
+  // split (the `stand` column pitch_arsenal never carried). Same 20s
+  // timeout as contact_points for the same reason — this is the other
+  // genuinely pitch-level fetch on this page, not a compact aggregate row.
+  const pitcherPitchesPromise = (async () => {
+    if (!isPitcher) return null;
+    const tryYearPP = (yr) => fetchLeaderboard(
+      `/api/savant?endpoint=pitcher_pitches&year=${yr}&playerId=${id}`,
+      { timeoutMs: 20_000 },
+    ).catch(() => null);
+    const cur = await tryYearPP(season);
+    if (Array.isArray(cur) && cur.length) return cur;
+    const prev = await tryYearPP(season - 1);
+    return Array.isArray(prev) && prev.length ? prev : null;
+  })();
+
+  try {
+    // Baseball Savant is inconsistent about the player-id column name across
+    // its own leaderboards: expected_statistics uses 'player_id', but the
+    // newer bat-tracking leaderboard uses plain 'id' (confirmed against a
+    // live CSV pull — e.g. Giancarlo Stanton's row is `519317,"Stanton,
+    // Giancarlo",...` under an `id` header, no `player_id` column at all).
+    // Matching on player_id alone meant bat-tracking silently matched zero
+    // players, every player, every time. Check both so either schema works.
+    const findByPlayerId = (arr, targetId) =>
+      arr.find(p => String(p.player_id ?? p.id) === String(targetId)) || null;
+
+    // Try both endpoints for current season first, then prior year if needed
+    const tryYear = async (yr) => {
+      const [sArr, btArr, scArr] = await Promise.all([
+        fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${yr}`),
+        fetchLeaderboard(`/api/savant?endpoint=bat-tracking&year=${yr}`),
+        // Exit velocity, barrel%, hard-hit%, sweet-spot%, launch angle — this
+        // endpoint was defined in the server-side proxy from the start but
+        // never actually called from here, so brl_percent/hard_hit_percent/
+        // sweet_spot_percent were always undefined and every UI tile reading
+        // them was silently falling back to its estimated proxy value.
+        fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${yr}`),
+      ]);
+      let sData = null, btData = null;
+      if (Array.isArray(sArr) && sArr.length > 0) sData = findByPlayerId(sArr, id);
+      if (Array.isArray(btArr) && btArr.length > 0) btData = findByPlayerId(btArr, id);
+      if (Array.isArray(scArr) && scArr.length > 0) {
+        const scData = findByPlayerId(scArr, id);
+        // Merge onto sData rather than replace — expected_statistics and
+        // statcast_leaderboard carry different, complementary fields for
+        // the same player, and either fetch can independently be missing.
+        if (scData) sData = { ...(sData || {}), ...scData };
+      }
+      // Hand back the full statcast_leaderboard rows too, not just this
+      // player's row — plate-discipline percentile bars need to rank the
+      // player against the real qualified-batter population, and this
+      // array is already sitting in memory from the fetch above (cached,
+      // so grabbing it here costs nothing extra).
+      return { sData, btData, scArr: Array.isArray(scArr) ? scArr : null };
+    };
+
+    const cur = await tryYear(season);
+    savant      = cur.sData;
+    batTracking = cur.btData;
+    statcastPopulation = cur.scArr;
+
+    // Fall back independently: only re-fetch what's still missing
+    if (!savant || !batTracking) {
+      const prev = await tryYear(season - 1);
+      if (!savant)      savant      = prev.sData;
+      if (!batTracking) batTracking = prev.btData;
+      if (!statcastPopulation) statcastPopulation = prev.scArr;
+    }
+
+    // Additional high-fidelity metrics (Speed & Defense) — already in flight
+    // since before the try block, just waiting to be picked up here.
+    const [speedArr, oaaArr] = await Promise.all([speedPromise, oaaPromise]);
+
+    if (savant) {
+      if (Array.isArray(speedArr)) {
+        const s = findByPlayerId(speedArr, id);
+        if (s) savant.sprint_speed = s.sprint_speed;
+      }
+      if (Array.isArray(oaaArr)) {
+        const s = findByPlayerId(oaaArr, id);
+        if (s) savant.oaa = s.oaa;
+      }
+    }
+  } catch { /* optional — never block player load */ }
+
+  // Resolved outside the try block above (and awaited independently of it)
+  // so a savant/batTracking failure can't take pitch_arsenal down with it —
+  // the promise was already created, so this just picks up its result.
+  const { rows: pitchArsenal, population: pitchArsenalPopulation } =
+    await pitchArsenalPromise.catch(() => ({ rows: null, population: null }));
+  const contactPoints = await contactPointsPromise.catch(() => null);
+  const pitcherPitches = await pitcherPitchesPromise.catch(() => null);
+
+  const statResult = isPitcher ? pitchingResult : hittingResult;
+
+  return {
+    id, profile, savant, batTracking, statcastPopulation, isPitcher,
+    pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
+    stats:        statResult?.stat        || {},
+    statSeason:   statResult?.season      || season,
+    isFallback:   statResult?.isFallback  || false,
+    career:       careerHitting,
+    careerPitching,
+    hittingStats:  hittingResult?.stat    || {},
+    pitchingStats: pitchingResult?.stat   || {},
+    contractData:  contractRaw,
+  };
+}
+
+// Intelligence page comparison
+export async function searchAndGetStats(name, season = SEASON) {
+  const people = await searchPlayers(name, 1);
+  if (!people.length) return null;
+  const id     = people[0].id;
+  const result = await getSeasonStatsSafe(id, 'hitting', season);
+  return { name: people[0].fullName, id, stats: result.stat, season: result.season, isFallback: result.isFallback };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHEDULE — MLB + MiLB
+// ═══════════════════════════════════════════════════════════════════════════
+
+function normalizeGame(g) {
+  return {
+    gamePk:     g.gamePk,
+    status:     g.status?.detailedState || '',
+    statusCode: g.status?.statusCode    || '',
+    inning:     g.linescore?.currentInning  || null,
+    inningHalf: g.linescore?.inningHalf     || '',
+    away: {
+      name:   g.teams?.away?.team?.name         || '',
+      abbr:   g.teams?.away?.team?.abbreviation || '',
+      id:     g.teams?.away?.team?.id,
+      runs:   g.linescore?.teams?.away?.runs   ?? g.teams?.away?.score ?? null,
+      hits:   g.linescore?.teams?.away?.hits   ?? null,
+      errors: g.linescore?.teams?.away?.errors ?? null,
+      wins:   g.teams?.away?.leagueRecord?.wins,
+      losses: g.teams?.away?.leagueRecord?.losses,
+    },
+    home: {
+      name:   g.teams?.home?.team?.name         || '',
+      abbr:   g.teams?.home?.team?.abbreviation || '',
+      id:     g.teams?.home?.team?.id,
+      runs:   g.linescore?.teams?.home?.runs   ?? g.teams?.home?.score ?? null,
+      hits:   g.linescore?.teams?.home?.hits   ?? null,
+      errors: g.linescore?.teams?.home?.errors ?? null,
+      wins:   g.teams?.home?.leagueRecord?.wins,
+      losses: g.teams?.home?.leagueRecord?.losses,
+    },
+    venue:     g.venue?.name || '',
+    time:      g.gameDate,
+    gameType:  g.gameType,
+    levelName: g.teams?.home?.team?.sport?.name || 'MLB',
+    levelId:   g.teams?.home?.team?.sport?.id   || 1,
+  };
+}
+
+export async function getTodaysGames(date) {
+  const d    = date || new Date().toISOString().slice(0, 10);
+  const data = await mlb('/schedule', {
+    sportId: 1, date: d,
+    hydrate: 'linescore(matchup,runners),team,flags,review',
+    language: 'en',
+  });
+  return (data.dates?.[0]?.games || []).map(normalizeGame);
+}
+
+export async function getMiLBGames(date, levelIds = [11, 12, 13, 14]) {
+  const d    = date || new Date().toISOString().slice(0, 10);
+  const ids  = Array.isArray(levelIds) ? levelIds.join(',') : String(levelIds);
+  const data = await mlb('/schedule', { sportIds: ids, date: d, hydrate: 'linescore,team', language: 'en' });
+  const games = (data.dates?.[0]?.games || []).map(normalizeGame);
+  const byLevel = {};
+  for (const g of games) {
+    const key = g.levelName || 'Other';
+    if (!byLevel[key]) byLevel[key] = [];
+    byLevel[key].push(g);
+  }
+  return { games, byLevel };
+}
+
+export async function getMiLBGamePks(date, levelIds = [11, 12]) {
+  const d    = date || new Date().toISOString().slice(0, 10);
+  const ids  = Array.isArray(levelIds) ? levelIds.join(',') : String(levelIds);
+  const data = await mlb('/schedule', { sportIds: ids, date: d });
+  return (data.dates?.[0]?.games || [])
+    .filter(g => g.status?.codedGameState === 'F' || g.status?.abstractGameState === 'Live')
+    .map(g => ({
+      gamePk:  g.gamePk,
+      away:    g.teams?.away?.team?.name || '',
+      home:    g.teams?.home?.team?.name || '',
+      level:   g.teams?.home?.team?.sport?.name || '',
+      levelId: g.teams?.home?.team?.sport?.id,
+      status:  g.status?.detailedState || '',
+    }));
+}
+
+export async function getOrgGames(date, mlbTeamId) {
+  const d = date || new Date().toISOString().slice(0, 10);
+  const [mlbGames, milbResult] = await Promise.all([
+    getTodaysGames(d),
+    getMiLBGames(d, [11, 12, 13, 14, 15]),
+  ]);
+  let affiliateIds = new Set([mlbTeamId]);
+  try {
+    const aff = await mlb(`/teams/${mlbTeamId}/affiliates`, { season: SEASON });
+    for (const t of aff.teams || []) affiliateIds.add(t.id);
+  } catch (_) { /* best effort */ }
+  return [
+    ...mlbGames.filter(g => affiliateIds.has(g.away.id) || affiliateIds.has(g.home.id)),
+    ...milbResult.games.filter(g => affiliateIds.has(g.away.id) || affiliateIds.has(g.home.id)),
+  ];
+}
+
+export async function getGameLinescore(gamePk) { return mlb(`/game/${gamePk}/linescore`); }
+export async function getGameBoxscore(gamePk)  { return mlb(`/game/${gamePk}/boxscore`); }
+
+// Play-by-play — works for both MLB and MiLB
+// MiLB: pitch x/y pixel coords available; Statcast-level data NOT available.
+export async function getGamePBP(gamePk) {
+  const data  = await mlb(`/game/${gamePk}/playByPlay`);
+  const plays = data.allPlays || [];
+  return plays.map(play => ({
+    atBatIndex:  play.atBatIndex,
+    inning:      play.about?.inning,
+    half:        play.about?.halfInning,
+    batter:      { id: play.matchup?.batter?.id, name: play.matchup?.batter?.fullName },
+    pitcher:     { id: play.matchup?.pitcher?.id, name: play.matchup?.pitcher?.fullName },
+    batSide:     play.matchup?.batSide?.code,
+    pitchHand:   play.matchup?.pitchHand?.code,
+    result:      play.result?.event,
+    resultType:  play.result?.eventType,
+    description: play.result?.description,
+    rbi:         play.result?.rbi,
+    pitches: (play.pitchIndex || []).map(idx => {
+      const pe = play.playEvents?.[idx] || {};
+      return {
+        pitchNumber: pe.pitchNumber,
+        callCode:    pe.details?.call?.code,
+        callDesc:    pe.details?.call?.description,
+        type:        pe.details?.type?.description,
+        // MiLB: pixel coords — multiply by -1 for catcher's-view orientation
+        coordX:      pe.pitchData?.coordinates?.x,
+        coordY:      pe.pitchData?.coordinates?.y,
+        hitCoordX:   pe.hitData?.coordinates?.coordX,
+        hitCoordY:   pe.hitData?.coordinates?.coordY,
+        trajectory:  pe.hitData?.trajectory,
+        hardness:    pe.hitData?.hardness,
+        balls:       pe.count?.balls,
+        strikes:     pe.count?.strikes,
+        outs:        pe.count?.outs,
+      };
+    }),
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STANDINGS — MLB + MiLB
+// ═══════════════════════════════════════════════════════════════════════════
+
+function parseStandingsRecord(rec) {
+  return {
+    divisionName: rec.division?.name || rec.division?.nameShort || '',
+    teams: rec.teamRecords.map(t => ({
+      id:       t.team.id,
+      name:     t.team.name,
+      abbr:     t.team.abbreviation || '',
+      w:        t.wins,
+      l:        t.losses,
+      pct:      parseFloat(t.winningPercentage) || 0,
+      gb:       t.gamesBack,
+      streak:   t.streak?.streakCode || '',
+      l10:  (() => { const r = t.records?.splitRecords?.find(r => r.type === 'lastTen'); return r ? `${r.wins}-${r.losses}` : ''; })(),
+      home: (() => { const r = t.records?.overallRecords?.find(r => r.type === 'home');  return r ? `${r.wins}-${r.losses}` : ''; })(),
+      away: (() => { const r = t.records?.overallRecords?.find(r => r.type === 'away');  return r ? `${r.wins}-${r.losses}` : ''; })(),
+      rs:       t.runsScored,
+      ra:       t.runsAllowed,
+      diff:     t.runDifferential,
+      divRank:  t.divisionRank,
+      wildRank: t.wildCardRank,
+      elim:     t.eliminationNumber,
+    }))
+  };
+}
+
+async function fetchStandings(leagueIds, season = SEASON) {
+  const ids  = Array.isArray(leagueIds) ? leagueIds.join(',') : String(leagueIds);
+  const data = await mlb('/standings', { leagueId: ids, season, standingsTypes: 'regularSeason', hydrate: 'team,division,league' });
+  const out  = {};
+  for (const rec of data.records || []) {
+    const parsed = parseStandingsRecord(rec);
+    out[parsed.divisionName] = parsed.teams;
+  }
+  return out;
+}
+
+// MLB: AL (103) + NL (104)
+export const getStandings       = (season = SEASON) => fetchStandings('103,104', season);
+// MiLB levels
+export const getTripleAStandings = (season = SEASON) => fetchStandings('117,112',     season);
+export const getDoubleAStandings = (season = SEASON) => fetchStandings('113,110,111', season);
+export const getHighAStandings   = (season = SEASON) => fetchStandings('214,215,223', season);
+export const getSingleAStandings = (season = SEASON) => fetchStandings('302,303',     season);
+export const getMiLBStandings    = (leagueIds, season = SEASON) => fetchStandings(leagueIds, season);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STAT LEADERS — MLB + MiLB
+// leaderCategories: homeRuns | battingAverage | onBasePlusSlugging |
+//   earnedRunAverage | strikeouts | wins | saves | runsBattedIn |
+//   stolenBases | hits | whip | inningsPitched | onBasePercentage |
+//   sluggingPercentage | strikeoutsPer9Inn | walks
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function getStatLeaders(categories, season = SEASON, limit = 10, sportId = 1, playerPool = '') {
+  const params = {
+    leaderCategories: Array.isArray(categories) ? categories.join(',') : categories,
+    season, sportId, limit,
+  };
+  if (playerPool) params.playerPool = playerPool;
+  const data = await mlb('/stats/leaders', params);
+  const out  = {};
+  for (const cat of data.leagueLeaders || []) {
+    out[cat.leaderCategory] = cat.leaders.map(l => ({
+      rank:  l.rank,
+      id:    l.person?.id,
+      name:  l.person?.fullName || '',
+      team:  l.team?.abbreviation || l.team?.name || '',
+      value: l.value,
+    }));
+  }
+  return out;
+}
+
+export async function getAllLeaders(season = SEASON) {
+  const [hitting, pitching] = await Promise.all([
+    getStatLeaders(['homeRuns','battingAverage','onBasePlusSlugging','runsBattedIn','stolenBases'], season, 10, 1),
+    getStatLeaders(['earnedRunAverage','strikeouts','wins','saves','whip'], season, 10, 1, 'Qualified'),
+  ]);
+  return { ...hitting, ...pitching };
+}
+
+export const getMiLBLeaders = (categories, season = SEASON, levelId = 11, limit = 10) =>
+  getStatLeaders(categories, season, limit, levelId);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEAMS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function getAllTeams(sportId = 1) {
+  const data = await mlb('/teams', { sportId, activeStatus: 'Active' });
+  return (data.teams || []).map(t => ({
+    id: t.id, name: t.name, abbr: t.abbreviation, short: t.shortName,
+    venue: t.venue?.name, league: t.league?.name, division: t.division?.name,
+    sport: t.sport?.name, sportId: t.sport?.id,
+  }));
+}
+
+export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
+  const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season });
+  return (data.teams || []).map(t => ({
+    id: t.id, name: t.name, abbr: t.abbreviation,
+    level: t.sport?.name || '', levelId: t.sport?.id || 0, league: t.league?.name || '',
+  })).sort((a, b) => a.levelId - b.levelId);
+}
+
+export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
+  const data   = await mlb(`/teams/${teamId}/stats`, { stats: 'season', group, season, sportIds: 1 });
+  const grp    = findStatGroup(data.stats, group);
+  return grp?.splits?.[0]?.stat || {};
+}
+
+export async function getTeamRoster(teamId, season = SEASON, rosterType = 'active') {
+  const data = await mlb(`/teams/${teamId}/roster`, { rosterType, season, hydrate: 'person(currentTeam)' });
+  return (data.roster || []).map(r => ({
+    id: r.person?.id, name: r.person?.fullName, pos: r.position?.abbreviation, num: r.jerseyNumber,
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAVANT
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function getSavantData(year = SEASON) {
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${year}`);
+  return Array.isArray(arr) ? arr : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOP PROSPECT STATS — mirrors mlb.com/prospects/stats/top-prospects
+// Pulls hitting + pitching leaders across Triple-A and Double-A simultaneously.
+// Returns { hitting: [...], pitching: [...] } each sorted by OPS / ERA.
+// ═══════════════════════════════════════════════════════════════════════════
+export async function getTopProspectStats(season = SEASON) {
+  const HIT_CATS = ['battingAverage','onBasePlusSlugging','homeRuns','stolenBases','runsBattedIn'];
+  const PIT_CATS = ['earnedRunAverage','strikeouts','whip','wins'];
+
+  // playerPool must be one of the API's actual values — All | Qualified |
+  // Rookies | Qualified_rookies. 'prospects' isn't a real value here (that
+  // filter only exists on MLB Pipeline's own site, not this public API), so
+  // it was silently being ignored and falling back to the API's default of
+  // 'Qualified' — which requires a minimum PA/IP threshold and could drop a
+  // recently-promoted prospect out of the leaderboard below before this
+  // function's merge step ever gets a chance to match them by mlbId. 'All'
+  // gets the complete top-15-by-OPS/ERA at each level; the merge against the
+  // curated PROSPECT_BATTERS/PROSPECT_PITCHERS list below is what actually
+  // limits results to real prospects, so widening the pool here only adds
+  // coverage, it can't let a non-prospect leak into what's displayed.
+  const [aaaHit, aaHit, aaaPit, aaPit] = await Promise.allSettled([
+    getStatLeaders(HIT_CATS, season, 15, 11, 'All'),
+    getStatLeaders(HIT_CATS, season, 15, 12, 'All'),
+    getStatLeaders(PIT_CATS, season, 15, 11, 'All'),
+    getStatLeaders(PIT_CATS, season, 15, 12, 'All'),
+  ]);
+
+
+  function mergeHitting(a, b) {
+    const map = new Map();
+    for (const src of [a, b]) {
+      if (src.status !== 'fulfilled') continue;
+      const res = src.value;
+      const opsList = res.onBasePlusSlugging || [];
+      const avgList = res.battingAverage    || [];
+      const hrList  = res.homeRuns           || [];
+      const rbiList = res.runsBattedIn       || [];
+      const sbList  = res.stolenBases        || [];
+      opsList.forEach(p => {
+        const existing = map.get(p.id);
+        if (!existing || +p.value > +(existing.ops||0)) {
+          map.set(p.id, {
+            id: p.id, name: p.name, team: p.team,
+            ops: p.value,
+            avg: avgList.find(x=>x.id===p.id)?.value  || '—',
+            hr:  hrList .find(x=>x.id===p.id)?.value  || '—',
+            rbi: rbiList.find(x=>x.id===p.id)?.value  || '—',
+            sb:  sbList .find(x=>x.id===p.id)?.value  || '—',
+          });
+        }
+      });
+    }
+    return [...map.values()].sort((a,b) => +(b.ops||0) - +(a.ops||0)).slice(0, 20);
+  }
+
+  function mergePitching(a, b) {
+    const map = new Map();
+    for (const src of [a, b]) {
+      if (src.status !== 'fulfilled') continue;
+      const res = src.value;
+      const eraList  = res.earnedRunAverage || [];
+      const kList    = res.strikeouts       || [];
+      const whipList = res.whip             || [];
+      const wList    = res.wins             || [];
+      eraList.forEach(p => {
+        const existing = map.get(p.id);
+        if (!existing || +p.value < +(existing.era||99)) {
+          map.set(p.id, {
+            id: p.id, name: p.name, team: p.team,
+            era:  p.value,
+            k:    kList  .find(x=>x.id===p.id)?.value || '—',
+            whip: whipList.find(x=>x.id===p.id)?.value|| '—',
+            w:    wList   .find(x=>x.id===p.id)?.value|| '—',
+          });
+        }
+      });
+    }
+    return [...map.values()].sort((a,b) => +(a.era||99) - +(b.era||99)).slice(0, 20);
+  }
+
+  return {
+    hitting:  mergeHitting(aaaHit, aaHit),
+    pitching: mergePitching(aaaPit, aaPit),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAFT RESULTS — real, live results from statsapi.mlb.com/api/v1/draft/{year}
+// Distinct from the curated pre-draft SKIP Big Board in constants/data.js:
+// this is what actually happened on draft day — real drafting team, real
+// signing bonus, full bio — once picks start getting made.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function normalizeDraftPick(p) {
+  const person = p.person || {};
+  return {
+    round:        p.pickRound,
+    pick:         p.pickNumber,
+    roundPick:    p.roundPickNumber,
+    rank:         p.rank ?? null,
+    pickValue:    p.pickValue    ? Number(p.pickValue)    : null,
+    signingBonus: p.signingBonus ? Number(p.signingBonus) : null,
+    id:           person.id ?? null,
+    name:         person.fullName || '',
+    firstName:    person.firstName || '',
+    lastName:     person.lastName  || '',
+    height:       person.height || '',
+    weight:       person.weight || null,
+    birthDate:    person.birthDate || null,
+    age:          person.currentAge ?? null,
+    birthCity:    person.birthCity || '',
+    birthState:   person.birthStateProvince || '',
+    birthCountry: person.birthCountry || '',
+    bats:         person.batSide?.code   || '',
+    throws:       person.pitchHand?.code || '',
+    pos:          person.primaryPosition?.abbreviation || '',
+    posType:      person.primaryPosition?.type || '',
+    mlbDebutDate: person.mlbDebutDate || null,
+    school:       p.school?.name       || 'No School',
+    schoolClass:  p.school?.schoolClass|| '',
+    schoolState:  p.school?.state      || '',
+    homeCity:     p.home?.city  || '',
+    homeState:    p.home?.state || '',
+    homeCountry:  p.home?.country || '',
+    team:         p.team?.name || '',
+    teamId:       p.team?.id   ?? null,
+    blurb:        p.blurb || '',
+    headshotLink: p.headshotLink || '',
+    scoutingReport: p.scoutingReport || '',
+    isDrafted:    !!p.isDrafted,
+    isPass:       !!p.isPass,
+  };
+}
+
+export async function getDraftResults(year) {
+  try {
+    const data   = await mlb(`/draft/${year}`, {}, { ttl: 10 * 60_000 }); // 10min — results don't change once picked
+    const rounds = data?.drafts?.rounds || [];
+    const picks  = rounds.flatMap(r => (r.picks || []).map(normalizeDraftPick));
+    return { year, rounds: rounds.map(r => r.round), picks };
+  } catch {
+    return { year, rounds: [], picks: [] };
+  }
+}
+
+/** Round 1 only (+ competitive-balance round "1C") — the common case for a Big Board view. */
+export async function getFirstRoundResults(year) {
+  const { picks, ...rest } = await getDraftResults(year);
+  return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
+}

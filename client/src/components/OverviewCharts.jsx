@@ -1,0 +1,266 @@
+/**
+ * src/components/OverviewCharts.jsx
+ *
+ * Deferred-loading split (2026-08-12): every recharts-dependent visual that
+ * OverviewPage.jsx renders, pulled into its own module. OverviewPage.jsx used
+ * to import recharts directly, which meant its own lazy-loaded chunk had a
+ * hard dependency on recharts-vendor (the single largest chunk in the app,
+ * ~85KB gzip) — and since Overview is the default landing tab, that chunk was
+ * on the critical path for the very first thing anyone sees, even the parts
+ * of the page (rankings, stat strips, standings tables) that have nothing to
+ * do with charts.
+ *
+ * OverviewPage.jsx now lazy-loads each component below individually (see the
+ * `lazy(() => import('../components/OverviewCharts.jsx').then(...))` calls
+ * there), each wrapped in its own <Suspense> with a skeleton matching the
+ * chart's real dimensions. The page shell — including every non-chart panel —
+ * can paint immediately; only these six chart areas wait on recharts-vendor,
+ * and only once, since the browser's module cache dedupes the six dynamic
+ * import() calls into a single fetch.
+ *
+ * Each component here is intentionally a thin, prop-only wrapper (no closures
+ * over OverviewPage's local state) so this file has no dependency on anything
+ * but its own props, `C` (fixed color tokens), and recharts.
+ */
+import React from "react";
+import {
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+} from "recharts";
+import { C, WARM_TOOLTIP } from "../constants/colors.js";
+
+const TT = { ...WARM_TOOLTIP, wrapperStyle: { zIndex: 9999 } };
+
+export function OffenseRadar({ data, accent }) {
+  return (
+    <ResponsiveContainer width="100%" height={196}>
+      <RadarChart
+        data={data}
+        margin={{ top: 12, right: 22, bottom: 12, left: 22 }}
+      >
+        <PolarGrid stroke={C.border} />
+        <PolarAngleAxis
+          dataKey="axis"
+          tick={{
+            fontSize: 9.5,
+            fill: C.text2,
+            fontFamily: "'DM Mono',monospace",
+          }}
+          tickLine={false}
+        />
+        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+        <Radar
+          dataKey="val"
+          stroke={accent}
+          fill={accent}
+          fillOpacity={0.18}
+          strokeWidth={2}
+          isAnimationActive={false}
+        />
+        <Tooltip {...TT} formatter={v => [v, "Score"]} />
+      </RadarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function StrengthRadar({ data, accent }) {
+  return (
+    <ResponsiveContainer width="100%" height={196}>
+      <RadarChart
+        data={data}
+        margin={{ top: 12, right: 22, bottom: 12, left: 22 }}
+      >
+        <PolarGrid stroke={C.border} />
+        <PolarAngleAxis
+          dataKey="axis"
+          tick={{
+            fontSize: 9.5,
+            fill: C.text2,
+            fontFamily: "'DM Mono',monospace",
+          }}
+          tickLine={false}
+        />
+        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+        <Radar
+          dataKey="val"
+          stroke={accent}
+          fill={accent}
+          fillOpacity={0.15}
+          strokeWidth={2}
+          dot={{ r: 2.5, fill: accent }}
+          isAnimationActive={false}
+        />
+        <Tooltip {...TT} formatter={v => [v, "Score"]} />
+      </RadarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function RunDiffChart({ data, accent }) {
+  return (
+    <ResponsiveContainer width="100%" height={144}>
+      <ComposedChart
+        data={data}
+        margin={{ top: 4, right: 14, bottom: 0, left: 0 }}
+      >
+        <CartesianGrid stroke={C.borderLight} vertical={false} />
+        <XAxis
+          dataKey="game"
+          tick={{ fontSize: 10, fill: C.text3 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          yAxisId="bars"
+          tick={{ fontSize: 10, fill: C.text3 }}
+          width={26}
+          axisLine={false}
+          tickLine={false}
+          domain={[-6, 8]}
+        />
+        <YAxis yAxisId="line" orientation="right" hide domain={[0, 35]} />
+        <Tooltip {...TT} />
+        <Bar
+          yAxisId="bars"
+          dataKey="diff"
+          fill={`color-mix(in srgb, ${accent} 22%, transparent)`}
+          stroke={accent}
+          strokeWidth={1}
+          maxBarSize={16}
+          isAnimationActive={false}
+        />
+        <Line
+          yAxisId="line"
+          dataKey="cum"
+          stroke={accent}
+          strokeWidth={2}
+          dot={false}
+          isAnimationActive={false}
+        />
+        <ReferenceLine yAxisId="bars" y={0} stroke={C.border} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function ArsenalPie({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={130}>
+      <PieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius="40%"
+          outerRadius="68%"
+          dataKey="pct"
+          strokeWidth={1.5}
+          stroke={C.surface}
+          isAnimationActive={false}
+        >
+          {data.map((e, i) => (
+            <Cell key={i} fill={e.color} />
+          ))}
+        </Pie>
+        <Tooltip {...TT} formatter={(v, n, p) => [v + "%", p.payload.type]} />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function PositionOaaChart({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={110}>
+      <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <CartesianGrid stroke={C.borderLight} vertical={false} />
+        <XAxis
+          dataKey="pos"
+          tick={{ fontSize: 9, fill: C.text3 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 9, fill: C.text3 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip {...TT} formatter={v => [v, "OAA"]} />
+        <ReferenceLine y={0} stroke={C.border} />
+        <Bar
+          dataKey="oaa"
+          isAnimationActive={false}
+          radius={[2, 2, 0, 0]}
+          fill={C.teal}
+          label={{
+            position: "top",
+            fontSize: 8,
+            fill: C.text3,
+            fontFamily: "'DM Mono',monospace",
+            formatter: v => (v > 0 ? `+${v}` : v),
+          }}
+        >
+          {data.map((e, i) => (
+            <Cell
+              key={i}
+              fill={e.oaa >= 3 ? C.teal : e.oaa >= 0 ? C.amber : C.rust}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function EvDistributionChart({ data, accent }) {
+  return (
+    <ResponsiveContainer width="100%" height={130}>
+      <BarChart
+        data={data}
+        margin={{ top: 4, right: 8, bottom: 0, left: -20 }}
+        barCategoryGap="8%"
+      >
+        <CartesianGrid stroke={C.borderLight} vertical={false} />
+        <XAxis
+          dataKey="mph"
+          tick={{ fontSize: 8, fill: C.text4 }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={v => (+v % 20 === 0 ? v : "")}
+        />
+        <YAxis
+          tick={{ fontSize: 8, fill: C.text4 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          {...TT}
+          formatter={v => [v.toFixed(1) + "%", "Freq"]}
+          labelFormatter={v => `${v} mph`}
+        />
+        <Bar
+          isAnimationActive={false}
+          dataKey="pct"
+          fill={accent}
+          radius={[2, 2, 0, 0]}
+          opacity={0.8}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}

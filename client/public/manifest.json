@@ -1,0 +1,12 @@
+{
+  "name": "SKIP · Scouting Knowledge & Intelligence Platform",
+  "short_name": "SKIP",
+  "description": "A baseball intelligence terminal for scouting, prospect evaluation, and roster decisions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#C17D2C",
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}
