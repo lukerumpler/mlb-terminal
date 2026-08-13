@@ -190,11 +190,15 @@ function NcaaWatchPanel() {
 // time) even if that live fetch fails, is rate-limited, or MLB's draft
 // feed is temporarily down.
 function DraftMoversPanel() {
-  const drafted = useMemo(() =>
-    DRAFT_CLASS_2026
-      .filter(p => p.actualPick != null && p.myRank != null)
-      .map(p => ({ ...p, delta: p.actualPick - p.myRank })),
-  []);
+  const drafted = useMemo(() => {
+    const canonicalRanks = new Map(DRAFT_BOARD.map(row => [normName(row.name), row.rank]));
+    return DRAFT_CLASS_2026
+      .filter(p => p.actualPick != null && (canonicalRanks.get(normName(p.name)) ?? p.myRank) != null)
+      .map(p => {
+        const skipRank = canonicalRanks.get(normName(p.name)) ?? p.myRank;
+        return { ...p, skipRank, delta: p.actualPick - skipRank };
+      });
+  }, []);
 
   if (drafted.length === 0) return null;
 
@@ -229,11 +233,13 @@ function DraftMoversPanel() {
 
 function DraftClassPanel() {
   const [q, setQ] = useState('');
-  const ranked = useMemo(() =>
-    [...DRAFT_CLASS_2026]
-      .filter(p => p.myRank != null)
-      .sort((a, b) => a.myRank - b.myRank),
-  []);
+  const ranked = useMemo(() => {
+    const canonicalRanks = new Map(DRAFT_BOARD.map(row => [normName(row.name), row.rank]));
+    return [...DRAFT_CLASS_2026]
+      .filter(p => (canonicalRanks.get(normName(p.name)) ?? p.myRank) != null)
+      .map(p => ({ ...p, skipRank: canonicalRanks.get(normName(p.name)) ?? p.myRank }))
+      .sort((a, b) => a.skipRank - b.skipRank);
+  }, []);
   const unranked = useMemo(() =>
     DRAFT_CLASS_2026.filter(p => p.myRank == null).sort((a, b) => a.name.localeCompare(b.name)),
   []);
@@ -281,7 +287,7 @@ function DraftClassPanel() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr>
-                {['Rank','Pos','Name','School','B/T','Score','Crowd','Actual','Move'].map(h => (
+                {['SKIP Rk','Pos','Name','School','B/T','Crowd','Actual','Move'].map(h => (
                   <th key={h} style={{ padding:'6px 10px', fontSize:9.5, fontWeight:700, textTransform:'uppercase',
                     letterSpacing:'.05em', color:C.text2, textAlign:h==='Name'||h==='School'?'left':'right',
                     borderBottom:`0.5px solid ${C.border}`, whiteSpace:'nowrap', position:'sticky', top:0, background:C.surface }}>{h}</th>
@@ -290,17 +296,16 @@ function DraftClassPanel() {
             </thead>
             <tbody>
               {filteredRanked.map(p => {
-                const move = p.powerRank != null ? p.powerRank - p.myRank : null; // positive = SKIP higher than consensus
+                const move = p.actualPick != null ? p.actualPick - p.skipRank : null; // positive = the actual pick came later than SKIP's rank
                 return (
                   <tr key={p.name} style={{ borderBottom:`0.5px solid ${C.borderLight}` }}>
-                    <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.text }) }}>{p.myRank}</td>
+                    <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.text }) }}>{p.skipRank}</td>
                     <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{p.pos}</td>
                     <td style={{ padding:'5px 10px', ...sans({ fontSize:11.5, color:C.text, fontWeight: boardNames.has(p.name) ? 700 : 500, whiteSpace:'nowrap' }) }}>
                       {p.name}{boardNames.has(p.name) && <span style={{ color:C.amber }}> ★</span>}
                     </td>
                     <td style={{ padding:'5px 10px', ...sans({ fontSize:10.5, color:C.text3, whiteSpace:'nowrap' }) }}>{p.school}</td>
                     <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{p.bt || '—'}</td>
-                    <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{p.score?.toFixed(1) ?? '—'}</td>
                     <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{p.crowdRank ?? '—'}</td>
                     <td style={{ padding:'5px 10px', textAlign:'right', ...px({ fontSize:10.5, fontWeight:p.actualPick!=null?700:400, color:p.actualPick!=null?C.teal:C.text4 }) }}>
                       {p.actualPick != null ? `#${p.actualPick}` : '—'}
@@ -344,9 +349,7 @@ function DraftClassPanel() {
 
       <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.border}` }}>
         <div style={sans({ fontSize:10, color:C.text3, lineHeight:1.5 })}>
-          ★ = on the SKIP Big Board with full scouting grades. Actual = real Round 1 pick number
-          (draft held July 11, 2026), where confirmed. Move = SKIP&rsquo;s pre-draft rank vs. the
-          public crowd consensus rank (↑ SKIP higher, ↓ SKIP lower). &ldquo;Prep&rdquo; means high school.
+          ★ = on the SKIP Big Board with full scouting grades. SKIP Rk is the canonical editorial rank shared with the Big Board. Actual = the official Round 1 pick number where confirmed. Move compares the actual pick to SKIP Rk (↑ earlier than rank, ↓ later than rank). &ldquo;Prep&rdquo; means high school.
         </div>
       </div>
     </Panel>
@@ -400,22 +403,25 @@ function DraftPage() {
   const hasLiveBonuses = bonusByPick.size > 0;
 
   const draftComplete = !officialLoading && !officialError && officialPicks.length > 0;
+  const trackedDraftCount = DRAFT_CLASS_2026.length;
+  const scoutedDraftCount = DRAFT_CLASS_2026.filter(p => p.myRank != null).length;
+  const collegeDraftPct = trackedDraftCount ? Math.round(DRAFT_CLASS_2026.filter(p => p.school !== 'Prep').length / trackedDraftCount * 100) : null;
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <StatStrip items={[
-        { val:'10',     lbl:'Big Board',    sub:'SKIP Ranked'     },
-        { val:'210',    lbl:'Draft Pool',   sub:'Tracked Names'   },
+        { val:String(DRAFT_BOARD.length), lbl:'Big Board',    sub:'SKIP Ranked'     },
+        { val:String(trackedDraftCount),  lbl:'Draft Pool',   sub:`${scoutedDraftCount} scouted` },
         { val:draftComplete ? '✓ Jul 11' : 'Jul 11', lbl:'Draft Date', sub: draftComplete ? 'Results in' : 'Philadelphia PA' },
-        { val:'20',     lbl:'Rounds',       sub:'~600 picks'      },
-        { val:'58%',    lbl:'College',      sub:'42% High School' },
+        { val:'20',     lbl:'Rounds',       sub:'Official format' },
+        { val:collegeDraftPct == null ? '—' : `${collegeDraftPct}%`, lbl:'College', sub:collegeDraftPct == null ? 'Unavailable' : `${100 - collegeDraftPct}% Prep` },
         { val: hasLiveBonuses ? 'Live' : '$332M', lbl: hasLiveBonuses ? 'Bonuses' : 'Signing Pool', sub: hasLiveBonuses ? 'Official — Rd 1' : 'Est. Total' },
       ]} />
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr minmax(230px,260px)', gap:12, alignItems:'start' }}>
 
         {/* Big board */}
-          <Panel title="SKIP Big Board — Top 10" accent={C.amber} badge="Editorial">
+          <Panel title="SKIP Big Board — Top 10" accent={C.amber} badge="SKIP Editorial">
           {/* FIX: overflowX on the table wrapper, not Panel itself */}
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
@@ -478,7 +484,7 @@ function DraftPage() {
           {draftComplete && (
             <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
               <span style={sans({ fontSize:9.5, color:C.text4 })}>
-                "Actual" column is live from MLB's official draft results · green = SKIP's rank called it or beat it, amber = close, red = missed
+                SKIP ranks are editorial scouting opinions. The Actual column is live from MLB's official draft results; green = earlier than the SKIP rank, amber = close, red = later.
               </span>
             </div>
           )}

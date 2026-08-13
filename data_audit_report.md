@@ -77,3 +77,39 @@ Spencer Strider’s selected profile entered the shared loading state without a 
 
 
 The complete six-player quick-access identity audit found and corrected one real catalog error: MLB person ID `668939` belonged to Adley Rutschman, not Bobby Witt Jr. MLB’s live people search identified Bobby Witt Jr. as ID `677951`; the quick-access record was corrected and its official position/team abbreviations were aligned (`RF`, `TWP`, `LF`, `SS`, `P`, `SS`). The corrected audit now reports **6/6 identities matched** live MLB name, hydrated current team, position, and ID records.
+
+
+## Baseball Savant baseline for the UI refinement
+
+Baseball Savant’s 2026 Percentile Rankings page states the qualifier thresholds of 2.1 PA per team game for batters and 1.25 PA per team game for pitchers, and presents the percentile values as the primary visual ranking rather than raw-stat scales. Its displayed batter columns include xwOBA, xBA, xSLG, xISO, xOBP, Barrel%, EV, Max EV, HardHit%, K%, BB%, Whiff%, Chase%, Sprint Speed, OAA, Arm Strength, Bat Speed, Squared-Up Rate, and Swing Length. These values are the baseline for SKIP’s percentile-first player cards.
+
+Baseball Savant’s Visuals page identifies authentic Statcast visual conventions including pitch highlighter spray charts, batting stance and intercept visuals, swing-and-miss profiles, pitch arsenals, hitting signatures, and Statcast field visualizer spray charts. It also links the official glossary definitions for EV, launch angle, barrels, hard-hit rate, sweet-spot rate, batted-ball events, xBA, xwOBA, bat speed, pitch velocity, pitch movement, active spin, spin rate, extension, xERA, OAA, arm strength, and sprint speed. SKIP must not use deterministic seeded dots as if they were tracked spray locations; where the required source-backed coordinates are unavailable, the UI should display an explicit unavailable state.
+
+References: [Baseball Savant Percentile Rankings](https://baseballsavant.mlb.com/leaderboard/percentile-rankings); [Baseball Savant Visuals](https://baseballsavant.mlb.com/visuals); [Baseball Savant CSV Documentation](https://baseballsavant.mlb.com/csv-docs); [Baseball Savant Statcast Metrics Context](https://baseballsavant.mlb.com/statcast-metrics-context).
+
+
+## UI refinement source baseline — 2026-08-13
+- Baseball Savant percentile rankings: https://baseballsavant.mlb.com/leaderboard/percentile-rankings
+- Baseball Savant visuals and Statcast chart conventions: https://baseballsavant.mlb.com/visuals
+- Baseball Savant CSV field documentation: https://baseballsavant.mlb.com/csv-docs
+
+Implementation rule: percentile bars use league-population ranks on a 0–100 scale, while raw values remain secondary labels. Missing Statcast distributions, team spray coordinates, and team pitch arsenals render as unavailable rather than seeded estimates. Player spray charts use Statcast Search `hc_x`/`hc_y` coordinates when present; draft class rows use one canonical SKIP rank map shared by the Big Board, directory, and mover panels.
+
+
+## Baseball Savant baseline — spray and Statcast visuals
+- Official CSV documentation: https://baseballsavant.mlb.com/csv-docs
+- Official visuals glossary: https://baseballsavant.mlb.com/visuals
+- Baseball Savant defines `hc_x` as the hit-coordinate X of the batted ball and `hc_y` as the hit-coordinate Y of the batted ball. These are field-contact coordinates and must not be confused with the batter-relative intercept coordinates used by the Contact Point panel.
+- Baseball Savant defines a hard-hit ball as a batted ball with exit velocity of at least 95 mph, a launch-angle sweet spot as 8–32 degrees, xBA as expected batting average, and xwOBA as a result based on exit velocity, launch angle, and in some cases sprint speed.
+- Baseball Savant’s visuals page is the presentation baseline for batted-ball, pitch, expected-statistics, and bat-tracking labels. Player percentile chart widths must use the 0–100 population rank; raw statistics are contextual labels only.
+
+
+## UI and chart refinement checkpoint — 2026-08-13
+
+The Juan Soto profile smoke test rendered live 2026 MLB and Baseball Savant data with xwOBA at the 98th percentile, xSLG at the 98th percentile, EV at the 92nd percentile, and raw values retained only as secondary context. The profile card is percentile-first and contains no slider interaction. The shared ordinal formatter now correctly renders 92nd, 93rd, 98th, 99th, and 100th, while null values remain an em dash.
+
+The player spray chart now consumes Baseball Savant field-contact `hc_x`/`hc_y` coordinates from the Statcast Search feed and uses a wider horizontal and calibrated vertical projection around home plate near (125, 198). Contact Point remains a separate batter-relative intercept visualization. Missing coordinates render an explicit unavailable state; no synthetic dots or one-value EV histogram are used.
+
+The Overview smoke test confirmed live Dodgers standings, team hitting and pitching totals, team leaders, and proper 93rd/77th percentile labels. Unsupported team-level Statcast panels remain explicitly unavailable. The Draft tab rendered a canonical SKIP rank order shared by the Big Board, movers, and class directory, with SKIP editorial fields separated from official round results.
+
+A 375px mobile preview was also checked. The terminal now collapses the navigation rail to icons, stacks major Overview grids, and converts the shared metric strip to two columns so the data cards remain readable on a narrow screen while desktop layout remains unchanged.

@@ -10914,7 +10914,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Correct shared static datasets, API normalization, fallback logic, derived formulas, and displayed labels at their source.
 - [x] Add deterministic tests for the corrected records, source normalization, and no-fabrication/unknown-value handling.
 - [x] Run the full test suite, TypeScript check, lint, production build, API smoke tests, and preview verification across data-bearing tabs.
-- [ ] Review the final diff and confirm no roadmap markdown changes.
+- [x] Review the final diff and confirm no roadmap markdown changes.
 - [ ] Save a new checkpoint after all audit items are verified.
 - [ ] Deliver a source-based summary of what was verified, corrected, and left explicitly unavailable.
 
@@ -10940,5 +10940,22 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify contract, transaction, injury, scouting, and editorial profile fields against authoritative sources or clearly mark them as unavailable/editorial.
 - [x] Correct shared profile data adapters, normalization, derived calculations, labels, and fallback behavior without changing the Bloomberg-terminal design.
 - [x] Add deterministic tests covering representative hitter, pitcher, prospect, unavailable-data, and live-hydration profile cases.
-- [ ] Smoke-test all player profile routes and rerun lint, TypeScript, build, API checks, and the full Vitest suite.
-- [ ] Review the final diff to confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save a checkpoint, and deliver the all-profile audit summary.
+- [x] Smoke-test all player profile routes and rerun lint, TypeScript, build, API checks, and the full Vitest suite.
+- [x] Review the final diff to confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save a checkpoint, and deliver the all-profile audit summary.
+
+
+## UI, percentile, team, prospect, and draft refinement
+- [x] Inventory the player-card, percentile, spray-chart, team-overview, prospect, draft, and other data-bearing surfaces against the supplied dashboard examples.
+- [x] Replace raw-value bar scales with percentile scales wherever percentile data exists, preserving the underlying raw statistic as a secondary label.
+- [x] Reorganize the top player card around SKIP proprietary metrics and remove the unnecessary slider interaction.
+- [x] Correct percentile mappings and displayed labels for all player profiles, including Juan Soto and players with 99th-percentile values.
+- [x] Replace misleading spray-chart fallbacks with correctly oriented source-backed batted-ball plots or explicit unavailable states.
+- [x] Verify and correct team-overview aggregates, standings, leaderboards, labels, and illustrative panels across all teams.
+- [x] Verify and correct prospect-page identity, organization, level, and metric mappings where needed.
+- [x] Rebuild the Draft page data mapping and organization so player rows, rankings, positions, teams, and editorial fields remain aligned.
+- [x] Improve shared layout hierarchy, spacing, card organization, and chart labeling while preserving the Bloomberg-terminal visual language.
+- [x] Add deterministic regression tests for percentile mapping, player-card layout behavior, spray-chart data handling, team aggregates, and draft/prospect row alignment.
+- [x] Smoke-test all affected tabs at desktop and mobile widths, then run lint, TypeScript, build, and the full Vitest suite.
+- [x] Confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, review the diff, save a checkpoint, and deliver the updated Manus-editable project.
+
+- [x] Use Baseball Savant as the primary baseline for Statcast definitions, percentile direction, pitch/batted-ball chart conventions, and percentile-card presentation across the affected tabs.

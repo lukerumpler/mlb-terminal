@@ -19,7 +19,7 @@ import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
-import { percentile, percentileColor } from '../lib/percentile.js';
+import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
 
 function pctBar(pct, color) {
   return (
@@ -204,66 +204,51 @@ function GeometryRadar({ kpis, isPitcher }) {
 }
 
 /* ─── Spray chart (SVG) ───────────────────────────────────────────── */
-/* ─── Spray Chart (SVG) ──────────────────────────────────────────────
-   Dot positions are seeded deterministically from the player's own
-   season AVG/HR/SB, not real tracked batted-ball coordinates — this app
-   has no per-batted-ball location data source. Stays a stable, plausible-
-   looking shape per player (not literally random each render), but it's
-   a style representation, not a real spray chart. Labeled as such in the
-   panel badge below (same "not raw data" convention as "SKIP Model" on
-   GeometryRadar) and in a caption, rather than presenting HR/XBH/1B dots
-   as if they were actual tracked locations.
------------------------------------------------------------------------- */
-function SprayChart({ s }) {
-  const avg = parseFloat(s?.avg) || 0;
-  const hr  = parseInt(s?.homeRuns) || 0;
-  const sb  = parseInt(s?.stolenBases) || 0;
-  // Seed deterministic dot positions from player stats
-  const seed = Math.round(avg * 1000) + hr * 7 + sb * 3;
-  const dots = useMemo(() => {
-    const rng = (i) => {
-      const x = Math.sin(seed + i * 127.1) * 43758.5453;
-      return x - Math.floor(x);
-    };
-    return Array.from({ length: 28 }, (_, i) => {
-      const r  = rng(i);
-      const r2 = rng(i + 100);
-      const angle = (r * 160 - 80) * (Math.PI / 180);
-      const dist  = 28 + r2 * 44;
-      const isHR  = i < Math.min(hr, 8);
-      const is2B  = !isHR && i < Math.min(hr + Math.round(avg * 40), 16);
-      const color = isHR ? C.rust : is2B ? C.amber : C.teal;
-      return {
-        cx: 70 + dist * Math.sin(angle),
-        cy: 78 - dist * Math.cos(angle),
-        color, r: isHR ? 3.5 : 2.5,
-      };
-    });
-  }, [seed, avg, hr]);
+/* Baseball Savant Statcast Search returns `hc_x` / `hc_y` for tracked
+   batted-ball events. These are the source-backed field coordinates used
+   here; no seeded dots or season-stat geometry is allowed to stand in for a
+   spray chart. */
+export function normalizeSprayPoint(row) {
+  const x = Number(row?.hc_x);
+  const y = Number(row?.hc_y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  // Statcast hit coordinates are recorded on the Savant field plane with
+  // home plate near (125, 198). The larger horizontal scale is intentional:
+  // it keeps the foul lines and pull/opposite-field spread visually honest.
+  const cx = Math.max(8, Math.min(132, 70 + (x - 125) * 0.74));
+  const cy = Math.max(10, Math.min(80, 80 - (198 - y) * 0.34));
+  const event = String(row?.events || '').toLowerCase();
+  const color = event === 'home_run' ? C.rust
+    : ['double','triple'].includes(event) ? C.amber
+    : C.teal;
+  return { cx, cy, color, event, launchSpeed: Number(row?.launch_speed) || null };
+}
 
+function SprayChart({ contactPoints }) {
+  const dots = useMemo(() => (Array.isArray(contactPoints) ? contactPoints : [])
+    .map(normalizeSprayPoint)
+    .filter(Boolean), [contactPoints]);
+  if (!dots.length) {
+    return <div style={sans({ fontSize:10.5, color:C.text3, padding:'22px 6px', textAlign:'center' })}>No Baseball Savant batted-ball coordinates available for this player and season.</div>;
+  }
   return (
-    <svg width="100%" viewBox="0 0 140 90" style={{ display:'block' }}>
-      {/* Field */}
-      <path d="M70,80 L10,26 Q38,-2 70,0 Q102,-2 130,26 Z"
-        fill={`color-mix(in srgb, ${C.teal} 9%, transparent)`} stroke={C.border} strokeWidth="0.5"/>
-      <path d="M70,80 L22,34 Q44,12 70,10 Q96,12 118,34 Z"
-        fill="none" stroke={C.borderLight} strokeWidth="0.5"/>
-      {/* Foul lines */}
-      <line x1="70" y1="80" x2="8" y2="22" stroke={C.border} strokeWidth="0.5"/>
-      <line x1="70" y1="80" x2="132" y2="22" stroke={C.border} strokeWidth="0.5"/>
-      {/* Infield */}
-      <rect x="57" y="54" width="26" height="26" fill={`color-mix(in srgb, ${C.amber} 7%, transparent)`} stroke={C.border} strokeWidth="0.5" transform="rotate(-45 70 67)"/>
-      {/* Home plate */}
-      <circle cx="70" cy="78" r="2.5" fill={C.surface3} stroke={C.border} strokeWidth="0.5"/>
-      {/* Dots */}
-      {dots.map((d,i) => <circle key={i} cx={d.cx} cy={d.cy} r={d.r} fill={d.color} opacity={0.8}/>)}
-      {/* Legend */}
-      <g fontFamily="'DM Mono',monospace" fontSize="6" fill={C.text3}>
-        <circle cx="4" cy="5" r="2.5" fill={C.rust}/><text x="9" y="8">HR</text>
-        <circle cx="4" cy="14" r="2.5" fill={C.amber}/><text x="9" y="17">XBH</text>
-        <circle cx="4" cy="23" r="2.5" fill={C.teal}/><text x="9" y="26">1B</text>
-      </g>
-    </svg>
+    <div>
+      <svg width="100%" viewBox="0 0 140 90" style={{ display:'block' }} role="img" aria-label={`${dots.length} tracked batted-ball locations`}>
+        <path d="M70,80 L8,18 Q36,-5 70,0 Q104,-5 132,18 Z" fill={`color-mix(in srgb, ${C.teal} 9%, transparent)`} stroke={C.border} strokeWidth="0.5"/>
+        <path d="M70,80 L20,34 Q44,10 70,10 Q96,10 120,34 Z" fill="none" stroke={C.borderLight} strokeWidth="0.5"/>
+        <line x1="70" y1="80" x2="8" y2="22" stroke={C.border} strokeWidth="0.5"/>
+        <line x1="70" y1="80" x2="132" y2="22" stroke={C.border} strokeWidth="0.5"/>
+        <rect x="57" y="54" width="26" height="26" fill={`color-mix(in srgb, ${C.amber} 7%, transparent)`} stroke={C.border} strokeWidth="0.5" transform="rotate(-45 70 67)"/>
+        <circle cx="70" cy="78" r="2.5" fill={C.surface3} stroke={C.border} strokeWidth="0.5"/>
+        {dots.map((d, i) => <circle key={`${d.cx}-${d.cy}-${i}`} cx={d.cx} cy={d.cy} r={2.2} fill={d.color} opacity={0.72} />)}
+        <g fontFamily="'DM Mono',monospace" fontSize="6" fill={C.text3}>
+          <circle cx="4" cy="5" r="2.5" fill={C.rust}/><text x="9" y="8">HR</text>
+          <circle cx="4" cy="14" r="2.5" fill={C.amber}/><text x="9" y="17">XBH</text>
+          <circle cx="4" cy="23" r="2.5" fill={C.teal}/><text x="9" y="26">1B/OUT</text>
+        </g>
+      </svg>
+      <div style={sans({ fontSize:9, color:C.text4, padding:'4px 4px 0', lineHeight:1.4 })}>Live Baseball Savant Statcast coordinates · {dots.length} tracked batted-ball events.</div>
+    </div>
   );
 }
 
@@ -476,61 +461,173 @@ function ZoneWhiffGrid({ contactPoints }) {
 }
 
 
-function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking }) {
+function populationField(row, keys) {
+  for (const key of keys) {
+    const value = Number(row?.[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+export function metricPopulationPercentile(value, population, keys, higherIsBetter = true) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || !Array.isArray(population)) return null;
+  const values = population.map(row => populationField(row, keys)).filter(v => v != null);
+  return percentile(raw, values, higherIsBetter);
+}
+
+function derivedPopulationPercentile(value, population, derive, higherIsBetter = true) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || !Array.isArray(population)) return null;
+  const values = population.map(row => {
+    const next = Number(derive(row));
+    return Number.isFinite(next) ? next : null;
+  }).filter(v => v != null);
+  return percentile(raw, values, higherIsBetter);
+}
+
+function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStatisticsPopulation, batTrackingPopulation, statcastPopulation }) {
   const sv = savant || {};
   const bt = batTracking || {};
-  const k9   = profileMetricValue(s?.strikeoutsPer9Inn);
+  const expectedPopulation = expectedStatisticsPopulation || [];
+  const statcastPopulationRows = statcastPopulation || [];
+  const batTrackingRows = batTrackingPopulation || [];
+  const k9 = profileMetricValue(s?.strikeoutsPer9Inn);
   const whip = profileMetricValue(s?.whip);
   const estBa = profileMetricValue(sv.est_ba);
   const estSlg = profileMetricValue(sv.est_slg);
   const expectedIso = estBa != null && estSlg != null ? estSlg - estBa : null;
   const scoreValue = value => Number.isFinite(Number(value)) ? Number(value) : null;
+  const savantPercentile = (value, population, keys, higher = true) => metricPopulationPercentile(value, population, keys, higher);
+  const expectedIsoPercentile = value => derivedPopulationPercentile(value, expectedPopulation, row => {
+    const ba = populationField(row, ['est_ba']);
+    const slg = populationField(row, ['est_slg']);
+    return ba == null || slg == null ? null : slg - ba;
+  });
 
   const hittingRows = [
-    { lbl:'xwOBA',              val: formatProfileMetric(sv.est_woba, 3), raw: profileMetricValue(sv.est_woba), max:0.500, lo:0.300 },
-    { lbl:'Bat Speed',          val: formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw: profileMetricValue(bt.avg_bat_speed), max:80, lo:65 },
-    { lbl:'Sweet Spot %',       val: formatProfileMetric(sv.sweet_spot_percent, 1, '%'), raw: profileMetricValue(sv.sweet_spot_percent), max:50, lo:25 },
-    { lbl:'Barrel %',           val: formatProfileMetric(sv.brl_percent, 1, '%'), raw: profileMetricValue(sv.brl_percent), max:20, lo:5 },
-    { lbl:'Contact Quality',    val: scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), max:99, lo:40 },
-    { lbl:'Swing Decisions',    val: scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), max:99, lo:40 },
-    { lbl:'Hard Hit %',         val: formatProfileMetric(sv.hard_hit_percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent), max:60, lo:30 },
-    { lbl:'Damage Rate',        val: scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), max:99, lo:40 },
-    { lbl:'Expected ISO',       val: formatProfileMetric(expectedIso, 3), raw:expectedIso, max:0.300, lo:0.050 },
-    { lbl:'Barrel Consistency', val: (() => { const v = scoreValue(kpis.CAS); const d = scoreValue(kpis.DPI); return v == null || d == null ? '—' : String(Math.min(99, Math.round(v * 0.6 + d * 0.4))); })(), raw: (() => { const v = scoreValue(kpis.CAS); const d = scoreValue(kpis.DPI); return v == null || d == null ? null : Math.min(99, Math.round(v * 0.6 + d * 0.4)); })(), max:99, lo:40 },
+    { lbl:'xwOBA', val:formatProfileMetric(sv.est_woba, 3), raw:profileMetricValue(sv.est_woba), pct:savantPercentile(sv.est_woba, expectedPopulation, ['est_woba']) },
+    { lbl:'xBA', val:formatProfileMetric(estBa, 3), raw:estBa, pct:savantPercentile(estBa, expectedPopulation, ['est_ba']) },
+    { lbl:'xSLG', val:formatProfileMetric(estSlg, 3), raw:estSlg, pct:savantPercentile(estSlg, expectedPopulation, ['est_slg']) },
+    { lbl:'Bat Speed', val:formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw:profileMetricValue(bt.avg_bat_speed), pct:savantPercentile(bt.avg_bat_speed, batTrackingRows, ['avg_bat_speed']) },
+    { lbl:'Sweet Spot %', val:formatProfileMetric(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, 1, '%'), raw:profileMetricValue(sv.sweet_spot_percent ?? sv.anglesweetspotpercent), pct:savantPercentile(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
+    { lbl:'Barrel %', val:formatProfileMetric(sv.brl_percent, 1, '%'), raw:profileMetricValue(sv.brl_percent), pct:savantPercentile(sv.brl_percent, statcastPopulationRows, ['brl_percent']) },
+    { lbl:'Hard Hit %', val:formatProfileMetric(sv.hard_hit_percent ?? sv.ev95percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent ?? sv.ev95percent), pct:savantPercentile(sv.hard_hit_percent ?? sv.ev95percent, statcastPopulationRows, ['hard_hit_percent','ev95percent']) },
+    { lbl:'Expected ISO', val:formatProfileMetric(expectedIso, 3), raw:expectedIso, pct:expectedIsoPercentile(expectedIso) },
+    { lbl:'Contact Quality', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
+    { lbl:'Swing Decisions', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
+    { lbl:'Damage Rate', val:scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), pct:scoreValue(kpis.DPI) },
+    { lbl:'Barrel Consistency', val:(() => { const v=scoreValue(kpis.CAS); const d=scoreValue(kpis.DPI); return v==null||d==null?'—':String(Math.min(99,Math.round(v*.6+d*.4))); })(), raw:null, pct:(() => { const v=scoreValue(kpis.CAS); const d=scoreValue(kpis.DPI); return v==null||d==null?null:Math.min(99,Math.round(v*.6+d*.4)); })() },
   ];
   const pitchingRows = [
-    { lbl:'K/9 Rate',     val: formatProfileMetric(k9, 1),   raw:k9,   max:14, lo:6 },
-    { lbl:'WHIP',         val: formatProfileMetric(whip, 3),  raw:whip, max:2,  lo:0.8, invert:true },
-    { lbl:'Stuff Score',  val: scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), max:99, lo:40 },
-    { lbl:'Command',      val: scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), max:99, lo:40 },
-    { lbl:'Run Prev.',    val: scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), max:99, lo:40 },
-    { lbl:'Contact Suppr',val: (() => { const hh = profileMetricValue(sv.hard_hit_percent); return hh == null ? '—' : `${(100 - hh).toFixed(1)}%`; })(), raw:(() => { const hh = profileMetricValue(sv.hard_hit_percent); return hh == null ? null : 100 - hh; })(), max:80, lo:50 },
+    { lbl:'K/9 Rate', val:formatProfileMetric(k9, 1), raw:k9, pct:null },
+    { lbl:'WHIP', val:formatProfileMetric(whip, 3), raw:whip, pct:null },
+    { lbl:'Stuff Score', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
+    { lbl:'Command', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
+    { lbl:'Run Prevention', val:scoreValue(kpis.DPI) == null ? '—' : String(kpis.DPI), raw:scoreValue(kpis.DPI), pct:scoreValue(kpis.DPI) },
+    { lbl:'Contact Suppression', val:'—', raw:null, pct:null },
   ];
   const rows = isPitcher ? pitchingRows : hittingRows;
 
   return (
     <Panel title="Analytics Layers" accent={C.teal} badge="SKIP Intelligence">
       <div style={{ padding:'6px 0 4px' }}>
-        {rows.map(({ lbl, val, raw, max, lo, invert }) => {
-          const pct = raw != null && max > lo
-            ? Math.max(0, Math.min(100, invert
-                ? (1 - (raw - lo) / (max - lo)) * 100
-                : ((raw - lo) / (max - lo)) * 100))
-            : 0;
-          const color = pct >= 70 ? C.teal : pct >= 45 ? C.amber : C.slate;
+        {rows.map(({ lbl, val, pct }) => {
+          const rank = pct == null ? null : Math.max(0, Math.min(100, Math.round(pct)));
+          const color = percentileColor(rank);
           return (
-            <div key={lbl} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 14px',
-              borderBottom:`0.5px solid ${C.borderLight}` }}>
-              <span style={sans({ fontSize:10, color:C.text2, width:108, flexShrink:0 })}>{lbl}</span>
-              <div style={{ flex:1, height:4, background:C.surface3, borderRadius:2, overflow:'hidden' }}>
-                <div style={{ height:'100%', width:`${pct.toFixed(0)}%`, background:color, borderRadius:2,
-                  transition:'width .6s ease' }}/>
+            <div key={lbl} style={{ display:'grid', gridTemplateColumns:'112px minmax(80px,1fr) 44px 58px', alignItems:'center', gap:8, padding:'5px 14px', borderBottom:`0.5px solid ${C.borderLight}` }}>
+              <span style={sans({ fontSize:10, color:C.text2, minWidth:0 })}>{lbl}</span>
+              <div aria-label={rank == null ? `${lbl} percentile unavailable` : `${lbl} ${percentileLabel(rank)} percentile`} style={{ height:6, background:C.surface3, borderRadius:4, overflow:'hidden', position:'relative' }}>
+                {rank != null && <div style={{ height:'100%', width:`${rank}%`, background:color, borderRadius:4, transition:'width .4s ease' }} />}
               </div>
-              <span style={px({ fontSize:10.5, fontWeight:700, color, width:52, textAlign:'right', flexShrink:0 })}>{val}</span>
+              <span style={px({ fontSize:10.5, fontWeight:800, color, width:44, textAlign:'right' })}>{percentileLabel(rank)}</span>
+              <span style={px({ fontSize:9.5, color:C.text3, width:58, textAlign:'right', whiteSpace:'nowrap' })}>{val}</span>
             </div>
           );
         })}
       </div>
+    </Panel>
+  );
+}
+
+export function buildSavantPercentileAxes(player, isPitcher = Boolean(player?.isPitcher)) {
+  const profile = player || {};
+  const sv = profile.savant || {};
+  const expected = Array.isArray(profile.expectedStatisticsPopulation) ? profile.expectedStatisticsPopulation : [];
+  const statcast = Array.isArray(profile.statcastPopulation) ? profile.statcastPopulation : [];
+  const batTracking = Array.isArray(profile.batTrackingPopulation) ? profile.batTrackingPopulation : [];
+  const pitchRows = Array.isArray(profile.pitchArsenal) ? profile.pitchArsenal : [];
+  const pitchPopulation = Array.isArray(profile.pitchArsenalPopulation) ? profile.pitchArsenalPopulation : [];
+  const weightedWhiff = weightedArsenalStat(pitchRows, 'whiff_percent');
+  const whiffPopulation = pitcherArsenalStatPopulation(pitchPopulation, 'whiff_percent');
+  const weightedK = weightedArsenalStat(pitchRows, 'k_percent');
+  const kPopulation = pitcherArsenalStatPopulation(pitchPopulation, 'k_percent');
+
+  const hitterAxes = [
+    { axis:'xwOBA', raw:profileMetricValue(sv.est_woba), rawLabel:formatProfileMetric(sv.est_woba, 3), pct:metricPopulationPercentile(sv.est_woba, expected, ['est_woba']) },
+    { axis:'EV', raw:profileMetricValue(sv.avg_hit_speed), rawLabel:formatProfileMetric(sv.avg_hit_speed, 1, ' mph'), pct:metricPopulationPercentile(sv.avg_hit_speed, statcast, ['avg_hit_speed']) },
+    { axis:'xSLG', raw:profileMetricValue(sv.est_slg), rawLabel:formatProfileMetric(sv.est_slg, 3), pct:metricPopulationPercentile(sv.est_slg, expected, ['est_slg']) },
+    { axis:'Whiff%', raw:profileMetricValue(sv.whiff_percent), rawLabel:formatProfileMetric(sv.whiff_percent, 1, '%'), pct:metricPopulationPercentile(sv.whiff_percent, statcast, ['whiff_percent'], false) },
+    { axis:'Chase%', raw:profileMetricValue(sv.oz_swing_percent), rawLabel:formatProfileMetric(sv.oz_swing_percent, 1, '%'), pct:metricPopulationPercentile(sv.oz_swing_percent, statcast, ['oz_swing_percent'], false) },
+    { axis:'Bat Speed', raw:profileMetricValue(profile.batTracking?.avg_bat_speed), rawLabel:formatProfileMetric(profile.batTracking?.avg_bat_speed, 1, ' mph'), pct:metricPopulationPercentile(profile.batTracking?.avg_bat_speed, batTracking, ['avg_bat_speed']) },
+  ];
+  const pitcherAxes = [
+    { axis:'Whiff%', raw:weightedWhiff, rawLabel:formatProfileMetric(weightedWhiff, 1, '%'), pct:whiffPopulation.length ? percentile(weightedWhiff, whiffPopulation, true) : null },
+    { axis:'K%', raw:weightedK, rawLabel:formatProfileMetric(weightedK, 1, '%'), pct:kPopulation.length ? percentile(weightedK, kPopulation, true) : null },
+    { axis:'xwOBA', raw:profileMetricValue(sv.est_woba), rawLabel:formatProfileMetric(sv.est_woba, 3), pct:metricPopulationPercentile(sv.est_woba, expected, ['est_woba'], false) },
+    { axis:'EV Allowed', raw:profileMetricValue(sv.avg_hit_speed), rawLabel:formatProfileMetric(sv.avg_hit_speed, 1, ' mph'), pct:metricPopulationPercentile(sv.avg_hit_speed, statcast, ['avg_hit_speed'], false) },
+  ];
+  return (isPitcher ? pitcherAxes : hitterAxes).filter(item => item.pct != null);
+}
+
+function SavantPercentileProfile({ player, isPitcher, teamAccent }) {
+  const axes = buildSavantPercentileAxes(player, isPitcher);
+  const hasProfile = axes.length >= 3;
+  const season = player.isFallback ? `${player.statSeason} fallback` : String(player.statSeason || SEASON);
+
+  return (
+    <Panel title="Percentile Profile" accent={teamAccent} badge={hasProfile ? `Baseball Savant · ${season}` : 'Unavailable'}>
+      {!hasProfile ? (
+        <div style={sans({ fontSize:11, color:C.text3, padding:'28px 18px', textAlign:'center', lineHeight:1.5 })}>
+          Baseball Savant percentile data is not available for this player in {season}. No raw-value proxy chart is shown.
+        </div>
+      ) : (
+        <div style={{ padding:'4px 14px 12px' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 }}>
+            <div>
+              <div style={sans({ fontSize:13, fontWeight:800, color:C.text })}>{player.profile?.fullName || 'Player'}</div>
+              <div style={px({ fontSize:9.5, color:C.text3 })}>{player.profile?.currentTeam?.name || 'Free Agent'} · {player.profile?.primaryPosition?.abbreviation || '—'}</div>
+            </div>
+            <div style={px({ fontSize:9, color:C.text4 })}>0–100 rank</div>
+          </div>
+          <ResponsiveContainer width="100%" height={238}>
+            <RadarChart data={axes} margin={{ top:18, right:38, bottom:14, left:38 }}>
+              <PolarGrid stroke={C.border} />
+              <PolarAngleAxis dataKey="axis" tick={({ payload, x, y, textAnchor }) => {
+                const item = axes.find(entry => entry.axis === payload.value);
+                return (
+                  <g>
+                    <text x={x} y={y} textAnchor={textAnchor} fill={C.text2} fontSize={9} fontWeight={700} fontFamily="'Plus Jakarta Sans',sans-serif">{payload.value}</text>
+                    <text x={x} y={y + 12} textAnchor={textAnchor} fill={percentileColor(item?.pct)} fontSize={9} fontWeight={800} fontFamily="'DM Mono',monospace">{percentileLabel(item?.pct)}</text>
+                  </g>
+                );
+              }} />
+              <PolarRadiusAxis domain={[0, 100]} ticks={[50]} tick={{ fill:C.text4, fontSize:8, fontFamily:"'DM Mono',monospace" }} axisLine={false} />
+              <Radar isAnimationActive={false} dataKey="pct" stroke={teamAccent} fill={teamAccent} fillOpacity={0.2} strokeWidth={2} dot={{ r:3, fill:teamAccent }} />
+            </RadarChart>
+          </ResponsiveContainer>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:'5px 14px', borderTop:`0.5px solid ${C.borderLight}`, paddingTop:8 }}>
+            {axes.map(item => (
+              <div key={item.axis} style={{ display:'flex', justifyContent:'space-between', gap:8 }}>
+                <span style={sans({ fontSize:9.5, color:C.text2 })}>{item.axis}</span>
+                <span style={px({ fontSize:9.5, color:C.text3, whiteSpace:'nowrap' })}>{item.rawLabel} · {percentileLabel(item.pct)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={sans({ fontSize:9, color:C.text4, marginTop:8, lineHeight:1.45 })}>Percentiles are ranked against the qualified Baseball Savant population. Raw statistics are shown only as context; the chart width is always the percentile rank.</div>
+        </div>
+      )}
     </Panel>
   );
 }
@@ -695,7 +792,7 @@ function PlateDisciplinePercentiles({ savant, population, isPitcher, pitchArsena
                 <span style={sans({ fontSize:10.5, fontWeight:600, color:C.text2 })}>{lbl}</span>
                 <span style={px({ fontSize:10.5, fontWeight:700, color })}>
                   {raw != null ? `${raw.toFixed(1)}%` : '—'}
-                  {pct != null && <span style={{ color:C.text4, fontWeight:500, marginLeft:5 }}>{pct}th</span>}
+                  {pct != null && <span style={{ color:C.text4, fontWeight:500, marginLeft:5 }}>{percentileLabel(pct)}</span>}
                 </span>
               </div>
               <div style={{ height:5, background:C.surface3, borderRadius:3, overflow:'hidden' }}>
@@ -840,61 +937,12 @@ function MarketIntelPanel({ kpis, ct, p }) {
   );
 }
 
-/* ─── EV Distribution histogram ──────────────────────────────────── */
-function EVDistribution({ savant, season }) {
-  const avgEV = profileMetricValue(savant?.avg_hit_speed);
-  if (avgEV == null) {
-    return (
-      <Panel title="Exit Velocity Distribution" accent={C.amber} badge="Unavailable">
-        <div style={sans({ fontSize:11, color:C.text3, padding:'18px 14px', textAlign:'center', lineHeight:1.5 })}>
-          No Baseball Savant exit-velocity distribution is available for this player in {season || SEASON}.
-        </div>
-      </Panel>
-    );
-  }
-  // Deterministically seeded from the real Savant average exit velocity; the
-  // histogram is a visual estimate, not a raw per-batted-ball distribution.
-  // recomputing when avgEV itself changes — not on every unrelated
-  // re-render of the player page.
-  const bins = useMemo(() => {
-    const seed = Math.round(avgEV * 10);
-    const rng = (i) => { const x = Math.sin(seed + i * 6.3) * 43758; return x - Math.floor(x); };
-    return [40,50,60,70,75,80,85,88,91,94,97,100,104,108,114,120].map((mph, i) => ({
-      mph,
-      pct: i < 2 ? rng(i)*2
-         : i < 5 ? 2 + rng(i)*5
-         : i < 8 ? 5 + rng(i)*8
-         : i === 8 ? 10 + rng(i)*6   // peak near avg EV
-         : i < 12 ? 6 + rng(i)*7
-         : 1 + rng(i)*3,
-      isAvg: Math.abs(mph - avgEV) < 5,
-    }));
-  }, [avgEV]);
-
+/* ─── EV Distribution ─────────────────────────────────────────────── */
+function EVDistribution({ season }) {
   return (
-    <Panel title="Exit Velocity Distribution" accent={C.amber} badge={`Savant ${season || SEASON} · Avg ${avgEV.toFixed(1)} mph`}>
-      <div style={{ padding:'8px 4px 4px' }}>
-        <ResponsiveContainer width="100%" height={100}>
-          <BarChart data={bins} margin={{ top:4, right:8, bottom:0, left:0 }} barCategoryGap="10%">
-            <XAxis dataKey="mph" tick={{ fontSize:8, fill:C.text4 }} axisLine={false} tickLine={false}
-              tickFormatter={v => v % 20 === 0 ? v : ''}/>
-            <YAxis hide/>
-            <Tooltip {...TT} formatter={v=>[v.toFixed(1)+'%','Freq']}
-              labelFormatter={v=>`${v} mph`}/>
-            <Bar isAnimationActive={false} dataKey="pct" radius={[2,2,0,0]}
-              fill={C.amber} opacity={0.7}
-              label={false}>
-              {bins.map((b, i) => (
-                <rect key={i} fill={b.isAvg ? C.rust : C.amber}/>
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px 0' }}>
-          {[['40','Weak'],['80','Average'],['95','Hard'],['110+','Barrel']].map(([v,l])=>(
-            <span key={l} style={sans({ fontSize:8.5, color:C.text4 })}>{v} {l}</span>
-          ))}
-        </div>
+    <Panel title="Exit Velocity Distribution" accent={C.amber} badge="Unavailable">
+      <div style={sans({ fontSize:11, color:C.text3, padding:'24px 14px', textAlign:'center', lineHeight:1.5 })}>
+        No per-batted-ball Baseball Savant exit-velocity distribution is available for this player in {season || SEASON}. The average EV remains available in the percentile profile, but no synthetic histogram is shown.
       </div>
     </Panel>
   );
@@ -1380,6 +1428,9 @@ function PlayerProfile({ player, derived }) {
         </div>
       </div>
 
+      {/* ── Savant-style percentile profile ── */}
+      <SavantPercentileProfile player={player} isPitcher={player.isPitcher} teamAccent={teamAccent} />
+
       {/* ── SKIP quote ── */}
       <SkipQuoteBanner quote={quote} accent={verdictAccent} />
 
@@ -1450,7 +1501,16 @@ function PlayerProfile({ player, derived }) {
             <GeometryRadar kpis={kpis} isPitcher={player.isPitcher} />
           </Panel>
 
-          <AnalyticsLayers kpis={kpis} s={s} isPitcher={player.isPitcher} savant={player.savant} batTracking={player.batTracking} />
+          <AnalyticsLayers
+            kpis={kpis}
+            s={s}
+            isPitcher={player.isPitcher}
+            savant={player.savant}
+            batTracking={player.batTracking}
+            expectedStatisticsPopulation={player.expectedStatisticsPopulation}
+            batTrackingPopulation={player.batTrackingPopulation}
+            statcastPopulation={player.statcastPopulation}
+          />
 
           {!player.isPitcher && (
             <PlateDisciplinePercentiles savant={player.savant} population={player.statcastPopulation} />
@@ -1468,7 +1528,7 @@ function PlayerProfile({ player, derived }) {
             />
           )}
 
-          <EVDistribution savant={player.savant} season={player.statSeason} />
+          <EVDistribution season={player.statSeason} />
 
           {/* ── Plate Discipline Heat Zone ──
                Batters get the real thing (ZoneWhiffGrid, sourced from
@@ -1493,12 +1553,9 @@ function PlayerProfile({ player, derived }) {
           )}
 
           {!player.isPitcher && (
-            <Panel title="Spray Chart" accent={C.teal} badge="Illustrative">
+            <Panel title="Spray Chart" accent={C.teal} badge={Array.isArray(player.contactPoints) && player.contactPoints.length ? 'Live Savant' : 'Unavailable'}>
               <div style={{ padding:'8px 10px 4px' }}>
-                <SprayChart s={s} />
-                <div style={sans({ fontSize:9, color:C.text4, padding:'2px 2px 4px', lineHeight:1.4 })}>
-                  Style representation seeded from season AVG/HR/SB — not real tracked batted-ball locations.
-                </div>
+                <SprayChart contactPoints={player.contactPoints} />
               </div>
             </Panel>
           )}

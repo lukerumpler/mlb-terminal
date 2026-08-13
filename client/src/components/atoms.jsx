@@ -137,7 +137,7 @@ export function Panel({ title, accent = C.amber, badge, children, style = {} }) 
 
 export function StatStrip({ items }) {
   return (
-    <div style={{
+    <div className="skip-stat-strip" style={{
       display:'grid',
       gridTemplateColumns:`repeat(${Math.min(items.length, 8)}, minmax(64px, 1fr))`,
       background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:10,

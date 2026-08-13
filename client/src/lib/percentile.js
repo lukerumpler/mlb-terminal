@@ -27,6 +27,14 @@ export function percentile(value, allValues, higherIsBetter = true) {
 // SKIP's existing rust -> amber -> teal scale (the same three stops
 // PlateDisciplineZone already uses for "cold/neutral/hot"), rather than
 // importing Savant's own literal red/blue convention wholesale.
+export function percentileLabel(value) {
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
+  const n = Math.round(Number(value));
+  const mod100 = n % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : ({ 1:'st', 2:'nd', 3:'rd' }[n % 10] || 'th');
+  return `${n}${suffix}`;
+}
+
 export function percentileColor(pct) {
   if (pct == null) return C.text3;
   if (pct >= 80) return C.teal;

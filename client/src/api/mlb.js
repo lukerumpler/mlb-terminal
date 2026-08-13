@@ -265,6 +265,8 @@ export async function loadFullPlayer(person, season = SEASON) {
   let savant = null;
   let batTracking = null;
   let statcastPopulation = null;
+  let expectedStatisticsPopulation = null;
+  let batTrackingPopulation = null;
 
   // isPitcher needs to be known *before* the optional-Savant block below so
   // pitch_arsenal (Roadmap #1) — a pitcher-only, per-pitch-type leaderboard —
@@ -400,13 +402,21 @@ export async function loadFullPlayer(person, season = SEASON) {
       // player against the real qualified-batter population, and this
       // array is already sitting in memory from the fetch above (cached,
       // so grabbing it here costs nothing extra).
-      return { sData, btData, scArr: Array.isArray(scArr) ? scArr : null };
+      return {
+        sData,
+        btData,
+        scArr: Array.isArray(scArr) ? scArr : null,
+        expectedArr: Array.isArray(sArr) ? sArr : null,
+        btArr: Array.isArray(btArr) ? btArr : null,
+      };
     };
 
     const cur = await tryYear(season);
     savant      = cur.sData;
     batTracking = cur.btData;
     statcastPopulation = cur.scArr;
+    expectedStatisticsPopulation = cur.expectedArr;
+    batTrackingPopulation = cur.btArr;
 
     // Fall back independently: only re-fetch what's still missing
     if (!savant || !batTracking) {
@@ -414,6 +424,8 @@ export async function loadFullPlayer(person, season = SEASON) {
       if (!savant)      savant      = prev.sData;
       if (!batTracking) batTracking = prev.btData;
       if (!statcastPopulation) statcastPopulation = prev.scArr;
+      if (!expectedStatisticsPopulation) expectedStatisticsPopulation = prev.expectedArr;
+      if (!batTrackingPopulation) batTrackingPopulation = prev.btArr;
     }
 
     // Additional high-fidelity metrics (Speed & Defense) — already in flight
@@ -443,7 +455,8 @@ export async function loadFullPlayer(person, season = SEASON) {
   const statResult = isPitcher ? pitchingResult : hittingResult;
 
   return {
-    id, profile, savant, batTracking, statcastPopulation, isPitcher,
+    id, profile, savant, batTracking, statcastPopulation,
+    expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
     statSeason:   statResult?.season      || season,
@@ -716,6 +729,25 @@ export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
   const data   = await mlb(`/teams/${teamId}/stats`, { stats: 'season', group, season, sportIds: 1 });
   const grp    = findStatGroup(data.stats, group);
   return grp?.splits?.[0]?.stat || {};
+}
+
+// Current-season player rows for one MLB team. This is intentionally separate
+// from getTeamStats: the team endpoint returns one aggregate row, while the
+// /stats resource exposes the individual player splits needed for true team
+// leaders and does not require a static roster snapshot.
+export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEASON) {
+  const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'homeRuns';
+  const data = await mlb('/stats', {
+    stats: 'season', group, season, sportIds: 1, teamId,
+    limit: 100, hydrate: 'person', order: 'desc', sortStat,
+  });
+  const grp = findStatGroup(data.stats, group);
+  return (grp?.splits || []).map(split => ({
+    id: split.player?.id ?? split.person?.id ?? null,
+    name: split.player?.fullName ?? split.person?.fullName ?? '',
+    stat: split.stat || {},
+    position: split.position?.abbreviation ?? split.player?.primaryPosition?.abbreviation ?? '',
+  })).filter(row => row.id && row.name);
 }
 
 // Aggregate current-season team statistics. The MLB Stats API returns one

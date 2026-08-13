@@ -175,3 +175,75 @@
     }
   }
 }
+
+
+/* Responsive SKIP terminal shell. Desktop keeps the original 200px
+   navigation rail; narrow screens collapse labels into an icon rail so the
+   data cards remain readable instead of being squeezed into a 175px column. */
+@media (max-width: 720px) {
+  .skip-sidebar {
+    width: 72px !important;
+  }
+
+  .skip-sidebar > div:first-child {
+    padding: 10px 8px 9px !important;
+  }
+
+  .skip-sidebar-logo {
+    width: 56px !important;
+    margin: 0 auto 8px !important;
+  }
+
+  .skip-sidebar > div:first-child > div {
+    margin: 0 auto;
+    padding: 3px 5px !important;
+  }
+
+  .skip-sidebar > div:first-child > div span {
+    font-size: 8px !important;
+    letter-spacing: 0 !important;
+  }
+
+  .skip-sidebar > div:nth-child(2) {
+    padding: 8px 6px !important;
+  }
+
+  .skip-sidebar > div:nth-child(2) > button {
+    justify-content: center;
+    gap: 0 !important;
+    padding: 8px 4px !important;
+  }
+
+  .skip-sidebar .skip-nav-label,
+  .skip-sidebar .skip-nav-shortcut,
+  .skip-sidebar .skip-utility-label {
+    display: none;
+  }
+
+  .skip-sidebar > div:nth-child(2) > button > span:first-child {
+    width: 24px !important;
+  }
+
+  .skip-sidebar > div:nth-child(2) > button > span:last-child:not(.skip-nav-label):not(.skip-nav-shortcut) {
+    margin-left: 0 !important;
+    padding: 1px 4px !important;
+    font-size: 9px !important;
+  }
+
+  .skip-sidebar-insight {
+    display: none;
+  }
+
+  .skip-topbar {
+    padding: 0 12px !important;
+  }
+
+  .skip-topbar > div:nth-child(3),
+  .skip-topbar > div:nth-child(4) {
+    display: none;
+  }
+
+  .skip-content {
+    padding: 12px 12px 20px !important;
+  }
+}
