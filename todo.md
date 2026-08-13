@@ -10915,8 +10915,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add deterministic tests for the corrected records, source normalization, and no-fabrication/unknown-value handling.
 - [x] Run the full test suite, TypeScript check, lint, production build, API smoke tests, and preview verification across data-bearing tabs.
 - [x] Review the final diff and confirm no roadmap markdown changes.
-- [ ] Save a new checkpoint after all audit items are verified.
-- [ ] Deliver a source-based summary of what was verified, corrected, and left explicitly unavailable.
+- [x] Save a new checkpoint after all audit items are verified.
+- [x] Deliver a source-based summary of what was verified, corrected, and left explicitly unavailable.
 
 ## Whole-audit validation blocker
 
@@ -10985,3 +10985,14 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add smooth modal transition states and accessible loading spinners while comparison players and the summary are fetching.
 - [x] Add authoritative three-season historical trend sparklines for each Draft board player's key metrics, with explicit unavailable states when history is missing.
 - [x] Add regression tests, run lint/check/build/full Vitest, visually verify the new interactions, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## New user requests (video links, recommendation, trajectory sorting, exact sparkline tooltips)
+- [x] Add a lightweight source-safe player video section to player pages using player name/team search queries and verified MLB video links without fabricating media files.
+- [x] Enhance the AI comparison summary to include a brief recommendation on which player better fits specific team needs or play styles.
+- [x] Implement a sorting feature on the Draft board that allows users to order players based on the upward or downward trajectory of their historical trend sparklines.
+- [x] Add a hover tooltip to the historical trend sparklines on the draft board to display the exact metric values for each season.
+- [x] Add regression tests, verify desktop/mobile UI, run lint/check/build/full Vitest, save checkpoint, and deliver.
+
+## Overview hierarchy refinement
+- [x] Move Team Leaders and Front Office Evaluation higher on the team overview page, before lower-detail panels, while preserving responsive behavior.
+- [x] Run focused tests and responsive visual verification, confirm the roadmap remains unchanged, and save a checkpoint.

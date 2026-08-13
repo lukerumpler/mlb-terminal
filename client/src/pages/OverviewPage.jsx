@@ -464,6 +464,71 @@ function OverviewPage() {
         {val:'—',lbl:'Team WAR',   sub:'Unavailable'},
       ]}/>
 
+      <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(280px,1fr) minmax(320px,1.25fr)',gap:14,alignItems:'start'}}>
+        <Panel title="Team Leaders" accent={C.rust}>
+          <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
+            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
+            {leaders.batting.map((row,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
+                <div style={{display:'flex',gap:7,alignItems:'center'}}>
+                  <span style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
+                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
+                </div>
+                <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{padding:'10px 14px 6px'}}>
+            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:8})}>Pitching</div>
+            {leaders.pitching.map((row,i)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
+                <div style={{display:'flex',gap:7,alignItems:'center'}}>
+                  <span style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
+                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
+                </div>
+                <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Front Office Evaluation" accent={teamAccent} badge="Decision Lens">
+          <div style={{padding:'10px 14px 0'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div>
+                <div style={sans({fontSize:9.5,fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Strengths</div>
+                {fo.strengths.map(s=>(
+                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:5}}>
+                    <span style={{color:C.teal,fontSize:11,flexShrink:0,marginTop:1}}>✓</span>
+                    <span style={sans({fontSize:10.5,color:C.text2,lineHeight:1.4})}>{s}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={sans({fontSize:9.5,fontWeight:700,color:C.rust,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Weaknesses</div>
+                {fo.weaknesses.map(s=>(
+                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:5}}>
+                    <span style={{color:C.rust,fontSize:11,flexShrink:0,marginTop:1}}>✕</span>
+                    <span style={sans({fontSize:10.5,color:C.text2,lineHeight:1.4})}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
+              <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
+                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense','—',C.teal],['Baserunning','—',C.teal],['Depth','—',C.slate],['Future Value','—',C.purple]].map(([lbl,val,color])=>(
+                  <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>
+                    <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
+                    <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
       <Panel title="Front Office Read" accent={teamAccent} badge="Decision Lens">
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
           {[
@@ -814,8 +879,8 @@ function OverviewPage() {
         </Panel>
       </div>
 
-      {/* ── ROW 3: League Rankings + Pct Bars | Splits Dashboard | Team Leaders ── */}
-      <div className="overview-responsive-grid" style={{display:'grid',gridTemplateColumns:'minmax(190px,220px) 1fr minmax(210px,260px)',gap:14,alignItems:'start'}}>
+      {/* ── ROW 3: League Rankings + Pct Bars | Splits Dashboard ── */}
+      <div className="overview-responsive-grid" style={{display:'grid',gridTemplateColumns:'minmax(190px,220px) 1fr',gap:14,alignItems:'start'}}>
 
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           <Panel title="League Rankings" accent={teamAccent} badge="MLB">
@@ -888,69 +953,6 @@ function OverviewPage() {
           </div>
         </Panel>
 
-        <Panel title="Team Leaders" accent={C.rust}>
-          <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
-            {leaders.batting.map((row,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
-                <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                  <span style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
-                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
-                </div>
-                <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{padding:'10px 14px 6px'}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:8})}>Pitching</div>
-            {leaders.pitching.map((row,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
-                <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                  <span style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
-                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
-                </div>
-                <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Front Office Evaluation */}
-          <div style={{margin:'0 14px',padding:'12px 0',borderTop:`0.5px solid ${C.border}`}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:10})}>Front Office Evaluation</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <div>
-                <div style={sans({fontSize:9.5,fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Strengths</div>
-                {fo.strengths.map(s=>(
-                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:4}}>
-                    <span style={{color:C.teal,fontSize:11,flexShrink:0,marginTop:1}}>✓</span>
-                    <span style={sans({fontSize:10,color:C.text2,lineHeight:1.4})}>{s}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div style={sans({fontSize:9.5,fontWeight:700,color:C.rust,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Weaknesses</div>
-                {fo.weaknesses.map(s=>(
-                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:4}}>
-                    <span style={{color:C.rust,fontSize:11,flexShrink:0,marginTop:1}}>✕</span>
-                    <span style={sans({fontSize:10,color:C.text2,lineHeight:1.4})}>{s}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{margin:'0 14px 14px',paddingTop:12,borderTop:`0.5px solid ${C.border}`}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:10})}>Overall Team Rating</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-              {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense','—',C.teal],['Baserunning','—',C.teal],['Depth','—',C.slate],['Future Val','—',C.purple]].map(([lbl,val,color])=>(
-                <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:8,padding:'8px 4px'}}>
-                  <div style={px({fontSize:18,fontWeight:800,color,lineHeight:1})}>{val}</div>
-                  <div style={sans({fontSize:9.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
       </div>
 
       {/* ── Live Schedule ── */}

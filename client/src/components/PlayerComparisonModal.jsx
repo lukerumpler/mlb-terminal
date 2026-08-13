@@ -241,6 +241,12 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
               <>
                 <div style={sans({ fontSize:12, fontWeight:800, color:C.text, lineHeight:1.35 })}>{summary.headline}</div>
                 <div style={sans({ fontSize:10.5, color:C.text2, lineHeight:1.5, marginTop:4 })}>{summary.summary}</div>
+                {summary.recommendation && (
+                  <div style={{ marginTop:8, padding:'7px 10px', borderRadius:6, background:C.surface, border:`0.5px solid ${C.border}`, ...sans({ fontSize:10, color:C.amberDark, lineHeight:1.45 }) }}>
+                    <strong style={{ fontWeight:700, textTransform:'uppercase', fontSize:9, letterSpacing:'.06em', marginRight:6 }}>Fit & Team Need:</strong>
+                    {summary.recommendation}
+                  </div>
+                )}
                 {Array.isArray(summary.edges) && summary.edges.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:9 }}>{summary.edges.map((edge, index) => <span key={`${edge.axis}-${index}`} style={px({ fontSize:9, color:edge.leader === 'Even' ? C.text3 : C.teal, background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:999, padding:'4px 7px' })}>{edge.axis}: {edge.leader}{edge.margin == null ? '' : ` +${edge.margin}`}</span>)}</div>}
                 <div style={sans({ fontSize:9.5, color:C.text4, lineHeight:1.45, marginTop:8 })}>{summary.caveat}</div>
               </>

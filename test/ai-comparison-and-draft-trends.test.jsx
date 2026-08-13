@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasValidComparisonPayload } from '../server/api/comparison-summary.js';
+import comparisonSummary, { hasValidComparisonPayload, fallbackSummary } from '../server/api/comparison-summary.js';
 import { normalizeDraftTrend } from '../client/src/pages/OtherPages.jsx';
 
 describe('AI comparison summary contract', () => {
@@ -14,6 +14,13 @@ describe('AI comparison summary contract', () => {
 
   it('accepts two same-type players with percentile axes', () => {
     expect(hasValidComparisonPayload({ players: [player('A'), player('B')] })).toBe(true);
+  });
+
+  it('validates the fallback summary helper directly', () => {
+    const summary = fallbackSummary([player('Slugger'), player('Contact')]);
+    expect(summary).toBeTruthy();
+    expect(summary.recommendation).toBeTruthy();
+    expect(typeof summary.recommendation).toBe('string');
   });
 
   it('rejects incomplete, mismatched, or empty comparison payloads', () => {

@@ -389,12 +389,13 @@ function DraftTrendSparkline({ history = [], loading = false, isPitcher = false 
   const values = history.map(point => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
+  const tooltipText = history.map(p => `${p.season}: ${p.value.toFixed(3)}`).join(' | ');
   return (
-    <div title={`${metric} history: ${history.map(point => `${point.season} ${point.value.toFixed(3)}`).join(' · ')}`} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+    <div title={`Exact season values — ${tooltipText}`} style={{ display:'inline-flex', alignItems:'center', gap:4, cursor:'help' }} tabIndex={0} aria-label={`Trend sparkline. ${tooltipText}`}>
       <LineChart width={76} height={28} data={history} margin={{ top:3, right:2, bottom:3, left:2 }}>
         <Line type="monotone" dataKey="value" stroke={isPitcher ? C.teal : C.amber} strokeWidth={2} dot={{ r:2, fill:isPitcher ? C.teal : C.amber }} isAnimationActive={false} />
       </LineChart>
-      <span style={px({ fontSize:8.5, color:C.text3, fontWeight:700 })}>{metric} {min === max ? min.toFixed(3) : `${min.toFixed(3)}–${max.toFixed(3)}`}</span>
+      <span style={px({ fontSize:8.5, color:C.text3, fontWeight:700 })} title={tooltipText}>{metric} {min === max ? min.toFixed(3) : `${min.toFixed(3)}–${max.toFixed(3)}`}</span>
     </div>
   );
 }
@@ -471,9 +472,20 @@ function DraftPage() {
     const rows = DRAFT_BOARD.filter(row => boardPosition === 'all' || row.pos === boardPosition);
     return [...rows].sort((a, b) => {
       if (boardSort === 'position') return a.pos.localeCompare(b.pos) || a.rank - b.rank;
-      return boardSort === 'rank-desc' ? b.rank - a.rank : a.rank - b.rank;
+      if (boardSort === 'rank-desc') return b.rank - a.rank;
+      if (boardSort === 'trend-up' || boardSort === 'trend-down') {
+        const histA = draftTrends[a.name] || [];
+        const histB = draftTrends[b.name] || [];
+        const slopeA = histA.length >= 2 ? histA[histA.length - 1].value - histA[0].value : 0;
+        const slopeB = histB.length >= 2 ? histB[histB.length - 1].value - histB[0].value : 0;
+        // For hitters, higher OPS slope is up (+); for pitchers, lower ERA slope is up (+).
+        const adjA = a.pos.includes('P') ? -slopeA : slopeA;
+        const adjB = b.pos.includes('P') ? -slopeB : slopeB;
+        return boardSort === 'trend-up' ? adjB - adjA : adjA - adjB;
+      }
+      return a.rank - b.rank;
     });
-  }, [boardPosition, boardSort]);
+  }, [boardPosition, boardSort, draftTrends]);
   const trackedDraftCount = DRAFT_CLASS_2026.length;
   const scoutedDraftCount = DRAFT_CLASS_2026.filter(p => p.myRank != null).length;
   const collegeDraftPct = trackedDraftCount ? Math.round(DRAFT_CLASS_2026.filter(p => p.school !== 'Prep').length / trackedDraftCount * 100) : null;
@@ -503,6 +515,8 @@ function DraftPage() {
               <option value="rank-asc">SKIP rank · 1 → 100</option>
               <option value="rank-desc">SKIP rank · 100 → 1</option>
               <option value="position">Position · A → Z</option>
+              <option value="trend-up">Trajectory · Improving / Upward</option>
+              <option value="trend-down">Trajectory · Declining / Downward</option>
             </select>
             <span style={px({ fontSize:9.5, color:C.text4, marginLeft:'auto' })}>{visibleDraftBoard.length} player{visibleDraftBoard.length === 1 ? '' : 's'} shown</span>
           </div>

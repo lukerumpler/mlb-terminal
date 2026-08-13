@@ -51,7 +51,7 @@ function buildEdges(players) {
     .sort((a, b) => (b.margin ?? -1) - (a.margin ?? -1));
 }
 
-function fallbackSummary(players) {
+export function fallbackSummary(players) {
   const edges = buildEdges(players);
   const [first, second] = players;
   const usable = edges.filter(edge => edge.margin != null);
@@ -62,13 +62,15 @@ function fallbackSummary(players) {
   const summary = usable.length
     ? usable.slice(0, 3).map(edge => `${edge.axis}: ${edge.leader} by ${edge.margin} percentile points`).join(' · ')
     : 'The connected Savant profile does not contain enough shared percentile values for a directional comparison.';
-  return {
-    headline,
-    summary: `${first.name} vs ${second.name}: ${summary}.`,
-    edges: usable.slice(0, 4),
-    caveat: 'This comparison uses only the connected 0–100 Savant percentile axes; missing fields are not inferred.',
-    generated: false,
-  };
+      return {
+      headline,
+      summary: `${first.name} vs ${second.name}: ${summary}.`,
+      recommendation: `${leader && leader !== 'Even' && leader !== 'Unavailable' ? leader : first.name} better suits teams prioritizing high-percentile contact quality and above-average bat speed, while the alternative fits low-whiff disciplined approaches.`,
+      edges: usable.slice(0, 4),
+      caveat: 'This comparison uses only the connected 0–100 Savant percentile axes; missing fields are not inferred.',
+      generated: false,
+    };
+
 }
 
 function validRequest(body) {
@@ -118,9 +120,10 @@ export default async function comparisonSummary(req, res) {
           strict: true,
           schema: {
             type: 'object',
-            properties: {
+            properties:             {
               headline: { type: 'string' },
               summary: { type: 'string' },
+              recommendation: { type: 'string' },
               edges: {
                 type: 'array',
                 items: {
@@ -137,8 +140,9 @@ export default async function comparisonSummary(req, res) {
               },
               caveat: { type: 'string' },
             },
-            required: ['headline', 'summary', 'edges', 'caveat'],
+            required: ['headline', 'summary', 'recommendation', 'edges', 'caveat'],
             additionalProperties: false,
+
           },
         },
       },
@@ -149,6 +153,7 @@ export default async function comparisonSummary(req, res) {
     res.json({
       headline: parsed.headline.slice(0, 180),
       summary: parsed.summary.slice(0, 500),
+      recommendation: typeof parsed.recommendation === 'string' ? parsed.recommendation.slice(0, 300) : fallback.recommendation,
       edges: Array.isArray(parsed.edges) ? parsed.edges.slice(0, 4) : fallback.edges,
       caveat: typeof parsed.caveat === 'string' ? parsed.caveat.slice(0, 240) : fallback.caveat,
       generated: true,

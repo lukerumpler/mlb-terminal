@@ -161,3 +161,6 @@ NCAA.com exposes current Division I individual and team leaderboard pages and li
 D1Baseball team-season pages for Georgia Tech 2024–2026 expose season links, team record, RPI, and links to separate Stats pages, but the extracted Overview HTML does not expose a player-by-season table. This reinforces the rule that a Draft sparkline must be rendered only from an explicit source-backed history payload; team records or editorial draft notes cannot be repurposed as player trends.
 
 UI verification addendum (2026-08-13): desktop and 375px screenshots show the Bloomberg-style shell, responsive icon rail, stacked overview cards, and explicit `LOADING MLB DATA`/dash states when upstream requests are still pending. The comparison modal’s new motion and spinner states are covered by interaction tests; Draft trend cells are source-gated and show `—` when no complete three-season history is available.
+
+## Overview hierarchy refinement — 2026-08-13
+Team Leaders and Front Office Evaluation now appear immediately below the Overview metric strip, before Front Office Read and lower-detail charts. Desktop verification shows the two decision panels side by side; the 375px view stacks them cleanly, with Team Leaders visible directly below the key team metrics. Existing loading/live states remain source-transparent.
