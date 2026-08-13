@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../client/src/App.jsx';
 
@@ -38,6 +38,25 @@ describe('Draft page', () => {
     await user.type(search, 'zzzzznomatch');
     await user.clear(search);
 
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+  });
+
+  it('filters the SKIP Big Board by position and sorts by rank or position', async () => {
+    const user = userEvent.setup();
+    await goToTab(user, 'Draft', /2026 Draft Class/);
+
+    const positionFilter = screen.getByRole('combobox', { name: /Filter Draft board by position/i });
+    const sortControl = screen.getByRole('combobox', { name: /Sort Draft board/i });
+
+    await user.selectOptions(positionFilter, 'RHP');
+    const boardTable = screen.getAllByRole('table')[0];
+    expect(within(boardTable).getByText('Jackson Flora')).toBeInTheDocument();
+    expect(within(boardTable).queryByText('Roch Cholowsky')).toBeNull();
+
+    await user.selectOptions(sortControl, 'rank-desc');
+    expect(screen.getByText(/SKIP rank · 100 → 1/)).toBeInTheDocument();
+    await user.selectOptions(sortControl, 'position');
+    expect(screen.getByText(/Position · A → Z/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });

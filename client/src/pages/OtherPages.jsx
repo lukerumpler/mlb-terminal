@@ -370,6 +370,8 @@ function DraftPage() {
   const [officialPicks, setOfficialPicks] = useState([]);
   const [officialLoading, setOfficialLoading] = useState(true);
   const [officialError, setOfficialError] = useState(false);
+  const [boardPosition, setBoardPosition] = useState('all');
+  const [boardSort, setBoardSort] = useState('rank-asc');
 
   useEffect(() => {
     let alive = true;
@@ -403,6 +405,14 @@ function DraftPage() {
   const hasLiveBonuses = bonusByPick.size > 0;
 
   const draftComplete = !officialLoading && !officialError && officialPicks.length > 0;
+  const boardPositions = useMemo(() => ['all', ...Array.from(new Set(DRAFT_BOARD.map(row => row.pos))).sort()], []);
+  const visibleDraftBoard = useMemo(() => {
+    const rows = DRAFT_BOARD.filter(row => boardPosition === 'all' || row.pos === boardPosition);
+    return [...rows].sort((a, b) => {
+      if (boardSort === 'position') return a.pos.localeCompare(b.pos) || a.rank - b.rank;
+      return boardSort === 'rank-desc' ? b.rank - a.rank : a.rank - b.rank;
+    });
+  }, [boardPosition, boardSort]);
   const trackedDraftCount = DRAFT_CLASS_2026.length;
   const scoutedDraftCount = DRAFT_CLASS_2026.filter(p => p.myRank != null).length;
   const collegeDraftPct = trackedDraftCount ? Math.round(DRAFT_CLASS_2026.filter(p => p.school !== 'Prep').length / trackedDraftCount * 100) : null;
@@ -421,7 +431,20 @@ function DraftPage() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr minmax(230px,260px)', gap:12, alignItems:'start' }}>
 
         {/* Big board */}
-          <Panel title="SKIP Big Board — Top 10" accent={C.amber} badge="SKIP Editorial">
+          <Panel title={`SKIP Big Board — ${visibleDraftBoard.length} of ${DRAFT_BOARD.length}`} accent={C.amber} badge="SKIP Editorial">
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', padding:'10px 14px', borderBottom:`0.5px solid ${C.borderLight}` }} role="group" aria-label="Draft board controls">
+            <label htmlFor="draft-position-filter" style={sans({ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.05em' })}>Position</label>
+            <select id="draft-position-filter" aria-label="Filter Draft board by position" value={boardPosition} onChange={e => setBoardPosition(e.target.value)} style={{ height:27, padding:'0 8px', border:`1px solid ${C.border}`, borderRadius:5, fontSize:10.5, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface2, color:C.text, cursor:'pointer' }}>
+              {boardPositions.map(position => <option key={position} value={position}>{position === 'all' ? 'All positions' : position}</option>)}
+            </select>
+            <label htmlFor="draft-sort" style={sans({ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.05em', marginLeft:4 })}>Sort</label>
+            <select id="draft-sort" aria-label="Sort Draft board" value={boardSort} onChange={e => setBoardSort(e.target.value)} style={{ height:27, padding:'0 8px', border:`1px solid ${C.border}`, borderRadius:5, fontSize:10.5, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface2, color:C.text, cursor:'pointer' }}>
+              <option value="rank-asc">SKIP rank · 1 → 100</option>
+              <option value="rank-desc">SKIP rank · 100 → 1</option>
+              <option value="position">Position · A → Z</option>
+            </select>
+            <span style={px({ fontSize:9.5, color:C.text4, marginLeft:'auto' })}>{visibleDraftBoard.length} player{visibleDraftBoard.length === 1 ? '' : 's'} shown</span>
+          </div>
           {/* FIX: overflowX on the table wrapper, not Panel itself */}
           <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:600 }}>
@@ -438,11 +461,11 @@ function DraftPage() {
                 </tr>
               </thead>
               <tbody>
-                {DRAFT_BOARD.map((d, i) => {
+                {visibleDraftBoard.map((d, i) => {
                   const actual = officialByName.get(normName(d.name));
                   return (
-                  <tr key={i}
-                    style={{ borderBottom: i < DRAFT_BOARD.length-1 ? `0.5px solid ${C.borderLight}` : 'none' }}
+                  <tr key={d.name}
+                    style={{ borderBottom: i < visibleDraftBoard.length-1 ? `0.5px solid ${C.borderLight}` : 'none' }}
                     onMouseEnter={e => e.currentTarget.style.background = C.amberSoft}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding:'7px 10px', textAlign:'center', ...px({ fontSize:13, fontWeight:800, color:i < 3 ? C.amber : C.text3 }) }}>{d.rank}</td>
@@ -484,7 +507,7 @@ function DraftPage() {
           {draftComplete && (
             <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
               <span style={sans({ fontSize:9.5, color:C.text4 })}>
-                SKIP ranks are editorial scouting opinions. The Actual column is live from MLB's official draft results; green = earlier than the SKIP rank, amber = close, red = later.
+                SKIP ranks are editorial scouting opinions. Use the controls above to filter by position or sort by rank. The Actual column is live from MLB's official draft results; green = earlier than the SKIP rank, amber = close, red = later.
               </span>
             </div>
           )}

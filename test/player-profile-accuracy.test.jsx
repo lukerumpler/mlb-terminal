@@ -9,6 +9,7 @@ import {
 import { computeAMD } from '../client/src/engine/skip.js';
 import { selectSeasonSplit } from '../client/src/api/mlb.js';
 import { percentileLabel } from '../client/src/lib/percentile.js';
+import { comparisonAxes, comparisonIdentity } from '../client/src/components/PlayerComparisonModal.jsx';
 
 describe('player profile data accuracy guards', () => {
   it('formats percentile labels with the correct ordinal suffix', () => {
@@ -35,8 +36,8 @@ describe('player profile data accuracy guards', () => {
     ]);
   });
 
-  it('normalizes Baseball Savant spray coordinates to a realistic field plot', () => {
-    expect(normalizeSprayPoint({ hc_x: 125, hc_y: 198, events: 'field_out' })).toMatchObject({ cx: 70, cy: 80, color: expect.any(String) });
+  it('normalizes Baseball Savant spray coordinates and preserves hover metrics', () => {
+    expect(normalizeSprayPoint({ hc_x: 125, hc_y: 198, events: 'field_out', launch_speed: 101.2, launch_angle: 28.4, hit_distance_sc: 390 })).toMatchObject({ cx: 70, cy: 80, launchSpeed: 101.2, launchAngle: 28.4, distance: 390, color: expect.any(String) });
     const pulled = normalizeSprayPoint({ hc_x: 40, hc_y: 30, events: 'home_run' });
     expect(pulled.cx).toBeLessThan(20);
     expect(pulled.cy).toBeGreaterThan(15);
@@ -75,6 +76,13 @@ describe('player profile data accuracy guards', () => {
   it('does not create a percentile radar from missing Savant populations', () => {
     expect(buildSavantPercentileAxes({ savant: { est_slg: 0.600 } }, false)).toEqual([]);
     expect(formatProfileMetric(0.598, 3)).toBe('0.598');
+  });
+
+  it('keeps comparison profiles on the same percentile axes as the player page', () => {
+    const player = { profile: { fullName: 'Juan Soto', currentTeam: { name: 'New York Mets' }, primaryPosition: { abbreviation: 'RF' } } };
+    const axes = comparisonAxes(player, () => [{ axis:'Power', pct:99, rawLabel:'99' }], false);
+    expect(comparisonIdentity(player)).toEqual({ name:'Juan Soto', identity:'New York Mets · RF' });
+    expect(axes[0]).toMatchObject({ axis:'Power', pct:99, label:'99th', color:expect.any(String) });
   });
 
   it('prefers a current-sport aggregate split over an arbitrary team split', () => {

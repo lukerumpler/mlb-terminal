@@ -10959,3 +10959,11 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, review the diff, save a checkpoint, and deliver the updated Manus-editable project.
 
 - [x] Use Baseball Savant as the primary baseline for Statcast definitions, percentile direction, pitch/batted-ball chart conventions, and percentile-card presentation across the affected tabs.
+
+## New features and skill creation
+- [x] Initialize the reusable `skip-baseball-audit` skill using `init_skill.py`.
+- [x] Author `SKILL.md` and reference materials capturing the live data audit, percentile population rules, Savant baselines, and Bloomberg-terminal UI patterns.
+- [x] Add side-by-side player percentile radar comparison feature.
+- [x] Enhance player and team spray charts with hover tooltips for exit velocity, launch angle, distance, and batted-ball event type.
+- [x] Implement filtering and sorting controls on the Draft board for SKIP rank and position.
+- [ ] Run release checks (lint, TypeScript, build, all 130+ tests), verify ROADMAP_REFERENCE_FEATURES.md is unchanged, save checkpoint, and deliver the skill and project.

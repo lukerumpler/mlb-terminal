@@ -17,6 +17,7 @@ import { Badge, Panel, KVRow, GradeBar, PosBadge, SkeletonPlayerHero, SkeletonPa
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
+import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
@@ -221,10 +222,24 @@ export function normalizeSprayPoint(row) {
   const color = event === 'home_run' ? C.rust
     : ['double','triple'].includes(event) ? C.amber
     : C.teal;
-  return { cx, cy, color, event, launchSpeed: Number(row?.launch_speed) || null };
+  const launchSpeed = Number(row?.launch_speed);
+  const launchAngle = Number(row?.launch_angle);
+  const distance = Number(row?.hit_distance_sc ?? row?.hit_distance);
+  return {
+    cx, cy, color, event,
+    launchSpeed: Number.isFinite(launchSpeed) ? launchSpeed : null,
+    launchAngle: Number.isFinite(launchAngle) ? launchAngle : null,
+    distance: Number.isFinite(distance) ? distance : null,
+    type: row?.bb_type || null,
+  };
+}
+
+function sprayMetric(value, suffix = '') {
+  return value == null ? 'Unavailable' : `${value.toFixed(1)}${suffix}`;
 }
 
 function SprayChart({ contactPoints }) {
+  const [hovered, setHovered] = useState(null);
   const dots = useMemo(() => (Array.isArray(contactPoints) ? contactPoints : [])
     .map(normalizeSprayPoint)
     .filter(Boolean), [contactPoints]);
@@ -232,22 +247,47 @@ function SprayChart({ contactPoints }) {
     return <div style={sans({ fontSize:10.5, color:C.text3, padding:'22px 6px', textAlign:'center' })}>No Baseball Savant batted-ball coordinates available for this player and season.</div>;
   }
   return (
-    <div>
-      <svg width="100%" viewBox="0 0 140 90" style={{ display:'block' }} role="img" aria-label={`${dots.length} tracked batted-ball locations`}>
+    <div style={{ position:'relative' }}>
+      <svg width="100%" viewBox="0 0 140 90" style={{ display:'block' }} role="img" aria-label={`${dots.length} tracked batted-ball locations`} onMouseLeave={() => setHovered(null)}>
         <path d="M70,80 L8,18 Q36,-5 70,0 Q104,-5 132,18 Z" fill={`color-mix(in srgb, ${C.teal} 9%, transparent)`} stroke={C.border} strokeWidth="0.5"/>
         <path d="M70,80 L20,34 Q44,10 70,10 Q96,10 120,34 Z" fill="none" stroke={C.borderLight} strokeWidth="0.5"/>
         <line x1="70" y1="80" x2="8" y2="22" stroke={C.border} strokeWidth="0.5"/>
         <line x1="70" y1="80" x2="132" y2="22" stroke={C.border} strokeWidth="0.5"/>
         <rect x="57" y="54" width="26" height="26" fill={`color-mix(in srgb, ${C.amber} 7%, transparent)`} stroke={C.border} strokeWidth="0.5" transform="rotate(-45 70 67)"/>
         <circle cx="70" cy="78" r="2.5" fill={C.surface3} stroke={C.border} strokeWidth="0.5"/>
-        {dots.map((d, i) => <circle key={`${d.cx}-${d.cy}-${i}`} cx={d.cx} cy={d.cy} r={2.2} fill={d.color} opacity={0.72} />)}
+        {dots.map((d, i) => (
+          <circle
+            key={`${d.cx}-${d.cy}-${i}`}
+            cx={d.cx}
+            cy={d.cy}
+            r={hovered === d ? 3.2 : 2.2}
+            fill={d.color}
+            opacity={hovered === d ? 1 : 0.72}
+            stroke={hovered === d ? C.text : 'none'}
+            strokeWidth={hovered === d ? 0.8 : 0}
+            tabIndex={0}
+            onMouseEnter={() => setHovered(d)}
+            onFocus={() => setHovered(d)}
+            onBlur={() => setHovered(null)}
+          >
+            <title>{`${d.event || 'Batted ball'} · EV ${sprayMetric(d.launchSpeed, ' mph')} · LA ${sprayMetric(d.launchAngle, '°')}`}</title>
+          </circle>
+        ))}
         <g fontFamily="'DM Mono',monospace" fontSize="6" fill={C.text3}>
           <circle cx="4" cy="5" r="2.5" fill={C.rust}/><text x="9" y="8">HR</text>
           <circle cx="4" cy="14" r="2.5" fill={C.amber}/><text x="9" y="17">XBH</text>
           <circle cx="4" cy="23" r="2.5" fill={C.teal}/><text x="9" y="26">1B/OUT</text>
         </g>
       </svg>
-      <div style={sans({ fontSize:9, color:C.text4, padding:'4px 4px 0', lineHeight:1.4 })}>Live Baseball Savant Statcast coordinates · {dots.length} tracked batted-ball events.</div>
+      {hovered && (
+        <div role="status" style={{ position:'absolute', left:`${Math.max(14, Math.min(86, hovered.cx / 140 * 100))}%`, top:`${Math.max(7, hovered.cy / 90 * 100)}%`, transform:'translate(-50%, -112%)', pointerEvents:'none', minWidth:150, padding:'7px 9px', background:C.surface, border:`1px solid ${C.border}`, borderRadius:6, boxShadow:'0 6px 18px rgba(0,0,0,.22)', zIndex:3 }}>
+          <div style={sans({ fontSize:10, fontWeight:800, color:C.text, marginBottom:4, textTransform:'capitalize' })}>{(hovered.event || 'Batted ball').replaceAll('_', ' ')}</div>
+          <div style={px({ fontSize:9.5, color:C.text2, lineHeight:1.55 })}>Exit velocity <strong style={{ color:C.amber }}>{sprayMetric(hovered.launchSpeed, ' mph')}</strong></div>
+          <div style={px({ fontSize:9.5, color:C.text2, lineHeight:1.55 })}>Launch angle <strong style={{ color:C.teal }}>{sprayMetric(hovered.launchAngle, '°')}</strong></div>
+          {hovered.distance != null && <div style={px({ fontSize:9.5, color:C.text3, lineHeight:1.55 })}>Distance {sprayMetric(hovered.distance, ' ft')}</div>}
+        </div>
+      )}
+      <div style={sans({ fontSize:9, color:C.text4, padding:'4px 4px 0', lineHeight:1.4 })}>Live Baseball Savant Statcast coordinates · {dots.length} tracked batted-ball events. Hover a dot for EV and launch angle.</div>
     </div>
   );
 }
@@ -1048,6 +1088,7 @@ function PlayersPage() {
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
+  const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
   const mountedRef = useRef(true);
@@ -1239,7 +1280,19 @@ function PlayersPage() {
         <PlayersEmptyState onPick={pickPlayer} />
       )}
 
-      {player && derived && <PlayerProfile player={player} derived={derived} />}
+      {player && derived && (
+        <>
+          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} />
+          {compareOpen && (
+            <PlayerComparisonModal
+              primary={player}
+              isPitcher={player.isPitcher}
+              getAxes={buildSavantPercentileAxes}
+              onClose={() => setCompareOpen(false)}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -1290,7 +1343,7 @@ function ContractPanel({ contractData: ct }) {
 /* ═══════════════════════════════════════════════════════════════════
    PLAYER PROFILE — full intelligence layout
 ═══════════════════════════════════════════════════════════════════ */
-function PlayerProfile({ player, derived }) {
+function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
@@ -1391,6 +1444,9 @@ function PlayerProfile({ player, derived }) {
               {p.pitchHand?.code && <Badge>{p.pitchHand.code}HP</Badge>}
               {p.height && p.weight && <Badge>{p.height} / {p.weight}</Badge>}
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
+              <button onClick={onCompare} style={{ marginTop:8, padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                Compare player
+              </button>
             </div>
           </div>
         </div>

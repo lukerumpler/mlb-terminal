@@ -42,7 +42,31 @@ beforeEach(() => {
   loadFullPlayer.mockReset();
 });
 
-describe('PlayersPage — pickPlayer race condition', () => {
+describe('PlayersPage — player comparison and race conditions', () => {
+  it('opens the side-by-side comparison modal and loads a second player through the live adapter', async () => {
+    const user = userEvent.setup();
+    const primary = { id: 1, fullName: 'Primary Player' };
+    const secondary = { id: 2, fullName: 'Second Player', currentTeam: { abbreviation:'NYM' }, primaryPosition: { abbreviation:'OF' } };
+    searchPlayers.mockImplementation(async q => q === 'Primary' ? [primary] : q === 'Second' ? [secondary] : []);
+    loadFullPlayer.mockResolvedValueOnce(mockPlayer(1, 'Primary Player')).mockResolvedValueOnce(mockPlayer(2, 'Second Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Primary');
+    await waitFor(() => expect(screen.getByText('Primary Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Primary Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name:/Compare player/i })).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name:/Compare player/i }));
+    expect(screen.getByRole('dialog', { name:/Compare Primary Player/i })).toBeInTheDocument();
+    const comparisonInput = screen.getByRole('textbox', { name:/Add second player/i });
+    await user.type(comparisonInput, 'Second');
+    await waitFor(() => expect(screen.getByText('Second Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Second Player'));
+    await waitFor(() => expect(screen.getByText('Player B')).toBeInTheDocument());
+    expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
+  });
+
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {
     const user = userEvent.setup();
     const playerA = { id: 1, fullName: 'Slow Player A' };
