@@ -84,5 +84,5 @@
 - [x] Refine Overview and Profile section gaps, internal padding, and responsive spacing without reducing data usability.
 - [x] Add or update rendered and responsive tests for the spacing refinements.
 - [x] Verify Overview and Profile at desktop and mobile widths and save a checkpoint.
-- [ ] Capture direct desktop and mobile verification for the updated Player Profile spacing surfaces.
-- [ ] Save a new checkpoint covering the Overview/Profile spacing refinements after final verification.
+- [x] Capture direct desktop and mobile verification for the updated Player Profile spacing surfaces.
+- [x] Save a new checkpoint covering the Overview/Profile spacing refinements after final verification.
