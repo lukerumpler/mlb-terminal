@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getPlayerContactPoints, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
@@ -168,7 +168,11 @@ function getBattedBall() { return null; }
 function getPitchArsenal() { return null; }
 
 export function buildExitVelocityBins(rows = []) {
-  const speeds = rows.map(row => Number(row?.launch_speed)).filter(Number.isFinite);
+  const speeds = rows
+    .map(row => row?.launch_speed)
+    .filter(value => value != null && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
   if (!speeds.length) return [];
   const buckets = new Map();
   speeds.forEach(speed => {
@@ -340,6 +344,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.updatedAt || null);
   const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
+  const [teamExitVelocitySource, setTeamExitVelocitySource] = useState('');
   const [teamExitVelocityState, setTeamExitVelocityState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
   const [feedRetryToken, setFeedRetryToken] = useState(0);
@@ -434,18 +439,34 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   useEffect(() => {
     let alive = true;
     setTeamExitVelocityRows([]);
+    setTeamExitVelocitySource('');
     setTeamExitVelocityState('loading');
-    getTeamExitVelocity(teamBase?.abbr, CURRENT_SEASON).then(rows => {
+    const loadTeamRows = async () => {
+      const directRows = await getTeamExitVelocity(teamBase?.abbr, CURRENT_SEASON).catch(() => null);
+      if (Array.isArray(directRows) && directRows.length) {
+        return { rows: directRows, source: 'Baseball Savant Statcast Search · team query' };
+      }
+      const hitters = (liveTeamPlayers.hitting || [])
+        .filter(row => row?.id)
+        .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
+        .slice(0, 12);
+      const responses = await Promise.all(hitters.map(row => getPlayerContactPoints(row.id, CURRENT_SEASON).catch(() => null)));
+      const rows = responses.flatMap(result => Array.isArray(result) ? result : []);
+      return rows.length ? { rows, source: 'Baseball Savant Statcast Search · verified roster-player rollup' } : { rows: [], source: '' };
+    };
+    loadTeamRows().then(({ rows, source }) => {
       if (!alive) return;
-      setTeamExitVelocityRows(Array.isArray(rows) ? rows : []);
-      setTeamExitVelocityState(Array.isArray(rows) && rows.length ? 'ready' : 'unavailable');
+      setTeamExitVelocityRows(rows);
+      setTeamExitVelocitySource(source);
+      setTeamExitVelocityState(rows.length ? 'ready' : 'unavailable');
     }).catch(() => {
       if (!alive) return;
       setTeamExitVelocityRows([]);
+      setTeamExitVelocitySource('');
       setTeamExitVelocityState('unavailable');
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr, feedRetryToken]);
+  }, [teamBase?.abbr, feedRetryToken, liveTeamPlayers]);
 
   useEffect(() => {
     let alive = true;
@@ -1299,7 +1320,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 <EvDistributionChart data={evBins} accent={teamAccent} />
               </Suspense>
               <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
-                Source: Baseball Savant Statcast Search · {teamExitVelocityRows.length.toLocaleString()} batted balls · 5 mph bins.
+                Source: {teamExitVelocitySource} · {teamExitVelocityRows.length.toLocaleString()} batted balls · 5 mph bins.
               </div>
             </div>
           ) : (

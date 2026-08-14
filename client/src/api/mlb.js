@@ -851,6 +851,12 @@ export async function getTeamExitVelocity(teamAbbr, year = SEASON) {
   return Array.isArray(arr) ? arr : null;
 }
 
+export async function getPlayerContactPoints(playerId, year = SEASON) {
+  if (!playerId) return null;
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=contact_points&year=${year}&playerId=${encodeURIComponent(playerId)}`, { timeoutMs: 20_000 });
+  return Array.isArray(arr) ? arr : null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TOP PROSPECT STATS — mirrors mlb.com/prospects/stats/top-prospects
 // Pulls hitting + pitching leaders across Triple-A and Double-A simultaneously.
