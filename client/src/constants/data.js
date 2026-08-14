@@ -46,19 +46,6 @@ export function sortTeamsByLeagueDivisionName(entries = Object.entries(TEAMS)) {
     if (divisionCompare !== 0) return divisionCompare;
     return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
   });
-};
-
-export function sortTeamsByLeagueDivisionName(entries = Object.entries(TEAMS)) {
-  const leagueRank = { AL: 0, NL: 1 };
-  return [...entries].sort(([, a], [, b]) => {
-    const [aLeague = '', ...aDivisionParts] = String(a?.div || '').split(' ');
-    const [bLeague = '', ...bDivisionParts] = String(b?.div || '').split(' ');
-    const leagueCompare = (leagueRank[aLeague] ?? 99) - (leagueRank[bLeague] ?? 99);
-    if (leagueCompare !== 0) return leagueCompare;
-    const divisionCompare = aDivisionParts.join(' ').localeCompare(bDivisionParts.join(' '), 'en', { sensitivity: 'base' });
-    if (divisionCompare !== 0) return divisionCompare;
-    return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
-  });
 }
 
 // ─── TOP 100 PROSPECTS — Live from MLB.com/prospects/stats/top-prospects ──────

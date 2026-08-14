@@ -45,12 +45,20 @@
 - [ ] Add focused tests for odds, team-WAR, freshness, retry, and failure states; verify desktop/mobile presentation.
 - [ ] Save and publish the completed model-source and retry update.
 
-- [ ] Sort the Team Overview selector by league, then division, then alphabetical team name.
-- [ ] Add regression coverage for deterministic selector ordering and preserve selected-team behavior.
-- [ ] Verify the selector on desktop/mobile and save a published checkpoint.
+- [x] Sort the Team Overview selector by league, then division, then alphabetical team name.
+- [x] Add regression coverage for deterministic selector ordering and preserve selected-team behavior.
+- [x] Verify the selector on desktop/mobile and save a published checkpoint.
 
-- [ ] Add affiliate lookup from an MLB team to its current minor-league clubs and levels.
-- [ ] Add a minor-league team overview mode with level, affiliate, team identity, and available live metrics.
-- [ ] Support the San Francisco Giants → Triple-A Sacramento River Cats example through the real MLB affiliate data path.
-- [ ] Add tests for affiliate mapping, level selection, loading/error states, and MLB overview preservation.
-- [ ] Verify the minor-league overview on desktop/mobile and save a published checkpoint.
+- [x] Add affiliate lookup from an MLB team to its current minor-league clubs and levels.
+- [x] Add a minor-league team overview mode with level, affiliate, team identity, and available live metrics.
+- [x] Support the San Francisco Giants → Triple-A Sacramento River Cats example through the real MLB affiliate data path.
+- [x] Add tests for affiliate mapping, level selection, loading/error states, and MLB overview preservation.
+- [x] Verify the minor-league overview on desktop/mobile and save a published checkpoint.
+
+- [x] Add a rendered test that selects an MLB team, verifies the affiliate selector and minor-league identity/metrics, exercises loading/error fallback, and confirms the MLB overview remains visible.
+- [x] Save a new checkpoint after selector ordering and minor-league overview validation.
+
+- [x] Assert the affiliate loading badge in the rendered interaction test before the mocked minor-league overview resolves.
+- [x] Save the final selector and minor-league overview checkpoint after all validation is complete.
+
+- [ ] Save the final published checkpoint after the latest selector, affiliate overview, and loading-test changes.
