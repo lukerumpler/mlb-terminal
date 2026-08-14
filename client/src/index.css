@@ -519,3 +519,30 @@
 @media (prefers-reduced-motion: reduce) {
   .skip-video-tooltip { transition: none; }
 }
+
+/* Mobile prospect rankings: preserve the desktop table for wide workspaces, but
+   switch the widest batter/pitcher views to compact, scan-friendly cards. */
+.skip-prospect-mobile-cards { display:none; }
+@media (max-width:720px) {
+  .skip-prospect-workspace-grid .skip-long-table { display:none !important; }
+  .skip-prospect-mobile-cards { display:grid; gap:8px; padding:10px 12px 12px; }
+  .skip-prospect-mobile-card { border:1px solid var(--border, #ded8ce); border-radius:9px; background:var(--surface, #fffdf8); overflow:hidden; }
+  .skip-prospect-mobile-card.is-selected { border-color:var(--amber, #d49a35); box-shadow:0 4px 12px color-mix(in srgb, var(--amber, #d49a35) 13%, transparent); }
+  .skip-prospect-mobile-card-main { width:100%; border:0; background:transparent; padding:10px 11px 8px; text-align:left; color:inherit; cursor:pointer; }
+  .skip-prospect-mobile-card-top { display:flex; align-items:center; gap:7px; min-width:0; }
+  .skip-prospect-mobile-rank { flex:0 0 auto; color:var(--amber, #d49a35); font:800 11px/1 'DM Mono', monospace; }
+  .skip-prospect-mobile-card-name { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:800 12px/1.2 'Plus Jakarta Sans', sans-serif; }
+  .skip-prospect-mobile-card-fv { flex:0 0 auto; }
+  .skip-prospect-mobile-card-meta { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin:8px 0 9px 26px; color:var(--text3, #777); font:9px/1.2 'DM Mono', monospace; }
+  .skip-prospect-mobile-stat-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border-top:1px solid var(--border-light, #eee9e0); }
+  .skip-prospect-mobile-stat-grid > div { min-width:0; padding:7px 4px 5px; text-align:center; border-right:1px solid var(--border-light, #eee9e0); }
+  .skip-prospect-mobile-stat-grid > div:last-child { border-right:0; }
+  .skip-prospect-mobile-stat-grid span { display:block; color:var(--text3, #777); font:700 8px/1.1 'DM Mono', monospace; letter-spacing:.06em; text-transform:uppercase; }
+  .skip-prospect-mobile-stat-grid strong { display:block; margin-top:3px; color:var(--text, #27231e); font:800 13px/1 'DM Mono', monospace; }
+  .skip-prospect-mobile-card-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:7px 10px; border-top:1px solid var(--border-light, #eee9e0); background:var(--surface2, #f8f4ec); }
+  .skip-prospect-mobile-card-actions button, .skip-prospect-mobile-card-actions label { min-height:26px; padding:0 7px; border:1px solid var(--border, #ded8ce); border-radius:5px; background:var(--surface, #fffdf8); color:var(--text2, #5d574e); font:700 9px/24px 'Plus Jakarta Sans', sans-serif; cursor:pointer; }
+  .skip-prospect-mobile-card-actions button.is-watched { border-color:var(--amber, #d49a35); color:var(--amber-dark, #9b6915); background:var(--amber-soft, #fff5df); }
+  .skip-prospect-mobile-card-actions label { display:inline-flex; align-items:center; gap:4px; }
+  .skip-prospect-mobile-card-actions input { width:12px; height:12px; accent-color:var(--teal, #168c7a); }
+  .skip-prospect-mobile-card-detail { padding:7px 11px 9px; color:var(--text3, #777); font:9px/1.4 'Plus Jakarta Sans', sans-serif; }
+}

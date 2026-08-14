@@ -124,6 +124,44 @@ function TeamLogo({ abbr, size = 20 }) {
   if (!id) return <span style={sans({ fontSize:10, color:C.text3 })}>{abbr}</span>;
   return <img src={`https://www.mlbstatic.com/team-logos/${id}.svg`} alt={abbr} width={size} height={size} loading="lazy" style={{ flexShrink:0, objectFit:'contain' }} />;
 }
+
+function ProspectMobileCards({ rows, kind, selectedId, onSelect, onCard, isWatched, onToggleWatch, compareIds, onToggleCompare }) {
+  const isPitcher = kind === 'pitcher';
+  return (
+    <div className="skip-prospect-mobile-cards" aria-label={`${isPitcher ? 'Pitcher' : 'Batter'} prospect cards`}>
+      {rows.map(pr => {
+        const selected = selectedId === pr.mlbId;
+        const primary = isPitcher
+          ? [['ERA', fmtEra(pr.era)], ['WHIP', fmt(pr.whip)], ['IP', fmt(pr.ip)], ['SO', fmt(pr.so)]]
+          : [['OPS', fmt(pr.ops)], ['AVG', fmt(pr.avg)], ['PA', fmt(pr.pa)], ['HR', fmt(pr.hr)]];
+        return (
+          <article key={pr.mlbId} className={`skip-prospect-mobile-card${selected ? ' is-selected' : ''}`}>
+            <button type="button" className="skip-prospect-mobile-card-main" onClick={() => onSelect(selected ? null : pr.mlbId)} aria-expanded={selected}>
+              <div className="skip-prospect-mobile-card-top">
+                <span className="skip-prospect-mobile-rank">#{pr.rank}</span>
+                <TeamLogo abbr={pr.team} size={28} />
+                <span className="skip-prospect-mobile-card-name">{pr.name}</span>
+                <span className="skip-prospect-mobile-card-fv"><FVBadge fv={pr.fv}/></span>
+              </div>
+              <div className="skip-prospect-mobile-card-meta">
+                <PosBadge pos={pr.pos}/><span>{pr.level}</span><span>Age {pr.age}</span><span>{pr.eta || 'ETA pending'}</span>
+              </div>
+              <div className="skip-prospect-mobile-stat-grid">
+                {primary.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+              </div>
+            </button>
+            <div className="skip-prospect-mobile-card-actions">
+              <button type="button" onClick={() => onCard(pr.mlbId)}>View scouting card</button>
+              <label title="Add to comparison"><input type="checkbox" checked={compareIds.includes(pr.mlbId)} onChange={() => onToggleCompare(pr.mlbId)} /> Compare</label>
+              <button type="button" className={isWatched(pr.mlbId) ? 'is-watched' : ''} onClick={() => onToggleWatch({ mlbId:pr.mlbId, name:pr.name, pos:pr.pos, team:pr.team })}>{isWatched(pr.mlbId) ? '★ Watched' : '☆ Watch'}</button>
+            </div>
+            {selected && <div className="skip-prospect-mobile-card-detail">Tap the row again to collapse season detail. Use the desktop ranking table for full column sorting.</div>}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
 function ProspectPhoto({ mlbId, name, size = 40 }) {
   const [err, setErr] = useState(false);
   const src = `https://content.mlb.com/images/headshots/current/60x60/${mlbId}.png`;
@@ -935,6 +973,18 @@ function ProspectsPage() {
                 </div>
               </Panel>
             )}
+
+            <ProspectMobileCards
+              rows={batPit === 'bat' ? sortedBatters : sortedPitchers}
+              kind={batPit === 'bat' ? 'batter' : 'pitcher'}
+              selectedId={selId}
+              onSelect={setSelId}
+              onCard={setCardId}
+              isWatched={isWatched}
+              onToggleWatch={toggleWatch}
+              compareIds={compareIds}
+              onToggleCompare={toggleCompare}
+            />
 
             {/* ── Detail panel for selected batter ── */}
             {selBatter && batPit === 'bat' && (

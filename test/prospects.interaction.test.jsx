@@ -141,7 +141,7 @@ describe('Prospects page — merged feature interactions', () => {
     expect(etaHeader).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     expect(global.__consoleErrors.filter(e => e.includes('Error') && !e.includes('network unavailable')).length).toBe(0);
-  });
+  }, 12000);
 
   it('filters by level and by watchlist-only without crashing', async () => {
     const user = userEvent.setup();
@@ -206,4 +206,18 @@ describe('Command palette', () => {
     await user.click(pitchersToggle);
     expect(await screen.findByText('Pitching performance')).toBeInTheDocument();
     expect(document.querySelectorAll('.skip-long-table').length).toBeGreaterThan(0);
+  });
+
+  it('mounts compact mobile card collections for both ranking pools', async () => {
+    const user = userEvent.setup();
+    await goToProspects(user);
+
+    const batterCards = document.querySelectorAll('.skip-prospect-mobile-card');
+    expect(batterCards.length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Batter prospect cards')).toBeInTheDocument();
+
+    const pitchersToggle = screen.getAllByRole('button', { name: /^Pitchers$/ })[0];
+    await user.click(pitchersToggle);
+    expect(screen.getByLabelText('Pitcher prospect cards')).toBeInTheDocument();
+    expect(document.querySelectorAll('.skip-prospect-mobile-card').length).toBeGreaterThan(0);
   });

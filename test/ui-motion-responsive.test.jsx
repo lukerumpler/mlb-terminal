@@ -7,6 +7,9 @@ const appSource = fs.readFileSync(path.join(projectRoot, 'client/src/App.jsx'), 
 const documentSource = fs.readFileSync(path.join(projectRoot, 'client/index.html'), 'utf8');
 const playersSource = fs.readFileSync(path.join(projectRoot, 'client/src/pages/PlayersPage.jsx'), 'utf8');
 const prospectsSource = fs.readFileSync(path.join(projectRoot, 'client/src/pages/ProspectsPage.jsx'), 'utf8');
+const overviewSource = fs.readFileSync(path.join(projectRoot, 'client/src/pages/OverviewPage.jsx'), 'utf8');
+const indexSource = fs.readFileSync(path.join(projectRoot, 'client/src/index.css'), 'utf8');
+const teamLogoSource = fs.readFileSync(path.join(projectRoot, 'client/src/components/TeamLogo.jsx'), 'utf8');
 
 describe('SKIP motion and responsive UI hooks', () => {
   it('keeps grouped workspace navigation and accessible labels in the shell', () => {
@@ -46,5 +49,13 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(appSource).toContain('.skip-panel:hover, .skip-stat-strip:hover { transform:none !important;');
     expect(playersSource).toContain('getRepeaterTierSeverity');
     expect(playersSource).toContain('aria-label="CBT repeater-tier severity legend"');
+    expect(prospectsSource).toContain('ProspectMobileCards');
+    expect(prospectsSource).toContain('skip-prospect-mobile-cards');
+    expect(indexSource).toContain('.skip-prospect-mobile-cards { display:none; }');
+    expect(indexSource).toContain('.skip-prospect-workspace-grid .skip-long-table { display:none !important; }');
+    expect(indexSource).not.toContain('  .skip-long-table { display:none !important; }');
+    expect(overviewSource).toContain("import TeamLogo from '../components/TeamLogo.jsx';");
+    expect(playersSource).toContain("import TeamLogo from '../components/TeamLogo.jsx';");
+    expect(teamLogoSource).toContain('team-logos/${team.id}.svg');
   });
 });

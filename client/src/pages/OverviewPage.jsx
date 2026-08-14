@@ -3,6 +3,7 @@ import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA } from '../constants/data.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
+import TeamLogo from '../components/TeamLogo.jsx';
 import { percentile } from '../lib/percentile.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -513,8 +514,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
       {/* ── Selector + headline ── */}
       <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
-        <div>
-          <div style={px({fontSize:10,fontWeight:700,color:C.amber,letterSpacing:'.14em',textTransform:'uppercase',marginBottom:5})}>TEAM COMMAND CENTER</div>
+          <div>
+          <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}>
+            <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={30} />
+            <div style={px({fontSize:10,fontWeight:700,color:C.amber,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
+          </div>
           <h1 style={sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1})}>Season overview</h1>
           <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
         </div>
@@ -532,6 +536,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>
       <div style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
+          <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
           <span className="sr-only">Select team</span>
           <select aria-label="Select team" value={selTeam} onChange={e=>setSelTeam(e.target.value)}
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>

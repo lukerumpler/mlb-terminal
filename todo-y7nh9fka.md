@@ -69,3 +69,13 @@
 - [x] Save a new checkpoint for the completed table usability update.
 - [x] Complete final direct Players and Prospects verification using rendered page coverage and current responsive preview checks.
 - [x] Save a new checkpoint for the resumed sticky-table update after the latest shared fast-forward.
+- [x] Inspect current wide prospect rankings and team icon surfaces.
+- [x] Add a compact mobile card view for batter and pitcher prospect rankings.
+- [x] Add more team iconography to Team Overview and Player Profile.
+- [x] Add automated responsive and iconography coverage.
+- [x] Verify desktop/mobile layouts and save a checkpoint.
+- [x] Scope mobile table-to-card CSS to Prospects ranking views only.
+- [x] Capture direct Prospects and Player Profile verification through rendered page tests, plus responsive Overview preview inspection.
+- [x] Save a new checkpoint after the scoped mobile-card update.
+- [x] Add explicit rendered coverage for Player Profile team iconography.
+- [x] Save the final mobile prospect-card and iconography checkpoint.

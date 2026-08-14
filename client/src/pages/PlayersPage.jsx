@@ -14,6 +14,7 @@ import {
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
 } from '../engine/skip.js';
 import { Badge, Panel, KVRow, GradeBar, PosBadge, SkeletonPlayerHero, SkeletonPanelGrid } from '../components/atoms.jsx';
+import TeamLogo from '../components/TeamLogo.jsx';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
@@ -2013,8 +2014,11 @@ function PlayerProfile({ player, derived, onCompare }) {
               overflow:'hidden', textOverflow:'ellipsis', maxWidth:200 })}>
               {p.useLastName || p.lastName || p.fullName}
             </div>
-            <div style={sans({ fontSize:11, color:teamAccent, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase', marginTop:5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:200 })}>
-              {p.currentTeam?.name || 'Free Agent'} · {p.primaryPosition?.abbreviation || '—'}
+            <div style={{display:'flex',alignItems:'center',gap:7,marginTop:5,minWidth:0}}>
+              <TeamLogo abbr={p.currentTeam?.abbreviation} size={24} />
+              <div style={sans({ fontSize:11, color:teamAccent, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:180 })}>
+                {p.currentTeam?.name || 'Free Agent'} · {p.primaryPosition?.abbreviation || '—'}
+              </div>
             </div>
             <div style={{ display:'flex', gap:4, marginTop:8, flexWrap:'wrap' }}>
               {p.currentAge     && <Badge>Age {p.currentAge}</Badge>}

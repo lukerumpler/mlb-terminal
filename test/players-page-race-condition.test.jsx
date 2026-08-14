@@ -23,7 +23,7 @@ const { default: PlayersPage } = await import('../client/src/pages/PlayersPage.j
 
 function mockPlayer(id, fullName) {
   return {
-    id, profile: { fullName, primaryPosition: { abbreviation: 'OF' }, pitchHand: { code: 'R' }, batSide: { code: 'R' } },
+    id, profile: { fullName, currentTeam: { name: 'New York Mets', abbreviation: 'NYM' }, primaryPosition: { abbreviation: 'OF' }, pitchHand: { code: 'R' }, batSide: { code: 'R' } },
     savant: { est_woba: 0.350, avg_hit_speed: 92, est_slg: 0.500, whiff_percent: 20, oz_swing_percent: 28 },
     batTracking: { avg_bat_speed: 72 },
     expectedStatisticsPopulation: [{ est_woba: 0.280, est_slg: 0.400 }, { est_woba: 0.320, est_slg: 0.460 }, { est_woba: 0.380, est_slg: 0.560 }],
@@ -174,6 +174,8 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await user.click(screen.getByText('Interactive Player'));
     await waitFor(() => expect(screen.getByRole('button', { name:/TPVI True Value/i })).toBeInTheDocument());
     expect(document.querySelector('.skip-profile-photo-frame')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Mets logo/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/New York Mets · OF/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Focus: Value/i)).toBeInTheDocument();
 
     const casButton = screen.getByRole('button', { name:/CAS Contact Auth/i });
