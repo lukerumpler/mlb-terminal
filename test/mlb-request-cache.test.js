@@ -13,6 +13,8 @@ const {
   __resetMlbClientStateForTests,
   fetchTeamFinancials,
   getGameFeedMetadata,
+  getTeamVenueMetadata,
+  __resetTeamVenueMetadataCacheForTests,
 } = await import('../client/src/api/mlb.js');
 
 describe('MLB request cache optimization', () => {
@@ -29,6 +31,7 @@ describe('MLB request cache optimization', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     __resetMlbClientStateForTests();
+    __resetTeamVenueMetadataCacheForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -66,6 +69,15 @@ describe('MLB request cache optimization', () => {
   it('extracts recorded MLB weather and constructs an official Gameday link', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ gameData: { weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } } }) });
     await expect(getGameFeedMetadata(123456)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, mediaUrl: 'https://www.mlb.com/gameday/123456' });
+  });
+
+  it('loads official venue metadata and caches it for one day', async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ teams: [{ venue: { id: 1, name: 'Dodger Stadium' } }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ venues: [{ id: 1, name: 'Dodger Stadium', fieldInfo: { capacity: 56000, turfType: 'Grass', roofType: 'Open', leftLine: 330, leftCenter: 375, center: 395, rightCenter: 375, rightLine: 330 }, location: { latitude: 34.0739, longitude: -118.2400 } }] }) });
+    await expect(getTeamVenueMetadata(119)).resolves.toMatchObject({ status: 'live', venue: { name: 'Dodger Stadium', capacity: 56000, surface: 'Grass', roof: 'Open', latitude: 34.0739 } });
+    await expect(getTeamVenueMetadata(119)).resolves.toMatchObject({ freshness: 'cached', venue: { name: 'Dodger Stadium' } });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('aggregates schedule-derived Home/Away and Day/Night W–L rows and caches the result', async () => {

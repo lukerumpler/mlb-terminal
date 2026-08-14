@@ -11121,11 +11121,35 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## MLB 429 Rate-Limit Mitigation
-- [ ] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
-- [ ] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
-- [ ] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
-- [ ] Add regression tests for rate-limit handling and verified cache fallback.
-- [ ] Run release gates and save checkpoint.
+- [x] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
+- [x] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
+- [x] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
+- [x] Add regression tests for rate-limit handling and verified cache fallback.
+- [x] Run release gates and save checkpoint.
 
 ## Current MLB Rate-Limit Fix
-- [ ] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.
+- [x] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.
+
+## Three-Tier News Fallback
+- [x] Implement Tier 1–3 news fallback in api/news.js with stale-if-error cache metadata.
+- [x] Update React news components to display accessible Tier 1, Tier 2, Tier 3, cached, and unavailable badges.
+- [x] Complete RESILIENCE_GUIDE.md with configuration, feed provenance, and deployment steps.
+- [x] Add regression tests for fallback ordering, cache behavior, and badge rendering.
+- [ ] Run release gates and save a published checkpoint.
+
+## Attached Data-Gaps Specification
+- [x] Review and reconcile the attached FanGraphs, Savant, splits, weather, metadata, and playoff-odds requirements.
+- [x] Preserve honest unavailable states where a source or endpoint is not verified.
+- [x] Implement only verified data-gap improvements without modifying ROADMAP_REFERENCE_FEATURES.md.
+- [x] Add regression coverage and verify desktop/mobile rendering for each changed panel.
+
+## ESPN RSS and Secure API Configuration
+- [x] Integrate the verified ESPN MLB RSS XML feed into the resilient news fallback route.
+- [x] Add environment-based Vercel CORS allowlisting and document required variables.
+- [x] Add simulated Nitter/ESPN failure-injection tests for fallback ordering and stale cache behavior.
+- [x] Preserve and continue the attached FanGraphs, Savant, splits, weather, and metadata gap work.
+
+## Shared Checkpoint Reconciliation and Reapplication
+- [x] Merge latest origin/main changes while keeping uncommitted news fallback, CORS, guide, venue, and Savant updates.
+- [ ] Reapply and verify all 60 test files and build output.
+- [ ] Save final checkpoint.

@@ -100,7 +100,7 @@ describe("Baseball Savant provider cache", () => {
     const result = response();
     await savantHandler(req("/api/savant?endpoint=team_batted_balls&year=2095&team=LAD"), result);
     expect(result.statusCode).toBe(200);
-    expect(result.body).toEqual([{ hc_x: 125, hc_y: 210, bb_type: "fly_ball", launch_speed: 101.4, xwoba: 0.512, events: "home_run" }]);
+    expect(result.body).toEqual([{ hc_x: 125, hc_y: 210, bb_type: "fly_ball", launch_speed: 101.4, launch_angle: null, launch_speed_angle: null, xwoba: 0.512, events: "home_run" }]);
   });
 
   it("returns a bounded 429 with Retry-After when no verified Savant fallback exists", async () => {

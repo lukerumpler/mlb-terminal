@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getTeamVenueMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -536,6 +536,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamPitchArsenalData, setTeamPitchArsenalData] = useState(null);
   const [teamSavantSource, setTeamSavantSource] = useState('');
   const [teamSavantState, setTeamSavantState] = useState('idle');
+  const [teamVenueMetadata, setTeamVenueMetadata] = useState(null);
+  const [teamVenueState, setTeamVenueState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
   const [feedRetryToken, setFeedRetryToken] = useState(0);
   const [teamModelData, setTeamModelData] = useState(null);
@@ -693,7 +695,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   useEffect(() => {
     let alive = true;
     setTodayGameMetadata({});
-    const games = todayGames.slice(0, 6);
+    const games = todayGames.slice(0, 6).filter(game => /final|progress|live/i.test(String(game.status || '')) || game.inning);
     if (games.length) {
       Promise.all(games.map(game => getGameFeedMetadata(game.gamePk).then(metadata => [game.gamePk, metadata]).catch(() => [game.gamePk, null]))).then(entries => {
         if (alive) setTodayGameMetadata(Object.fromEntries(entries));
@@ -701,6 +703,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     }
     return () => { alive = false; };
   }, [todayGames]);
+  useEffect(() => {
+    let alive = true;
+    setTeamVenueState('loading');
+    setTeamVenueMetadata(null);
+    getTeamVenueMetadata(teamBase?.id).then(data => {
+      if (!alive) return;
+      setTeamVenueMetadata(data);
+      setTeamVenueState(data?.status === 'live' || data?.status === 'cached' ? 'ready' : data?.status === 'source-gap' ? 'source-gap' : 'unavailable');
+    }).catch(() => {
+      if (!alive) return;
+      setTeamVenueMetadata({ status: 'upstream-unavailable', source: 'MLB Stats API', venue: null });
+      setTeamVenueState('unavailable');
+    });
+    return () => { alive = false; };
+  }, [teamBase?.id, feedRetryToken]);
   useEffect(() => {
     let alive = true;
     setTeamSplitRows([]);
@@ -1199,6 +1216,23 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           {[["Projected W",teamModelData?.advancedMetrics?.projectedWins,1],["Projected L",teamModelData?.advancedMetrics?.projectedLosses,1],["Off WAR",teamModelData?.advancedMetrics?.offenseWar,1],["Def WAR",teamModelData?.advancedMetrics?.defenseWar,1],["xwOBA",teamSavantDisplayData?.expectedWOBA,3],["Exit velo",teamSavantDisplayData?.exitVelocity,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</div></div>)}
         </div>
         <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>FanGraphs projections · {modelFreshness} · {teamSavantDisplayData?.source || 'Baseball Savant'} · {teamSavantDisplayData?.retrievedAt ? `retrieved ${new Date(teamSavantDisplayData.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : 'not retrieved'}</div>
+      </Panel>
+      <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
+        {teamVenueMetadata?.venue ? <>
+          <div style={{padding:'10px 14px 8px',display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',alignItems:'baseline'}}>
+            <div style={px({fontSize:15,fontWeight:800,color:C.text})}>{teamVenueMetadata.venue.name || team.name}</div>
+            <div style={sans({fontSize:9,color:C.text3})}>{teamVenueMetadata.freshness === 'stale-cached' ? 'Verified cached snapshot' : 'Verified venue metadata'}</div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
+            {[
+              ['Capacity', teamVenueMetadata.venue.capacity == null ? '—' : teamVenueMetadata.venue.capacity.toLocaleString()],
+              ['Surface', teamVenueMetadata.venue.surface || '—'],
+              ['Roof', teamVenueMetadata.venue.roof || '—'],
+              ['Coordinates', teamVenueMetadata.venue.latitude == null || teamVenueMetadata.venue.longitude == null ? '—' : `${teamVenueMetadata.venue.latitude.toFixed(2)}, ${teamVenueMetadata.venue.longitude.toFixed(2)}`],
+            ].map(([label,value], index) => <div key={label} style={{padding:'9px 10px',borderRight:index < 3 ? `0.5px solid ${C.borderLight}` : 'none'}}><div style={px({fontSize:13,fontWeight:800,color:value === '—' ? C.text3 : C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:3})}>{label}</div></div>)}
+          </div>
+          <div style={sans({padding:'8px 14px 10px',fontSize:9,color:C.text4,lineHeight:1.4})}>Wall distances: LF {teamVenueMetadata.venue.dimensions?.leftLine ?? '—'} · LCF {teamVenueMetadata.venue.dimensions?.leftCenter ?? '—'} · CF {teamVenueMetadata.venue.dimensions?.center ?? '—'} · RCF {teamVenueMetadata.venue.dimensions?.rightCenter ?? '—'} · RF {teamVenueMetadata.venue.dimensions?.rightLine ?? '—'} ft. Altitude, wall height, orientation, and park factors are not shown without a verified source.</div>
+        </> : <OverviewEmptyState status={teamVenueState === 'loading' ? 'Loading' : teamVenueState === 'source-gap' ? 'Source gap' : 'Unavailable'} message="Ballpark metadata" detail="Official MLB venue metadata is not available for this team right now. No static park values are substituted." />}
       </Panel>
 
       <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>

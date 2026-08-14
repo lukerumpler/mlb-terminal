@@ -14,6 +14,10 @@ describe('StatusBadge', () => {
   it.each([
     ['verified', 'Verified'],
     ['estimated', 'Estimated'],
+    ['tier-1', 'Tier 1 · Official'],
+    ['tier-2', 'Tier 2 · Backup'],
+    ['tier-3', 'Tier 3 · Secondary'],
+    ['cached-fallback', 'Stale Fallback'],
     ['unavailable', 'Unavailable'],
     ['coverage-gap', 'Coverage Gap'],
   ])('renders the %s status as visible text', (status, label) => {

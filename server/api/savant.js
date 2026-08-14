@@ -439,6 +439,8 @@ export default async function handler(req, res) {
           hc_y: Number(r.hc_y),
           bb_type: r.bb_type || null,
           launch_speed: r.launch_speed == null ? null : Number(r.launch_speed),
+          launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
+          launch_speed_angle: r.launch_speed_angle == null ? null : Number(r.launch_speed_angle),
           xwoba: r.estimated_woba_using_speedangle == null ? null : Number(r.estimated_woba_using_speedangle),
           events: r.events || null,
         }))

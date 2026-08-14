@@ -886,6 +886,55 @@ export async function getGameFeedMetadata(gamePk) {
     return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable' };
   }
 }
+const teamVenueMetadataCache = new Map();
+export async function getTeamVenueMetadata(teamId) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return { status: 'source-gap', source: 'MLB Stats API', venue: null, retrievedAt: new Date().toISOString() };
+  const cached = teamVenueMetadataCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) return { ...cached.data, freshness: 'cached' };
+  try {
+    const teamResponse = await mlb(`/teams/${id}`, { hydrate: 'venue,league,division,sport' }, { ttl: 60 * 60_000, timeoutMs: 12_000 });
+    const team = teamResponse?.teams?.[0];
+    const venueId = Number(team?.venue?.id);
+    if (!Number.isFinite(venueId)) return { status: 'source-gap', source: 'MLB Stats API', venue: null, retrievedAt: new Date().toISOString() };
+    const venueResponse = await mlb(`/venues/${venueId}`, { hydrate: 'location,fieldInfo' }, { ttl: 24 * 60 * 60_000, timeoutMs: 12_000 });
+    const raw = venueResponse?.venues?.[0] || {};
+    const fieldInfo = raw.fieldInfo || {};
+    const location = raw.location || {};
+    const numberOrNull = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+    const data = {
+      status: raw.id ? 'live' : 'source-gap',
+      source: 'MLB Stats API',
+      sourceUrl: `https://statsapi.mlb.com/api/v1/venues/${venueId}?hydrate=location,fieldInfo`,
+      retrievedAt: new Date().toISOString(),
+      venue: raw.id ? {
+        id: raw.id,
+        name: raw.name || team?.venue?.name || null,
+        capacity: numberOrNull(fieldInfo.capacity),
+        surface: fieldInfo.turfType || null,
+        roof: fieldInfo.roofType || null,
+        dimensions: {
+          leftLine: numberOrNull(fieldInfo.leftLine),
+          leftCenter: numberOrNull(fieldInfo.leftCenter),
+          center: numberOrNull(fieldInfo.center),
+          rightCenter: numberOrNull(fieldInfo.rightCenter),
+          rightLine: numberOrNull(fieldInfo.rightLine),
+        },
+        latitude: numberOrNull(location.latitude),
+        longitude: numberOrNull(location.longitude),
+      } : null,
+      freshness: 'live',
+    };
+    teamVenueMetadataCache.set(id, { data, expiresAt: Date.now() + 24 * 60 * 60_000 });
+    return data;
+  } catch {
+    if (cached) return { ...cached.data, status: 'cached', freshness: 'stale-cached', reason: 'MLB venue metadata unavailable' };
+    return { status: 'upstream-unavailable', source: 'MLB Stats API', venue: null, retrievedAt: new Date().toISOString() };
+  }
+}
+
+export function __resetTeamVenueMetadataCacheForTests() { teamVenueMetadataCache.clear(); }
+
 export async function getGameLinescore(gamePk) { return mlb(`/game/${gamePk}/linescore`); }
 export async function getGameBoxscore(gamePk)  { return mlb(`/game/${gamePk}/boxscore`); }
 

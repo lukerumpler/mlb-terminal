@@ -19,6 +19,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from '
 import { C, px, sans } from '../constants/colors.js';
 import { Panel, SkeletonRows } from '../components/atoms.jsx';
 import { fetchFeeds } from '../api/feed.js';
+import StatusBadge from '../components/StatusBadge.jsx';
 
 // ─── Account registry ─────────────────────────────────────────────────────
 // Each group is independently toggleable. Handles are case-insensitive for
@@ -138,6 +139,7 @@ const PostCard = memo(function PostCard({ item, highlight }) {
                 padding:'1px 6px', borderRadius:3,
               }}>{meta.org}</span>
             )}
+            {item.sourceTier && <StatusBadge status={`tier-${item.sourceTier}`} compact />}
             <span style={{ marginLeft:'auto', ...px({ fontSize:10, color:C.text4, whiteSpace:'nowrap' }) }}>
               {relTime(item.isoDate)}
             </span>
@@ -182,6 +184,8 @@ export default memo(function FeedPage() {
   const [items,       setItems]       = useState([]);
   const [errors,      setErrors]      = useState([]);
   const [loading,     setLoading]     = useState(true);
+  const [feedStatus,  setFeedStatus]  = useState('unavailable');
+  const [sourceStatuses, setSourceStatuses] = useState([]);
   const [lastFetch,   setLastFetch]   = useState(null);
   const [activeGroups,setActiveGroups]= useState(new Set(ALL_GROUPS));
   const [search,      setSearch]      = useState('');
@@ -215,6 +219,8 @@ export default memo(function FeedPage() {
     if (!mountedRef.current || latestHandlesRef.current !== handles) return;
     setItems(result.items);
     setErrors(result.errors);
+    setFeedStatus(result.status || 'unavailable');
+    setSourceStatuses(result.sourceStatuses || []);
     setLastFetch(new Date());
     setLoading(false);
   }, []);
@@ -248,8 +254,10 @@ export default memo(function FeedPage() {
       )
     : items;
 
-  const totalAccounts = activeHandles.length;
-  const liveCount     = totalAccounts - errors.length;
+  const totalAccounts = sourceStatuses.length || activeHandles.length;
+  const liveCount     = sourceStatuses.length
+    ? sourceStatuses.filter(source => source.ok).length
+    : totalAccounts - errors.length;
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -260,14 +268,17 @@ export default memo(function FeedPage() {
         padding:'12px 16px', background:C.surface,
         border:`0.5px solid ${C.border}`, borderRadius:10,
       }}>
-        <div>
-          <div style={sans({ fontSize:16, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
-            Intel Feed
-          </div>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <div style={sans({ fontSize:16, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
+                Intel Feed
+              </div>
+              <StatusBadge status={feedStatus} compact />
+            </div>
           <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
             {loading
               ? 'Fetching posts…'
-              : `${filtered.length} posts from ${liveCount}/${totalAccounts} accounts`
+              : `${filtered.length} headlines · ${liveCount}/${totalAccounts || '—'} sources responding`
             }
             {lastFetch && !loading && (
               <span style={{ marginLeft:8, color:C.text4 }}>
@@ -318,8 +329,8 @@ export default memo(function FeedPage() {
           border:`0.5px solid ${C.amberMid}`,
           ...sans({ fontSize:11, color:C.amberDark }),
         }}>
-          ⚠ Could not reach: {errors.map(e => `@${e.handle}`).join(', ')} —
-          feed sources may be temporarily unavailable. Other accounts loaded fine.
+          ⚠ {errors.map(error => `${error.source || error.handle} (${error.error})`).join(' · ')} —
+          SKIP is showing the next configured tier or a verified cached snapshot.
         </div>
       )}
 
@@ -345,44 +356,24 @@ export default memo(function FeedPage() {
         {/* Sidebar: accounts + stats */}
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
 
-          {/* Active accounts */}
-          <Panel title="Active Accounts" accent={C.teal} badge={`${liveCount}/${totalAccounts}`}>
-            {ACCOUNT_GROUPS.filter(g => activeGroups.has(g.key)).map(group => (
-              <div key={group.key}>
-                <div style={{
-                  padding:'6px 14px 4px',
-                  borderBottom:`0.5px solid ${C.borderLight}`,
-                }}>
-                  <span style={{ ...sans({ fontSize:10, fontWeight:700, letterSpacing:'.06em',
-                    textTransform:'uppercase', color:group.color }), }}>
-                    {group.icon} {group.label}
-                  </span>
+          {/* Three-tier source chain */}
+          <Panel title="Source Chain" accent={C.teal} badge={`${liveCount}/${totalAccounts || '—'}`}>
+            {(sourceStatuses.length ? sourceStatuses : [{ tier:1, key:'pending', label:'Waiting for configured sources', ok:false, reason:'loading' }]).map(source => (
+              <div key={`${source.key}:${source.tier}`} style={{
+                display:'flex', alignItems:'center', gap:8,
+                padding:'8px 14px',
+                borderBottom:`0.5px solid ${C.borderLight}`,
+              }}>
+                <StatusBadge status={`tier-${source.tier}`} compact />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={sans({ fontSize:11, fontWeight:600, color:C.text,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' })}>
+                    {source.label}
+                  </div>
+                  <div style={px({ fontSize:9, color:C.text4 })}>
+                    {source.ok === true ? 'Selected' : source.ok === false ? (source.reason || 'Unavailable') : 'Standby'}
+                  </div>
                 </div>
-                {group.accounts.map(acc => {
-                  const hasError = errors.some(e => e.handle === acc.handle);
-                  return (
-                    <div key={acc.handle} style={{
-                      display:'flex', alignItems:'center', gap:8,
-                      padding:'6px 14px',
-                      borderBottom:`0.5px solid ${C.borderLight}`,
-                    }}>
-                      <div style={{
-                        width:6, height:6, borderRadius:'50%', flexShrink:0,
-                        background: hasError ? C.rust : loading ? C.amber : C.teal,
-                      }} />
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={sans({ fontSize:11, fontWeight:600, color:C.text,
-                          overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' })}>
-                          {acc.label}
-                        </div>
-                        <div style={px({ fontSize:9, color:C.text4 })}>@{acc.handle}</div>
-                      </div>
-                      <span style={px({ fontSize:10, color:C.text4 })}>
-                        {items.filter(i => i.handle === acc.handle).length || '—'}
-                      </span>
-                    </div>
-                  );
-                })}
               </div>
             ))}
           </Panel>
@@ -391,15 +382,13 @@ export default memo(function FeedPage() {
           <Panel title="About" accent={C.slate}>
             <div style={{ padding:'12px 14px', ...sans({ fontSize:11, color:C.text2, lineHeight:1.65 }) }}>
               <p style={{ marginBottom:8 }}>
-                Posts are fetched from public RSS feeds via a server-side proxy — no X API key required,
-                no login, no tracking.
+                Headlines are fetched through a server-side three-tier source chain. Each headline keeps its source label and article link.
               </p>
               <p style={{ marginBottom:8 }}>
-                Feed updates automatically every <strong>5 minutes</strong>. Use ↻ Refresh to force an immediate update.
+                Tier 1 is official, Tier 2 is a reliable league backup, and Tier 3 is a secondary publisher. If all live sources fail, verified cached content is shown.
               </p>
               <p style={{ color:C.text3, fontSize:10, ...sans({}) }}>
-                Sources: nitter.privacydev.net, nitter.poast.org, nitter.net.
-                If all sources are down, cached content may be shown.
+                Feed updates automatically every <strong>5 minutes</strong>. Use ↻ Refresh to force an immediate update. A badge always identifies the current source state.
               </p>
             </div>
           </Panel>

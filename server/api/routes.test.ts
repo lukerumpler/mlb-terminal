@@ -8,6 +8,7 @@ describe("legacy API route registration", () => {
       "/api/ncaa",
       "/api/savant",
       "/api/feed",
+      "/api/news",
       "/api/contract",
       "/api/comparison-summary",
     ]);

@@ -4,5 +4,10 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/news.js": {
+      "maxDuration": 15
+    }
+  }
 }
