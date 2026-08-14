@@ -10996,3 +10996,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 ## Overview hierarchy refinement
 - [x] Move Team Leaders and Front Office Evaluation higher on the team overview page, before lower-detail panels, while preserving responsive behavior.
 - [x] Run focused tests and responsive visual verification, confirm the roadmap remains unchanged, and save a checkpoint.
+
+## Front Office radar and player video thumbnails
+- [x] Add a source-backed team-strength radar beside Front Office Evaluation using the overall team rating fields and explicit unavailable values.
+- [x] Replace plain player video links with clickable thumbnails and clear external-source labels, without fabricating video records.
+- [x] Add regression tests, verify responsive visuals, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.

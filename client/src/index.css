@@ -325,6 +325,7 @@
   .skip-profile-photo-frame img, .skip-profile-kpi, .skip-profile-metric-row { transition: none; }
 }
 
+<<<<<<< HEAD
 .skip-profile-tab-rail {
   display:flex; gap:4px; flex-wrap:wrap; padding:4px; margin:2px 0 0;
   background:var(--surface, #f7f5ef); border:1px solid var(--border, rgba(0,0,0,.12)); border-radius:9px;
@@ -366,4 +367,16 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .skip-profile-tab-rail button, .skip-profile-expand-button, .skip-chart-dialog-backdrop, .skip-chart-dialog { transition:none; animation:none; }
+}
+
+/* Overview decision surfaces: keep the radar beside Front Office Evaluation on
+   wide terminals, then stack it cleanly below the decision cards at narrower
+   widths so labels and chart axes remain readable. */
+@media (max-width: 1100px) {
+  .overview-decision-row { grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr) !important; }
+  .overview-decision-row > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+  .overview-decision-row { grid-template-columns: 1fr !important; }
+  .overview-decision-row > :last-child { grid-column: auto; }
 }

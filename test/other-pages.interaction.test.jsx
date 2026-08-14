@@ -199,3 +199,24 @@ describe('Scouting Notes page', () => {
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
+
+describe('Settings roster defaults', () => {
+  it('updates batting and pitching defaults for the Overview roster filters', async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem('skip-roster-sample-defaults');
+    await goToTab(user, 'Settings', /Preferences/);
+
+    const battingDefault = screen.getByRole('combobox', { name: 'Default batting minimum plate appearances' });
+    const pitchingDefault = screen.getByRole('combobox', { name: 'Default pitching minimum innings pitched' });
+    await user.selectOptions(battingDefault, '150');
+    await user.selectOptions(pitchingDefault, '30');
+
+    expect(battingDefault).toHaveValue('150');
+    expect(pitchingDefault).toHaveValue('30');
+
+    const overviewButton = screen.getByTitle('Overview');
+    await user.click(overviewButton);
+    await screen.findByText('AI Scout Insights');
+    expect(screen.getByRole('combobox', { name: 'Minimum plate appearances' })).toHaveValue('150');
+  });
+});

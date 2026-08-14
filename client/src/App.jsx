@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
 import { C, px, sans } from './constants/colors.js';
+import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
@@ -82,6 +83,14 @@ export default function App() {
   // fetch failed or returned nothing, next to a pulsing "LIVE" dot. Tracking
   // real status means we only ever show genuinely live data as live.
   const [tickerStatus, setTickerStatus] = useState('loading');
+  const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
+  const updateRosterDefaults = useCallback((next) => {
+    setRosterDefaults(current => {
+      const value = sanitizeRosterDefaults(typeof next === 'function' ? next(current) : next);
+      saveRosterDefaults(value);
+      return value;
+    });
+  }, []);
   const [theme, setTheme] = useState(() => {
     try {
       const saved = localStorage.getItem('skip-theme');
@@ -265,7 +274,7 @@ export default function App() {
 
           <PageErrorBoundary resetKey={tab}>
             <Suspense fallback={<PageLoading />}>
-              {tab === 'overview'     && <OverviewPage />}
+              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
               {tab === 'players'      && <PlayersPage />}
               {tab === 'prospects'    && <ProspectsPage />}
               {tab === 'draft'        && <DraftPage />}
@@ -276,7 +285,7 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} />}
             </Suspense>
           </PageErrorBoundary>
         </div>
