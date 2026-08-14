@@ -163,7 +163,7 @@ const ROSTER_SORT_OPTIONS = [
 
 export function rosterStatValue(row, key) {
   const stat = row?.stat || {};
-  const aliases = { avg:['avg','battingAverage'], homeRuns:['homeRuns','hr'], rbi:['rbi','runsBattedIn'], stolenBases:['stolenBases','sb'], strikeOuts:['strikeOuts','strikeouts','so'] };
+  const aliases = { avg:['avg','battingAverage'], homeRuns:['homeRuns','hr'], rbi:['rbi','runsBattedIn'], stolenBases:['stolenBases','sb'], strikeOuts:['strikeOuts','strikeouts','so'], pa:['plateAppearances','pa'], ip:['inningsPitched','ip'] };
   for (const candidate of (aliases[key] || [key])) {
     const value = Number(stat[candidate]);
     if (Number.isFinite(value)) return value;
@@ -176,12 +176,19 @@ function formatRosterStat(row, option) {
   return value == null ? '—' : value.toFixed(option.digits);
 }
 
-export function buildRosterRows(players, position, sortKey) {
+export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, minPitchingIp = 0) {
   const option = ROSTER_SORT_OPTIONS.find(item => item.key === sortKey) || ROSTER_SORT_OPTIONS[0];
+  const selectedPositions = positions === 'all' || !Array.isArray(positions) ? (positions === 'all' ? [] : [positions]) : positions;
   return [
     ...(players?.hitting || []).map(row => ({ ...row, group:'hitting' })),
     ...(players?.pitching || []).map(row => ({ ...row, group:'pitching' })),
-  ].filter(row => row?.stat && (position === 'all' || row.position === position) && row.group === option.group)
+  ].filter(row => {
+    if (!row?.stat || row.group !== option.group) return false;
+    if (selectedPositions.length && !selectedPositions.includes(row.position)) return false;
+    const sample = rosterStatValue(row, row.group === 'hitting' ? 'pa' : 'ip');
+    const minimum = row.group === 'hitting' ? Number(minBattingPa) : Number(minPitchingIp);
+    return minimum === 0 || (sample != null && sample >= minimum);
+  })
     .sort((a, b) => {
       const av = rosterStatValue(a, option.key), bv = rosterStatValue(b, option.key);
       if (av == null && bv == null) return a.name.localeCompare(b.name);
@@ -201,8 +208,10 @@ function OverviewPage() {
   const [liveTeamError,setLiveTeamError]=useState(false);
   const [teamPlayersLoading, setTeamPlayersLoading] = useState(true);
   const [teamPlayersError, setTeamPlayersError] = useState(false);
-  const [rosterPosition, setRosterPosition] = useState('all');
+  const [selectedRosterPositions, setSelectedRosterPositions] = useState([]);
   const [rosterSort, setRosterSort] = useState('ops');
+  const [minBattingPa, setMinBattingPa] = useState(0);
+  const [minPitchingIp, setMinPitchingIp] = useState(0);
   const teamBase=TEAMS[selTeam];
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
@@ -261,7 +270,8 @@ function OverviewPage() {
     ...(liveTeamPlayers.pitching || []).map(row => row.position),
   ].filter(Boolean))].sort(), [liveTeamPlayers]);
   const rosterSortOption = ROSTER_SORT_OPTIONS.find(item => item.key === rosterSort) || ROSTER_SORT_OPTIONS[0];
-  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, rosterPosition, rosterSort), [liveTeamPlayers, rosterPosition, rosterSort]);
+  const activeMinimum = rosterSortOption.group === 'hitting' ? minBattingPa : minPitchingIp;
+  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp]);
 
   useEffect(()=>{
     let alive=true;
@@ -551,18 +561,31 @@ function OverviewPage() {
         <div style={{padding:'8px 14px 0',...sans({fontSize:10,color:C.text3,lineHeight:1.45})}}>
           Automated read of the selected team using current aggregate stats and roster leaders. It updates when the team or live feed changes.
         </div>
-        <div className="roster-insight-controls" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'10px 14px 2px'}}>
-          <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
-            <span>Position</span>
-            <select aria-label="Filter roster insights by position" value={rosterPosition} onChange={e=>setRosterPosition(e.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
-              <option value="all">All positions</option>
-              {rosterPositions.map(position => <option key={position} value={position}>{position}</option>)}
-            </select>
-          </label>
+        <div className="roster-insight-controls" style={{display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap',padding:'10px 14px 2px'}}>
+          <fieldset style={{border:0,padding:0,margin:0,minWidth:190}}>
+            <legend style={sans({fontSize:10,color:C.text2,fontWeight:700,marginBottom:5})}>Positions</legend>
+            <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+              <button type="button" aria-label="Show all roster positions" onClick={()=>setSelectedRosterPositions([])} style={{height:28,padding:'0 8px',border:`1px solid ${selectedRosterPositions.length===0?C.amber:C.border}`,borderRadius:6,background:selectedRosterPositions.length===0?C.amberSoft:C.surface,color:selectedRosterPositions.length===0?C.amberDark:C.text2,fontSize:10,cursor:'pointer'}}>All</button>
+              {rosterPositions.map(position => {
+                const checked = selectedRosterPositions.includes(position);
+                return <label key={position} style={{display:'inline-flex',alignItems:'center',gap:4,height:28,padding:'0 7px',border:`1px solid ${checked?C.amber:C.border}`,borderRadius:6,background:checked?C.amberSoft:C.surface,cursor:'pointer',...sans({fontSize:10,color:checked?C.amberDark:C.text2,fontWeight:700})}}>
+                  <input type="checkbox" aria-label={`Filter roster insights by ${position}`} checked={checked} onChange={e=>setSelectedRosterPositions(prev=>e.target.checked?[...prev,position]:prev.filter(item=>item!==position))} style={{accentColor:C.amber}} />
+                  {position}
+                </label>;
+              })}
+              {!rosterPositions.length && <span style={sans({fontSize:10,color:C.text4,fontStyle:'italic'})}>Loading positions…</span>}
+            </div>
+          </fieldset>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Sort by</span>
             <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {ROSTER_SORT_OPTIONS.map(option => <option key={option.key} value={option.key}>{option.label}{option.direction === 'asc' ? ' ↑' : ' ↓'}</option>)}
+            </select>
+          </label>
+          <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
+            <span>Min {rosterSortOption.group === 'hitting' ? 'PA' : 'IP'}</span>
+            <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+              {(rosterSortOption.group === 'hitting' ? [[0,'Any PA'],[50,'50+ PA'],[150,'150+ PA'],[300,'300+ PA']] : [[0,'Any IP'],[10,'10+ IP'],[30,'30+ IP'],[60,'60+ IP']]).map(([value,label])=><option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <span style={{marginLeft:'auto',...px({fontSize:9.5,color:C.text4})}}>{filteredRosterRows.length} {filteredRosterRows.length === 1 ? 'player' : 'players'} · {rosterSortOption.label}</span>
@@ -579,7 +602,7 @@ function OverviewPage() {
           ))}
           {teamPlayersLoading && <div role="status" style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>Loading roster leaders…</div>}
           {!teamPlayersLoading && teamPlayersError && <div role="alert" style={sans({fontSize:10,color:C.rust,fontStyle:'italic',padding:'5px 0'})}>Roster leader data is unavailable right now.</div>}
-          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <div style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>No roster players match this position/stat view.</div>}
+          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <div style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>No roster players match the selected positions, stat, and sample threshold.</div>}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:8}}>
           {[

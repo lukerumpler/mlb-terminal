@@ -30,3 +30,9 @@
 - [x] Distinguish roster-leader loading, unavailable, and no-match states in the filtered panel.
 - [x] Add rendered UI interaction coverage for position and stat sorting controls.
 - [x] Save a new checkpoint after resolving the roster-insights filter gaps.
+- [x] Inspect the current roster-insights filter controls and stat fields.
+- [x] Add multi-select position filtering with clear selection behavior.
+- [x] Add minimum sample-size thresholds for batting PA and pitching IP.
+- [x] Preserve loading, unavailable, no-match, and sorting behavior with the expanded filters.
+- [x] Add automated transformation and rendered interaction coverage.
+- [x] Verify the expanded controls responsively and save a checkpoint.

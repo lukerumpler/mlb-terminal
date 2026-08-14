@@ -11,17 +11,16 @@ describe('Roster Insights rendered filters', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const positionSelect = await screen.findByRole('combobox', { name: 'Filter roster insights by position' });
+        const allPositionsButton = await screen.findByRole('button', { name: 'Show all roster positions' });
     const statSelect = await screen.findByRole('combobox', { name: 'Sort roster insights by player statistic' });
+    const minimumPaSelect = await screen.findByRole('combobox', { name: 'Minimum plate appearances' });
+    await user.click(allPositionsButton);
+    await user.selectOptions(statSelect, 'ops');
+    await user.selectOptions(minimumPaSelect, '150');
 
-    // The offline test fixture has no roster rows, so only the safe default
-    // position option is available; the transformation test covers populated
-    // position options separately.
-    await user.selectOptions(positionSelect, 'all');
-    await user.selectOptions(statSelect, 'era');
-
-    expect(positionSelect).toHaveValue('all');
-    expect(statSelect).toHaveValue('era');
+    expect(allPositionsButton).toBeInTheDocument();
+    expect(statSelect).toHaveValue('ops');
+    expect(minimumPaSelect).toHaveValue('150');
     await waitFor(() => {
       expect(document.body.textContent).toMatch(/No roster players match|Roster leader data is unavailable|Loading roster leaders/);
     });
