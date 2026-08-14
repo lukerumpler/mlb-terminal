@@ -6,19 +6,24 @@ const overviewSource = readFileSync('/home/ubuntu/skip-baseball/client/src/pages
 
 describe('FanGraphs model source adapter', () => {
   it('parses team playoff odds and team WAR when the upstream exposes HTML tables', () => {
-    const oddsHtml = '<table><tr><th>Team</th><th>Playoff Odds</th></tr><tr><td>LAD</td><td>87.5%</td></tr></table>';
-    const warHtml = '<table><tr><th>Team</th><th>WAR</th></tr><tr><td>LAD</td><td>42.7</td></tr></table>';
+    const oddsHtml = '<table><tr><th>Team</th><th>Playoff Odds</th><th>Projected Wins</th><th>Projected Losses</th></tr><tr><td>LAD</td><td>87.5%</td><td>95.4</td><td>66.6</td></tr></table>';
+    const warHtml = '<table><tr><th>Team</th><th>WAR</th><th>Off WAR</th><th>Def WAR</th></tr><tr><td>LAD</td><td>42.7</td><td>29.1</td><td>8.4</td></tr></table>';
     const result = parseFanGraphsModelHtml({ oddsHtml, warHtml }, 'LAD', 2026);
     expect(result.playoffOdds).toBe(87.5);
     expect(result.teamWar).toBe(42.7);
     expect(result.source).toBe('FanGraphs');
     expect(result.season).toBe(2026);
+    expect(result.advancedMetrics.projectedWins).toBe(95.4);
+    expect(result.advancedMetrics.projectedLosses).toBe(66.6);
+    expect(result.advancedMetrics.offenseWar).toBe(29.1);
+    expect(result.advancedMetrics.defenseWar).toBe(8.4);
   });
 
   it('returns null model values when the source markup is blocked or changed', () => {
     const result = parseFanGraphsModelHtml({ oddsHtml: '<html>challenge</html>', warHtml: '' }, 'LAD', 2026);
     expect(result.playoffOdds).toBeNull();
     expect(result.teamWar).toBeNull();
+    expect(result.advancedMetrics.projectedWins).toBeNull();
   });
 });
 

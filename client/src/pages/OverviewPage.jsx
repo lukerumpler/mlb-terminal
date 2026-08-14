@@ -336,6 +336,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [affiliateStandings, setAffiliateStandings] = useState(null);
   const [affiliateSchedule, setAffiliateSchedule] = useState(null);
   const [affiliateSavant, setAffiliateSavant] = useState(null);
+  const [teamSavantData, setTeamSavantData] = useState(null);
   const [pendingAffiliate, setPendingAffiliate] = useState(null);
   const overviewRef = useRef(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
@@ -522,6 +523,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
   }, [teamBase?.abbr, feedRetryToken]);
+
+  useEffect(() => {
+    let alive = true;
+    getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON).then(data => { if (alive) setTeamSavantData(data); }).catch(() => { if (alive) setTeamSavantData({ status:'upstream-unavailable', source:'Baseball Savant', retrievedAt:new Date().toISOString() }); });
+    return () => { alive = false; };
+  }, [teamBase?.abbr]);
 
   useEffect(() => {
     if (!liveTeamData) return;
@@ -852,7 +859,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
             {sortTeamsByLeagueDivisionName().map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
           </select>
-          <select aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=affiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) setAffiliateLevel(String(next.levelId));}} disabled={!affiliates.length || affiliatesState==='loading'}
+          <select aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=affiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!affiliates.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliates.length?'pointer':'not-allowed',opacity:affiliates.length?1:.65}}>
              <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':'Select MiLB affiliate'}</option>
              {affiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
@@ -901,6 +908,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
         <span>Playoff odds: {teamModelData?.statuses?.playoffOdds || teamModelState} · Team WAR: {teamModelData?.statuses?.teamWar || teamModelState}</span>
       </div>
+      <Panel title="Advanced Models & Savant" accent={C.purple} badge={teamSavantData?.status === 'live' ? 'Baseball Savant' : teamSavantData?.status || 'Loading…'}>
+        <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
+          {[["Projected W",teamModelData?.advancedMetrics?.projectedWins,1],["Projected L",teamModelData?.advancedMetrics?.projectedLosses,1],["Off WAR",teamModelData?.advancedMetrics?.offenseWar,1],["Def WAR",teamModelData?.advancedMetrics?.defenseWar,1],["xwOBA",teamSavantData?.expectedWOBA,3],["Exit velo",teamSavantData?.exitVelocity,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</div></div>)}
+        </div>
+        <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>FanGraphs projections · {modelFreshness} · Baseball Savant · {teamSavantData?.retrievedAt ? `retrieved ${new Date(teamSavantData.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : 'not retrieved'}</div>
+      </Panel>
 
       <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
         <Panel title="Team Leaders" accent={C.rust} badge={teamPlayersBadge}>

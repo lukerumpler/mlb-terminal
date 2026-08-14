@@ -45,11 +45,40 @@ function parsePercentage(value) {
   return match ? Number(match[1]) : null;
 }
 
+function normalizeMetricKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function findTeamRowDetails(html, teamAbbr) {
+  const upper = String(teamAbbr).toUpperCase();
+  for (const table of tablesFromHtml(html)) {
+    const headerMatch = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
+    const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
+    for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const cells = cellsFromRow(row[1]);
+      if (cells.some(cell => new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, 'i').test(cell))) {
+        const metrics = {};
+        cells.forEach((cell, index) => {
+          const key = normalizeMetricKey(headers[index]);
+          const value = numeric(cell);
+          if (key && value != null) metrics[key] = value;
+        });
+        return { cells, metrics };
+      }
+    }
+  }
+  return null;
+}
+
 export function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season = DEFAULT_SEASON) {
-  const oddsRow = findTeamRow(oddsHtml, teamAbbr);
-  const warRow = findTeamRow(warHtml, teamAbbr);
+  const oddsDetails = findTeamRowDetails(oddsHtml, teamAbbr);
+  const warDetails = findTeamRowDetails(warHtml, teamAbbr);
+  const oddsRow = oddsDetails?.cells || findTeamRow(oddsHtml, teamAbbr);
+  const warRow = warDetails?.cells || findTeamRow(warHtml, teamAbbr);
   const playoffOdds = oddsRow ? oddsRow.map(parsePercentage).find(value => value != null) ?? null : null;
   const teamWar = warRow ? warRow.map(numeric).find(value => value != null) ?? null : null;
+  const metrics = { ...(oddsDetails?.metrics || {}), ...(warDetails?.metrics || {}) };
+  const pick = (...keys) => keys.map(key => metrics[key]).find(value => value != null) ?? null;
   return {
     playoffOdds,
     teamWar,
@@ -57,6 +86,17 @@ export function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season 
     teamAbbr,
     source: 'FanGraphs',
     sourceUrls: { playoffOdds: ODDS_URL, teamWar: WAR_URL },
+    advancedMetrics: {
+      projectedWins: pick('projected_wins', 'wins', 'w'),
+      projectedLosses: pick('projected_losses', 'losses', 'l'),
+      projectedRuns: pick('projected_runs', 'runs', 'r'),
+      projectedRunsAllowed: pick('projected_runs_allowed', 'runs_allowed', 'ra'),
+      offenseWar: pick('offense_war', 'off_war', 'batting_war'),
+      defenseWar: pick('defense_war', 'def_war', 'fielding_war'),
+      bullpenWar: pick('bullpen_war', 'relief_war'),
+      projectedWrcPlus: pick('projected_wrc_plus', 'wrc_plus'),
+      projectedFip: pick('projected_fip', 'fip'),
+    },
   };
 }
 
@@ -97,6 +137,7 @@ export default async function handler(req, res) {
     teamAbbr,
     playoffOdds: parsed.playoffOdds,
     teamWar: parsed.teamWar,
+    advancedMetrics: parsed.advancedMetrics,
     statuses: {
       playoffOdds: parsed.playoffOdds != null ? 'live' : oddsResult.status === 'fulfilled' ? 'unparsed' : 'upstream-unavailable',
       teamWar: parsed.teamWar != null ? 'live' : warResult.status === 'fulfilled' ? 'unparsed' : 'upstream-unavailable',
