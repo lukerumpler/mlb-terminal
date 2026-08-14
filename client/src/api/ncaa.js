@@ -1,3 +1,5 @@
+import { recordFeedSuccess } from '../lib/feedFreshness.js';
+
 // SKIP — NCAA College Baseball API Client
 // Proxies through /api/ncaa (Vercel serverless) → ncaa-api.henrygd.me → ncaa.com
 //
@@ -61,6 +63,7 @@ async function ncaa(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL
       throw new Error(`NCAA API returned an unreadable response — ${path}`);
     }
     if (useCache) cache.set(url, { data, expires: Date.now() + ttl });
+    recordFeedSuccess('ncaa');
     return data;
   })();
 

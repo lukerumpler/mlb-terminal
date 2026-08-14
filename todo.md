@@ -11056,3 +11056,11 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add regression tests for SurchargeRiskBadge, historical tax-row normalization, and season-specific Spotrac source URLs.
 - [x] Run final lint, type-check, production build, and Vitest release gates.
 - [x] Confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged before checkpoint.
+
+## Data freshness and selectable CBT history continuation
+
+- [x] Add a user-configurable data freshness indicator that records and displays the last successful update time for each live feed.
+- [x] Add a persisted 5-, 10-, or 15-season selector for the source-backed Franchise CBT Trend panel.
+- [x] Keep freshness timestamps source-specific, Low Data Mode-safe, and honest when a feed has never succeeded or is unavailable.
+- [x] Add regression tests for timestamp persistence/formatting, feed success tracking, and selectable historical season windows.
+- [x] Verify responsive UI, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.

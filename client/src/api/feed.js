@@ -9,6 +9,7 @@
 const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
 
 import { compareValues } from '../lib/sorting.js';
+import { recordFeedSuccess } from '../lib/feedFreshness.js';
 // { key → { data, ts } }
 const _cache = new Map();
 
@@ -37,6 +38,7 @@ export async function fetchFeed(handle, n = 10) {
       signal: AbortSignal.timeout(12_000),
     });
     const data = await res.json();
+    if (!data?.error) recordFeedSuccess('intel-feed');
     return cacheSet(key, data);
   } catch (e) {
     return { handle, items: [], fetchedAt: new Date().toISOString(), error: e.message };

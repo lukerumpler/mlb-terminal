@@ -1,4 +1,6 @@
 // SKIP — MLB + MiLB Stats API Client
+import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
+
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
 //
@@ -98,6 +100,7 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
     if (useCache) cache.set(url, { data, expires: Date.now() + ttl });
+    recordFeedSuccess(inferMlbFeedKey(path));
     return data;
   })();
 
@@ -145,6 +148,7 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
       return null;
     }
     cache.set(url, { data, expires: Date.now() + LEADERBOARD_TTL_MS });
+    recordFeedSuccess('savant');
     return data;
   })();
 
@@ -276,6 +280,7 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
       const res = await fetch(`/api/team-financials?${params}`, { signal:AbortSignal.timeout(18_000) });
       if (!res.ok) return null;
       const data = await res.json();
+      if (data?.found) recordFeedSuccess('spotrac');
       return data?.found ? data : null;
     } catch { return null; }
   })();
@@ -292,6 +297,7 @@ export async function fetchContractData(playerId, fullName) {
     });
     if (!res.ok) return null;
     const data = await res.json();
+    if (data?.found) recordFeedSuccess('contracts');
     return data?.found ? data : null;
   } catch { return null; }
 }

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { TEAMS, RUN_DIFF_DATA } from '../constants/data.js';
+import { TEAMS, RUN_DIFF_DATA, SEASON as CURRENT_SEASON } from '../constants/data.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, fetchTeamFinancials } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import { percentile } from '../lib/percentile.js';
+import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -256,6 +257,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [activeRosterPreset, setActiveRosterPreset] = useState(null);
   const [taxTrendRows, setTaxTrendRows] = useState([]);
   const [taxTrendState, setTaxTrendState] = useState('loading');
+  const [taxHistoryRange, setTaxHistoryRange] = useState(() => readCbtHistoryRange());
+  const taxHistorySeasons = useMemo(() => buildCbtHistorySeasons(taxHistoryRange, CURRENT_SEASON), [taxHistoryRange]);
   useEffect(() => {
     setMinBattingPa(Number(rosterDefaults.battingPa) || 0);
     setMinPitchingIp(Number(rosterDefaults.pitchingIp) || 0);
@@ -400,7 +403,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     let alive = true;
     const teamAbbr = teamBase?.abbr;
     if (!teamAbbr) return () => { alive = false; };
-    const seasons = [2024, 2025, 2026];
+    const seasons = taxHistorySeasons;
     setTaxTrendRows([]);
     setTaxTrendState('loading');
     Promise.all(seasons.map(season => fetchTeamFinancials(teamAbbr, season)))
@@ -417,7 +420,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         }
       });
     return () => { alive = false; };
-  }, [teamBase?.abbr]);
+  }, [teamBase?.abbr, taxHistorySeasons]);
 
   const exportTeamOverviewPdf = async () => {
     if (!overviewRef.current || pdfExportState === 'loading') return;
@@ -681,8 +684,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </Panel>
       </div>
 
-      <Panel title="Franchise CBT Trend" accent={teamAccent} badge="2024–2026">
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px 4px'}}>
+      <Panel title="Franchise CBT Trend" accent={teamAccent} badge={`${taxHistorySeasons[0]}–${taxHistorySeasons.at(-1)}`}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px 4px',flexWrap:'wrap'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
             <div>
@@ -690,8 +693,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div style={sans({fontSize:9.5,color:C.text3,marginTop:2})}>Historical tax payroll and estimated CBT bill</div>
             </div>
           </div>
-          <div style={px({fontSize:9,color:taxTrendState==='ready'?C.teal:taxTrendState==='loading'?C.amber:C.text3,fontWeight:800,letterSpacing:'.06em'})}>
-            {taxTrendState === 'loading' ? 'LOADING SOURCE HISTORY' : taxTrendState === 'ready' ? 'SPOTRAC HISTORY' : 'HISTORY UNAVAILABLE'}
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginLeft:'auto'}}>
+            <label style={{display:'inline-flex',alignItems:'center',gap:6,...sans({fontSize:9.5,color:C.text3,fontWeight:700})}}>
+              <span>History</span>
+              <select aria-label="Franchise CBT history range" value={taxHistoryRange} onChange={event => setTaxHistoryRange(saveCbtHistoryRange(event.target.value))}
+                style={{padding:'5px 7px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface3,color:C.text,...px({fontSize:9.5,fontWeight:800})}}>
+                {CBT_HISTORY_OPTIONS.map(option => <option key={option} value={option}>{option} seasons</option>)}
+              </select>
+            </label>
+            <div style={px({fontSize:9,color:taxTrendState==='ready'?C.teal:taxTrendState==='loading'?C.amber:C.text3,fontWeight:800,letterSpacing:'.06em'})}>
+              {taxTrendState === 'loading' ? 'LOADING SOURCE HISTORY' : taxTrendState === 'ready' ? 'SPOTRAC HISTORY' : 'HISTORY UNAVAILABLE'}
+            </div>
           </div>
         </div>
         <div style={{padding:'2px 8px 0'}}>
@@ -704,7 +716,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <span><i style={{display:'inline-block',width:16,height:2,background:C.rust,verticalAlign:'middle',marginRight:5}} />Estimated tax bill</span>
         </div>
         <div style={{padding:'0 14px 10px',...sans({fontSize:9.5,color:C.text4,lineHeight:1.4})}}>
-          Season rows are requested from the season-specific Spotrac MLB Tax Tracker. Missing rows remain unavailable; SKIP does not interpolate historical tax values. Threshold rules follow the <a href="https://www.mlb.com/glossary/transactions/competitive-balance-tax" target="_blank" rel="noreferrer" style={{color:C.amber}}>MLB CBT glossary</a>.
+                        {taxHistoryRange}-season rows are requested from season-specific Spotrac MLB Tax Trackers. Missing rows remain unavailable; SKIP does not interpolate historical tax values. Threshold rules follow the <a href="https://www.mlb.com/glossary/transactions/competitive-balance-tax" target="_blank" rel="noreferrer" style={{color:C.amber}}>MLB CBT glossary</a>.
+
         </div>
       </Panel>
 

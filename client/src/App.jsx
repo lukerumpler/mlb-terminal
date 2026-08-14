@@ -5,6 +5,7 @@ import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
+import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
 // pages) ships as its own chunk and loads on demand instead of bloating the
@@ -86,8 +87,18 @@ export default function App() {
   const [tickerStatus, setTickerStatus] = useState('loading');
   const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
   const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
+  const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
+  const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
+  }, []);
+  const updateFeedFreshnessSettings = useCallback((next) => {
+    setFeedFreshnessSettings(current => saveFeedFreshnessSettings({ ...current, ...(typeof next === 'function' ? next(current) : next) }));
+  }, []);
+  useEffect(() => {
+    const sync = () => setFeedFreshnessSuccesses(readFeedSuccesses());
+    window.addEventListener('skip-feed-freshness-updated', sync);
+    return () => window.removeEventListener('skip-feed-freshness-updated', sync);
   }, []);
   const updateRosterDefaults = useCallback((next) => {
     setRosterDefaults(current => {
@@ -109,6 +120,7 @@ export default function App() {
   }, [theme]);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
+  const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
 
   const [showPalette, setShowPalette] = useState(false);
   useEffect(() => {
@@ -247,6 +259,13 @@ export default function App() {
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
           <div style={{ flex:1 }} />
+          {feedFreshnessSettings.enabled && (
+            <button type="button" className="skip-freshness-indicator" onClick={() => setTab('settings')} aria-label="Open data freshness settings" title="Open data freshness settings"
+              style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:26, padding:'4px 8px', border:`1px solid ${feedFreshnessSummary.successful ? C.tealMid : C.border}`, borderRadius:999, background:feedFreshnessSummary.successful ? C.tealSoft : C.surface3, color:feedFreshnessSummary.successful ? C.teal : C.text3, cursor:'pointer', ...px({ fontSize:9, fontWeight:800, letterSpacing:'.04em' }) }}>
+              <span aria-hidden="true" style={{ width:6, height:6, borderRadius:'50%', background:feedFreshnessSummary.successful ? C.teal : C.text4 }} />
+              <span className="skip-freshness-label">DATA {feedFreshnessSummary.successful}/{feedFreshnessSummary.total} · {feedFreshnessSummary.successful ? feedFreshnessSummary.display : 'PENDING'}</span>
+            </button>
+          )}
           {lowDataMode && (
             <button type="button" className="skip-low-data-indicator" onClick={() => setTab('settings')} aria-label="Low Data Mode is active. Open Settings to change it." title="Low Data Mode is active — open Settings to change it"
               style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:26, padding:'4px 8px', border:`1px solid ${C.amberMid}`, borderRadius:999, background:C.amberSoft, color:C.amberDark, cursor:'pointer', ...px({ fontSize:9, fontWeight:800, letterSpacing:'.05em' }) }}>
@@ -297,7 +316,7 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
             </Suspense>
           </PageErrorBoundary>
         </div>
