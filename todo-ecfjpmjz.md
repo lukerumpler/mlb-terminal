@@ -27,3 +27,8 @@
 - [ ] Enable Vercel Analytics for the production project.
 - [ ] Configure and verify the user-selected custom production domain.
 - [ ] Save a final checkpoint and record the completed Vercel configuration and test results.
+
+## Deferred by user
+
+- [ ] Resume Vercel production environment-variable setup from the Mac Command Center workflow.
+- [ ] Resume Vercel serverless API deployment verification, authenticated-flow testing, Analytics enablement, and `www.lukerumper.com` confirmation.
