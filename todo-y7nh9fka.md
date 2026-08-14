@@ -79,3 +79,10 @@
 - [x] Save a new checkpoint after the scoped mobile-card update.
 - [x] Add explicit rendered coverage for Player Profile team iconography.
 - [x] Save the final mobile prospect-card and iconography checkpoint.
+- [x] Audit current Team Overview spacing and identify the highest-impact density issues.
+- [x] Audit current Player Profile spacing and identify the highest-impact density issues.
+- [x] Refine Overview and Profile section gaps, internal padding, and responsive spacing without reducing data usability.
+- [x] Add or update rendered and responsive tests for the spacing refinements.
+- [x] Verify Overview and Profile at desktop and mobile widths and save a checkpoint.
+- [ ] Capture direct desktop and mobile verification for the updated Player Profile spacing surfaces.
+- [ ] Save a new checkpoint covering the Overview/Profile spacing refinements after final verification.
