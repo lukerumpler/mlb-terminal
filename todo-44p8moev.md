@@ -72,3 +72,10 @@
 - [x] Save a successful checkpoint after the freshness assertions pass.
 
 - [x] Save the final checkpoint after the current freshness assertions pass.
+
+- [ ] Add dedicated standings and schedule views to the minor-league affiliate overview.
+- [ ] Integrate richer source-aware FanGraphs projections and advanced metrics on MLB Team Overview.
+- [ ] Add more Baseball Savant data with source and freshness metadata.
+- [ ] Persist recently viewed minor-league affiliates across sessions and expose quick-access controls.
+- [ ] Add rendered tests for MiLB navigation/data, model/Savant freshness, and affiliate history persistence.
+- [ ] Verify MLB and MiLB flows on desktop/mobile and save a published checkpoint.
