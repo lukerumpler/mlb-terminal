@@ -1253,6 +1253,24 @@ export function getExtensionTaxWarning({ teamFinancials } = {}) {
   };
 }
 
+export function SurchargeRiskBadge({ warning, compact = false } = {}) {
+  if (!warning || warning.kind !== 'warning') return null;
+  const bandLabel = warning.band?.label || 'CBT surcharge band';
+  const severity = warning.severity || { color:C.rust, soft:C.rustSoft, border:C.rustMid, label:'WATCH' };
+  const label = compact ? 'SURCHARGE RISK' : `SURCHARGE RISK · ${severity.label}`;
+  return (
+    <span
+      role="status"
+      title={`${label}: ${bandLabel}. ${warning.message}`}
+      aria-label={`${label}. ${bandLabel}. ${warning.message}`}
+      style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:22, padding:'3px 7px', border:`1px solid ${severity.border}`, borderRadius:999, background:severity.soft, color:severity.color, ...px({ fontSize:8.5, fontWeight:800, letterSpacing:'.045em' }) }}
+    >
+      <span aria-hidden="true" style={{ width:5, height:5, borderRadius:'50%', background:severity.color, flexShrink:0 }} />
+      {label}
+    </span>
+  );
+}
+
 function formatFinancialValue(value) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -2026,6 +2044,7 @@ function PlayerProfile({ player, derived, onCompare }) {
               {p.pitchHand?.code && <Badge>{p.pitchHand.code}HP</Badge>}
               {p.height && p.weight && <Badge>{p.height} / {p.weight}</Badge>}
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
+              <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <button onClick={onCompare} style={{ marginTop:8, padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
                 Compare player
               </button>

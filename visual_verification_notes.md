@@ -1,0 +1,7 @@
+# Visual verification notes
+
+The desktop 1280×720 Overview screenshot shows the latest shared team identity work rendering correctly: the Dodgers logo appears beside the Team Command Center heading and team selector, the overview decision row is ordered with Team Leaders before Front Office Evaluation, and the Team Strength Radar sits beside the evaluation panel. The new Franchise CBT Trend panel appears directly below that decision row with the Dodgers logo, a 2024–2026 badge, and a loading-source-history status while its season-specific requests resolve. The fixed live-score ticker is visible at the bottom as expected.
+
+The mobile 375×812 screenshot shows the responsive shell remains readable: the compact sidebar, team logo, season overview header, PDF/live-data actions, team selector, headline stats, and two-column stat strip fit without horizontal overflow in the visible viewport. The new financial panel is below the first mobile fold, so its chart should be verified after the page data settles or on the live preview scroll position. No new badge or chart text was clipped in the captured areas.
+
+The dev-server log also contains older MLB upstream timeout messages for schedule and team aggregate endpoints. These are handled as unavailable/live-data states by the existing proxy and are not TypeScript or build errors; the latest screenshot still rendered the authoritative aggregate snapshot.

@@ -12,9 +12,7 @@ import { getRepeaterTier, CBT_SOURCE_URL } from '../../shared/luxuryTax.js';
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const SPOTRAC_PAYROLL_URL = season => `https://www.spotrac.com/mlb/payroll/_/year/${season}`;
-const SPOTRAC_TAX_URL = 'https://www.spotrac.com/mlb/tax';
-const PAYROLL_SOURCE_URL = 'https://www.spotrac.com/mlb/payroll/_/year/2026';
-const TAX_SOURCE_URL = 'https://www.spotrac.com/mlb/tax';
+const SPOTRAC_TAX_URL = season => `https://www.spotrac.com/mlb/tax/_/year/${season}`;
 const UA = 'Mozilla/5.0 (compatible; SKIPBaseball/1.0; +https://skipbaseball.com)';
 
 function stripTags(html) {
@@ -128,7 +126,7 @@ export function parseTeamTaxHtml(html, teamAbbr, season = DEFAULT_SEASON) {
     repeaterYears: null,
     repeaterTier: getRepeaterTier(null).label,
     source: 'Spotrac MLB Team Tax Tracker',
-    sourceUrl: TAX_SOURCE_URL,
+    sourceUrl: SPOTRAC_TAX_URL(season),
     repeaterSourceUrl: CBT_SOURCE_URL,
   };
 }
@@ -157,7 +155,7 @@ export default async function handler(req, res) {
 
   const [payrollResult, taxResult] = await Promise.allSettled([
     fetchHtml(SPOTRAC_PAYROLL_URL(season)).then(html => parseTeamPayrollHtml(html, team, season)),
-    fetchHtml(SPOTRAC_TAX_URL).then(html => parseTeamTaxHtml(html, team, season)),
+    fetchHtml(SPOTRAC_TAX_URL(season)).then(html => parseTeamTaxHtml(html, team, season)),
   ]);
   const payroll = payrollResult.status === 'fulfilled' ? payrollResult.value : null;
   const tax = taxResult.status === 'fulfilled' ? taxResult.value : null;
@@ -166,5 +164,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ found:false, teamAbbr:team, season });
   }
   res.setHeader('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=3600');
-  return res.status(200).json({ found:true, teamAbbr:team, season, payroll, tax, source:'Spotrac', sourceUrls:{ payroll:PAYROLL_SOURCE_URL, tax:TAX_SOURCE_URL } });
+  return res.status(200).json({ found:true, teamAbbr:team, season, payroll, tax, source:'Spotrac',     sourceUrls:{ payroll:SPOTRAC_PAYROLL_URL(season), tax:SPOTRAC_TAX_URL(season) }
+ });
 }

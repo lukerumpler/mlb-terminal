@@ -42,3 +42,30 @@ describe('team financial CSV export', () => {
     expect(csv).toContain('estimated_tax');
   });
 });
+
+
+describe('surcharge risk badge and historical trend data', () => {
+  it('renders only for a verified surcharge warning and carries accessible source-backed text', async () => {
+    const { SurchargeRiskBadge } = await import('../client/src/pages/PlayersPage.jsx');
+    const warning = getExtensionTaxWarning({ teamFinancials:{ tax:{ taxPayroll:430_000_000, taxThreshold:244_000_000, repeaterYears:3, repeaterTier:'Third consecutive year or more' } } });
+    const element = SurchargeRiskBadge({ warning, compact:true });
+    expect(element).not.toBeNull();
+    expect(element.props.role).toBe('status');
+    expect(element.props['aria-label']).toContain('SURCHARGE RISK');
+    expect(element.props['aria-label']).toContain('+$60M or more surcharge');
+    expect(SurchargeRiskBadge({ warning:getExtensionTaxWarning({ teamFinancials:{ tax:{ taxPayroll:200_000_000, taxThreshold:244_000_000 } } }) })).toBeNull();
+  });
+
+  it('keeps missing season-specific financial rows unavailable instead of imputing them', async () => {
+    const { buildHistoricalTaxTrendRows } = await import('../client/src/pages/OverviewPage.jsx');
+    expect(buildHistoricalTaxTrendRows([
+      { season:2024, tax:{ taxPayroll:250_000_000, estimatedTaxBill:3_000_000, taxThreshold:237_000_000 }, sourceUrls:{ tax:'https://www.spotrac.com/mlb/tax/_/year/2024' } },
+      null,
+      { season:2026, tax:{ taxPayroll:260_000_000, estimatedTaxBill:null, taxThreshold:244_000_000 }, sourceUrls:{ tax:'https://www.spotrac.com/mlb/tax/_/year/2026' } },
+    ])).toEqual([
+      { season:2024, taxPayroll:250_000_000, estimatedTaxBill:3_000_000, taxThreshold:237_000_000, sourceUrl:'https://www.spotrac.com/mlb/tax/_/year/2024' },
+      { season:2025, taxPayroll:null, estimatedTaxBill:null, taxThreshold:null, sourceUrl:null },
+      { season:2026, taxPayroll:260_000_000, estimatedTaxBill:null, taxThreshold:244_000_000, sourceUrl:'https://www.spotrac.com/mlb/tax/_/year/2026' },
+    ]);
+  });
+});

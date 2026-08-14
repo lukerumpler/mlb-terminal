@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { C, px, sans } from '../constants/colors.js';
 import { usePngExport } from '../lib/usePngExport.js';
-import { useLowDataMode } from '../lib/lowData.js';
+import TeamBadge from './TeamBadge.jsx';
 
 /* ── Compact, team-branded percentile radar card ───────────────────────
    A smaller, shareable cousin of the full "Player Geometry Engine" radar
@@ -24,19 +24,6 @@ import { useLowDataMode } from '../lib/lowData.js';
    cross-origin team-logo SVG on some browsers) — see that file for why
    this used to be two separately-maintained copies of the same logic.
 ------------------------------------------------------------------------ */
-
-function TeamBadge({ teamId, teamAbbr, size = 22 }) {
-  const lowDataMode = useLowDataMode();
-  if (!teamId || lowDataMode) return <span aria-label={teamAbbr || 'Team logo unavailable in Low Data Mode'} style={{ width:size, height:size, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:4, background:C.surface3, color:C.text3, ...px({ fontSize:8, fontWeight:800 }) }}>{teamAbbr || '—'}</span>;
-  return (
-    <img
-      src={`https://www.mlbstatic.com/team-logos/${teamId}.svg`}
-      alt={teamAbbr || ''}
-      width={size} height={size} loading="lazy"
-      style={{ flexShrink: 0, objectFit: 'contain' }}
-    />
-  );
-}
 
 export default function RadarCard({
   name,

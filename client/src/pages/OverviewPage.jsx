@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, fetchTeamFinancials } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import { percentile } from '../lib/percentile.js';
@@ -22,6 +22,7 @@ const RunDiffChart = lazy(() => import('../components/OverviewCharts.jsx').then(
 const ArsenalPie = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.ArsenalPie })));
 const PositionOaaChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.PositionOaaChart })));
 const EvDistributionChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.EvDistributionChart })));
+const LuxuryTaxTrendChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.LuxuryTaxTrendChart })));
 
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
@@ -222,6 +223,20 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
     });
 }
 
+export function buildHistoricalTaxTrendRows(results, seasons = [2024, 2025, 2026]) {
+  const numericOrNull = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
+  return seasons.map((season, index) => {
+    const record = Array.isArray(results) ? results[index] : null;
+    return {
+      season,
+      taxPayroll: numericOrNull(record?.tax?.taxPayroll),
+      estimatedTaxBill: numericOrNull(record?.tax?.estimatedTaxBill),
+      taxThreshold: numericOrNull(record?.tax?.taxThreshold),
+      sourceUrl: record?.sourceUrls?.tax || record?.tax?.sourceUrl || null,
+    };
+  });
+}
+
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const overviewRef = useRef(null);
@@ -239,6 +254,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [minBattingPa, setMinBattingPa] = useState(() => Number(rosterDefaults.battingPa) || 0);
   const [minPitchingIp, setMinPitchingIp] = useState(() => Number(rosterDefaults.pitchingIp) || 0);
   const [activeRosterPreset, setActiveRosterPreset] = useState(null);
+  const [taxTrendRows, setTaxTrendRows] = useState([]);
+  const [taxTrendState, setTaxTrendState] = useState('loading');
   useEffect(() => {
     setMinBattingPa(Number(rosterDefaults.battingPa) || 0);
     setMinPitchingIp(Number(rosterDefaults.pitchingIp) || 0);
@@ -378,6 +395,30 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
     return ()=>{ alive=false; };
   },[teamBase?.id]);
+
+  useEffect(() => {
+    let alive = true;
+    const teamAbbr = teamBase?.abbr;
+    if (!teamAbbr) return () => { alive = false; };
+    const seasons = [2024, 2025, 2026];
+    setTaxTrendRows([]);
+    setTaxTrendState('loading');
+    Promise.all(seasons.map(season => fetchTeamFinancials(teamAbbr, season)))
+      .then(results => {
+        if (!alive) return;
+        const rows = buildHistoricalTaxTrendRows(results, seasons);
+        setTaxTrendRows(rows);
+        setTaxTrendState(rows.some(row => row.taxPayroll != null || row.estimatedTaxBill != null) ? 'ready' : 'unavailable');
+      })
+      .catch(() => {
+        if (alive) {
+          setTaxTrendRows([]);
+          setTaxTrendState('unavailable');
+        }
+      });
+    return () => { alive = false; };
+  }, [teamBase?.abbr]);
+
   const exportTeamOverviewPdf = async () => {
     if (!overviewRef.current || pdfExportState === 'loading') return;
     setPdfExportState('loading');
@@ -639,6 +680,33 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </Panel>
       </div>
+
+      <Panel title="Franchise CBT Trend" accent={teamAccent} badge="2024–2026">
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px 4px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
+            <div>
+              <div style={sans({fontSize:11,fontWeight:800,color:C.text})}>{team.name || 'Selected franchise'}</div>
+              <div style={sans({fontSize:9.5,color:C.text3,marginTop:2})}>Historical tax payroll and estimated CBT bill</div>
+            </div>
+          </div>
+          <div style={px({fontSize:9,color:taxTrendState==='ready'?C.teal:taxTrendState==='loading'?C.amber:C.text3,fontWeight:800,letterSpacing:'.06em'})}>
+            {taxTrendState === 'loading' ? 'LOADING SOURCE HISTORY' : taxTrendState === 'ready' ? 'SPOTRAC HISTORY' : 'HISTORY UNAVAILABLE'}
+          </div>
+        </div>
+        <div style={{padding:'2px 8px 0'}}>
+          <Suspense fallback={<ChartFallback height={178}/> }>
+            <LuxuryTaxTrendChart data={taxTrendRows} accent={teamAccent}/>
+          </Suspense>
+        </div>
+        <div style={{display:'flex',gap:16,flexWrap:'wrap',padding:'0 14px 8px',...sans({fontSize:9.5,color:C.text3})}}>
+          <span><i style={{display:'inline-block',width:16,height:2,background:teamAccent,verticalAlign:'middle',marginRight:5}} />CBT payroll</span>
+          <span><i style={{display:'inline-block',width:16,height:2,background:C.rust,verticalAlign:'middle',marginRight:5}} />Estimated tax bill</span>
+        </div>
+        <div style={{padding:'0 14px 10px',...sans({fontSize:9.5,color:C.text4,lineHeight:1.4})}}>
+          Season rows are requested from the season-specific Spotrac MLB Tax Tracker. Missing rows remain unavailable; SKIP does not interpolate historical tax values. Threshold rules follow the <a href="https://www.mlb.com/glossary/transactions/competitive-balance-tax" target="_blank" rel="noreferrer" style={{color:C.amber}}>MLB CBT glossary</a>.
+        </div>
+      </Panel>
 
       <Panel title="Front Office Read" accent={teamAccent} badge="Decision Lens">
         <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>

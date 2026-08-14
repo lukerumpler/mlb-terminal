@@ -11040,3 +11040,19 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add source-backed luxury-tax surcharge impact warnings to individual player extension recommendation banners.
 - [x] Add a CSV export option for team payroll, CBT, repeater-tier, and multi-year luxury-tax projection data alongside PDF reports.
 - [x] Add regression tests, verify warning/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Surcharge badges, historical tax trends, and team identity
+- [x] Add a visual surcharge-risk badge to player cards when an extension would add payroll inside a CBT surcharge band.
+- [x] Add historical multi-season franchise luxury-tax trend charts beside the existing five-year projection model using verified data only.
+- [x] Add stronger team-focused visual identity to team overview and player pages with verified logos/colors and accessible fallbacks.
+- [x] Add regression tests, verify responsive chart and identity states, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Inherited financial and visual identity continuation
+
+- [x] Add a visible Surcharge Risk badge to player identity cards when verified CBT overage places a new extension in a surcharge band.
+- [x] Add a source-specific historical 2024–2026 franchise CBT trend chart to Team Overview using season-specific Spotrac tax responses only.
+- [x] Preserve verified MLB CBT threshold/rate citations and show unavailable states instead of interpolating missing franchise history.
+- [x] Verify team logos, team-color accents, chart legends, and new financial badges remain readable and responsive in Low Data Mode.
+- [x] Add regression tests for SurchargeRiskBadge, historical tax-row normalization, and season-specific Spotrac source URLs.
+- [x] Run final lint, type-check, production build, and Vitest release gates.
+- [x] Confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged before checkpoint.

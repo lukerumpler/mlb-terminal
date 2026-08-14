@@ -264,3 +264,98 @@ export function EvDistributionChart({ data, accent }) {
     </ResponsiveContainer>
   );
 }
+
+export function LuxuryTaxTrendChart({ data = [], accent = C.amber }) {
+  const hasData = data.some(
+    row => row.taxPayroll != null || row.estimatedTaxBill != null
+  );
+  if (!hasData) {
+    return (
+      <div
+        role="status"
+        style={{
+          height: 164,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 18px",
+          color: C.text3,
+          fontFamily: "'DM Mono',monospace",
+          fontSize: 10,
+          textAlign: "center",
+        }}
+      >
+        Historical franchise tax data unavailable from the season-specific
+        source feed.
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={178}>
+      <ComposedChart
+        data={data}
+        margin={{ top: 8, right: 12, bottom: 0, left: 4 }}
+      >
+        <CartesianGrid stroke={C.borderLight} vertical={false} />
+        <XAxis
+          dataKey="season"
+          tick={{ fontSize: 9.5, fill: C.text3 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          yAxisId="payroll"
+          tick={{ fontSize: 9, fill: C.text3 }}
+          width={42}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={value =>
+            value == null ? "—" : `$${Math.round(value / 1e6)}M`
+          }
+        />
+        <YAxis
+          yAxisId="tax"
+          orientation="right"
+          tick={{ fontSize: 9, fill: C.rust }}
+          width={42}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={value =>
+            value == null ? "—" : `$${Math.round(value / 1e6)}M`
+          }
+        />
+        <Tooltip
+          {...TT}
+          formatter={(value, name) => [
+            value == null
+              ? "Unavailable"
+              : `$${(Number(value) / 1e6).toFixed(1)}M`,
+            name === "taxPayroll" ? "CBT payroll" : "Estimated tax",
+          ]}
+        />
+        <Line
+          yAxisId="payroll"
+          type="monotone"
+          dataKey="taxPayroll"
+          name="taxPayroll"
+          stroke={accent}
+          strokeWidth={2}
+          dot={{ r: 3, fill: accent }}
+          connectNulls={false}
+          isAnimationActive={false}
+        />
+        <Line
+          yAxisId="tax"
+          type="monotone"
+          dataKey="estimatedTaxBill"
+          name="estimatedTaxBill"
+          stroke={C.rust}
+          strokeWidth={2}
+          dot={{ r: 3, fill: C.rust }}
+          connectNulls={false}
+          isAnimationActive={false}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
