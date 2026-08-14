@@ -162,6 +162,12 @@ function rdForInsights(team) {
   return Number.isFinite(rs) && Number.isFinite(ra) ? rs - ra : null;
 }
 
+export const ROSTER_PRESETS = [
+  { id:'qualified-hitters', label:'Qualified hitters', positions:[], sort:'ops', minBattingPa:150, minPitchingIp:0 },
+  { id:'rotation-candidates', label:'Rotation candidates', positions:['SP'], sort:'era', minBattingPa:0, minPitchingIp:30 },
+  { id:'high-leverage-arms', label:'High-leverage arms', positions:['RP'], sort:'era', minBattingPa:0, minPitchingIp:10 },
+];
+
 const ROSTER_SORT_OPTIONS = [
   { key:'ops', label:'OPS', group:'hitting', digits:3, direction:'desc' },
   { key:'homeRuns', label:'Home Runs', group:'hitting', digits:0, direction:'desc' },
@@ -188,6 +194,11 @@ function formatRosterStat(row, option) {
   return value == null ? '—' : value.toFixed(option.digits);
 }
 
+export function formatRosterSampleLabel(group, minimum) {
+  const unit = group === 'hitting' ? 'PA' : 'IP';
+  return minimum > 0 ? `${minimum} ${unit}+` : `Any ${unit}`;
+}
+
 export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, minPitchingIp = 0) {
   const option = ROSTER_SORT_OPTIONS.find(item => item.key === sortKey) || ROSTER_SORT_OPTIONS[0];
   const selectedPositions = positions === 'all' || !Array.isArray(positions) ? (positions === 'all' ? [] : [positions]) : positions;
@@ -210,7 +221,7 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
     });
 }
 
-function OverviewPage() {
+function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [splitTab,setSplitTab]=useState('home');
   const [arsenalTab,setArsenalTab]=useState('usage');
@@ -222,8 +233,13 @@ function OverviewPage() {
   const [teamPlayersError, setTeamPlayersError] = useState(false);
   const [selectedRosterPositions, setSelectedRosterPositions] = useState([]);
   const [rosterSort, setRosterSort] = useState('ops');
-  const [minBattingPa, setMinBattingPa] = useState(0);
-  const [minPitchingIp, setMinPitchingIp] = useState(0);
+  const [minBattingPa, setMinBattingPa] = useState(() => Number(rosterDefaults.battingPa) || 0);
+  const [minPitchingIp, setMinPitchingIp] = useState(() => Number(rosterDefaults.pitchingIp) || 0);
+  const [activeRosterPreset, setActiveRosterPreset] = useState(null);
+  useEffect(() => {
+    setMinBattingPa(Number(rosterDefaults.battingPa) || 0);
+    setMinPitchingIp(Number(rosterDefaults.pitchingIp) || 0);
+  }, [rosterDefaults.battingPa, rosterDefaults.pitchingIp]);
   const teamBase=TEAMS[selTeam];
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
@@ -284,6 +300,13 @@ function OverviewPage() {
   const rosterSortOption = ROSTER_SORT_OPTIONS.find(item => item.key === rosterSort) || ROSTER_SORT_OPTIONS[0];
   const activeMinimum = rosterSortOption.group === 'hitting' ? minBattingPa : minPitchingIp;
   const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp]);
+  const applyRosterPreset = preset => {
+    setSelectedRosterPositions(preset.positions);
+    setRosterSort(preset.sort);
+    setMinBattingPa(preset.minBattingPa);
+    setMinPitchingIp(preset.minPitchingIp);
+    setActiveRosterPreset(preset.id);
+  };
 
   useEffect(()=>{
     let alive=true;
@@ -584,15 +607,19 @@ function OverviewPage() {
         <div style={{padding:'8px 14px 0',...sans({fontSize:10,color:C.text3,lineHeight:1.45})}}>
           Automated read of the selected team using current aggregate stats and roster leaders. It updates when the team or live feed changes.
         </div>
-        <div className="roster-insight-controls" style={{display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap',padding:'10px 14px 2px'}}>
+        <div className="roster-insight-presets" style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',padding:'10px 14px 0'}}>
+          <span style={sans({fontSize:9.5,color:C.text3,fontWeight:800,textTransform:'uppercase',letterSpacing:'.07em'})}>Presets</span>
+          {ROSTER_PRESETS.map(preset => <button key={preset.id} type="button" aria-pressed={activeRosterPreset === preset.id} onClick={()=>applyRosterPreset(preset)} style={{height:28,padding:'0 9px',border:`1px solid ${activeRosterPreset === preset.id ? C.teal : C.border}`,borderRadius:6,background:activeRosterPreset === preset.id ? C.tealSoft : C.surface,color:activeRosterPreset === preset.id ? C.teal : C.text2,fontSize:10,fontWeight:700,cursor:'pointer'}}>{preset.label}</button>)}
+        </div>
+        <div className="roster-insight-controls" style={{display:'flex',alignItems:'flex-start',gap:8,flexWrap:'wrap',padding:'8px 14px 2px'}}>
           <fieldset style={{border:0,padding:0,margin:0,minWidth:190}}>
             <legend style={sans({fontSize:10,color:C.text2,fontWeight:700,marginBottom:5})}>Positions</legend>
             <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-              <button type="button" aria-label="Show all roster positions" onClick={()=>setSelectedRosterPositions([])} style={{height:28,padding:'0 8px',border:`1px solid ${selectedRosterPositions.length===0?C.amber:C.border}`,borderRadius:6,background:selectedRosterPositions.length===0?C.amberSoft:C.surface,color:selectedRosterPositions.length===0?C.amberDark:C.text2,fontSize:10,cursor:'pointer'}}>All</button>
+              <button type="button" aria-label="Show all roster positions" onClick={()=>{setSelectedRosterPositions([]);setActiveRosterPreset(null)}} style={{height:28,padding:'0 8px',border:`1px solid ${selectedRosterPositions.length===0?C.amber:C.border}`,borderRadius:6,background:selectedRosterPositions.length===0?C.amberSoft:C.surface,color:selectedRosterPositions.length===0?C.amberDark:C.text2,fontSize:10,cursor:'pointer'}}>All</button>
               {rosterPositions.map(position => {
                 const checked = selectedRosterPositions.includes(position);
                 return <label key={position} style={{display:'inline-flex',alignItems:'center',gap:4,height:28,padding:'0 7px',border:`1px solid ${checked?C.amber:C.border}`,borderRadius:6,background:checked?C.amberSoft:C.surface,cursor:'pointer',...sans({fontSize:10,color:checked?C.amberDark:C.text2,fontWeight:700})}}>
-                  <input type="checkbox" aria-label={`Filter roster insights by ${position}`} checked={checked} onChange={e=>setSelectedRosterPositions(prev=>e.target.checked?[...prev,position]:prev.filter(item=>item!==position))} style={{accentColor:C.amber}} />
+                  <input type="checkbox" aria-label={`Filter roster insights by ${position}`} checked={checked} onChange={e=>{setActiveRosterPreset(null);setSelectedRosterPositions(prev=>e.target.checked?[...prev,position]:prev.filter(item=>item!==position))}} style={{accentColor:C.amber}} />
                   {position}
                 </label>;
               })}
@@ -601,13 +628,13 @@ function OverviewPage() {
           </fieldset>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Sort by</span>
-            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>setRosterSort(e.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>{setActiveRosterPreset(null);setRosterSort(e.target.value)}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {ROSTER_SORT_OPTIONS.map(option => <option key={option.key} value={option.key}>{option.label}{option.direction === 'asc' ? ' ↑' : ' ↓'}</option>)}
             </select>
           </label>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Min {rosterSortOption.group === 'hitting' ? 'PA' : 'IP'}</span>
-            <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+            <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>{setActiveRosterPreset(null);rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {(rosterSortOption.group === 'hitting' ? [[0,'Any PA'],[50,'50+ PA'],[150,'150+ PA'],[300,'300+ PA']] : [[0,'Any IP'],[10,'10+ IP'],[30,'30+ IP'],[60,'60+ IP']]).map(([value,label])=><option key={value} value={value}>{label}</option>)}
             </select>
           </label>
@@ -621,6 +648,7 @@ function OverviewPage() {
                 <span style={{marginLeft:'auto',...px({fontSize:8.5,color:C.text3})}}>{row.position || '—'}</span>
               </div>
               <div style={{marginTop:3,...px({fontSize:10,color:C.teal,fontWeight:700})}}>{formatRosterStat(row, rosterSortOption)} {rosterSortOption.label}</div>
+              <div style={{marginTop:2,...px({fontSize:8.5,color:C.text4})}}>Sample: {formatRosterSampleLabel(rosterSortOption.group, activeMinimum)}</div>
             </div>
           ))}
           {teamPlayersLoading && <div role="status" style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>Loading roster leaders…</div>}
