@@ -12,6 +12,7 @@ const {
   mlb,
   __resetMlbClientStateForTests,
   fetchTeamFinancials,
+  getGameFeedMetadata,
 } = await import('../client/src/api/mlb.js');
 
 describe('MLB request cache optimization', () => {
@@ -60,6 +61,11 @@ describe('MLB request cache optimization', () => {
     await getTeamPlayerStats(9997, 'hitting', 2098);
     await getTeamPlayerStats(9997, 'hitting', 2098);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('extracts recorded MLB weather and constructs an official Gameday link', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ gameData: { weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } } }) });
+    await expect(getGameFeedMetadata(123456)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, mediaUrl: 'https://www.mlb.com/gameday/123456' });
   });
 
   it('aggregates schedule-derived Home/Away and Day/Night W–L rows and caches the result', async () => {

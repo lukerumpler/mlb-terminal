@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseFanGraphsModelHtml } from '../server/api/fangraphs-models.js';
+import { parseFanGraphsModelHtml, parseFanGraphsAggregateWarHtml } from '../server/api/fangraphs-models.js';
 
 const overviewSource = readFileSync('/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx', 'utf8');
 
@@ -17,6 +17,14 @@ describe('FanGraphs model source adapter', () => {
     expect(result.advancedMetrics.projectedLosses).toBe(66.6);
     expect(result.advancedMetrics.offenseWar).toBe(29.1);
     expect(result.advancedMetrics.defenseWar).toBe(8.4);
+  });
+
+  it('parses aggregate batting and pitching WAR by header name and computes total WAR', () => {
+    const battingHtml = '<table><tr><th>Team</th><th>WAR</th></tr><tr><td>Los Angeles Dodgers</td><td>24.3</td></tr><tr><td>New York Yankees</td><td>21.1</td></tr></table>';
+    const pitchingHtml = '<table><tr><th>Team</th><th>WAR</th></tr><tr><td>Los Angeles Dodgers</td><td>18.1</td></tr><tr><td>New York Yankees</td><td>17.2</td></tr></table>';
+    const result = parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, 2026);
+    expect(result.teams).toContainEqual({ team: 'Los Angeles Dodgers', battingWAR: 24.3, pitchingWAR: 18.1, totalWAR: 42.4 });
+    expect(result.teams).toContainEqual({ team: 'New York Yankees', battingWAR: 21.1, pitchingWAR: 17.2, totalWAR: 38.3 });
   });
 
   it('returns null model values when the source markup is blocked or changed', () => {

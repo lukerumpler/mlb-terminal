@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -34,6 +34,17 @@ const LuxuryTaxTrendChart = lazy(() => import('../components/OverviewCharts.jsx'
 
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
+function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
+  return <div className="skip-overview-empty-state" role="status">
+    <span className="skip-overview-empty-mark" aria-hidden="true">—</span>
+    <div className="skip-overview-empty-copy">
+      <span className="skip-overview-empty-status">{status}</span>
+      <span className="skip-overview-empty-message">{message}</span>
+      {detail && <span className="skip-overview-empty-detail">{detail}</span>}
+    </div>
+  </div>;
+}
+
 function ChartFallback({ height }) {
   return (
     <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 8px' }}>
@@ -488,6 +499,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamSplitRows, setTeamSplitRows] = useState([]);
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
+  const [todayGameMetadata, setTodayGameMetadata] = useState({});
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
@@ -637,6 +649,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
   useEffect(() => {
     let alive = true;
+    setTodayGameMetadata({});
+    const games = todayGames.slice(0, 6);
+    if (games.length) {
+      Promise.all(games.map(game => getGameFeedMetadata(game.gamePk).then(metadata => [game.gamePk, metadata]).catch(() => [game.gamePk, null]))).then(entries => {
+        if (alive) setTodayGameMetadata(Object.fromEntries(entries));
+      });
+    }
+    return () => { alive = false; };
+  }, [todayGames]);
+  useEffect(() => {
+    let alive = true;
     setTeamSplitRows([]);
     getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => { if (alive) setTeamSplitRows(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setTeamSplitRows([]); });
     return () => { alive = false; };
@@ -705,7 +728,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     let alive = true;
     setTeamModelState('loading');
     setSkipPlayoffEstimate(null);
-    getTeamModelSources(teamBase?.abbr, CURRENT_SEASON).then(data => {
+    getTeamModelSources(teamBase?.abbr, CURRENT_SEASON).then(async data => {
+      if (!alive) return;
+      if (data?.teamWar == null) {
+        const aggregate = await getTeamAggregateWar(teamBase?.name, CURRENT_SEASON);
+        if (aggregate && alive) {
+          data = { ...data, found: true, teamWar: aggregate.teamWar, source: `${data.source || 'FanGraphs'} + ${aggregate.source}`, retrievedAt: aggregate.retrievedAt || data.retrievedAt, freshness: aggregate.freshness, statuses: { ...(data.statuses || {}), teamWar: aggregate.status } };
+        }
+      }
       if (!alive) return;
       setTeamModelData(data);
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
@@ -1364,7 +1394,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{padding:'8px 2px 4px'}}>
               {liveRunDiffData.length ? <Suspense fallback={<ChartFallback height={144}/> }>
                 <RunDiffChart data={liveRunDiffData} accent={teamAccent}/>
-              </Suspense> : <div style={sans({minHeight:126,display:'flex',alignItems:'center',justifyContent:'center',padding:'14px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season run differential was returned by the MLB Stats API.</div>}
+              </Suspense> : <OverviewEmptyState message="Run differential unavailable" detail="No verified current-season MLB Stats API rollup was returned." />}
             </div>
             <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: MLB Stats API standings · current-season cumulative snapshot.</div>
           </Panel>
@@ -1465,11 +1495,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           </div>
           ) : (
-            <div style={{padding:'28px 18px',textAlign:'center'}}>
-              <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>{teamSavantState === 'loading' ? 'Loading verified batted-ball rows' : 'Team batted-ball feed unavailable'}</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>{teamSavantState === 'loading' ? 'Checking the team feed and verified roster-player Statcast rollup.' : 'No verified team or roster-player batted-ball rows were returned by Baseball Savant for this season.'}</div>
-            </div>
+              <OverviewEmptyState status={teamSavantState === 'loading' ? 'Loading' : 'Unavailable'} message="Team batted-ball rows" detail={teamSavantState === 'loading' ? 'Checking the verified Baseball Savant team and roster feed.' : 'No verified Baseball Savant batted-ball rows were returned for this season.'} />
           )}
         </Panel>
 
@@ -1527,11 +1553,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               })}
             </div>
           )) : (
-            <div style={{padding:'28px 18px',textAlign:'center'}}>
-              <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>{teamSavantState === 'loading' ? 'Loading verified pitch rows' : 'Team pitch arsenal feed unavailable'}</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>{teamSavantState === 'loading' ? 'Checking the verified roster-player Statcast pitch rollup.' : 'No verified roster-player pitch rows were returned by Baseball Savant for this season.'}</div>
-            </div>
+              <OverviewEmptyState status={teamSavantState === 'loading' ? 'Loading' : 'Unavailable'} message="Team pitch arsenal rows" detail={teamSavantState === 'loading' ? 'Checking the verified Baseball Savant roster pitch rollup.' : 'No verified Baseball Savant pitch rows were returned for this season.'} />
           )}
           <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
             Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · usage is based on verified pitch rows; Stuff+ remains unavailable in this rollup.
@@ -1546,7 +1568,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 {[['xwOBA', contactAllowed.xwoba == null ? '—' : contactAllowed.xwoba.toFixed(3)], ['Avg EV', contactAllowed.exitVelocity == null ? '—' : `${contactAllowed.exitVelocity.toFixed(1)} mph`], ['Hard-hit', contactAllowed.hardHitPct == null ? '—' : `${contactAllowed.hardHitPct.toFixed(1)}%`]].map(([label,value]) => <div key={label} style={{padding:'18px 10px',textAlign:'center',borderRight:`0.5px solid ${C.borderLight}`}}><div style={px({fontSize:17,fontWeight:800,color:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
                 <div style={sans({gridColumn:'1 / -1',padding:'7px 14px 10px',fontSize:9,color:C.text4})}>Source: Baseball Savant · {contactAllowed.sampleSize.toLocaleString()} verified opponent batted-ball rows.</div>
               </div>
-            ) : <div style={{padding:'20px 18px',textAlign:'center'}}><div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div><div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Opponent Statcast feed unavailable</div><div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Baseball Savant did not return verified opponent batted-ball rows for this season.</div></div>}
+            ) : <OverviewEmptyState message="Opponent contact quality" detail="Baseball Savant did not return verified opponent batted-ball rows for this season." />}
           </Panel>
 
           {/* Position depth is derived from the verified current-season player rows. */}
@@ -1609,16 +1631,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
             </div>
           ) : (
-            <div style={{padding:'28px 18px',textAlign:'center'}}>
-              <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team exit-velocity feed unavailable</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Baseball Savant did not return verified team batted-ball rows for this season. Individual player exit-velocity panels remain available.</div>
-            </div>
+              <OverviewEmptyState message="Team exit velocity" detail="Baseball Savant did not return verified team batted-ball rows for this season. Individual player panels remain available." />
           )}
         </Panel>
 
         <Panel title="Spray Chart" accent={C.rust} badge={sprayRows.length ? 'Savant' : 'Unavailable'}>
-          {sprayRows.length ? <div style={{padding:'10px 14px 8px'}}><svg viewBox="0 0 260 150" role="img" aria-label="Verified Baseball Savant batted-ball spray coordinates" style={{width:'100%',height:150,background:'linear-gradient(180deg, rgba(21,112,112,.06), transparent)',borderRadius:6}}><path d="M130 142 L28 22 M130 142 L232 22" stroke={C.border} strokeWidth="1" fill="none"/><path d="M130 142 L130 18" stroke={C.border} strokeWidth="1" fill="none"/>{sprayRows.map((row,index) => { const x = Math.max(20, Math.min(240, 130 + ((Number(row.hc_x) - 125) * 0.85))); const y = Math.max(18, Math.min(138, 142 - ((Number(row.hc_y) - 30) * 0.55))); const color = row.bb_type === 'ground_ball' ? C.teal : row.bb_type === 'fly_ball' ? C.amber : row.bb_type === 'line_drive' ? C.rust : C.slate; return <circle key={`${row.hc_x}-${row.hc_y}-${index}`} cx={x} cy={y} r="2.2" fill={color} opacity=".72"/>; })}</svg><div style={sans({fontSize:9,color:C.text4,lineHeight:1.4,marginTop:5})}>Source: Baseball Savant · {sprayRows.length.toLocaleString()} verified batted-ball coordinates. Raw Savant coordinate view; points are not estimated.</div></div> : <div style={{padding:'28px 18px',textAlign:'center'}}><div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div><div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team spray feed unavailable</div><div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Baseball Savant did not return verified team batted-ball coordinates for this season.</div></div>}
+          {sprayRows.length ? <div style={{padding:'10px 14px 8px'}}><svg viewBox="0 0 260 150" role="img" aria-label="Verified Baseball Savant batted-ball spray coordinates" style={{width:'100%',height:150,background:'linear-gradient(180deg, rgba(21,112,112,.06), transparent)',borderRadius:6}}><path d="M130 142 L28 22 M130 142 L232 22" stroke={C.border} strokeWidth="1" fill="none"/><path d="M130 142 L130 18" stroke={C.border} strokeWidth="1" fill="none"/>{sprayRows.map((row,index) => { const x = Math.max(20, Math.min(240, 130 + ((Number(row.hc_x) - 125) * 0.85))); const y = Math.max(18, Math.min(138, 142 - ((Number(row.hc_y) - 30) * 0.55))); const color = row.bb_type === 'ground_ball' ? C.teal : row.bb_type === 'fly_ball' ? C.amber : row.bb_type === 'line_drive' ? C.rust : C.slate; return <circle key={`${row.hc_x}-${row.hc_y}-${index}`} cx={x} cy={y} r="2.2" fill={color} opacity=".72"/>; })}</svg><div style={sans({fontSize:9,color:C.text4,lineHeight:1.4,marginTop:5})}>Source: Baseball Savant · {sprayRows.length.toLocaleString()} verified batted-ball coordinates. Raw Savant coordinate view; points are not estimated.</div></div> : <OverviewEmptyState message="Team spray coordinates" detail="Baseball Savant did not return verified team batted-ball coordinates for this season." />}
         </Panel>
       </div>
 
@@ -1728,6 +1746,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                       <span style={{...px({fontSize:15,fontWeight:800,lineHeight:1}),color:w?C.amber:C.text}}>{tm.runs??'–'}</span>
                     </div>
                   ))}
+                  <div style={sans({fontSize:9,color:C.text3,marginTop:6,display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'})}>
+                    <span>{g.venue || 'Venue unavailable'}{todayGameMetadata[g.gamePk]?.weather?.temp ? ` · ${todayGameMetadata[g.gamePk].weather.temp}` : todayGameMetadata[g.gamePk]?.status === 'unavailable' ? ' · Weather unavailable' : ''}</span>
+                    <a href={todayGameMetadata[g.gamePk]?.mediaUrl || `https://www.mlb.com/gameday/${g.gamePk}`} target="_blank" rel="noreferrer" style={{color:C.navy,fontWeight:700,textDecoration:'none'}}>MLB Gameday ↗</a>
+                  </div>
                 </div>
               );
             })}

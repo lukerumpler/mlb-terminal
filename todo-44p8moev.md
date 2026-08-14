@@ -119,3 +119,9 @@
 - [ ] Add tests, desktop/mobile screenshots, and publish the specification-aligned release.
 - [x] Wire Advanced Models xwOBA and the intended exit-velocity dependency to verified team_batted_balls rows, or explicitly narrow their source contract.
 - [ ] Save a fresh checkpoint after the final provider-reliability and specification-aligned verification pass.
+
+- [ ] Audit the attached empty-state, responsive-overflow, control-state, footer, and sidebar recommendations against the current rendered dashboard.
+- [ ] Unify empty-state card templates, remove redundant body titles, distinguish status accents, and standardize unavailable-value presentation.
+- [ ] Repair responsive overflow and clipping in the Overview grid, badges, and Splits Dashboard table.
+- [ ] Replace nonfunctional toggle controls with truthful static states or implemented interactions; clarify footer truncation and sidebar grouping.
+- [ ] Add responsive regression coverage, verify desktop/mobile screenshots, and publish the UI repair update.

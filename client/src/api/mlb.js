@@ -773,6 +773,19 @@ export async function getOrgGames(date, mlbTeamId) {
   ];
 }
 
+export async function getGameFeedMetadata(gamePk) {
+  if (!gamePk) return null;
+  try {
+    const data = await mlb(`/game/${gamePk}/feed/live`, {}, { ttl: 10 * 60_000, timeoutMs: 10_000 });
+    return {
+      weather: data?.gameData?.weather ? { condition: data.gameData.weather.condition || null, temp: data.gameData.weather.temp || null, wind: data.gameData.weather.wind || null } : null,
+      mediaUrl: `https://www.mlb.com/gameday/${gamePk}`,
+      retrievedAt: new Date().toISOString(),
+    };
+  } catch {
+    return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable' };
+  }
+}
 export async function getGameLinescore(gamePk) { return mlb(`/game/${gamePk}/linescore`); }
 export async function getGameBoxscore(gamePk)  { return mlb(`/game/${gamePk}/boxscore`); }
 
@@ -1295,6 +1308,19 @@ export async function getFirstRoundResults(year) {
   return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
 }
 
+export async function getTeamAggregateWar(teamName, season = SEASON) {
+  if (!teamName) return null;
+  const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
+  try {
+    const response = await fetch(`/api/fangraphs-models?${params.toString()}`, { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const selected = (data?.teams || []).find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
+    return selected?.totalWAR == null ? null : { teamWar: selected.totalWAR, source: 'FanGraphs aggregate Team WAR', freshness: data.freshness || 'live', retrievedAt: data.retrievedAt || data.servedAt, status: data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial' };
+  } catch {
+    return null;
+  }
+}
 export async function getTeamModelSources(teamAbbr, season = SEASON) {
   const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
   try {

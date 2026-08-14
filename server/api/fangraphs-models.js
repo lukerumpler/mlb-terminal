@@ -4,12 +4,15 @@ const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = 'https://www.fangraphs.com/standings/playoff-odds/fg/mlb';
 const WAR_URL = 'https://www.fangraphs.com/depthcharts.aspx?position=Team';
+const AGGREGATE_WAR_URL = (season, stats) => `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
 const UA = 'Mozilla/5.0 (compatible; SKIPBaseball/1.0)';
 const CACHE_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
 const DEFAULT_COOLDOWN_MS = 30_000;
 const modelCache = new Map();
 const modelInFlight = new Map();
+const aggregateWarCache = new Map();
+const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
 
 function parseRetryAfterMs(response) {
@@ -123,6 +126,32 @@ export function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season 
   };
 }
 
+export function parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, season = DEFAULT_SEASON) {
+  const parseRows = html => {
+    const rows = new Map();
+    for (const table of tablesFromHtml(html)) {
+      const matches = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+      if (!matches.length) continue;
+      const headers = cellsFromRow(matches[0][1]);
+      const teamIndex = headers.findIndex(header => normalizeMetricKey(header) === 'team' || normalizeMetricKey(header).includes('team'));
+      const warIndex = headers.findIndex(header => normalizeMetricKey(header) === 'war' || normalizeMetricKey(header).endsWith('_war'));
+      if (teamIndex < 0 || warIndex < 0) continue;
+      for (const match of matches.slice(1)) {
+        const cells = cellsFromRow(match[1]);
+        const team = cells[teamIndex];
+        const war = numeric(cells[warIndex]);
+        if (team && war != null) rows.set(team, war);
+      }
+      if (rows.size) break;
+    }
+    return rows;
+  };
+  const batting = parseRows(battingHtml);
+  const pitching = parseRows(pitchingHtml);
+  const names = new Set([...batting.keys(), ...pitching.keys()]);
+  return { season, teams: [...names].map(team => ({ team, battingWAR: batting.get(team) ?? null, pitchingWAR: pitching.get(team) ?? null, totalWAR: batting.has(team) && pitching.has(team) ? Number((batting.get(team) + pitching.get(team)).toFixed(1)) : null })) };
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*' },
@@ -136,6 +165,46 @@ async function fetchHtml(url) {
   return response.text();
 }
 
+async function loadAggregateWar(season) {
+  const cached = aggregateWarCache.get(String(season));
+  if (cached && cached.expiresAt > Date.now()) return { data: cached.data, cache: 'HIT' };
+  const key = String(season);
+  const existing = aggregateWarInFlight.get(key);
+  if (existing) return { data: await existing, cache: 'COALESCED' };
+  if (fanGraphsCooldownUntil > Date.now()) {
+    if (cached && cached.staleExpiresAt > Date.now()) return { data: { ...cached.data, freshness: 'stale-cached', staleReason: 'FanGraphs rate limit cooldown' }, cache: 'STALE' };
+    const error = new Error('FanGraphs aggregate rate limit cooldown active');
+    error.status = 429;
+    error.retryAfter = Math.ceil((fanGraphsCooldownUntil - Date.now()) / 1000);
+    throw error;
+  }
+  const request = (async () => {
+    const [battingResult, pitchingResult] = await Promise.allSettled([fetchHtml(AGGREGATE_WAR_URL(season, 'bat')), fetchHtml(AGGREGATE_WAR_URL(season, 'pit'))]);
+    const throttled = [battingResult, pitchingResult].filter(result => result.status === 'rejected' && result.reason?.status === 429);
+    if (throttled.length) fanGraphsCooldownUntil = Math.max(fanGraphsCooldownUntil, Date.now() + Math.max(...throttled.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS)));
+    const parsed = parseFanGraphsAggregateWarHtml({ battingHtml: battingResult.status === 'fulfilled' ? battingResult.value : '', pitchingHtml: pitchingResult.status === 'fulfilled' ? pitchingResult.value : '' }, season);
+    const hasRows = parsed.teams.some(team => team.totalWAR != null);
+    if (!hasRows && battingResult.status === 'rejected' && pitchingResult.status === 'rejected') {
+      const error = new Error('FanGraphs aggregate Team WAR unavailable');
+      error.status = throttled.length ? 429 : 502;
+      if (throttled.length) error.retryAfter = Math.ceil(Math.max(...throttled.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS)) / 1000);
+      throw error;
+    }
+    return { found: hasRows, ...parsed, source: 'FanGraphs', sourceUrls: { batting: AGGREGATE_WAR_URL(season, 'bat'), pitching: AGGREGATE_WAR_URL(season, 'pit') }, retrievedAt: new Date().toISOString(), freshness: 'live', statuses: { batting: battingResult.status === 'fulfilled' && battingResult.value ? 'live' : 'upstream-unavailable', pitching: pitchingResult.status === 'fulfilled' && pitchingResult.value ? 'live' : 'upstream-unavailable' } };
+  })();
+  aggregateWarInFlight.set(key, request);
+  try {
+    const data = await request;
+    aggregateWarCache.set(key, { data, expiresAt: Date.now() + 60 * 60_000, staleExpiresAt: Date.now() + 2 * 60 * 60_000 });
+    return { data, cache: 'MISS' };
+  } catch (error) {
+    if (cached && cached.staleExpiresAt > Date.now()) return { data: { ...cached.data, freshness: 'stale-cached', staleReason: error.status === 429 ? 'FanGraphs rate limit' : 'FanGraphs upstream unavailable' }, cache: 'STALE' };
+    throw error;
+  } finally {
+    if (aggregateWarInFlight.get(key) === request) aggregateWarInFlight.delete(key);
+  }
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -144,6 +213,18 @@ export default async function handler(req, res) {
   const teamAbbr = String(url.searchParams.get('team') || '').trim().toUpperCase();
   const seasonValue = Number(url.searchParams.get('season') || DEFAULT_SEASON);
   const season = Number.isInteger(seasonValue) ? seasonValue : DEFAULT_SEASON;
+  if (url.searchParams.get('mode') === 'aggregate') {
+    if (isRateLimited(req, 'fangraphs')) return rateLimitResponse(res);
+    try {
+      const result = await loadAggregateWar(season);
+      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=1800');
+      res.setHeader('X-Provider-Cache', result.cache);
+      return res.status(200).json({ ...result.data, servedAt: new Date().toISOString() });
+    } catch (error) {
+      if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+      return res.status(error?.status || 502).json({ found: false, season, teams: [], statuses: { batting: 'unavailable', pitching: 'unavailable' }, error: 'FanGraphs aggregate Team WAR unavailable' });
+    }
+  }
   if (!TEAM_CODE.test(teamAbbr)) return res.status(400).json({ error: 'Missing or invalid team abbreviation' });
 
   const key = modelKey(teamAbbr, season);

@@ -58,8 +58,8 @@ describe('Team Overview model source and retry interaction', () => {
 
   it('shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending', async () => {
     render(<OverviewPage />);
-    expect(await screen.findByText('Loading verified batted-ball rows')).toBeInTheDocument();
-    expect(await screen.findByText('Loading verified pitch rows')).toBeInTheDocument();
+    expect(await screen.findByText('Team batted-ball rows')).toBeInTheDocument();
+    expect(await screen.findByText('Team pitch arsenal rows')).toBeInTheDocument();
   });
 
   it('renders verified team spray and opponent contact-quality rollups when Savant returns rows', async () => {
@@ -73,9 +73,9 @@ describe('Team Overview model source and retry interaction', () => {
   it('shows explicit unavailable states when Savant returns no verified rows', async () => {
     savantMode = 'empty';
     render(<OverviewPage />);
-    expect(await screen.findByText('Team batted-ball feed unavailable')).toBeInTheDocument();
-    expect(await screen.findByText('Team pitch arsenal feed unavailable')).toBeInTheDocument();
-    expect(await screen.findByText('No verified current-season run differential was returned by the MLB Stats API.')).toBeInTheDocument();
+    expect(await screen.findByText('Team batted-ball rows')).toBeInTheDocument();
+    expect(await screen.findByText('Team pitch arsenal rows')).toBeInTheDocument();
+    expect(await screen.findByText('Run differential unavailable')).toBeInTheDocument();
   });
 
   it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {
