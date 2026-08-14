@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import fangraphsHandler from "./fangraphs-models.js";
-import savantHandler from "./savant.js";
+import fangraphsHandler, { __resetFanGraphsProviderStateForTests } from "./fangraphs-models.js";
+import savantHandler, { __resetSavantStateForTests } from "./savant.js";
 import ncaaHandler from "./ncaa.js";
 
 type MockResponse = {
@@ -43,6 +43,8 @@ function html(team: string, odds: string, war: string) {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  __resetSavantStateForTests();
+  __resetFanGraphsProviderStateForTests();
 });
 
 describe("FanGraphs provider cache", () => {
@@ -57,6 +59,19 @@ describe("FanGraphs provider cache", () => {
     expect(first.statusCode).toBe(200);
     expect(second.headers["X-Provider-Cache"]).toBe("HIT");
     expect((second.body as { freshness: string }).freshness).toBe("cached");
+  });
+
+  it("cools down repeated FanGraphs model failures instead of reopening both sources immediately", async () => {
+    const fetchMock = vi.fn(async () => { throw Object.assign(new Error("FanGraphs unavailable"), { status: 502 }); });
+    vi.stubGlobal("fetch", fetchMock);
+    const first = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=LAD&season=2093"), first);
+    const second = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=LAD&season=2093"), second);
+    expect(first.statusCode).toBe(502);
+    expect(second.statusCode).toBe(503);
+    expect(second.headers["Retry-After"]).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("serves a verified stale model when FanGraphs returns 429 after cache expiry", async () => {
@@ -112,6 +127,25 @@ describe("Baseball Savant provider cache", () => {
     await savantHandler(req("/api/savant?endpoint=team_batted_balls&year=2095&team=LAD"), result);
     expect(result.statusCode).toBe(200);
     expect(result.body).toEqual([{ hc_x: 125, hc_y: 210, bb_type: "fly_ball", launch_speed: 101.4, launch_angle: null, launch_speed_angle: null, xwoba: 0.512, events: "home_run" }]);
+  });
+
+  it("serves verified stale Savant rows when a refresh connection terminates", async () => {
+    vi.useFakeTimers();
+    const csv = "player_id,launch_speed\n1,96.2\n";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(csv, { status: 200, headers: { "content-type": "text/csv" } }))
+      .mockRejectedValueOnce(Object.assign(new Error("terminated"), { name: "AbortError" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const url = "/api/savant?endpoint=team_exit_velocity&year=2094&team=LAX";
+    const first = response();
+    await savantHandler(req(url), first);
+    vi.advanceTimersByTime(60 * 60_000 + 1);
+    const stale = response();
+    await savantHandler(req(url), stale);
+    expect(stale.statusCode).toBe(200);
+    expect(stale.headers["X-Provider-Cache"]).toBe("STALE");
+    expect(stale.headers["X-Provider-Freshness"]).toBe("stale-cached");
+    expect(stale.body).toEqual([{ launch_speed: 96.2, launch_angle: null, launch_speed_angle: null, bb_type: null, events: null, game_date: null }]);
   });
 
   it("returns a bounded 429 with Retry-After when no verified Savant fallback exists", async () => {

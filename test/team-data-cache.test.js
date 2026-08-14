@@ -114,6 +114,20 @@ describe('team data cache and freshness helpers', () => {
     expect(result.snapshot.battedBallRows).toEqual([{ launch_speed:99 }]);
   });
 
+  it('does not persist an entirely unavailable Savant snapshot', async () => {
+    const saveCacheFn = vi.fn();
+    const result = await resolveTeamSavantSnapshot({
+      teamAbbr:'LAD', season:2026, cached:null,
+      hitters:[{ id:11 }], pitchers:[{ id:22 }],
+      getTeamExitVelocityFn: vi.fn().mockResolvedValue([]),
+      getPlayerContactPointsFn: vi.fn().mockResolvedValue([]),
+      getPitcherPitchesFn: vi.fn().mockResolvedValue([]),
+      saveCacheFn,
+    });
+    expect(result.snapshot).toEqual({ exitVelocityRows:[], battedBallRows:[], pitchRows:[] });
+    expect(saveCacheFn).not.toHaveBeenCalled();
+  });
+
   it('formats honest age labels without calling fresh data stale', () => {
     const now = 1_700_000_000_000;
     expect(formatDataAge(now - 30_000, now)).toBe('just now');

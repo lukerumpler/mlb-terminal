@@ -305,7 +305,8 @@ export async function resolveTeamSavantSnapshot({
       ? 'Baseball Savant Statcast Search · team query'
       : (contactRows.length || pitchRows.length ? 'Baseball Savant Statcast Search · verified roster rollup' : '');
   const snapshot = { exitVelocityRows: contactRows, battedBallRows: Array.isArray(directBattedRows) && directBattedRows.length ? directBattedRows : contactRows, pitchRows };
-  saveCacheFn(teamAbbr, season, snapshot);
+  const hasVerifiedRows = contactRows.length > 0 || (Array.isArray(directBattedRows) && directBattedRows.length > 0) || pitchRows.length > 0;
+  if (hasVerifiedRows) saveCacheFn(teamAbbr, season, snapshot);
   return { snapshot, source, cacheHit: false };
 }
 
@@ -634,6 +635,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   useEffect(() => {
     let alive = true;
     if (!affiliateId) { setAffiliateStandings(null); setAffiliateSchedule(null); setAffiliateSavant(null); return () => { alive = false; }; }
+    const selectedAffiliate = affiliates.find(row => String(row.id) === String(affiliateId));
+    const affiliateAbbr = String(selectedAffiliate?.abbr || '').trim();
     setAffiliateStandings({ status:'loading', rows:[] });
     setAffiliateSchedule({ status:'loading', games:[] });
     setAffiliateSavant({ status:'loading' });
@@ -649,13 +652,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setAffiliateStandings({ status:'upstream-unavailable', rows:[] });
       setAffiliateSchedule({ status:'upstream-unavailable', games:[] });
     });
-    getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON).then(savant => {
-      if (alive) setAffiliateSavant(savant);
-    }).catch(() => {
-      if (alive) setAffiliateSavant({ status:'upstream-unavailable' });
-    });
+    if (!affiliateAbbr) {
+      setAffiliateSavant({ status:'source-gap', source:'Baseball Savant', sampleSize:0, retrievedAt:new Date().toISOString() });
+    } else {
+      getTeamSavantMetrics(affiliateAbbr, CURRENT_SEASON).then(savant => {
+        if (alive) setAffiliateSavant(savant);
+      }).catch(() => {
+        if (alive) setAffiliateSavant({ status:'upstream-unavailable', source:'Baseball Savant' });
+      });
+    }
     return () => { alive = false; };
-  }, [affiliateId, affiliateLevel, teamBase?.abbr]);
+  }, [affiliateId, affiliateLevel, affiliates]);
 
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
@@ -1178,10 +1185,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              {affiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>
         </label>
-        <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
+        <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
-            <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center'}}>
-              <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
+            <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center',minWidth:0}}>
+              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}

@@ -116,6 +116,9 @@
         .skip-content select { max-width:100%; }
         .overview-responsive-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
         .overview-responsive-grid > * { min-width:0; }
+        .overview-team-metrics { min-width:0; max-width:100%; gap:16px !important; }
+        .overview-team-metrics > div { flex:0 1 auto; min-width:58px !important; }
+        .overview-team-metric-value { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .skip-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         .skip-stat-strip > div { min-height:78px; }
         .skip-sidebar button:hover { transform:none !important; }
@@ -132,6 +135,8 @@
     </style>
     <style>
       @media (max-width: 720px) {
+        .overview-team-metrics { width:100%; flex-wrap:nowrap !important; overflow-x:auto; overscroll-behavior-x:contain; padding:2px 2px 6px; scrollbar-width:thin; }
+        .overview-team-metrics > div { flex:0 0 76px; }
         .skip-mobile-nav-toggle { display:inline-flex !important; }
         .skip-sidebar { position:fixed !important; inset:0 auto 0 0; z-index:80; width:min(286px, calc(100vw - 48px)) !important; transform:translateX(-105%); transition:transform 180ms cubic-bezier(.23,1,.32,1); box-shadow:none !important; }
         .skip-sidebar.skip-mobile-nav-open { transform:translateX(0); box-shadow:14px 0 34px rgba(20,31,48,.18) !important; }

@@ -9,11 +9,22 @@ const UA = 'Mozilla/5.0 (compatible; SKIPBaseball/1.0)';
 const CACHE_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
 const DEFAULT_COOLDOWN_MS = 30_000;
+const FANGRAPHS_FAILURE_COOLDOWN_MS = 15_000;
 const modelCache = new Map();
 const modelInFlight = new Map();
 const aggregateWarCache = new Map();
 const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
+const modelFailureCooldownUntil = new Map();
+
+export function __resetFanGraphsProviderStateForTests() {
+  modelCache.clear();
+  modelInFlight.clear();
+  aggregateWarCache.clear();
+  aggregateWarInFlight.clear();
+  modelFailureCooldownUntil.clear();
+  fanGraphsCooldownUntil = 0;
+}
 
 function parseRetryAfterMs(response) {
   const value = response?.headers?.get?.('Retry-After');
@@ -259,6 +270,18 @@ export default async function handler(req, res) {
     res.setHeader('Retry-After', String(retryAfter));
     return res.status(429).json({ error: 'FanGraphs rate limit cooldown active', retryAfter });
   }
+  const failureUntil = modelFailureCooldownUntil.get(key) || 0;
+  if (failureUntil > Date.now()) {
+    if (stale) {
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+      res.setHeader('X-Provider-Cache', 'STALE');
+      return res.status(200).json({ ...stale.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: 'FanGraphs recent upstream failure' });
+    }
+    const retryAfter = Math.ceil((failureUntil - Date.now()) / 1000);
+    res.setHeader('Retry-After', String(retryAfter));
+    return res.status(503).json({ error: 'FanGraphs temporary upstream cooldown active', retryAfter });
+  }
+  if (failureUntil) modelFailureCooldownUntil.delete(key);
 
   if (isRateLimited(req, 'fangraphs')) return rateLimitResponse(res);
   const upstreamRequest = (async () => {
@@ -298,12 +321,14 @@ export default async function handler(req, res) {
   modelInFlight.set(key, upstreamRequest);
   try {
     const data = await upstreamRequest;
+    modelFailureCooldownUntil.delete(key);
     modelCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS, staleExpiresAt: Date.now() + CACHE_TTL_MS + STALE_TTL_MS });
     if (modelCache.size > 200) modelCache.delete(modelCache.keys().next().value);
     res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
     res.setHeader('X-Provider-Cache', 'MISS');
     return res.status(200).json({ ...data, servedAt: new Date().toISOString() });
   } catch (error) {
+    if (error?.status >= 500) modelFailureCooldownUntil.set(key, Date.now() + FANGRAPHS_FAILURE_COOLDOWN_MS);
     const fallback = staleModel(cached);
     if (fallback) {
       res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');

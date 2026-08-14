@@ -8,6 +8,7 @@ const {
   getAllTeamStats,
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
+  getTeamSavantMetrics,
   getTeamScheduleSplits,
   mlb,
   __resetMlbClientStateForTests,
@@ -122,6 +123,15 @@ describe('MLB request cache optimization', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves Savant provider freshness metadata after filtering expected-stat rows by team', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      headers: { get: name => name === 'X-Provider-Freshness' ? 'stale-cached' : 'STALE' },
+      json: async () => [{ team_abbr: 'LAD', est_ba: 0.280 }, { team_abbr: 'SF', est_ba: 0.250 }],
+    });
+    await expect(getTeamSavantMetrics('LAD', 2097)).resolves.toMatchObject({ status: 'cached', freshness: 'stale-cached', sampleSize: 1, expectedBA: 0.280 });
+  });
+
   it('pauses queued requests after a proxy 429 instead of sending a burst', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     fetch
@@ -155,6 +165,25 @@ describe('MLB request cache optimization', () => {
     await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toBeNull();
     await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toMatchObject({ found: true });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a verified stale response when a refresh returns a transient 504', async () => {
+    const verified = { teams: [{ id: 238, name: 'Los Angeles Dodgers' }] };
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => verified, text: async () => '' })
+      .mockResolvedValueOnce({ ok: false, status: 504, headers: { get: () => null }, text: async () => '{"error":"timeout"}' });
+
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    await vi.advanceTimersByTimeAsync(1_001);
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds affiliate schedule requests to a fourteen-day provider window', async () => {
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await getMinorLeagueTeamSchedule(9996, 11, 2098, 45);
+    const requestUrl = new URL(fetch.mock.calls[0][0], 'https://skipbasebal-mm6hz9ps.manus.space');
+    expect(requestUrl.searchParams.get('endDate')).toBe('2026-08-28');
   });
 
   it('returns a verified stale response when a refresh is rate-limited', async () => {

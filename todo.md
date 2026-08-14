@@ -11163,3 +11163,10 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Trace existing prospect page ranking data and card structures.
 - [x] Implement farm-system summary score card with source-aware metrics and unavailable states.
 - [x] Add unit and rendering tests, verify desktop/mobile views, and publish checkpoint.
+
+## Broad Debugging and Optimization Pass
+- [x] Audit current shared code, runtime logs, request behavior, and production preview for actionable issues.
+- [x] Reduce verified client/server data-loading failures, timeout noise, and stale-state ambiguity without fabricating baseball data.
+- [x] Improve measurable frontend performance, low-data behavior, responsive layout, and accessibility where regressions are found.
+- [x] Add regression coverage for every optimization or bug fix and run focused validation.
+- [x] Run the complete release gate, review desktop/mobile previews, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.

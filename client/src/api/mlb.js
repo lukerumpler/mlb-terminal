@@ -178,13 +178,19 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       const retryAfterMs = res.status === 429 ? parseRetryAfterMs(res) : 0;
+      const stale = useCache ? staleCacheGet(url) : undefined;
+      const canUseStale = [429, 500, 502, 503, 504].includes(res.status);
+      if (canUseStale && stale !== undefined) {
+        if (res.status === 429) {
+          proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + retryAfterMs);
+          console.warn('[mlb] proxy rate limit; using verified cached response', path);
+        } else {
+          console.warn(`[mlb] proxy ${res.status}; using verified cached response`, path);
+        }
+        return stale;
+      }
       if (res.status === 429) {
         proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + retryAfterMs);
-        const stale = useCache ? staleCacheGet(url) : undefined;
-        if (stale !== undefined) {
-          console.warn('[mlb] proxy rate limit; using verified cached response', path);
-          return stale;
-        }
         console.warn('[mlb] proxy rate limit; pausing MLB requests', path);
       } else if (quietStatuses.includes(res.status)) {
         console.warn('[mlb] expected upstream unavailable response', res.status, path);
@@ -1587,8 +1593,10 @@ export async function getMinorLeagueTeamStandings(teamId, levelId = 11, season =
 export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = SEASON, days = 14) {
   if (!teamId || !MILB_STANDINGS_LEAGUES[levelId]) return { games: [], retrievedAt: new Date().toISOString(), status: 'source-gap' };
   try {
+    const requestedDays = Number(days);
+    const windowDays = Number.isFinite(requestedDays) ? Math.min(14, Math.max(1, Math.floor(requestedDays))) : 14;
     const start = new Date();
-    const end = new Date(start.getTime() + Math.max(1, Number(days)) * 86400000);
+    const end = new Date(start.getTime() + windowDays * 86400000);
     const data = await mlb('/schedule', {
       sportIds: String(levelId),
       teamId,
@@ -1596,7 +1604,7 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
       endDate: end.toISOString().slice(0, 10),
       hydrate: 'linescore,team',
       language: 'en',
-    }, { ttl: 60_000 });
+    }, { ttl: 60_000, timeoutMs: 15_000, quietStatuses: [404] });
     const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
     return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
   } catch {
@@ -1607,6 +1615,7 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
 export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
   try {
     const rows = await getSavantData(year);
+    const providerMeta = Array.isArray(rows) ? rows.__providerMeta || null : null;
     const target = String(teamAbbr || '').toUpperCase();
     const teamRows = (Array.isArray(rows) ? rows : []).filter(row => {
       const rowTeam = String(row.team_abbr || row.team || row.team_name || '').toUpperCase();
@@ -1616,11 +1625,12 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
       const values = teamRows.map(row => Number(row[key])).filter(Number.isFinite);
       return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
     };
-    const freshness = teamRows.__providerMeta?.freshness || 'live';
+    const freshness = providerMeta?.freshness || 'live';
     return {
       status: teamRows.length ? freshness === 'stale-cached' ? 'cached' : 'live' : 'source-gap',
       source: 'Baseball Savant',
       freshness,
+      cache: providerMeta?.cache || null,
       retrievedAt: new Date().toISOString(),
       sampleSize: teamRows.length,
       expectedBA: average('est_ba'),
