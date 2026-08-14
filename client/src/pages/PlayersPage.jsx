@@ -1867,6 +1867,32 @@ function ContractPanel({ contractData: ct }) {
 /* ═══════════════════════════════════════════════════════════════════
    PLAYER PROFILE — full intelligence layout
 ═══════════════════════════════════════════════════════════════════ */
+function ProfileStatusState({ status = 'Unavailable', message, detail }) {
+  return <div className="skip-overview-empty-state" role="status"><span className="skip-overview-empty-mark" aria-hidden="true">—</span><div className="skip-overview-empty-copy"><span className="skip-overview-empty-status">{status}</span><strong>{message}</strong><span>{detail}</span></div></div>;
+}
+function formatBoxscoreRate(value, digits = 3) {
+  return value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits);
+}
+export function BoxscoreSplitPanel({ player }) {
+  const data = player?.boxscoreSplits;
+  const isPitcher = Boolean(player?.isPitcher);
+  const rows = isPitcher ? (data?.pitching || []) : (data?.batting || []);
+  const title = isPitcher ? 'Boxscore ERA Splits' : 'Boxscore OPS Splits';
+  const detail = isPitcher
+    ? 'Earned runs and innings are aggregated from official MLB game boxscores in the recent sample.'
+    : 'At-bats, walks, hit-by-pitch, sacrifice flies, and total bases are aggregated from official MLB game boxscores in the recent sample.';
+  if (!data || data.status === 'loading') {
+    return <Panel title={title} accent={C.teal} badge="Loading"><ProfileStatusState status="Loading" message="Checking official boxscores" detail="The player profile is retrieving the current verified game sample." /></Panel>;
+  }
+  if (data.status !== 'live' || !rows.length) {
+    return <Panel title={title} accent={C.teal} badge="Unavailable"><ProfileStatusState message={title} detail={data?.reason || 'No verified official MLB boxscore rows are available for this player.'} /></Panel>;
+  }
+  return <Panel title={title} accent={C.teal} badge={`${data.games} games`}>
+    <div className="skip-profile-source-strip">{data.source} · {data.windowLabel || 'Recent completed games'} · retrieved {data.retrievedAt ? new Date(data.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
+    <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th>Split</th><th>G</th>{isPitcher ? <><th>GS</th><th>IP</th><th>ER</th><th>K</th><th>BB</th><th>ERA</th><th>WHIP</th></> : <><th>PA</th><th>AB</th><th>H</th><th>HR</th><th>BB</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th></>}</tr></thead><tbody>{rows.map(row => <tr key={row.label}><td>{row.label}</td><td>{row.games}</td>{isPitcher ? <><td>{row.gamesStarted || '—'}</td><td>{row.inningsPitched ? row.inningsPitched.toFixed(1) : '—'}</td><td>{row.earnedRuns || '—'}</td><td>{row.strikeOuts || '—'}</td><td>{row.walksAllowed || '—'}</td><td>{formatBoxscoreRate(row.era, 2)}</td><td>{formatBoxscoreRate(row.whip, 3)}</td></> : <><td>{row.plateAppearances || '—'}</td><td>{row.atBats || '—'}</td><td>{row.hits || '—'}</td><td>{row.homeRuns || '—'}</td><td>{row.walks || '—'}</td><td>{formatBoxscoreRate(row.avg)}</td><td>{formatBoxscoreRate(row.obp)}</td><td>{formatBoxscoreRate(row.slg)}</td><td>{formatBoxscoreRate(row.ops)}</td></>}</tr>)}</tbody></table></div>
+    <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
+  </Panel>;
+}
 function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
@@ -2209,6 +2235,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
           {activeTab === 'splits' && (
             <div className="skip-profile-tab-grid splits-grid">
+              <BoxscoreSplitPanel player={player} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
               <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>

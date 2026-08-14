@@ -440,6 +440,104 @@ export async function fetchContractData(playerId, fullName) {
   } catch { return null; }
 }
 
+function parseBoxscoreInnings(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return 0;
+  const [whole, fraction = '0'] = text.split('.');
+  const outs = Number(fraction);
+  return (Number(whole) || 0) + (outs === 1 || outs === 2 ? outs / 3 : 0);
+}
+function makeBoxscoreBucket(label) {
+  return { label, games: 0, plateAppearances: 0, atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runs: 0, rbi: 0, walks: 0, hitByPitch: 0, sacrificeFlies: 0, totalBases: 0, inningsPitched: 0, earnedRuns: 0, hitsAllowed: 0, walksAllowed: 0, strikeOuts: 0, gamesStarted: 0 };
+}
+function findBoxscorePlayer(boxscore, playerId) {
+  const target = String(playerId);
+  for (const side of ['home', 'away']) {
+    const players = boxscore?.teams?.[side]?.players || {};
+    const match = Object.entries(players).find(([key, row]) => String(row?.person?.id || key).replace(/^ID/, '') === target);
+    if (match) return { ...match[1], side };
+  }
+  return null;
+}
+function addBoxscoreBatting(bucket, stats) {
+  if (!stats) return;
+  bucket.plateAppearances += Number(stats.plateAppearances) || 0;
+  bucket.atBats += Number(stats.atBats) || 0;
+  bucket.hits += Number(stats.hits) || 0;
+  bucket.doubles += Number(stats.doubles) || 0;
+  bucket.triples += Number(stats.triples) || 0;
+  bucket.homeRuns += Number(stats.homeRuns) || 0;
+  bucket.runs += Number(stats.runs) || 0;
+  bucket.rbi += Number(stats.rbi) || 0;
+  bucket.walks += Number(stats.baseOnBalls) || 0;
+  bucket.hitByPitch += Number(stats.hitByPitch) || 0;
+  bucket.sacrificeFlies += Number(stats.sacrificeFlies) || 0;
+  bucket.totalBases += Number(stats.totalBases) || 0;
+}
+function addBoxscorePitching(bucket, stats) {
+  if (!stats) return;
+  bucket.inningsPitched += parseBoxscoreInnings(stats.inningsPitched);
+  bucket.earnedRuns += Number(stats.earnedRuns) || 0;
+  bucket.hitsAllowed += Number(stats.hits) || 0;
+  bucket.walksAllowed += Number(stats.baseOnBalls) || 0;
+  bucket.strikeOuts += Number(stats.strikeOuts) || 0;
+  bucket.gamesStarted += Number(stats.gamesStarted) || 0;
+}
+function finalizeBoxscoreBucket(bucket, kind) {
+  const out = { ...bucket };
+  if (kind === 'batting') {
+    const obpDenominator = out.atBats + out.walks + out.hitByPitch + out.sacrificeFlies;
+    out.avg = out.atBats ? out.hits / out.atBats : null;
+    out.obp = obpDenominator ? (out.hits + out.walks + out.hitByPitch) / obpDenominator : null;
+    out.slg = out.atBats ? out.totalBases / out.atBats : null;
+    out.ops = out.obp != null && out.slg != null ? out.obp + out.slg : null;
+  } else {
+    out.era = out.inningsPitched ? (out.earnedRuns * 9) / out.inningsPitched : null;
+    out.whip = out.inningsPitched ? (out.hitsAllowed + out.walksAllowed) / out.inningsPitched : null;
+  }
+  return out;
+}
+export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON) {
+  const id = Number(playerId);
+  const clubId = Number(teamId);
+  const unavailable = (reason = 'No completed official boxscores were returned for this player.') => ({ status: 'unavailable', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: 0, requestedGames: 0, reason, batting: [], pitching: [] });
+  if (playerId == null || teamId == null || playerId === '' || teamId === '' || !Number.isFinite(id) || !Number.isFinite(clubId) || id <= 0 || clubId <= 0) return unavailable('The player does not have a current MLB team identifier.');
+  try {
+    const today = new Date();
+    const startDate = `${season}-03-01`;
+    const endDate = season === today.getUTCFullYear() ? today.toISOString().slice(0, 10) : `${season}-10-05`;
+    const schedule = await mlb('/schedule', { sportId: 1, teamId: clubId, startDate, endDate, gameType: 'R', hydrate: 'team' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
+    const games = (schedule?.dates || []).flatMap(date => date.games || []).filter(game => String(game.status?.abstractGameState || '').toLowerCase() === 'final').sort((a, b) => String(b.gameDate || '').localeCompare(String(a.gameDate || ''))).slice(0, 30);
+    if (!games.length) return unavailable('No completed regular-season games were returned for the current team and season.');
+    const results = [];
+    for (const game of games) {
+      try {
+        const boxscore = await getGameBoxscore(game.gamePk);
+        const row = findBoxscorePlayer(boxscore, id);
+        if (row) results.push({ game, row });
+      } catch { /* one unavailable boxscore must not erase verified rows from other games */ }
+    }
+    if (!results.length) return unavailable('The available official boxscores did not include this player.');
+    const batting = new Map();
+    const pitching = new Map();
+    const ensure = (map, key) => { if (!map.has(key)) map.set(key, makeBoxscoreBucket(key)); return map.get(key); };
+    for (const { game, row } of results) {
+      const date = new Date(game.gameDate || `${season}-01-01T00:00:00Z`);
+      const month = Number.isFinite(date.getTime()) ? date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) : 'Unknown';
+      const dimensions = ['All', row.side === 'home' ? 'Home' : 'Away', String(game.dayNight || '').toLowerCase() === 'day' ? 'Day' : String(game.dayNight || '').toLowerCase() === 'night' ? 'Night' : null, month].filter(Boolean);
+      for (const key of dimensions) {
+        const bat = ensure(batting, key); const pit = ensure(pitching, key);
+        bat.games += 1; pit.games += 1;
+        addBoxscoreBatting(bat, row.stats?.batting);
+        addBoxscorePitching(pit, row.stats?.pitching);
+      }
+    }
+    const finalize = (map, kind) => [...map.values()].map(bucket => finalizeBoxscoreBucket(bucket, kind)).filter(row => row.games > 0);
+    return { status: 'live', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: results.length, requestedGames: games.length, windowLabel: `Most recent ${games.length} completed regular-season games`, batting: finalize(batting, 'batting'), pitching: finalize(pitching, 'pitching') };
+  } catch (error) {
+    return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
+  }
+}
 export async function loadFullPlayer(person, season = SEASON) {
   const id = person.id;
 
@@ -447,6 +545,7 @@ export async function loadFullPlayer(person, season = SEASON) {
   const profile = await getPlayerProfile(id);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
+  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
   const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials] = await Promise.all([
     getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
     getSeasonStatsSafe(id, 'pitching', season, profileSportId),
@@ -665,6 +764,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     contractData:  contractRaw,
     handednessSplits: handednessResult,
     teamFinancials,
+    boxscoreSplits: await boxscoreSplitsPromise,
   };
 }
 

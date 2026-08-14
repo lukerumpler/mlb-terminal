@@ -129,3 +129,9 @@
 - [x] Add explicit regression coverage for Overview mobile selector/grid overflow, sidebar Workspace grouping, and ticker truncation behavior.
 - [x] Confirm remaining toggle-like controls are truthful implemented interactions or clearly labeled static states.
 - [x] Save and publish a fresh checkpoint covering provider reliability, source-aligned metrics, and the UI repair release.
+
+- [x] Inspect current player-profile routes, MLB proxy contracts, and existing player stat presentation for boxscore-level split integration.
+- [x] Define verified boxscore aggregation fields for player OPS and ERA splits, including source and freshness metadata.
+- [x] Implement bounded MLB boxscore retrieval, aggregation, and player-profile split presentation without fabricated values.
+- [x] Add regression tests for batting/pitching split success, loading, unavailable, and source freshness states.
+- [x] Verify desktop/mobile player-profile layouts and publish the validated boxscore splits release.

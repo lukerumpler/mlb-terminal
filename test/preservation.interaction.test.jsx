@@ -30,6 +30,7 @@ function WatchlistHarness() {
 
 describe('SKIP preserved interactions and persistence', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
   });
@@ -51,14 +52,15 @@ describe('SKIP preserved interactions and persistence', () => {
     expect(localStorage.getItem('skip-theme')).toBe('dark');
   });
 
-  it('opens the Command Palette with Ctrl+K and exposes the original tabs', async () => {
+  it('opens the Command Palette from the visible Search control and exposes the original tabs', async () => {
+    const user = userEvent.setup();
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTitle('Overview')).toBeInTheDocument();
       expect(document.documentElement.dataset.theme).toBe('light');
     });
-    await userEvent.setup().keyboard('{Control>}k{/Control}');
+    await user.click(screen.getByTitle('Search everything'));
 
     const palette = await screen.findByRole('dialog', { name: 'Command palette' });
     expect(palette).toBeInTheDocument();
