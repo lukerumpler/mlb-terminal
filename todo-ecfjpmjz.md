@@ -4,8 +4,8 @@
 - [x] Run the project’s type check, lint check, test suite, and production build.
 - [x] Resolve only delivery-blocking validation issues discovered during verification; none were found.
 - [x] Commit the current project to GitHub repository `lukerumpler/mlb-terminal` and push the intended branch.
-- [ ] Fix and verify the Vercel deployment so the live root serves the expected React HTML shell; the existing Vercel project is Git-connected to `lukerumpler/mlb-terminal`, but the current root response is JavaScript and the browser is blank.
-- [ ] After the Vercel runtime is fixed, record the final confirmed GitHub URL, Vercel URL, validation results, and any required Vercel settings.
+- [x] Fix and verify the Vercel deployment so the live root serves the expected React HTML shell; added `vercel.json`, triggered a new Git-connected deployment from `main`, and confirmed `https://mlb-terminal.vercel.app/` returns HTTP 200 with `text/html`.
+- [x] Record final delivery details: GitHub `https://github.com/lukerumpler/mlb-terminal`, Vercel `https://mlb-terminal.vercel.app`, deployment alias `https://mlb-terminal-l3e7gx351-rumpler.vercel.app`, and managed preview `https://skipbasebal-mm6hz9ps.manus.space/`; Vercel deployment `Hbd7qGiCX` is Ready from commit `7c1d943`.
 
 ## History
 
