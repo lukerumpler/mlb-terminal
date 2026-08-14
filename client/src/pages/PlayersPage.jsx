@@ -24,7 +24,7 @@ import { percentile, percentileColor, percentileLabel } from '../lib/percentile.
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
-import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes } from './playerNotes.js';
+import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
 function pctBar(pct, color) {
   return (
@@ -1784,10 +1784,14 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [noteTags, setNoteTags] = useState('');
   const [noteSort, setNoteSort] = useState('date-desc');
   const [noteFilterTag, setNoteFilterTag] = useState('');
+  const [bulkTag, setBulkTag] = useState('');
+  const [bulkTagReplacement, setBulkTagReplacement] = useState('');
+  const [importMode, setImportMode] = useState('merge');
+  const importInputRef = useRef(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
-  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); }, [player.id]);
+  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); setBulkTag(''); setBulkTagReplacement(''); }, [player.id]);
   useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
   const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
   const availableNoteTags = useMemo(() => [...new Set(observations.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b)), [observations]);
@@ -1914,6 +1918,29 @@ function PlayerProfile({ player, derived, onCompare }) {
   const beginEditObservation = note => { setEditingNoteId(note.id); setNoteText(note.text); setNoteCategory(note.category || 'Scouting'); setNoteTags((note.tags || []).join(', ')); setDeleteNoteId(null); };
   const cancelEditObservation = () => { setEditingNoteId(null); setNoteText(''); setNoteTags(''); setNoteCategory('Scouting'); };
   const confirmDeleteObservation = () => { if (!deleteNoteId) return; setObservations(current => current.filter(note => note.id !== deleteNoteId)); if (editingNoteId === deleteNoteId) cancelEditObservation(); setDeleteNoteId(null); };
+  const renameBulkTag = () => { if (!bulkTag.trim() || !bulkTagReplacement.trim()) return; setObservations(current => renameNoteTag(current, bulkTag, bulkTagReplacement)); setNoteFilterTag(''); setBulkTag(''); setBulkTagReplacement(''); };
+  const removeBulkTag = () => { if (!bulkTag.trim()) return; setObservations(current => removeNoteTag(current, bulkTag)); if (noteFilterTag === bulkTag.trim().replace(/^#/, '').toLowerCase()) setNoteFilterTag(''); setBulkTag(''); };
+  const exportObservations = () => {
+    const name = (p?.fullName || 'player').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+    const payload = JSON.stringify(buildNotesExportPayload(player.id, p?.fullName, observations), null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${name || 'player'}-observations.json`; anchor.click(); URL.revokeObjectURL(url);
+  };
+  const importObservations = event => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const incoming = normalizeImportedNotes(JSON.parse(String(reader.result || '')));
+        if (!incoming.length) return;
+        setObservations(current => applyImportedNotes(current, incoming, importMode));
+        setNoteFilterTag('');
+      } catch (error) { console.warn('[SKIP] observation import rejected', error); }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <>
@@ -2052,6 +2079,8 @@ function PlayerProfile({ player, derived, onCompare }) {
                   <div className="skip-notes-help">Use commas for multiple tags. Tags are saved per player in this browser.</div>
                 </form>
                 <div className="skip-notes-toolbar"><span>{visibleObservations.length} shown · {observations.length} saved</span><div className="skip-notes-toolbar-controls"><select aria-label="Filter observations by tag" value={noteFilterTag} onChange={event => setNoteFilterTag(event.target.value)}><option value="">All tags</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><select aria-label="Sort observations" value={noteSort} onChange={event => setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div></div>
+                <div className="skip-notes-management"><div className="skip-notes-management-heading">Tag management</div><div className="skip-notes-management-row"><select aria-label="Bulk tag" value={bulkTag} onChange={event => setBulkTag(event.target.value)}><option value="">Choose tag</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><input aria-label="Replacement tag" value={bulkTagReplacement} onChange={event => setBulkTagReplacement(event.target.value)} placeholder="Replacement tag" /><button type="button" onClick={renameBulkTag} disabled={!bulkTag || !bulkTagReplacement.trim()}>Rename</button><button type="button" className="is-danger" onClick={removeBulkTag} disabled={!bulkTag}>Remove</button></div><div className="skip-notes-help">Rename or remove the selected tag across every saved observation.</div></div>
+                <div className="skip-notes-backup"><div><div className="skip-notes-management-heading">Backup &amp; restore</div><div className="skip-notes-help">JSON backup for this player’s saved observations.</div></div><div className="skip-notes-backup-actions"><button type="button" onClick={exportObservations} disabled={!observations.length}>Export JSON</button><select aria-label="Import mode" value={importMode} onChange={event => setImportMode(event.target.value)}><option value="merge">Merge import</option><option value="replace">Replace all</option></select><button type="button" onClick={() => importInputRef.current?.click()}>Import JSON</button><input ref={importInputRef} type="file" accept="application/json,.json" onChange={importObservations} hidden /></div></div>
                 {visibleObservations.length ? <div className="skip-notes-list">{visibleObservations.map(note => <article className="skip-note-card" key={note.id}><div className="skip-note-meta"><span className="skip-note-category">{note.category}</span><time dateTime={new Date(note.createdAt).toISOString()}>{new Date(note.createdAt).toLocaleDateString()}</time></div><div className="skip-note-text">{note.text}</div>{note.tags?.length ? <div className="skip-note-tags">{note.tags.map(tag => <button type="button" key={tag} onClick={() => setNoteFilterTag(tag)} aria-label={`Filter by tag ${tag}`}>#{tag}</button>)}</div> : null}<div className="skip-note-actions"><button type="button" onClick={() => beginEditObservation(note)}>Edit</button>{deleteNoteId === note.id ? <><span>Delete this note?</span><button type="button" className="is-danger" onClick={confirmDeleteObservation}>Confirm</button><button type="button" onClick={() => setDeleteNoteId(null)}>Cancel</button></> : <button type="button" onClick={() => setDeleteNoteId(note.id)}>Delete</button>}</div></article>)}</div> : <div className="skip-notes-empty">{noteFilterTag ? `No observations tagged #${noteFilterTag}.` : 'Your saved scouting observations will appear here.'}</div>}
               </Panel>
             </div>

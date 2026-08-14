@@ -53,3 +53,14 @@
 - [x] Add Vitest coverage for tag filtering, edit, and delete interactions
 - [x] Run typecheck, tests, and visual verification for the Notes management update
 - [x] Save a checkpoint containing the Notes management update
+- [x] Inspect the latest Notes tag controls and observation persistence helpers
+- [x] Add bulk tag rename and remove controls for the current player
+- [x] Add JSON export for the current player’s saved observations
+- [x] Add JSON import with validation and an explicit merge/replace choice
+- [x] Preserve filters, sorting, edit/delete behavior, and empty states
+- [x] Add Vitest coverage for tag management and import/export validation
+- [x] Run typecheck, tests, and visual verification for the Notes backup update
+- [x] Save a checkpoint containing the Notes backup and tag-management update
+- [x] Add direct helper coverage for export payload generation and merge/replace import application
+- [x] Capture a loaded player Notes-tab preview showing bulk tag and backup controls
+- [x] Save the final checkpoint for the bulk tag and backup update

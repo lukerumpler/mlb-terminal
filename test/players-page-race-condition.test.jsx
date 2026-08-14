@@ -269,6 +269,18 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.queryByText('Check recovery notes after the next series.')).not.toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filter observations by tag' }), '');
 
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bulk tag' }), 'two-strike');
+    await user.type(screen.getByRole('textbox', { name: 'Replacement tag' }), 'follow-up');
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(screen.getByText('#follow-up', { selector: 'button' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bulk tag' }), 'follow-up');
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(screen.queryByText('#follow-up', { selector: 'button' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export JSON' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import JSON' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Import mode' }), 'replace');
+    expect(screen.getByRole('combobox', { name: 'Import mode' })).toHaveValue('replace');
+
     const editButtons = screen.getAllByRole('button', { name: 'Edit' });
     await user.click(editButtons[0]);
     const editor = screen.getByRole('textbox', { name: 'Observation' });
