@@ -79,3 +79,7 @@
 - [x] Persist recently viewed minor-league affiliates across sessions and expose quick-access controls.
 - [x] Add rendered tests for MiLB navigation/data, model/Savant freshness, and affiliate history persistence.
 - [x] Verify MLB and MiLB flows on desktop/mobile and save a published checkpoint.
+
+- [x] Improve mobile dashboard navigation with a compact, accessible navigation control while preserving the desktop sidebar.
+- [x] Add responsive interaction coverage and verify the mobile navigation at desktop and mobile sizes.
+- [ ] Save and publish the validated mobile navigation update.

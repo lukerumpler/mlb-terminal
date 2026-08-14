@@ -23,12 +23,20 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(appSource).toContain('className="skip-low-data-indicator"');
     expect(appSource).toContain('Low Data Mode is active');
     expect(appSource).toContain("onClick={() => setTab('settings')}");
+    expect(appSource).toContain('aria-label="Open navigation"');
+    expect(appSource).toContain('aria-label="Close navigation"');
+    expect(appSource).toContain('skip-mobile-nav-backdrop');
+    expect(appSource).toContain('skip-mobile-nav-open');
+    expect(appSource).toContain('setMobileNavOpen(false)');
   });
 
   it('keeps reduced-motion support and mobile rail rules in the document styles', () => {
     expect(appSource).toContain('@media (prefers-reduced-motion: reduce)');
     expect(appSource).toContain('.skip-panel:hover');
     expect(documentSource).toContain('.skip-nav-section');
+    expect(documentSource).toContain('.skip-mobile-nav-toggle');
+    expect(indexSource).toContain('.skip-mobile-nav-backdrop');
+    expect(indexSource).toContain('.skip-sidebar.skip-mobile-nav-open');
     expect(documentSource).toContain('.skip-stat-strip > div { min-height:78px; }');
     expect(appSource).toContain('.skip-content table th, .skip-content table td');
     expect(appSource).toContain('padding-top:5px !important; padding-bottom:5px !important;');

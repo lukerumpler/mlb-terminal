@@ -130,6 +130,20 @@
         .skip-prospect-workspace-grid > * { min-width:0; }
       }
     </style>
+    <style>
+      @media (max-width: 720px) {
+        .skip-mobile-nav-toggle { display:inline-flex !important; }
+        .skip-sidebar { position:fixed !important; inset:0 auto 0 0; z-index:80; width:min(286px, calc(100vw - 48px)) !important; transform:translateX(-105%); transition:transform 180ms cubic-bezier(.23,1,.32,1); box-shadow:none !important; }
+        .skip-sidebar.skip-mobile-nav-open { transform:translateX(0); box-shadow:14px 0 34px rgba(20,31,48,.18) !important; }
+        .skip-sidebar .skip-nav-section, .skip-sidebar .skip-nav-label, .skip-sidebar .skip-nav-shortcut, .skip-sidebar .skip-utility-label { display:block; }
+        .skip-sidebar > div:nth-child(2) > button { justify-content:flex-start; gap:8px !important; padding:9px 10px !important; min-height:42px; }
+        .skip-sidebar > div:nth-child(2) > button > span:first-child { width:24px !important; }
+        .skip-sidebar > div:nth-child(2) > button > span:last-child:not(.skip-nav-label):not(.skip-nav-shortcut) { margin-left:auto !important; }
+        .skip-sidebar-insight { display:block; }
+        .skip-mobile-nav-backdrop { display:block; position:fixed; inset:0; z-index:70; border:0; background:rgba(15,24,38,.34); backdrop-filter:blur(2px); }
+      }
+      @media (prefers-reduced-motion: reduce) { .skip-sidebar { transition:none !important; } }
+    </style>
     <script>
       // Apply saved/system theme before first paint to avoid a flash of the wrong theme.
       (function () {

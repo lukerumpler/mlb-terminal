@@ -14,6 +14,31 @@ beforeEach(() => {
   global.__consoleErrors.length = 0;
 });
 
+describe('SKIP app — mobile navigation', () => {
+  it('opens the labeled mobile drawer, navigates, and closes the drawer', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(window, 'innerWidth', { configurable:true, value:375 });
+    render(<App />);
+    const openButton = document.querySelector('.skip-mobile-nav-toggle');
+    expect(openButton).toBeTruthy();
+    await user.click(openButton);
+    expect(screen.getByRole('button', { name:'Close navigation' })).toBeInTheDocument();
+    expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeTruthy();
+    const playersButton = document.querySelector('.skip-sidebar button[title="Players"]');
+    expect(playersButton).toBeTruthy();
+    await user.click(playersButton);
+    await waitFor(() => expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeNull());
+    expect(document.querySelector('.skip-topbar')?.textContent).toContain('Players');
+  });
+
+  it('keeps the desktop sidebar mounted when the mobile drawer is inactive', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable:true, value:1280 });
+    render(<App />);
+    expect(screen.getByRole('navigation', { name:'SKIP workspace navigation' })).toBeInTheDocument();
+    expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeNull();
+  });
+});
+
 describe('SKIP app — full tab cycle', () => {
   it('mounts without crashing', async () => {
     render(<App />);

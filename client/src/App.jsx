@@ -82,6 +82,7 @@ const TABS = [
 export default function App() {
   const [tab, setTab]               = useState('overview');
   const [showAlerts, setShowAlerts] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [liveTicker, setLiveTicker] = useState([]);
   // 'loading' | 'live' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
@@ -223,7 +224,8 @@ export default function App() {
     <div className="skip-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:C.bg, fontFamily:"'Plus Jakarta Sans', sans-serif", color:C.text }}>
 
       {/* ── SIDEBAR ── */}
-      <div className="skip-sidebar" style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+      {mobileNavOpen && <button type="button" className="skip-mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+      <div className={`skip-sidebar${mobileNavOpen ? ' skip-mobile-nav-open' : ''}`} style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
 
         {/* Logo */}
         <div style={{ padding:'12px 12px 10px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
@@ -252,7 +254,7 @@ export default function App() {
             {(i === 0 || TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button title={t.label} onClick={() => setTab(t.key)} aria-current={tab===t.key ? 'page' : undefined}
+            <button title={t.label} onClick={() => { setTab(t.key); setMobileNavOpen(false); }} aria-current={tab===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
@@ -298,6 +300,7 @@ export default function App() {
 
         {/* Top bar */}
         <div className="skip-topbar" style={{ height:46, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 18px', gap:12, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+          <button type="button" className="skip-mobile-nav-toggle" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(open => !open)} style={{ display:'none', alignItems:'center', justifyContent:'center', width:34, height:34, border:`1px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text, cursor:'pointer', fontSize:18, lineHeight:1 }}>☰</button>
           <div style={sans({ fontSize:14, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
