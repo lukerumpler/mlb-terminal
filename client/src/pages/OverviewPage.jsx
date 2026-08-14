@@ -287,6 +287,39 @@ export function buildTeamStrengthData({ offense, power, speed, contact, pitching
     .map(row => ({ ...row, val:Number(row.val) }));
 }
 
+export function buildLiveRadarData({ team = {}, liveTeamData, runDiff = null } = {}) {
+  const records = Object.values(liveTeamData?.byAbbr || {});
+  const hittingRecords = records.map(row => row?.hitting).filter(Boolean);
+  const pitchingRecords = records.map(row => row?.pitching).filter(Boolean);
+  const standingsRecords = records.map(row => row?.standings).filter(Boolean);
+  const rankValue = (value, rows, keys, higher = true) => {
+    if (value == null || value === '') return null;
+    const current = Number(value);
+    if (!Number.isFinite(current)) return null;
+    const values = rows.map(row => keys.map(key => Number(row?.[key])).find(Number.isFinite)).filter(Number.isFinite);
+    return values.length ? percentile(current, values, higher) : null;
+  };
+  const offense = rankValue(team.ops, hittingRecords, ['ops']);
+  const power = rankValue(team.hr, hittingRecords, ['homeRuns']);
+  const speed = rankValue(team.sb, hittingRecords, ['stolenBases']);
+  const contact = rankValue(team.avg, hittingRecords, ['avg']);
+  const pitching = rankValue(team.era, pitchingRecords, ['era'], false);
+  const command = rankValue(team.whip, pitchingRecords, ['whip'], false);
+  const offenseData = [
+    { axis:'OPS', val:offense },
+    { axis:'SLG', val:rankValue(team.slg, hittingRecords, ['slg']) },
+    { axis:'OBP', val:rankValue(team.obp, hittingRecords, ['obp']) },
+    { axis:'HR', val:power },
+    { axis:'SB', val:speed },
+    { axis:'Run Diff', val:rankValue(runDiff, standingsRecords, ['diff']) },
+  ].filter(row => row.val != null);
+  return {
+    offenseData,
+    strengthData: buildTeamStrengthData({ offense, power, speed, contact, pitching, command }),
+    source: offenseData.length || records.length ? 'MLB Stats API team aggregates' : 'MLB Stats API unavailable',
+  };
+}
+
 function getFrontOffice(t) {
   const has = key => t[key] != null && Number.isFinite(Number(t[key]));
   const strengths = [
@@ -846,39 +879,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const liveRunDiffData = useMemo(() => buildLiveRunDiffData({ ...team, diff: rd }, CURRENT_SEASON), [team, rd]);
 
   const D=useMemo(()=>{
+    const liveRadar = buildLiveRadarData({ team, liveTeamData, runDiff: rd });
     const records = Object.values(liveTeamData?.byAbbr || {});
-    const hittingRecords = records.map(r => r.hitting).filter(Boolean);
-    const pitchingRecords = records.map(r => r.pitching).filter(Boolean);
-    const standingsRecords = records.map(r => r.standings).filter(Boolean);
+    const hittingRecords = records.map(row => row?.hitting).filter(Boolean);
+    const pitchingRecords = records.map(row => row?.pitching).filter(Boolean);
+    const standingsRecords = records.map(row => row?.standings).filter(Boolean);
     const rankValue = (value, rows, keys, higher = true) => {
       if (value == null || value === '') return null;
       const current = Number(value);
       if (!Number.isFinite(current)) return null;
-      const values = rows.map(row => {
-        for (const key of keys) {
-          const n = Number(row?.[key]);
-          if (Number.isFinite(n)) return n;
-        }
-        return null;
-      }).filter(v => v != null);
-      return percentile(current, values, higher);
+      const values = rows.map(row => keys.map(key => Number(row?.[key])).find(Number.isFinite)).filter(Number.isFinite);
+      return values.length ? percentile(current, values, higher) : null;
     };
     const offPct = rankValue(team.ops, hittingRecords, ['ops']);
-    const powerPct = rankValue(team.hr, hittingRecords, ['homeRuns']);
     const speedPct = rankValue(team.sb, hittingRecords, ['stolenBases']);
-    const contactPct = rankValue(team.avg, hittingRecords, ['avg']);
     const pitchingPct = rankValue(team.era, pitchingRecords, ['era'], false);
-    const whipPct = rankValue(team.whip, pitchingRecords, ['whip'], false);
-    const runDiffPct = rankValue(rd, standingsRecords, ['diff']);
-    const offenseData=[
-      {axis:'OPS', val:offPct}, {axis:'SLG', val:rankValue(team.slg, hittingRecords, ['slg'])},
-      {axis:'OBP', val:rankValue(team.obp, hittingRecords, ['obp'])}, {axis:'HR', val:powerPct},
-      {axis:'SB', val:speedPct}, {axis:'Run Diff', val:runDiffPct},
-    ].filter(row => row.val != null);
-    const strengthData=buildTeamStrengthData({
-      offense:offPct, power:powerPct, speed:speedPct, contact:contactPct,
-      pitching:pitchingPct, command:whipPct,
-    });
     const divName = team.div || 'League';
     const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
       const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
@@ -903,11 +918,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const available = [offPct, pitchingPct, speedPct].filter(v => v != null);
     const overallPct = available.length ? Math.round(available.reduce((sum, value) => sum + value, 0) / available.length) : null;
     return {
-      offenseData,strengthData,standings,leagueRanks,pctBars,divName,
+      offenseData:liveRadar.offenseData,strengthData:liveRadar.strengthData,radarSource:liveRadar.source,standings,leagueRanks,pctBars,divName,
       og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:'—',bg:pctToGrade(speedPct),
       overall:pctToGrade(overallPct),
     };
-  },[selTeam, liveTeamData]);
+  },[team, liveTeamData, rd]);
 
   // These only depend on `team`, but were previously called directly in the
   // render body — every unrelated state change on this page (e.g. clicking
@@ -1248,15 +1263,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
         <div style={{display:'flex',flexDirection:'column',gap:14,minWidth:0}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <Panel title="Offensive Profile" accent={teamAccent}>
-              <Suspense fallback={<ChartFallback height={196}/>}>
+            <Panel title="Offensive Profile" accent={teamAccent} badge={D.offenseData.length ? 'MLB Stats API' : 'Unavailable'}>
+              {D.offenseData.length ? <Suspense fallback={<ChartFallback height={196}/> }>
                 <OffenseRadar data={D.offenseData} accent={teamAccent}/>
-              </Suspense>
+              </Suspense> : <div style={sans({height:196,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season hitting aggregates were returned by the MLB Stats API.</div>}
+              <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: {D.radarSource}.</div>
             </Panel>
-            <Panel title="Team Strengths" accent={teamAccent} badge="Radar">
-              <Suspense fallback={<ChartFallback height={196}/>}>
+            <Panel title="Team Strengths" accent={teamAccent} badge={D.strengthData.length ? 'MLB Stats API' : 'Unavailable'}>
+              {D.strengthData.length ? <Suspense fallback={<ChartFallback height={196}/> }>
                 <StrengthRadar data={D.strengthData} accent={teamAccent}/>
-              </Suspense>
+              </Suspense> : <div style={sans({height:196,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season team aggregates were returned by the MLB Stats API.</div>}
+              <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: {D.radarSource}.</div>
             </Panel>
           </div>
           <Panel title={`Run Differential — ${CURRENT_SEASON}`} accent={teamAccent} badge={liveRunDiffData.length ? 'MLB Stats API' : 'Unavailable'}>

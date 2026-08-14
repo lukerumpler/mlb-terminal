@@ -1,11 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTeamAggregateCache, readTeamPlayersCache, saveTeamAggregateCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache } from '../client/src/lib/teamDataCache.js';
-import { buildBattedBallProfile, buildPitchArsenalRows, buildLiveRunDiffData, formatDataAge, resolveTeamSavantSnapshot } from '../client/src/pages/OverviewPage.jsx';
+import { buildBattedBallProfile, buildPitchArsenalRows, buildLiveRadarData, buildLiveRunDiffData, formatDataAge, resolveTeamSavantSnapshot } from '../client/src/pages/OverviewPage.jsx';
 
 describe('team data cache and freshness helpers', () => {
   it('normalizes a verified current-season run differential without retaining mock game rows', () => {
     expect(buildLiveRunDiffData({ diff: 42 }, 2026)).toEqual([{ game: '2026', diff: 42, cum: 42 }]);
     expect(buildLiveRunDiffData({ diff: null }, 2026)).toEqual([]);
+  });
+
+  it('builds both radar datasets from live team aggregates and preserves unavailable states', () => {
+    const liveTeamData = { byAbbr: {
+      LAD: { standings:{ diff:42 }, hitting:{ ops:.802, homeRuns:98, stolenBases:54, avg:.260, slg:.430, obp:.330 }, pitching:{ era:3.10, whip:1.08 } },
+      NYY: { standings:{ diff:10 }, hitting:{ ops:.750, homeRuns:80, stolenBases:30, avg:.240, slg:.400, obp:.320 }, pitching:{ era:4.20, whip:1.30 } },
+    } };
+    const data = buildLiveRadarData({ team:{ ops:.802, hr:98, sb:54, avg:.260, slg:.430, obp:.330, era:3.10, whip:1.08 }, liveTeamData, runDiff:42 });
+    expect(data.source).toContain('MLB Stats API');
+    expect(data.offenseData.map(row => row.axis)).toEqual(['OPS','SLG','OBP','HR','SB','Run Diff']);
+    expect(data.strengthData.map(row => row.axis)).toContain('Pitching');
+    expect(buildLiveRadarData({ team:{}, liveTeamData:null }).offenseData).toEqual([]);
+    expect(buildLiveRadarData({ team:{}, liveTeamData:null }).strengthData).toEqual([]);
   });
 
   beforeEach(() => localStorage.clear());

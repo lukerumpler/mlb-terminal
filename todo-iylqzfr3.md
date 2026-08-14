@@ -91,3 +91,10 @@
 - [x] Capture an Overview preview showing the updated live run-differential panel
 - [x] Clarify the completed Overview scope as current-season team data, not player career stats
 - [x] Save the final live Overview checkpoint
+- [x] Audit remaining static radar inputs and current MLB aggregate fields
+- [x] Replace Offensive Profile radar inputs with live team aggregate percentiles
+- [x] Replace Team Strength radar inputs with live team aggregate percentiles
+- [x] Preserve unavailable axes instead of fabricating radar values
+- [x] Add Vitest coverage for live radar normalization and rendered source states
+- [x] Run typecheck, tests, and visual verification for the radar update
+- [x] Save a checkpoint containing the live radar update
