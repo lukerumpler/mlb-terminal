@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useRef } from 'react';
-import { C, px, sans } from '../constants/colors.js';
+import StatusBadge from './StatusBadge.jsx';
 
 function displayValue(value, fallback = 'Not supplied by source') {
   return value == null || value === '' ? fallback : String(value);
@@ -47,7 +47,7 @@ export default function SourceProvenanceDrawer({ open, onClose, title = 'Source 
             <section className="skip-provenance-entry" key={`${entry.label || 'metric'}-${index}`}>
               <div className="skip-provenance-entry-head">
                 <div className="skip-provenance-entry-label">{entry.label || 'Metric group'}</div>
-                <span className={`skip-provenance-status ${entry.available ? 'is-ready' : ''}`}>{entry.available ? 'Verified' : 'Unavailable'}</span>
+                <StatusBadge status={entry.status || (entry.available ? 'verified' : 'unavailable')} compact />
               </div>
               <div className="skip-provenance-grid">
                 <div><span>Provider</span><strong>{displayValue(entry.provider)}</strong></div>

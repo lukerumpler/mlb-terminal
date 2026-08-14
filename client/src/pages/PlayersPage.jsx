@@ -23,6 +23,7 @@ import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
+import MetricInfo from '../components/MetricInfo.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
@@ -871,9 +872,10 @@ function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStat
           const color = percentileColor(rank);
           return (
             <div key={lbl} style={{ display:'grid', gridTemplateColumns:'112px minmax(80px,1fr) 44px 58px', alignItems:'center', gap:8, padding:'5px 14px', borderBottom:`0.5px solid ${C.borderLight}` }}>
-              <span style={sans({ fontSize:10, color:C.text2, minWidth:0 })}>{lbl}</span>
-              <div aria-label={rank == null ? `${lbl} percentile unavailable` : `${lbl} ${percentileLabel(rank)} percentile`} style={{ height:6, background:C.surface3, borderRadius:4, overflow:'hidden', position:'relative' }}>
-                {rank != null && <div style={{ height:'100%', width:`${rank}%`, background:color, borderRadius:4, transition:'width .4s ease' }} />}
+              <span style={sans({ fontSize:10, color:C.text2, minWidth:0 })}><MetricInfo label={lbl} /></span>
+              <div role="img" aria-label={rank == null ? `${lbl} percentile unavailable` : `${lbl} ${percentileLabel(rank)} percentile`} style={{ height:6, background:`linear-gradient(to right, ${C.rust} 0%, ${C.amber} 50%, ${C.teal} 100%)`, borderRadius:4, position:'relative', opacity:rank == null ? .45 : 1 }}>
+                <div style={{ position:'absolute', top:'50%', left:'50%', height:10, width:1, background:`color-mix(in srgb, ${C.border} 70%, transparent)`, transform:'translateY(-50%)' }} />
+                {rank != null && <div aria-hidden="true" style={{ position:'absolute', top:'50%', left:`${rank}%`, width:10, height:10, borderRadius:'50%', background:C.surface, border:`2px solid ${color}`, boxShadow:`0 0 0 1px ${C.surface}`, transform:'translate(-50%,-50%)' }} />}
               </div>
               <span style={px({ fontSize:10.5, fontWeight:800, color, width:44, textAlign:'right' })}>{percentileLabel(rank)}</span>
               <span style={px({ fontSize:9.5, color:C.text3, width:58, textAlign:'right', whiteSpace:'nowrap' })}>{val}</span>
@@ -1921,12 +1923,12 @@ function PlayerProfile({ player, derived, onCompare }) {
     ['Contract', hasProfileContractMetadata, 'Spotrac'],
   ];
   const profileProvenance = useMemo(() => [
-    { label:'Player identity', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
-    { label:'Season statistics', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
-    { label:'Statcast metrics', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
-    { label:'Tracking and pitch context', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
-    { label:'Contract and service time', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
-    { label:'SKIP decision metrics', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
+    { label:'Player identity', status:p?.id ? 'verified' : 'unavailable', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
+    { label:'Season statistics', status:(s?.gamesPlayed || s?.atBats || s?.inningsPitched) ? 'verified' : 'unavailable', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
+    { label:'Statcast metrics', status:player.savant ? 'verified' : 'unavailable', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
+    { label:'Tracking and pitch context', status:(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length) ? 'verified' : 'unavailable', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
+    { label:'Contract and service time', status:hasProfileContractMetadata ? 'verified' : 'unavailable', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
+    { label:'SKIP decision metrics', status:'estimated', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
   ], [p, s, player]);
 
   // Player's own team brand color for panel accents — TEAMS is a curated
