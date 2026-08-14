@@ -15,6 +15,9 @@ import {
 } from '../engine/skip.js';
 import { Badge, Panel, KVRow, GradeBar, PosBadge, SkeletonPlayerHero, SkeletonPanelGrid } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
+import Breadcrumbs from '../components/Breadcrumbs.jsx';
+import { openTab, openTeamOverview } from '../lib/navigation.js';
+import { getTeamAccent } from '../lib/teamVisuals.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
@@ -1890,7 +1893,7 @@ function PlayerProfile({ player, derived, onCompare }) {
   // subset (not all 30 clubs), so this gracefully falls back to the app's
   // default amber for anyone outside that set rather than showing nothing.
   const teamKey = p.currentTeam?.abbreviation?.toLowerCase();
-  const teamAccent = (teamKey && TEAMS[teamKey]?.color) || C.amber;
+  const teamAccent = getTeamAccent(teamKey ? TEAMS[teamKey] : null);
 
   const seasonRows = player.isPitcher
     ? [['G',s.gamesPlayed],['GS',s.gamesStarted],['IP',fmtIP(s.inningsPitched)],
@@ -2019,8 +2022,18 @@ function PlayerProfile({ player, derived, onCompare }) {
     reader.readAsText(file);
   };
 
+  const currentTeamName = p.currentTeam?.name || 'Free Agent';
+  const currentTeamAbbr = p.currentTeam?.abbreviation;
+  const hasRegisteredTeam = Boolean(currentTeamAbbr && TEAMS[currentTeamAbbr.toLowerCase()]);
+  const breadcrumbItems = [
+    { label:'Players', onClick:() => openTab('players') },
+    ...(hasRegisteredTeam ? [{ label:currentTeamName, onClick:() => openTeamOverview(currentTeamAbbr) }] : []),
+    { label:p.fullName || 'Player' },
+  ];
+
   return (
     <>
+      <Breadcrumbs items={breadcrumbItems} accent={teamAccent} />
       {/* ══ HERO ══════════════════════════════════════════════════════════ */}
       <div className="skip-player-hero" style={{ background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:12,
         display:'flex', alignItems:'stretch', overflow:'hidden', overflowX:'auto' }}>

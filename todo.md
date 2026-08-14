@@ -11080,3 +11080,10 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Make player and team links styled, accessible, and responsive across tables, rankings, and leaderboards.
 - [x] Add regression tests for player/team navigation events and MiLB profile resolution.
 - [x] Verify UI behavior, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a checkpoint.
+
+## Breadcrumbs and team-specific color accents
+
+- [ ] Add reusable breadcrumb navigation to player profile views and team overview headers.
+- [ ] Apply accessible team-specific color accents to Overview page borders, badges, accent strips, and tab active states.
+- [ ] Add regression tests for breadcrumb rendering and team accent derivation.
+- [ ] Verify responsive layout, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.

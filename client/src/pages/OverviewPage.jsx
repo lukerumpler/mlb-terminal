@@ -4,6 +4,9 @@ import { TEAMS, RUN_DIFF_DATA, SEASON as CURRENT_SEASON } from '../constants/dat
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, fetchTeamFinancials } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
+import Breadcrumbs from '../components/Breadcrumbs.jsx';
+import { openTab } from '../lib/navigation.js';
+import { getTeamAccent } from '../lib/teamVisuals.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 
@@ -297,7 +300,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   // used for small body text — some team colors (e.g. the Padres' near-black
   // brown) would fail contrast as text against a themed background, but read
   // fine as a bar fill or a 3px accent strip.
-  const teamAccent = team?.color || C.amber;
+  const teamAccent = getTeamAccent(team);
   const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
@@ -566,16 +569,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const evBins = [];
 
   return (
-    <div ref={overviewRef} className="page-enter" style={{display:'flex',flexDirection:'column',gap:14}}>
+    <div ref={overviewRef} className="page-enter" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
+
+      <Breadcrumbs items={[{ label:'Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
 
       {/* ── Selector + headline ── */}
       <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
           <div>
           <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}>
             <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={30} />
-            <div style={px({fontSize:10,fontWeight:700,color:C.amber,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
+            <div style={px({fontSize:10,fontWeight:700,color:teamAccent,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
           </div>
-          <h1 style={sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1})}>Season overview</h1>
+          <h1 style={{ ...sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1}), borderLeft:`3px solid ${teamAccent}`, paddingLeft:9 }}>Season overview</h1>
           <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -963,12 +968,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </Panel>
 
         {/* Pitch Arsenal */}
-        <Panel title="Pitch Arsenal" accent={C.rust}
+        <Panel title="Pitch Arsenal" accent={teamAccent}
           badge={arsenal ? <div style={{display:'flex',gap:6}}>
             {[['Usage','usage'],['Grades','grades']].map(([l,k])=>(
               <button key={k} onClick={()=>setArsenalTab(k)} aria-pressed={arsenalTab===k}
                 style={{padding:'2px 8px',fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
-                  background:arsenalTab===k?C.rust:C.surface3,color:arsenalTab===k?'#fff':C.text3,
+                  background:arsenalTab===k?`color-mix(in srgb, ${teamAccent} 14%, transparent)`:C.surface3,color:arsenalTab===k?teamAccent:C.text3,
                   border:'none',borderRadius:4,cursor:'pointer'}}>
                 {l}
               </button>
@@ -1138,11 +1143,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </Panel>
         </div>
 
-        <Panel title="Splits Dashboard" accent={C.slate}>
+        <Panel title="Splits Dashboard" accent={teamAccent}>
           <div style={{display:'flex',borderBottom:`0.5px solid ${C.border}`}}>
             {[['home','Home / Away'],['hand','vs LHP / RHP'],['time','Day / Night']].map(([k,l])=>(
               <button key={k} onClick={()=>setSplitTab(k)} aria-pressed={splitTab===k}
-                style={{padding:'8px 16px',fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:splitTab===k?C.amber:C.text3,borderBottom:splitTab===k?`2px solid ${C.amber}`:'2px solid transparent',background:'transparent',border:'none',cursor:'pointer',transition:'all .12s',whiteSpace:'nowrap'}}>
+                style={{padding:'8px 16px',fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:splitTab===k?teamAccent:C.text3,borderBottom:splitTab===k?`2px solid ${teamAccent}`:'2px solid transparent',background:'transparent',border:'none',cursor:'pointer',transition:'all .12s',whiteSpace:'nowrap'}}>
                 {l}
               </button>
             ))}

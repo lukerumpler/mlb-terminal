@@ -1,3 +1,8 @@
+export function openTab(tab) {
+  if (typeof window === 'undefined' || !tab) return;
+  window.dispatchEvent(new CustomEvent('skip-navigate', { detail: { tab } }));
+}
+
 export function openPlayerProfile(personOrId, name) {
   if (typeof window === 'undefined') return;
   const detail = typeof personOrId === 'object' && personOrId !== null
