@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTeamStrengthData } from '../client/src/pages/OverviewPage.jsx';
-import { buildPlayerVideoLinks, buildPlayerHighlightSearches } from '../client/src/pages/PlayersPage.jsx';
+import { buildPlayerVideoLinks, buildPlayerHighlightSearches, normalizeEmbeddableVideoUrl, loadPlayerPlaylists, savePlayerPlaylists } from '../client/src/pages/PlayersPage.jsx';
 
 describe('team strength radar data', () => {
   it('keeps the overall and specific-strength axes in a stable order', () => {
@@ -58,5 +58,17 @@ describe('source-safe player video cards', () => {
 
   it('returns no key-play searches without a verified player name', () => {
     expect(buildPlayerHighlightSearches()).toEqual([]);
+  });
+
+  it('normalizes verified YouTube URLs for compact embedding', () => {
+    expect(normalizeEmbeddableVideoUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toMatchObject({ videoId:'dQw4w9WgXcQ', embedUrl:'https://www.youtube.com/embed/dQw4w9WgXcQ' });
+    expect(normalizeEmbeddableVideoUrl('https://www.youtube.com/results?search_query=baseball')).toBeNull();
+  });
+
+  it('persists player-specific playlists in local storage', () => {
+    localStorage.clear();
+    const playlists = [{ id:'my-highlights', name:'My Highlights', clips:[{ id:'clip-1', title:'Opening blast' }] }];
+    savePlayerPlaylists(660271, playlists);
+    expect(loadPlayerPlaylists(660271)).toEqual(playlists);
   });
 });

@@ -121,6 +121,40 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 
+  it('creates a playlist, saves a verified clip, embeds it, and removes it', async () => {
+    const user = userEvent.setup();
+    localStorage.clear();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Playlist Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Playlist Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Playlist');
+    await waitFor(() => expect(screen.getByText('Playlist Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Playlist Player'));
+    await waitFor(() => expect(screen.getByText('Player Video')).toBeInTheDocument());
+
+    await user.type(screen.getByRole('textbox', { name:/New playlist name/i }), 'Game 1 Cuts');
+    await user.click(screen.getByRole('button', { name:/Create$/i }));
+    expect(screen.getByRole('option', { name:/Game 1 Cuts \(0\)/i })).toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name:/Verified YouTube clip URL/i }), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    await user.type(screen.getByRole('textbox', { name:/Clip title/i }), 'Opening blast');
+    await user.click(screen.getByRole('button', { name:/Save clip/i }));
+    await waitFor(() => expect(screen.getByTitle('Opening blast')).toBeInTheDocument());
+    expect(screen.getByTitle('Opening blast')).toHaveAttribute('src', 'https://www.youtube.com/embed/dQw4w9WgXcQ');
+
+    await user.type(screen.getByRole('textbox', { name:/Verified YouTube clip URL/i }), 'https://www.youtube.com/watch?v=9bZkp7q19f0');
+    await user.type(screen.getByRole('textbox', { name:/Clip title/i }), 'Second look');
+    await user.click(screen.getByRole('button', { name:/Save clip/i }));
+    expect(screen.getByRole('button', { name:/Move Second look up/i })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name:/Move Second look up/i }));
+    const stored = JSON.parse(localStorage.getItem('skip-player-playlists:1'));
+    expect(stored.find(list => list.name === 'Game 1 Cuts').clips[0].title).toBe('Second look');
+    await user.click(screen.getByRole('button', { name:/Remove Second look/i }));
+    expect(screen.queryByRole('button', { name:/Remove Second look/i })).not.toBeInTheDocument();
+  });
+
   it('updates the selected metric when a profile KPI is clicked', async () => {
     const user = userEvent.setup();
     searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Interactive Player' }]);
