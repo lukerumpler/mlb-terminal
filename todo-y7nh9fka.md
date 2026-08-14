@@ -54,3 +54,7 @@
 - [x] Apply a shallower top header chrome while preserving readable controls.
 - [x] Verify responsive desktop/mobile behavior and update tests.
 - [x] Save a checkpoint for the approved shell update.
+- [x] Inspect current data-table and dashboard-card spacing styles.
+- [x] Add table-specific dense row-height rules without changing card spacing.
+- [x] Verify dense tables remain readable and responsive.
+- [x] Save a checkpoint for the table-density update.

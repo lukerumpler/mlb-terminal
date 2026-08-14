@@ -346,7 +346,11 @@ export default function App() {
         .skip-stat-strip { transition: box-shadow .2s ease, transform .2s ease; }
         .skip-stat-strip:hover { transform: translateY(-1px); box-shadow:0 12px 28px color-mix(in srgb, ${C.navy} 10%, transparent) !important; }
         tbody tr:hover { background: color-mix(in srgb, ${C.amber} 9%, transparent) !important; }
-
+        /* Tables use their own density system; dashboard cards keep their existing breathing room. */
+        .skip-content table th, .skip-content table td { padding-top:5px !important; padding-bottom:5px !important; }
+        @media (max-width:720px) {
+          .skip-content table th, .skip-content table td { padding-top:6px !important; padding-bottom:6px !important; }
+        }
 
         @keyframes scrollx { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         @keyframes pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }

@@ -24,6 +24,9 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(appSource).toContain('.skip-panel:hover');
     expect(documentSource).toContain('.skip-nav-section');
     expect(documentSource).toContain('.skip-stat-strip > div { min-height:78px; }');
+    expect(appSource).toContain('.skip-content table th, .skip-content table td');
+    expect(appSource).toContain('padding-top:5px !important; padding-bottom:5px !important;');
+    expect(appSource).toContain('padding-top:6px !important; padding-bottom:6px !important;');
   });
 
   it('adds dedicated mobile hooks to dense player and prospect views', () => {
