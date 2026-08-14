@@ -123,6 +123,30 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getByRole('button', { name:/TPVI True Value/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('switches profile tabs and opens an expanded chart dialog', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Tabbed Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Tabbed Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Tabbed');
+    await waitFor(() => expect(screen.getByText('Tabbed Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Tabbed Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Offense' })).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Offense' }));
+    expect(screen.getByText('Offense Focus')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Notes' }));
+    expect(screen.getByText('SKIP Read')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Overview' }));
+    await user.click(screen.getAllByRole('button', { name: /Expand Expand/i })[1]);
+    expect(screen.getByRole('dialog', { name: /Player Geometry Engine/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Close expanded chart/i }));
+    expect(screen.queryByRole('dialog', { name: /Player Geometry Engine/i })).not.toBeInTheDocument();
+  });
+
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {
     const user = userEvent.setup();
     const playerA = { id: 1, fullName: 'Slow Player A' };

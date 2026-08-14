@@ -13,3 +13,9 @@
 - [x] Save the validated profile changes in a checkpoint and capture the published version identifier
 - [x] Add explicit Vitest assertions for the profile responsive CSS rules and spacing behavior
 - [x] Capture a preview of the actual loaded player profile tab rather than the default overview tab
+- [x] Add a profile-level tab rail for Overview, Offense, Defense, Splits, and Notes
+- [x] Add click-to-expand chart overlays for radar, spray, and percentile profile charts
+- [x] Preserve existing player-profile data and keep tab content responsive
+- [x] Add Vitest coverage for profile tabs and chart expansion interactions
+- [x] Run typecheck, tests, and visual verification for the updated profile experience
+- [x] Save a checkpoint containing the profile navigation and chart expansion update
