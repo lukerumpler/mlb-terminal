@@ -71,4 +71,4 @@
 - [x] Assert rendered model-source freshness text in both the source-gap and recovered-live states.
 - [x] Save a successful checkpoint after the freshness assertions pass.
 
-- [ ] Save the final checkpoint after the current freshness assertions pass.
+- [x] Save the final checkpoint after the current freshness assertions pass.
