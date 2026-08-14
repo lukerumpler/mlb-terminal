@@ -255,7 +255,7 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await user.type(screen.getByRole('textbox', { name: 'Custom tags' }), 'two-strike, timing');
     await user.click(screen.getByRole('button', { name: 'Save note' }));
     expect(screen.getByText('Keep the hands quiet in two-strike counts.')).toBeInTheDocument();
-    expect(screen.getByText('#two-strike')).toBeInTheDocument();
+    expect(screen.getByText('#two-strike', { selector: 'button' })).toBeInTheDocument();
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Observation category' }), 'Medical');
     await user.type(screen.getByRole('textbox', { name: 'Observation' }), 'Check recovery notes after the next series.');
@@ -263,6 +263,24 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Sort observations' }), 'category');
     expect(screen.getAllByText('Medical')[1]).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Sort observations' })).toHaveValue('category');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter observations by tag' }), 'two-strike');
+    expect(screen.getByText('Keep the hands quiet in two-strike counts.')).toBeInTheDocument();
+    expect(screen.queryByText('Check recovery notes after the next series.')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter observations by tag' }), '');
+
+    const editButtons = screen.getAllByRole('button', { name: 'Edit' });
+    await user.click(editButtons[0]);
+    const editor = screen.getByRole('textbox', { name: 'Observation' });
+    await user.clear(editor);
+    await user.type(editor, 'Updated recovery note.');
+    await user.click(screen.getByRole('button', { name: 'Update note' }));
+    expect(screen.getByText('Updated recovery note.')).toBeInTheDocument();
+
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+    await user.click(deleteButtons[0]);
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    expect(screen.queryByText('Updated recovery note.')).not.toBeInTheDocument();
   });
 
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {

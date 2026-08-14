@@ -1783,10 +1783,15 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [noteCategory, setNoteCategory] = useState('Scouting');
   const [noteTags, setNoteTags] = useState('');
   const [noteSort, setNoteSort] = useState('date-desc');
+  const [noteFilterTag, setNoteFilterTag] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
-  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); }, [player.id]);
+  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); }, [player.id]);
   useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
   const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
+  const availableNoteTags = useMemo(() => [...new Set(observations.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b)), [observations]);
+  const visibleObservations = useMemo(() => noteFilterTag ? sortedObservations.filter(note => note.tags?.includes(noteFilterTag)) : sortedObservations, [noteFilterTag, sortedObservations]);
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -1892,15 +1897,23 @@ function PlayerProfile({ player, derived, onCompare }) {
     { lbl:'Value',   val:kpis.TPVI, color:C.navy   },
   ];
 
-  const addObservation = event => {
+  const saveObservation = event => {
     event.preventDefault();
     const text = noteText.trim();
     if (!text) return;
     const tags = [...new Set(noteTags.split(',').map(tag => tag.trim().replace(/^#/, '').toLowerCase()).filter(Boolean))].slice(0, 8);
-    setObservations(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, category: noteCategory, tags, createdAt: Date.now() }, ...current]);
+    if (editingNoteId) {
+      setObservations(current => current.map(note => note.id === editingNoteId ? { ...note, text, category: noteCategory, tags, updatedAt: Date.now() } : note));
+    } else {
+      setObservations(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, category: noteCategory, tags, createdAt: Date.now() }, ...current]);
+    }
     setNoteText('');
     setNoteTags('');
+    setEditingNoteId(null);
   };
+  const beginEditObservation = note => { setEditingNoteId(note.id); setNoteText(note.text); setNoteCategory(note.category || 'Scouting'); setNoteTags((note.tags || []).join(', ')); setDeleteNoteId(null); };
+  const cancelEditObservation = () => { setEditingNoteId(null); setNoteText(''); setNoteTags(''); setNoteCategory('Scouting'); };
+  const confirmDeleteObservation = () => { if (!deleteNoteId) return; setObservations(current => current.filter(note => note.id !== deleteNoteId)); if (editingNoteId === deleteNoteId) cancelEditObservation(); setDeleteNoteId(null); };
 
   return (
     <>
@@ -2028,17 +2041,18 @@ function PlayerProfile({ player, derived, onCompare }) {
               <Panel title="Strengths & Risks" accent={C.purple}><div style={{ padding:'12px 14px' }}><div style={sans({ fontSize:10, color:C.teal, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Strengths</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5, marginBottom:12 })}>{strengths.join(' · ') || 'No strengths available'}</div><div style={sans({ fontSize:10, color:C.rust, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Risks</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5 })}>{risks.join(' · ') || 'No risks available'}</div></div></Panel>
               <Panel title="Recommendation" accent={C.amber}><div style={sans({ padding:'14px', color:C.text2, lineHeight:1.6, fontSize:12 })}>{rec}</div></Panel>
               <Panel title="Saved Observations" accent={C.teal} badge={`${observations.length} saved`}>
-                <form className="skip-notes-composer" onSubmit={addObservation}>
-                  <textarea aria-label="Observation" value={noteText} onChange={event => setNoteText(event.target.value)} placeholder="Capture a scouting observation…" rows={3} />
+                <form className="skip-notes-composer" onSubmit={saveObservation}>
+                  <textarea aria-label="Observation" value={noteText} onChange={event => setNoteText(event.target.value)} placeholder={editingNoteId ? 'Edit this scouting observation…' : 'Capture a scouting observation…'} rows={3} />
                   <div className="skip-notes-form-row">
                     <select aria-label="Observation category" value={noteCategory} onChange={event => setNoteCategory(event.target.value)}>{PLAYER_NOTE_CATEGORIES.map(category => <option key={category}>{category}</option>)}</select>
                     <input aria-label="Custom tags" value={noteTags} onChange={event => setNoteTags(event.target.value)} placeholder="Tags, comma separated" />
-                    <button type="submit" disabled={!noteText.trim()}>Save note</button>
+                    <button type="submit" disabled={!noteText.trim()}>{editingNoteId ? 'Update note' : 'Save note'}</button>
+                    {editingNoteId && <button className="skip-notes-cancel" type="button" onClick={cancelEditObservation}>Cancel</button>}
                   </div>
                   <div className="skip-notes-help">Use commas for multiple tags. Tags are saved per player in this browser.</div>
                 </form>
-                <div className="skip-notes-toolbar"><span>{observations.length ? 'Saved observations' : 'No saved observations yet'}</span><select aria-label="Sort observations" value={noteSort} onChange={event => setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div>
-                {sortedObservations.length ? <div className="skip-notes-list">{sortedObservations.map(note => <article className="skip-note-card" key={note.id}><div className="skip-note-meta"><span className="skip-note-category">{note.category}</span><time dateTime={new Date(note.createdAt).toISOString()}>{new Date(note.createdAt).toLocaleDateString()}</time></div><div className="skip-note-text">{note.text}</div>{note.tags?.length ? <div className="skip-note-tags">{note.tags.map(tag => <span key={tag}>#{tag}</span>)}</div> : null}</article>)}</div> : <div className="skip-notes-empty">Your saved scouting observations will appear here.</div>}
+                <div className="skip-notes-toolbar"><span>{visibleObservations.length} shown · {observations.length} saved</span><div className="skip-notes-toolbar-controls"><select aria-label="Filter observations by tag" value={noteFilterTag} onChange={event => setNoteFilterTag(event.target.value)}><option value="">All tags</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><select aria-label="Sort observations" value={noteSort} onChange={event => setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div></div>
+                {visibleObservations.length ? <div className="skip-notes-list">{visibleObservations.map(note => <article className="skip-note-card" key={note.id}><div className="skip-note-meta"><span className="skip-note-category">{note.category}</span><time dateTime={new Date(note.createdAt).toISOString()}>{new Date(note.createdAt).toLocaleDateString()}</time></div><div className="skip-note-text">{note.text}</div>{note.tags?.length ? <div className="skip-note-tags">{note.tags.map(tag => <button type="button" key={tag} onClick={() => setNoteFilterTag(tag)} aria-label={`Filter by tag ${tag}`}>#{tag}</button>)}</div> : null}<div className="skip-note-actions"><button type="button" onClick={() => beginEditObservation(note)}>Edit</button>{deleteNoteId === note.id ? <><span>Delete this note?</span><button type="button" className="is-danger" onClick={confirmDeleteObservation}>Confirm</button><button type="button" onClick={() => setDeleteNoteId(null)}>Cancel</button></> : <button type="button" onClick={() => setDeleteNoteId(note.id)}>Delete</button>}</div></article>)}</div> : <div className="skip-notes-empty">{noteFilterTag ? `No observations tagged #${noteFilterTag}.` : 'Your saved scouting observations will appear here.'}</div>}
               </Panel>
             </div>
           )}

@@ -45,3 +45,11 @@
 - [x] Add focused regression coverage for the corrected percentile profile graphic
 - [x] Run typecheck, tests, and visual verification for the percentile profile
 - [x] Save a checkpoint containing the percentile graphic correction
+- [x] Inspect the existing Notes observation state, sort controls, and saved-card markup
+- [x] Add tag-based filtering alongside category sorting
+- [x] Add edit controls for saved observations
+- [x] Add delete controls with a safe confirmation step for saved observations
+- [x] Preserve per-player browser persistence and empty/filter-empty states
+- [x] Add Vitest coverage for tag filtering, edit, and delete interactions
+- [x] Run typecheck, tests, and visual verification for the Notes management update
+- [x] Save a checkpoint containing the Notes management update
