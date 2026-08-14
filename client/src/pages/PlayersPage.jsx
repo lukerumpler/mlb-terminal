@@ -21,6 +21,8 @@ import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
+import { buildMultiYearTaxProjection } from '../../../shared/luxuryTax.js';
+import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 
 function pctBar(pct, color) {
   return (
@@ -1233,7 +1235,8 @@ export function getTeamFinancialRows(teamFinancials) {
     ['CBT Threshold', tax.taxThreshold, C.slate],
     ['Est. Tax Bill', tax.estimatedTaxBill, tax.estimatedTaxBill > 0 ? C.rust : C.teal],
     ['Tax Space', tax.taxSpace, tax.taxSpace != null && Number(tax.taxSpace) < 0 ? C.rust : C.teal],
-  ].map(([label, value, color]) => ({ label, value:formatFinancialValue(value), color }));
+    ['Repeater Tier', tax.repeaterTier || 'History unavailable', tax.repeaterYears == null ? C.text4 : C.rust],
+  ].map(([label, value, color]) => ({ label, value: typeof value === 'string' ? value : formatFinancialValue(value), color }));
 }
 
 function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
@@ -1246,6 +1249,15 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
   const surplusColor = surplusM >= 60 ? C.teal : surplusM >= 20 ? C.amber : C.rust;
   const financialRows = getTeamFinancialRows(teamFinancials);
   const hasFinancials = financialRows.some(row => row.value !== '—');
+  const taxProjection = buildMultiYearTaxProjection({
+    baseAav: ct?.aav,
+    currentPlayerAav: ct?.aav,
+    currentTaxPayroll: teamFinancials?.tax?.taxPayroll,
+    currentSeason: teamFinancials?.season || 2026,
+    repeaterYears: teamFinancials?.tax?.repeaterYears,
+    years: 5,
+  });
+  const hasTaxProjection = taxProjection.status === 'available';
 
   return (
     <Panel title="Market & Contract Intelligence" accent={C.purple} badge="Financial Model">
@@ -1272,6 +1284,29 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
           <div style={sans({ fontSize:8.5, color:C.text4, lineHeight:1.35, marginTop:6 })}>
             {hasFinancials ? <>Source: <a href={teamFinancials?.sourceUrls?.tax || 'https://www.spotrac.com/mlb/tax'} target="_blank" rel="noreferrer noopener" style={{ color:C.teal }}>Spotrac MLB payroll and tax trackers</a>. Tax figures are payroll-based estimates.</> : 'No verified team payroll or tax response is available for this player’s current team.'}
           </div>
+        </div>
+        <div style={{ marginBottom:10, padding:'9px 10px 8px', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:7 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+            <span style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, letterSpacing:'.06em', textTransform:'uppercase' })}>Multi-Year CBT Projection</span>
+            <span style={px({ fontSize:8.5, color:hasTaxProjection ? C.teal : C.text4 })}>{hasTaxProjection ? '5-YEAR MODEL' : 'UNAVAILABLE'}</span>
+          </div>
+          {hasTaxProjection ? (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
+                <thead><tr>{['Year','AAV','CBT Overage','Repeater Tier','Est. Tax'].map(label => <th key={label} style={{ padding:'4px 5px', textAlign:label==='Year'?'left':'right', color:C.text3, fontSize:8, textTransform:'uppercase', letterSpacing:'.04em', borderBottom:`0.5px solid ${C.border}` }}>{label}</th>)}</tr></thead>
+                <tbody>{taxProjection.rows.map(row => <tr key={row.season}>
+                  <td style={{ padding:'5px', color:C.amber, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{row.season}</td>
+                  <td style={{ padding:'5px', textAlign:'right', color:C.text2, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.projectedAav)}</td>
+                  <td style={{ padding:'5px', textAlign:'right', color:row.overage > 0 ? C.rust : C.teal, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.overage)}</td>
+                  <td style={{ padding:'5px', textAlign:'right', color:row.repeaterYears == null ? C.text4 : C.text2, fontSize:8.5 }}>{row.repeaterTier}</td>
+                  <td style={{ padding:'5px', textAlign:'right', color:row.estimatedTax == null ? C.text4 : C.rust, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.estimatedTax)}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={sans({ fontSize:9.5, color:C.text3, lineHeight:1.45 })}>Requires verified player AAV and team tax payroll. Repeater history is not published by the current Spotrac response, so SKIP does not assume a tax rate.</div>
+          )}
+          <div style={sans({ fontSize:8.5, color:C.text4, lineHeight:1.35, marginTop:6 })}>Model assumptions: 3% annual AAV and payroll growth. CBT threshold and repeater bands follow the <a href="https://www.mlb.com/glossary/transactions/competitive-balance-tax" target="_blank" rel="noreferrer noopener" style={{ color:C.teal }}>MLB CBT glossary</a>; projection is not an official club forecast.</div>
         </div>
         {[
           ['Projected WAR/$', projWARperS+' WAR/$M', C.teal],
@@ -1717,6 +1752,7 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedChart, setExpandedChart] = useState(null);
+  const [pdfExportState, setPdfExportState] = useState('idle');
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -1755,6 +1791,55 @@ function PlayerProfile({ player, derived, onCompare }) {
   const quickStats = player.isPitcher
     ? [['ERA',s.era?(+s.era).toFixed(2):'—'],['K',dashIfMissing(s.strikeOuts)],['W',dashIfMissing(s.wins)],['WHIP',s.whip?(+s.whip).toFixed(3):'—']]
     : [['AVG',fmt(s.avg)],['HR',dashIfMissing(s.homeRuns)],['RBI',dashIfMissing(s.rbi)],['OPS',fmt(s.ops)]];
+
+  const runPdfExport = async kind => {
+    if (pdfExportState === 'loading') return;
+    setPdfExportState('loading');
+    try {
+      const playerName = p?.fullName || `${p?.useName || p?.firstName || ''} ${p?.useLastName || p?.lastName || ''}`.trim() || 'Player';
+      const projection = buildMultiYearTaxProjection({
+        baseAav: player.contractData?.aav,
+        currentPlayerAav: player.contractData?.aav,
+        currentTaxPayroll: player.teamFinancials?.tax?.taxPayroll,
+        currentSeason: player.teamFinancials?.season || player.statSeason || SEASON,
+        repeaterYears: player.teamFinancials?.tax?.repeaterYears,
+        years: 5,
+      });
+      const common = {
+        playerName,
+        teamName: p?.currentTeam?.name,
+        position: p?.primaryPosition?.abbreviation,
+        season: seasonLabel,
+        verdict: verd,
+        score,
+        archetype: arch,
+        kpis,
+        headlineRows: quickStats.map(([label, value]) => ({ label, value })),
+        teamFinancials: player.teamFinancials,
+        projection,
+      };
+      if (kind === 'valuation') {
+        await downloadPlayerValuationCardPdf(buildPlayerValuationCardModel({
+          ...common,
+          axes: shareCardAxes.map(axis => ({ label:axis.axis, value:axis.val })),
+          contractData: player.contractData,
+        }));
+      } else {
+        await downloadExecutiveScoutingSummaryPdf(buildExecutiveScoutingSummaryModel({
+          ...common,
+          strengths,
+          risks,
+          recommendation: rec,
+        }));
+      }
+      setPdfExportState(kind === 'valuation' ? 'valuation-ready' : 'summary-ready');
+      window.setTimeout(() => setPdfExportState('idle'), 2200);
+    } catch (error) {
+      console.error('[SKIP] player PDF export failed', error);
+      setPdfExportState('error');
+      window.setTimeout(() => setPdfExportState('idle'), 2500);
+    }
+  };
 
   const careerHeaders = player.isPitcher
     ? ['YR','G','GS','IP','W','L','ERA','K','BB','WHIP']
@@ -2052,8 +2137,21 @@ function PlayerProfile({ player, derived, onCompare }) {
               never show conflicting shapes, just different presentations.
               (Roadmap #7 — reconciled back in 2026-08-07 after this branch
               forked before it was originally built; see progress log.) */}
-          <Panel title="Share Card" accent={teamAccent} badge="PNG export">
+          <Panel title="Export Studio" accent={teamAccent} badge="PNG + PDF">
             <div style={{ padding:'10px 14px 12px' }}>
+              <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:10 }}>
+                <button type="button" onClick={() => runPdfExport('valuation')} disabled={pdfExportState === 'loading'}
+                  aria-label="Download player valuation card PDF"
+                  style={{ flex:1, minWidth:150, minHeight:30, border:`1px solid ${C.amberMid}`, borderRadius:6, background:pdfExportState === 'valuation-ready' ? C.tealSoft : C.amberSoft, color:pdfExportState === 'valuation-ready' ? C.teal : C.amberDark, cursor:pdfExportState === 'loading' ? 'wait' : 'pointer', opacity:pdfExportState === 'loading' ? .7 : 1, ...px({ fontSize:9, fontWeight:800, letterSpacing:'.04em' }) }}>
+                  {pdfExportState === 'valuation-ready' ? 'VALUATION PDF READY' : 'PLAYER VALUATION PDF'}
+                </button>
+                <button type="button" onClick={() => runPdfExport('summary')} disabled={pdfExportState === 'loading'}
+                  aria-label="Download executive scouting summary PDF"
+                  style={{ flex:1, minWidth:150, minHeight:30, border:`1px solid ${C.purpleMid || C.border}`, borderRadius:6, background:pdfExportState === 'summary-ready' ? C.tealSoft : C.purpleSoft, color:pdfExportState === 'summary-ready' ? C.teal : C.purple, cursor:pdfExportState === 'loading' ? 'wait' : 'pointer', opacity:pdfExportState === 'loading' ? .7 : 1, ...px({ fontSize:9, fontWeight:800, letterSpacing:'.04em' }) }}>
+                  {pdfExportState === 'summary-ready' ? 'SUMMARY PDF READY' : 'EXECUTIVE SUMMARY PDF'}
+                </button>
+              </div>
+              {pdfExportState === 'error' && <div role="alert" style={sans({ fontSize:9.5, color:C.rust, marginBottom:8 })}>PDF export failed. Check the browser download permission and retry.</div>}
               <RadarCard
                 name={p.fullName}
                 subtitle={`${p.currentTeam?.name || 'Free Agent'} · ${p.primaryPosition?.abbreviation || '—'} · ${seasonLabel}`}

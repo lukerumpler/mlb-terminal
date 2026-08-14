@@ -17,17 +17,19 @@ describe('team financial rows', () => {
   it('formats payroll and luxury-tax fields for contract valuation panels', () => {
     expect(getTeamFinancialRows({
       payroll: { payroll:311496026 },
-      tax: { taxPayroll:430290578, taxThreshold:244000000, estimatedTaxBill:180319636, taxSpace:-186290578 },
+      tax: { taxPayroll:430290578, taxThreshold:244000000, estimatedTaxBill:180319636, taxSpace:-186290578, repeaterTier:'History unavailable' },
     })).toEqual([
       { label:'Team Payroll', value:'$311.5M', color:expect.any(String) },
       { label:'Tax Payroll', value:'$430.3M', color:expect.any(String) },
       { label:'CBT Threshold', value:'$244.0M', color:expect.any(String) },
       { label:'Est. Tax Bill', value:'$180.3M', color:expect.any(String) },
       { label:'Tax Space', value:'−$186.3M', color:expect.any(String) },
+      { label:'Repeater Tier', value:'History unavailable', color:expect.any(String) },
     ]);
   });
 
-  it('shows em dashes when the financial feed is unavailable', () => {
-    expect(getTeamFinancialRows(null).every(row => row.value === '—')).toBe(true);
+  it('shows unavailable strings or em dashes when the financial feed is unavailable', () => {
+    const rows = getTeamFinancialRows(null);
+    expect(rows.some(row => row.value === 'History unavailable' || row.value === '—')).toBe(true);
   });
 });

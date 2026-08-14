@@ -7,6 +7,7 @@
  * when the upstream page is unavailable or its markup changes.
  */
 import { applyCors, isRateLimited, rateLimitResponse } from './_shared.js';
+import { getRepeaterTier, CBT_SOURCE_URL } from '../../shared/luxuryTax.js';
 
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
@@ -121,8 +122,14 @@ export function parseTeamTaxHtml(html, teamAbbr, season = DEFAULT_SEASON) {
     estimatedTaxBill: parseMoney(row[taxBillIndex]),
     totalTaxPayroll: parseMoney(row[totalIndex]),
     taxThreshold: thresholdRow && thresholdIndex >= 0 ? parseMoney(thresholdRow[thresholdIndex]) : null,
+    // Spotrac’s public 2026 table reports current payroll/tax estimates but not
+    // a verified consecutive-year history. Keep the tier explicitly unknown;
+    // downstream projections must not silently assume a first-year rate.
+    repeaterYears: null,
+    repeaterTier: getRepeaterTier(null).label,
     source: 'Spotrac MLB Team Tax Tracker',
     sourceUrl: TAX_SOURCE_URL,
+    repeaterSourceUrl: CBT_SOURCE_URL,
   };
 }
 

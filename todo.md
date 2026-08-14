@@ -11013,3 +11013,14 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Keep video references optional and low-data: no autoplay, no embedded players, lazy or deferred thumbnails, lightweight external search links, and accessible text fallbacks.
 - [x] Preserve the team PDF export and payroll/luxury-tax work while resolving any shared-file merge issues.
 - [x] Run focused and full tests, lint/check/build, responsive verification, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Player exports and repeater-tier contract modeling
+- [ ] Add a reusable Player Valuation Card PDF export with player identity, SKIP metrics, percentile profile, contract value, and source notes.
+- [ ] Add a reusable Executive Scouting Summary PDF export with team/player context, decision signals, financial context, and source notes.
+- [ ] Add luxury-tax repeater-tier tracking and multi-year tax-adjusted contract projections with explicit assumptions and unavailable states.
+- [ ] Add regression tests, verify download flows and responsive UI, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Player PDF templates and luxury-tax repeater tiers
+- [x] Add reusable PDF export templates for individual player valuation cards and executive scouting summaries.
+- [x] Integrate team luxury-tax penalty repeater tier tracking into multi-year contract projection models with transparent assumptions and source notes.
+- [x] Add regression tests, verify download flows and responsive UI, run release checks, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
