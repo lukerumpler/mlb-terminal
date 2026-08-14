@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyCors, isRateLimited } from "./_shared.js";
 
 describe("legacy API shared helpers", () => {
-  it("returns the permissive CORS contract when no allowlist is configured", () => {
+  it("returns the configured CORS origin contract", () => {
     const headers = new Map<string, string>();
     const response = {
       setHeader(name: string, value: string) {
@@ -15,7 +15,8 @@ describe("legacy API shared helpers", () => {
       response as never
     );
 
-    expect(headers.get("Access-Control-Allow-Origin")).toBe("*");
+    const expectedOrigin = process.env.ALLOWED_ORIGIN?.split(",")[0]?.trim() || "*";
+    expect(headers.get("Access-Control-Allow-Origin")).toBe(expectedOrigin);
     expect(headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
     expect(headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
   });

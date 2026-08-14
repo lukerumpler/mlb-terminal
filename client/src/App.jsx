@@ -9,6 +9,7 @@ import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
+import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
@@ -26,7 +27,6 @@ const SettingsPage     = lazy(() => import('./pages/OtherPages.jsx').then(m => (
 const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
-const CommandPalette    = lazy(() => import('./components/CommandPalette.jsx'));
 
 function PageLoading() {
   return (

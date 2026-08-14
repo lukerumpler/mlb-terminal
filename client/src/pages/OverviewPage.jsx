@@ -606,11 +606,26 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   useEffect(() => {
     let alive = true;
     if (!affiliateId) { setAffiliateOverview(null); setAffiliateOverviewState('idle'); return () => { alive = false; }; }
-    setAffiliateOverviewState('loading');
+    const selectedAffiliate = affiliates.find(row => String(row.id) === String(affiliateId));
+    setAffiliateOverviewState(selectedAffiliate ? 'identity-ready' : 'loading');
+    if (selectedAffiliate) {
+      setAffiliateOverview({
+        id: Number(affiliateId),
+        name: selectedAffiliate.name,
+        level: selectedAffiliate.level,
+        league: selectedAffiliate.league,
+        hitting: {},
+        pitching: {},
+      });
+    }
     getMinorLeagueTeamOverview(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON).then(data => {
       if (!alive) return;
-      setAffiliateOverview(data);
-      setAffiliateOverviewState(data ? 'ready' : 'error');
+      if (data) {
+        setAffiliateOverview(data);
+        setAffiliateOverviewState('ready');
+      } else {
+        setAffiliateOverviewState('error');
+      }
     }).catch(() => { if (alive) setAffiliateOverviewState('error'); });
     return () => { alive = false; };
   }, [affiliateId, affiliateLevel]);
@@ -624,17 +639,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     Promise.all([
       getMinorLeagueTeamStandings(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON),
       getMinorLeagueTeamSchedule(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON, 14),
-      getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON),
-    ]).then(([standings, schedule, savant]) => {
+    ]).then(([standings, schedule]) => {
       if (!alive) return;
       setAffiliateStandings(standings);
       setAffiliateSchedule(schedule);
-      setAffiliateSavant(savant);
     }).catch(() => {
       if (!alive) return;
       setAffiliateStandings({ status:'upstream-unavailable', rows:[] });
       setAffiliateSchedule({ status:'upstream-unavailable', games:[] });
-      setAffiliateSavant({ status:'upstream-unavailable' });
+    });
+    getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON).then(savant => {
+      if (alive) setAffiliateSavant(savant);
+    }).catch(() => {
+      if (alive) setAffiliateSavant({ status:'upstream-unavailable' });
     });
     return () => { alive = false; };
   }, [affiliateId, affiliateLevel, teamBase?.abbr]);
@@ -695,7 +712,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setTodayGameMetadata({});
     const games = todayGames.slice(0, 6);
     if (games.length) {
-      Promise.all(games.map(game => getGameFeedMetadata(game.gamePk).then(metadata => [game.gamePk, metadata]).catch(() => [game.gamePk, null]))).then(entries => {
+      Promise.all(games.map(game => getGameFeedMetadata(game).then(metadata => [game.gamePk, metadata]).catch(() => [game.gamePk, null]))).then(entries => {
         if (alive) setTodayGameMetadata(Object.fromEntries(entries));
       });
     }
@@ -1161,13 +1178,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
       </div>
 
-      {affiliateId && <Panel title="Minor-League Affiliate Overview" accent={C.teal} badge={affiliateOverviewState==='loading'?'Loading…':affiliateOverviewState==='ready'?'Live MLB Stats API':'Source unavailable'}>
+      {affiliateId && <Panel title="Minor-League Affiliate Overview" accent={C.teal} badge={affiliateOverviewState==='loading'?'Loading…':affiliateOverviewState==='identity-ready'?'Live MLB identity · stats loading':affiliateOverviewState==='ready'?'Live MLB Stats API':'Source unavailable'}>
         <div style={{display:'flex',gap:6,padding:'8px 12px',borderBottom:`1px solid ${C.borderLight}`,flexWrap:'wrap'}}>
           {[['overview','Overview'],['standings','Standings'],['schedule','Schedule']].map(([key,label])=><button key={key} type="button" onClick={()=>setAffiliateTab(key)} style={{border:0,borderBottom:`2px solid ${affiliateTab===key?C.teal:'transparent'}`,background:'transparent',color:affiliateTab===key?C.teal:C.text3,padding:'6px 8px',cursor:'pointer',...px({fontSize:9,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'})}}>{label}</button>)}
         </div>
         {affiliateTab==='overview' && <>
           <div className="skip-affiliate-overview-grid" style={{padding:'12px 14px',display:'grid',gridTemplateColumns:'minmax(0,1.3fr) repeat(4,minmax(90px,1fr))',gap:12,alignItems:'center'}}>
-            <div><div style={sans({fontSize:15,fontWeight:800,color:C.text})}>{affiliateOverview?.name || affiliates.find(row=>String(row.id)===String(affiliateId))?.name || 'Minor-league affiliate'}</div><div style={sans({fontSize:10,color:C.text3,marginTop:3})}>{affiliateOverview?.level || affiliates.find(row=>String(row.id)===String(affiliateId))?.level || 'MiLB'} · {affiliateOverview?.league || affiliates.find(row=>String(row.id)===String(affiliateId))?.league || 'Affiliate feed'}{affiliateOverview?.venue ? ` · ${affiliateOverview.venue}` : ''}</div><div style={sans({fontSize:9,color:C.text3,marginTop:5})}>Affiliated with {team.name} · {affiliateOverview?.retrievedAt ? `retrieved ${new Date(affiliateOverview.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateOverviewState}</div></div>
+            <div><div style={sans({fontSize:15,fontWeight:800,color:C.text})}>{affiliateOverview?.name || affiliates.find(row=>String(row.id)===String(affiliateId))?.name || 'Minor-league affiliate'}</div><div style={sans({fontSize:10,color:C.text3,marginTop:3})}>{affiliateOverview?.level || affiliates.find(row=>String(row.id)===String(affiliateId))?.level || 'MiLB'} · {affiliateOverview?.league || affiliates.find(row=>String(row.id)===String(affiliateId))?.league || 'Affiliate feed'}{affiliateOverview?.venue ? ` · ${affiliateOverview.venue}` : ''}</div><div style={sans({fontSize:9,color:C.text3,marginTop:5})}>Affiliated with {team.name} · {affiliateOverview?.retrievedAt ? `retrieved ${new Date(affiliateOverview.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateOverviewState === 'identity-ready' ? 'stats loading' : affiliateOverviewState}</div></div>
             {[[affiliateOverview?.hitting?.ops,'OPS'],[affiliateOverview?.hitting?.homeRuns,'HR'],[affiliateOverview?.pitching?.era,'ERA'],[affiliateOverview?.pitching?.strikeOuts,'K']].map(([value,label])=><div key={label} style={{textAlign:'center'}}><div style={px({fontSize:18,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(label==='ERA'?2:label==='OPS'?3:0)}</div><div style={sans({fontSize:9,textTransform:'uppercase',letterSpacing:'.06em',color:C.text3})}>{label}</div></div>)}
           </div>
           <div className="skip-affiliate-savant-grid" style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>

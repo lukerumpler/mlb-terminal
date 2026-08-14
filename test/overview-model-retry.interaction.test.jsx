@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 let feedAttempt = 0;
 let modelAttempt = 0;
 let savantMode = 'pending';
+let modelMode = 'fallback';
 
 vi.mock('../client/src/api/mlb.js', async () => {
   const actual = await vi.importActual('../client/src/api/mlb.js');
@@ -21,9 +22,12 @@ vi.mock('../client/src/api/mlb.js', async () => {
     getPlayerContactPoints: vi.fn().mockResolvedValue([]),
     getPitcherPitches: vi.fn().mockResolvedValue([]),
     fetchTeamFinancials: vi.fn().mockResolvedValue(null),
-    getTeamModelSources: vi.fn(async () => modelAttempt > 0
-      ? { found: true, retrievedAt: '2026-08-14T02:03:00.000Z', source: 'FanGraphs', playoffOdds: 72.4, teamWar: 28.6, statuses: { playoffOdds: 'live', teamWar: 'live' } }
-      : { found: false, retrievedAt: '2026-08-14T02:02:00.000Z', source: 'FanGraphs', playoffOdds: null, teamWar: null, statuses: { playoffOdds: 'upstream-unavailable', teamWar: 'upstream-unavailable' } }),
+    getTeamModelSources: vi.fn(async () => {
+      if (modelMode === '502') throw Object.assign(new Error('FanGraphs model sources unavailable'), { status: 502 });
+      return modelAttempt > 0
+        ? { found: true, retrievedAt: '2026-08-14T02:03:00.000Z', source: 'FanGraphs', playoffOdds: 72.4, teamWar: 28.6, statuses: { playoffOdds: 'live', teamWar: 'live' } }
+        : { found: false, retrievedAt: '2026-08-14T02:02:00.000Z', source: 'FanGraphs', playoffOdds: null, teamWar: null, statuses: { playoffOdds: 'upstream-unavailable', teamWar: 'upstream-unavailable' } };
+    }),
   };
 });
 
@@ -35,6 +39,7 @@ describe('Team Overview model source and retry interaction', () => {
     feedAttempt = 0;
     modelAttempt = 0;
     savantMode = 'pending';
+    modelMode = 'fallback';
     localStorage.clear();
   });
 
@@ -75,6 +80,16 @@ describe('Team Overview model source and retry interaction', () => {
     render(<OverviewPage />);
     expect(await screen.findByText('Team batted-ball rows')).toBeInTheDocument();
     expect(await screen.findByText('Team pitch arsenal rows')).toBeInTheDocument();
+  });
+
+  it('leaves model panels in explicit unavailable state after a FanGraphs 502', async () => {
+    modelMode = '502';
+    render(<OverviewPage />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/));
+    expect(document.body.textContent).toContain('FanGraphs · not retrieved');
+    expect(document.body.textContent).toContain('Unavailable');
+    expect(document.body.textContent).not.toMatch(/Playoff odds:\s*Loading/);
+    expect(document.body.textContent).not.toMatch(/Team WAR:\s*Loading/);
   });
 
   it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {

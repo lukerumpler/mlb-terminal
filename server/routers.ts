@@ -5,6 +5,31 @@ import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { z } from "zod";
 
+let aiFallbackUntil = 0;
+function buildRosterInsightsFallback(input: { team?: Record<string, unknown>; roster?: { hitting?: Array<Record<string, unknown>>; pitching?: Array<Record<string, unknown>> } }) {
+  const team = input.team || {};
+  const strengths: Array<{ title: string; detail: string; evidence: string }> = [];
+  const weaknesses: Array<{ title: string; detail: string; evidence: string }> = [];
+  const pct = Number(team.pct);
+  const runDiff = Number(team.diff ?? (Number(team.rs) - Number(team.ra)));
+  const ops = Number(team.ops);
+  const era = Number(team.era);
+  if (Number.isFinite(runDiff)) {
+    (runDiff >= 0 ? strengths : weaknesses).push({ title: runDiff >= 0 ? 'Positive run differential' : 'Negative run differential', detail: runDiff >= 0 ? 'The supplied team totals show more runs scored than allowed.' : 'The supplied team totals show more runs allowed than scored.', evidence: `Run differential: ${runDiff > 0 ? '+' : ''}${runDiff}` });
+  }
+  if (Number.isFinite(ops)) {
+    (ops >= 0.720 ? strengths : weaknesses).push({ title: ops >= 0.720 ? 'Offense is producing' : 'Offense needs support', detail: 'This status is derived only from the supplied team OPS value.', evidence: `Team OPS: ${ops.toFixed(3)}` });
+  }
+  if (Number.isFinite(era)) {
+    (era <= 4.00 ? strengths : weaknesses).push({ title: era <= 4.00 ? 'Run prevention is controlled' : 'Run prevention is a watch area', detail: 'This status is derived only from the supplied team ERA value.', evidence: `Team ERA: ${era.toFixed(2)}` });
+  }
+  if (Number.isFinite(pct)) {
+    (pct >= 0.500 ? strengths : weaknesses).push({ title: pct >= 0.500 ? 'Winning record' : 'Record below .500', detail: 'This status is derived only from the supplied standings record.', evidence: `Winning percentage: ${pct.toFixed(3)}` });
+  }
+  if (!strengths.length && !weaknesses.length) weaknesses.push({ title: 'Verified roster context is limited', detail: 'No supplied aggregate team metric was available for a safe local summary.', evidence: 'No verified team-level evidence supplied' });
+  return { strengths, weaknesses, source: 'Local verified roster fallback', fallback: true };
+}
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -29,6 +54,8 @@ export const appRouter = router({
         }),
       }))
       .mutation(async ({ input }) => {
+        if (Date.now() < aiFallbackUntil) return buildRosterInsightsFallback(input);
+        try {
         const response = await invokeLLM({
           model: 'gpt-5-mini',
           messages: [
@@ -57,6 +84,12 @@ export const appRouter = router({
         const content = response.choices[0]?.message?.content;
         if (typeof content !== 'string') throw new Error('AI insights response was empty');
         return JSON.parse(content);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/usage exhausted|412 precondition/i.test(message)) aiFallbackUntil = Date.now() + 10 * 60_000;
+          console.warn('[ai.rosterInsights] AI provider unavailable; returning verified local fallback', message);
+          return buildRosterInsightsFallback(input);
+        }
       }),
   }),
 
