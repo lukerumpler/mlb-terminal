@@ -271,6 +271,7 @@ export default function App() {
           </button>
 
           <div style={{ height:1, background:C.border, margin:'6px 2px' }} />
+          <div className="skip-nav-section skip-utility-section" aria-hidden="true">Workspace</div>
 
           <button onClick={() => setShowAlerts(s => !s)} title="View alerts" aria-expanded={showAlerts}
             style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
@@ -388,7 +389,7 @@ export default function App() {
                 ))}
               </div>
             ) : (
-              <div style={{ padding:'0 20px', ...px({ fontSize:11, color:'rgba(255,255,255,.45)' }) }}>
+              <div className="skip-ticker-message" style={{ padding:'0 20px', ...px({ fontSize:11, color:'rgba(255,255,255,.45)' }) }}>
                 {tickerStatus === 'loading' && 'Connecting to live scores…'}
                 {tickerStatus === 'empty'   && 'No games in progress right now.'}
                 {tickerStatus === 'error'   && 'Live scores unavailable — retrying…'}

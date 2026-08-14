@@ -1124,11 +1124,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           {[['overview','Overview'],['standings','Standings'],['schedule','Schedule']].map(([key,label])=><button key={key} type="button" onClick={()=>setAffiliateTab(key)} style={{border:0,borderBottom:`2px solid ${affiliateTab===key?C.teal:'transparent'}`,background:'transparent',color:affiliateTab===key?C.teal:C.text3,padding:'6px 8px',cursor:'pointer',...px({fontSize:9,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'})}}>{label}</button>)}
         </div>
         {affiliateTab==='overview' && <>
-          <div style={{padding:'12px 14px',display:'grid',gridTemplateColumns:'minmax(0,1.3fr) repeat(4,minmax(90px,1fr))',gap:12,alignItems:'center'}}>
+          <div className="skip-affiliate-overview-grid" style={{padding:'12px 14px',display:'grid',gridTemplateColumns:'minmax(0,1.3fr) repeat(4,minmax(90px,1fr))',gap:12,alignItems:'center'}}>
             <div><div style={sans({fontSize:15,fontWeight:800,color:C.text})}>{affiliateOverview?.name || affiliates.find(row=>String(row.id)===String(affiliateId))?.name || 'Minor-league affiliate'}</div><div style={sans({fontSize:10,color:C.text3,marginTop:3})}>{affiliateOverview?.level || affiliates.find(row=>String(row.id)===String(affiliateId))?.level || 'MiLB'} · {affiliateOverview?.league || affiliates.find(row=>String(row.id)===String(affiliateId))?.league || 'Affiliate feed'}{affiliateOverview?.venue ? ` · ${affiliateOverview.venue}` : ''}</div><div style={sans({fontSize:9,color:C.text3,marginTop:5})}>Affiliated with {team.name} · {affiliateOverview?.retrievedAt ? `retrieved ${new Date(affiliateOverview.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateOverviewState}</div></div>
             {[[affiliateOverview?.hitting?.ops,'OPS'],[affiliateOverview?.hitting?.homeRuns,'HR'],[affiliateOverview?.pitching?.era,'ERA'],[affiliateOverview?.pitching?.strikeOuts,'K']].map(([value,label])=><div key={label} style={{textAlign:'center'}}><div style={px({fontSize:18,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(label==='ERA'?2:label==='OPS'?3:0)}</div><div style={sans({fontSize:9,textTransform:'uppercase',letterSpacing:'.06em',color:C.text3})}>{label}</div></div>)}
           </div>
-          <div style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>
+          <div className="skip-affiliate-savant-grid" style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>
             {[['xBA',affiliateSavant?.expectedBA,3],['xSLG',affiliateSavant?.expectedSLG,3],['Hard-hit %',affiliateSavant?.hardHitPercent,1],['Barrel %',affiliateSavant?.barrelPercent,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}{value!=null && label.includes('%')?'%':''}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}><MetricInfo label={label} /></div></div>)}
           </div>
           <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · {affiliateSavant?.retrievedAt ? `retrieved ${new Date(affiliateSavant.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSavant?.status, 'Not retrieved')}</div>
@@ -1339,8 +1339,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
           ))}
           {teamPlayersLoading && <div role="status" style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>Loading roster leaders…</div>}
-          {!teamPlayersLoading && teamPlayersError && <div role="alert" style={sans({fontSize:10,color:C.rust,fontStyle:'italic',padding:'5px 0'})}>Roster leader data is unavailable right now.</div>}
-          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <div style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>No roster players match the selected positions, stat, and sample threshold.</div>}
+          {!teamPlayersLoading && teamPlayersError && <OverviewEmptyState status="Unavailable" message="Roster leader data" detail="The current MLB roster leader feed did not return verified rows." />}
+          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <OverviewEmptyState status="No matching rows" message="Roster leaders" detail="No roster players match the selected positions, stat, and sample threshold." />}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:8}}>
           {[
@@ -1381,13 +1381,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <Panel title="Offensive Profile" accent={teamAccent} badge={D.offenseData.length ? 'MLB Stats API' : 'Unavailable'}>
               {D.offenseData.length ? <Suspense fallback={<ChartFallback height={196}/> }>
                 <OffenseRadar data={D.offenseData} accent={teamAccent}/>
-              </Suspense> : <div style={sans({height:196,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season hitting aggregates were returned by the MLB Stats API.</div>}
+              </Suspense> : <OverviewEmptyState message="Offensive profile unavailable" detail="No verified current-season hitting aggregates were returned by the MLB Stats API." />}
               <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: {D.radarSource}.</div>
             </Panel>
             <Panel title="Team Strengths" accent={teamAccent} badge={D.strengthData.length ? 'MLB Stats API' : 'Unavailable'}>
               {D.strengthData.length ? <Suspense fallback={<ChartFallback height={196}/> }>
                 <StrengthRadar data={D.strengthData} accent={teamAccent}/>
-              </Suspense> : <div style={sans({height:196,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season team aggregates were returned by the MLB Stats API.</div>}
+              </Suspense> : <OverviewEmptyState message="Team strengths unavailable" detail="No verified current-season team aggregates were returned by the MLB Stats API." />}
               <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: {D.radarSource}.</div>
             </Panel>
           </div>

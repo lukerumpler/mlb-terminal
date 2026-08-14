@@ -99,29 +99,33 @@
 - [x] Inventory FanGraphs and Baseball Savant proxy/client request paths, cache behavior, and current 429 handling.
 - [x] Implement provider-specific caching, in-flight deduplication, bounded 429 backoff, and verified stale fallbacks with truthful freshness metadata.
 - [x] Add regression coverage for live, cached, stale, throttled, and recovery states.
-- [ ] Verify desktop/mobile freshness labels, run the full suite, and publish the provider-reliability update.
+- [x] Verify desktop/mobile freshness labels, run the full suite, and publish the provider-reliability update.
 
 - [x] Reconcile the supplied specification with current FanGraphs/Savant/MLB data contracts.
-- [ ] Add verified FanGraphs aggregate Team WAR coverage with cache and stale fallback metadata.
+- [x] Add verified FanGraphs aggregate Team WAR coverage with cache and stale fallback metadata.
 - [x] Add verified Savant team batted-ball and against-team endpoints for spray, xwOBA, contact quality, and exit-velocity rollups.
-- [ ] Add MLB schedule-based Home/Away and Day/Night split aggregation without fabricating OPS/ERA splits.
+- [x] Add MLB schedule-based Home/Away and Day/Night split aggregation without fabricating OPS/ERA splits.
 - [x] Decide whether Playoff Odds remains an explicit gap or becomes a clearly labeled SKIP estimate before implementing that field.
 - [x] Implement a clearly labeled SKIP Playoff Odds estimate using verified standings and remaining MLB schedule data; never attribute it to FanGraphs.
 - [x] Replace the oversized full-season playoff-estimate schedule request with bounded sequential date chunks and honor per-request timeout options.
 - [x] Wire team_batted_balls and team_batted_balls_against into OverviewPage so spray, xwOBA, contact-quality, and exit-velocity panels consume verified rows.
 - [x] Add rendered tests for team spray/contact-quality success and honest empty fallback states.
-- [ ] Capture post-change desktop/mobile screenshots and publish a fresh provider-reliability checkpoint.
+- [x] Capture post-change desktop/mobile screenshots and publish a fresh provider-reliability checkpoint.
 
 - [x] Finish wiring verified team and opponent Savant rows into spray, batted-ball, exit-velocity, and contact-quality panels.
-- [ ] Add verified aggregate FanGraphs Team WAR parsing with cache and stale fallback metadata.
+- [x] Add verified aggregate FanGraphs Team WAR parsing with cache and stale fallback metadata.
 - [x] Add schedule-derived Home/Away and Day/Night W–L split rows; keep OPS/ERA split fields explicitly unavailable until boxscore data is connected.
-- [ ] Add confirmed MLB venue metadata, recorded game weather, and official MLB media links where the current page has a relevant surface.
-- [ ] Add tests, desktop/mobile screenshots, and publish the specification-aligned release.
+- [x] Add confirmed MLB venue metadata, recorded game weather, and official MLB media links where the current page has a relevant surface.
+- [x] Add tests, desktop/mobile screenshots, and publish the specification-aligned release.
 - [x] Wire Advanced Models xwOBA and the intended exit-velocity dependency to verified team_batted_balls rows, or explicitly narrow their source contract.
-- [ ] Save a fresh checkpoint after the final provider-reliability and specification-aligned verification pass.
+- [x] Save a fresh checkpoint after the final provider-reliability and specification-aligned verification pass.
 
-- [ ] Audit the attached empty-state, responsive-overflow, control-state, footer, and sidebar recommendations against the current rendered dashboard.
-- [ ] Unify empty-state card templates, remove redundant body titles, distinguish status accents, and standardize unavailable-value presentation.
-- [ ] Repair responsive overflow and clipping in the Overview grid, badges, and Splits Dashboard table.
-- [ ] Replace nonfunctional toggle controls with truthful static states or implemented interactions; clarify footer truncation and sidebar grouping.
-- [ ] Add responsive regression coverage, verify desktop/mobile screenshots, and publish the UI repair update.
+- [x] Audit the attached empty-state, responsive-overflow, control-state, footer, and sidebar recommendations against the current rendered dashboard.
+- [x] Unify empty-state card templates, remove redundant body titles, distinguish status accents, and standardize unavailable-value presentation.
+- [x] Repair responsive overflow and clipping in the Overview grid, badges, and Splits Dashboard table.
+- [x] Replace nonfunctional toggle controls with truthful static states or implemented interactions; clarify footer truncation and sidebar grouping.
+- [x] Add responsive regression coverage, verify desktop/mobile screenshots, and publish the UI repair update.
+- [x] Finish converting any remaining Overview manual unavailable blocks to OverviewEmptyState and standardize unavailable-value rendering across relevant panels.
+- [x] Add explicit regression coverage for Overview mobile selector/grid overflow, sidebar Workspace grouping, and ticker truncation behavior.
+- [x] Confirm remaining toggle-like controls are truthful implemented interactions or clearly labeled static states.
+- [x] Save and publish a fresh checkpoint covering provider reliability, source-aligned metrics, and the UI repair release.

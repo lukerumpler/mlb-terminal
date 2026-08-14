@@ -75,6 +75,13 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(overviewSource).toContain('linear-gradient(to right, ${C.rust} 0%, ${C.amber} 50%, ${C.teal} 100%)');
     expect(playersSource).toContain('import MetricInfo from');
     expect(indexSource).toContain('.skip-metric-info-popover');
+    expect(appSource).toContain('skip-utility-section');
+    expect(appSource).toContain('className="skip-ticker-message"');
+    expect(indexSource).toContain('.skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }');
+    expect(overviewSource).toContain('className="skip-affiliate-overview-grid"');
+    expect(overviewSource).toContain('className="skip-affiliate-savant-grid"');
+    expect(indexSource).toContain('.overview-team-context > label { flex:1 1 100% !important;');
+    expect(indexSource).toContain('.skip-overview-empty-state');
     expect(indexSource).toContain('--status-verified');
     expect(playersSource).toContain("import TeamLogo from '../components/TeamLogo.jsx';");
     expect(teamLogoSource).toContain('team-logos/${team.id}.svg');

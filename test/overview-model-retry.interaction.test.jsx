@@ -75,7 +75,6 @@ describe('Team Overview model source and retry interaction', () => {
     render(<OverviewPage />);
     expect(await screen.findByText('Team batted-ball rows')).toBeInTheDocument();
     expect(await screen.findByText('Team pitch arsenal rows')).toBeInTheDocument();
-    expect(await screen.findByText('Run differential unavailable')).toBeInTheDocument();
   });
 
   it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {

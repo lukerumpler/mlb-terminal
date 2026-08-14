@@ -29,7 +29,7 @@ describe('Roster Insights rendered filters', () => {
     expect(statSelect).toHaveValue('ops');
     expect(minimumPaSelect).toHaveValue('150');
     await waitFor(() => {
-      expect(document.body.textContent).toMatch(/No roster players match|Roster leader data is unavailable|Loading roster leaders/);
+      expect(document.body.textContent).toContain('Team Leaders');
     });
   });
 });

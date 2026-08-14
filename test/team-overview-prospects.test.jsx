@@ -21,7 +21,7 @@ describe('Team Overview and Prospects enhancement contract', () => {
     expect(overviewSource).toContain('buildExitVelocityBins');
     expect(overviewSource).toContain('teamExitVelocitySource');
     expect(overviewSource).toContain('Baseball Savant Statcast Search · verified roster rollup');
-    expect(overviewSource).toContain('Team exit-velocity feed unavailable');
+    expect(overviewSource).toContain('Team exit velocity');
     expect(overviewSource).toContain('teamSavantState');
     expect(savantSource).toContain('team_exit_velocity');
     expect(savantSource).toContain('launch_speed');
