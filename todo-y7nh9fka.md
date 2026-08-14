@@ -132,3 +132,15 @@
 - [x] Connect Team Overview and Player Profile metrics to provenance entries without inventing missing metadata.
 - [x] Add regression coverage for drawer opening, metric details, unavailable metadata, and keyboard dismissal.
 - [x] Verify desktop/mobile drawer behavior and save a checkpoint.
+- [x] Add shared semantic status tokens for Verified, Estimated, Unavailable, and Coverage Gap in the global theme.
+- [x] Add a reusable accessible status badge component with text-first semantics and shared visual variants.
+- [x] Align the provenance drawer and existing source strips with shared status variants and responsive status rules.
+- [x] Add regression coverage for status rendering, semantic labels, focus behavior, and responsive source surfaces.
+- [x] Run type checks, focused/full tests, production build, and desktop/mobile preview verification.
+- [x] Save a checkpoint for the applied semantic status and accessibility improvements.
+- [x] Audit the attached UI-gaps specification against current SKIP shared-session changes and identify safe presentational items.
+- [x] Upgrade existing percentile bars to gradient tracks with accessible dot markers without changing metric data.
+- [x] Add accessible glossary tooltips for jargon-heavy dashboard metric labels where the existing UI already exposes those metrics.
+- [x] Preserve or document data-dependent deferrals for live ticker architecture, delta baselines, playoff-odds prominence, scouting grades, and multi-layer projections.
+- [x] Add focused regression coverage for the applied UI-gap presentation and accessibility changes.
+- [x] Re-run validation, inspect responsive previews, and save a checkpoint for the compatible UI-gap improvements.

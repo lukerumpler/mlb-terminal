@@ -62,11 +62,11 @@ function ToolRow({ label, value, pct }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
       <div style={{ width: 44, fontSize: 11, fontWeight: 700, color: CARD.ink, flexShrink: 0 }}>{label}</div>
-      <div style={{ flex: 1, position: 'relative', height: 2, background: CARD.line, borderRadius: 1 }}>
+      <div role="img" aria-label={hasData ? `${label} percentile ${pct}` : `${label} percentile unavailable`} style={{ flex: 1, position: 'relative', height: 4, background: `linear-gradient(to right, ${CARD.rustText} 0%, #c89a46 50%, #168c7a 100%)`, borderRadius: 2, opacity: hasData ? 1 : .45 }}>
         {hasData && (
           <div style={{
             position: 'absolute', left: `${p}%`, top: '50%', transform: 'translate(-50%,-50%)',
-            width: 10, height: 10, borderRadius: '50%', background: CARD.rustText,
+            width: 10, height: 10, borderRadius: '50%', background: CARD.panel,
             border: `2px solid ${CARD.panel}`, boxShadow: `0 0 0 1px ${CARD.rustText}`,
           }} />
         )}
