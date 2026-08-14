@@ -16,6 +16,8 @@ vi.mock('../client/src/api/mlb.js', async () => {
     getAllTeamStats: vi.fn(async group => feedAttempt > 0 ? { 119: { teamId: 119, teamAbbr: 'LAD', teamName: 'Los Angeles Dodgers', ops: .802, homeRuns: 98, era: 2.98, whip: 1.06, strikeOuts: 628, stolenBases: 54 } } : Promise.reject(new Error(`MLB ${group} feed stalled`))),
     getTeamPlayerStats: vi.fn().mockResolvedValue([]),
     getTeamExitVelocity: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve([])),
+    getTeamBattedBalls: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve(savantMode === 'empty' ? [] : [{ hc_x: 125, hc_y: 210, bb_type: 'fly_ball', launch_speed: 101.4, xwoba: 0.512 }])),
+    getTeamBattedBallsAgainst: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve(savantMode === 'empty' ? [] : [{ hc_x: 118, hc_y: 205, bb_type: 'line_drive', launch_speed: 96.2, xwoba: 0.365 }])),
     getPlayerContactPoints: vi.fn().mockResolvedValue([]),
     getPitcherPitches: vi.fn().mockResolvedValue([]),
     fetchTeamFinancials: vi.fn().mockResolvedValue(null),
@@ -33,6 +35,7 @@ describe('Team Overview model source and retry interaction', () => {
     feedAttempt = 0;
     modelAttempt = 0;
     savantMode = 'pending';
+    localStorage.clear();
   });
 
   it('shows a page-shaped Team Overview skeleton during the initial aggregate fetch', async () => {
@@ -57,6 +60,14 @@ describe('Team Overview model source and retry interaction', () => {
     render(<OverviewPage />);
     expect(await screen.findByText('Loading verified batted-ball rows')).toBeInTheDocument();
     expect(await screen.findByText('Loading verified pitch rows')).toBeInTheDocument();
+  });
+
+  it('renders verified team spray and opponent contact-quality rollups when Savant returns rows', async () => {
+    savantMode = 'ready';
+    render(<OverviewPage />);
+    expect(await screen.findByRole('img', { name: 'Verified Baseball Savant batted-ball spray coordinates' })).toBeInTheDocument();
+    expect(screen.queryByText('Opponent Statcast feed unavailable')).not.toBeInTheDocument();
+    expect(await screen.findByText('0.365')).toBeInTheDocument();
   });
 
   it('shows explicit unavailable states when Savant returns no verified rows', async () => {
@@ -88,7 +99,7 @@ describe('Team Overview model source and retry interaction', () => {
     expect((await screen.findAllByText(/MLB Stats API/)).length).toBeGreaterThan(0);
     expect(await screen.findByText('72.4%')).toBeInTheDocument();
     await waitFor(() => expect(document.body.textContent).toMatch(/28\.6/));
-    expect(document.body.textContent).toMatch(/Playoff odds:\s*Live/);
+    expect(document.body.textContent).toMatch(/Playoff odds:\s*FanGraphs/);
     expect(document.body.textContent).toMatch(/Team WAR:\s*Live/);
     expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs\s*·\s*retrieved\s+\d{1,2}:\d{2}/);
   }, 20000);

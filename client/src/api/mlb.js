@@ -153,7 +153,7 @@ class MlbProxyError extends Error {
 
 // ─── Core fetcher ─────────────────────────────────────────────────────────
 // Keeps commas unencoded in hydrate strings so MLB receives them intact.
-export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS } = {}) {
+export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS, timeoutMs = 10_000 } = {}) {
   const extraQs = Object.entries(params)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
     .join('&');
@@ -169,7 +169,7 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
   const request = (async () => {
     let res;
     try {
-      res = await scheduledFetch(url, 10_000);
+      res = await scheduledFetch(url, timeoutMs);
     } catch (error) {
       const stale = useCache ? staleCacheGet(url) : undefined;
       if (stale !== undefined) return stale;
@@ -236,6 +236,16 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
 // meaningfully change more than every few minutes, so a longer TTL than the
 // live-game 20s default is both safe and worth a lot more here.
 const LEADERBOARD_TTL_MS = 5 * 60_000;
+function annotateProviderRows(data, response) {
+  if (!Array.isArray(data)) return data;
+  const meta = {
+    freshness: response?.headers?.get?.('X-Provider-Freshness') || 'live',
+    cache: response?.headers?.get?.('X-Provider-Cache') || 'MISS',
+  };
+  try { Object.defineProperty(data, '__providerMeta', { value: meta, enumerable: false, configurable: true }); } catch { /* arrays may be frozen by a test/client */ }
+  return data;
+}
+
 async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
   const cached = cacheGet(url);
   if (cached !== undefined) return cached;
@@ -265,13 +275,13 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
     // makes any future caller that doesn't catch blindly fail safely too.
     let data;
     try {
-      data = await res.json();
+      data = annotateProviderRows(await res.json(), res);
     } catch {
       return null;
     }
     const expires = Date.now() + LEADERBOARD_TTL_MS;
     cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
-    recordFeedSuccess('savant');
+    if (data?.__providerMeta?.freshness !== 'stale-cached') recordFeedSuccess('savant');
     return data;
   })();
 
@@ -847,6 +857,139 @@ async function fetchStandings(leagueIds, season = SEASON) {
 
 // MLB: AL (103) + NL (104)
 export const getStandings       = (season = SEASON) => fetchStandings('103,104', season);
+const teamScheduleSplitsCache = new Map();
+export async function getTeamScheduleSplits(teamId, season = SEASON) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return [];
+  const cacheKey = `${id}:${season}`;
+  const cached = teamScheduleSplitsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.rows;
+  try {
+    const today = new Date();
+    const start = new Date(`${season}-03-01T00:00:00Z`);
+    const scheduleDates = [];
+    for (let cursor = start; cursor <= today; cursor = new Date(cursor.getTime() + 30 * 86400000)) {
+      const chunkStart = cursor.toISOString().slice(0, 10);
+      const chunkEnd = new Date(Math.min(cursor.getTime() + 29 * 86400000, today.getTime())).toISOString().slice(0, 10);
+      const data = await mlb('/schedule', { sportId: 1, teamId: id, startDate: chunkStart, endDate: chunkEnd, gameType: 'R', hydrate: 'linescore', language: 'en' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
+      scheduleDates.push(...(data.dates || []));
+    }
+    const buckets = { home: { w: 0, l: 0 }, away: { w: 0, l: 0 }, day: { w: 0, l: 0 }, night: { w: 0, l: 0 } };
+    for (const game of scheduleDates.flatMap(date => date.games || [])) {
+      if (String(game.status?.abstractGameState || '').toLowerCase() !== 'final') continue;
+      const home = Number(game.teams?.home?.team?.id) === id;
+      const away = Number(game.teams?.away?.team?.id) === id;
+      if (!home && !away) continue;
+      const won = Boolean((home ? game.teams.home : game.teams.away)?.isWinner);
+      const side = home ? buckets.home : buckets.away;
+      side[won ? 'w' : 'l'] += 1;
+      const timeBucket = String(game.dayNight || '').toLowerCase() === 'day' ? buckets.day : String(game.dayNight || '').toLowerCase() === 'night' ? buckets.night : null;
+      if (timeBucket) timeBucket[won ? 'w' : 'l'] += 1;
+    }
+    const rows = [
+      { split: 'Home', ...buckets.home, ops: '—', era: '—' },
+      { split: 'Away', ...buckets.away, ops: '—', era: '—' },
+      { split: 'Day', ...buckets.day, ops: '—', era: '—' },
+      { split: 'Night', ...buckets.night, ops: '—', era: '—' },
+    ].filter(row => row.w + row.l > 0);
+    teamScheduleSplitsCache.set(cacheKey, { rows, expiresAt: Date.now() + 5 * 60_000 });
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+function seededRandom(seed) {
+  let value = Math.abs(Number(seed) || 1) % 2147483647;
+  return () => {
+    value = value * 16807 % 2147483647;
+    return (value - 1) / 2147483646;
+  };
+}
+
+function flattenStandings(standings) {
+  return Object.entries(standings || {}).flatMap(([divisionName, teams]) => (teams || []).map(team => ({ ...team, divisionName, leagueName: divisionName.startsWith('American') ? 'American League' : divisionName.startsWith('National') ? 'National League' : '' })));
+}
+
+export async function getSkipPlayoffOddsEstimate(teamId, season = SEASON, simulations = 1200) {
+  if (!teamId) return { status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() };
+  try {
+    const standings = await getStandings(season);
+    const teams = flattenStandings(standings);
+    const selected = teams.find(team => Number(team.id) === Number(teamId));
+    if (!selected || teams.length < 20) throw new Error('Insufficient standings data');
+    const today = new Date();
+    const startDate = today.toISOString().slice(0, 10);
+    const endDate = `${season}-10-05`;
+    const chunkDays = 14;
+    const scheduleDates = [];
+    for (let cursor = new Date(`${startDate}T00:00:00Z`); cursor <= new Date(`${endDate}T00:00:00Z`); cursor = new Date(cursor.getTime() + chunkDays * 86400000)) {
+      const chunkStart = cursor.toISOString().slice(0, 10);
+      const chunkEnd = new Date(Math.min(cursor.getTime() + (chunkDays - 1) * 86400000, new Date(`${endDate}T00:00:00Z`).getTime())).toISOString().slice(0, 10);
+      const chunk = await mlb('/schedule', { sportId: 1, startDate: chunkStart, endDate: chunkEnd, hydrate: 'team', language: 'en' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
+      scheduleDates.push(...(chunk.dates || []));
+    }
+    const remaining = scheduleDates.flatMap(date => date.games || []).filter(game => {
+      const state = String(game.status?.abstractGameState || '').toLowerCase();
+      return game.gameDate && new Date(game.gameDate).getTime() >= today.getTime() && state !== 'final';
+    });
+    if (!remaining.length) throw new Error('No remaining schedule data');
+    const byId = new Map(teams.map(team => [Number(team.id), team]));
+    const games = remaining.map(game => ({
+      home: Number(game.teams?.home?.team?.id),
+      away: Number(game.teams?.away?.team?.id),
+    })).filter(game => byId.has(game.home) && byId.has(game.away));
+    if (!games.length) throw new Error('No usable remaining games');
+    const baseWins = new Map(teams.map(team => [Number(team.id), Number(team.w) || 0]));
+    const seed = Number(teamId) * 1009 + Number(season) * 9176 + games.length;
+    const random = seededRandom(seed);
+    let playoffHits = 0;
+    const count = Math.max(400, Math.min(5000, Number(simulations) || 1200));
+    for (let iteration = 0; iteration < count; iteration += 1) {
+      const wins = new Map(baseWins);
+      for (const game of games) {
+        const home = byId.get(game.home);
+        const away = byId.get(game.away);
+        const homePct = Number(home.pct) || 0.5;
+        const awayPct = Number(away.pct) || 0.5;
+        const probability = Math.min(0.78, Math.max(0.22, (awayPct / (homePct + awayPct)) * 0.96 + 0.04));
+        if (random() < probability) wins.set(game.away, (wins.get(game.away) || 0) + 1);
+        else wins.set(game.home, (wins.get(game.home) || 0) + 1);
+      }
+      const qualified = new Set();
+      const byDivision = new Map();
+      teams.forEach(team => {
+        const key = team.divisionName || 'Unknown division';
+        if (!byDivision.has(key)) byDivision.set(key, []);
+        byDivision.get(key).push(team);
+      });
+      const wildByLeague = new Map();
+      for (const divisionTeams of byDivision.values()) {
+        const ordered = divisionTeams.slice().sort((a, b) => (wins.get(Number(b.id)) - wins.get(Number(a.id))) || ((Number(b.pct) || 0) - (Number(a.pct) || 0)));
+        ordered.slice(0, 1).forEach(team => qualified.add(Number(team.id)));
+        const league = ordered[0]?.leagueName || 'Unknown league';
+        if (!wildByLeague.has(league)) wildByLeague.set(league, []);
+        wildByLeague.get(league).push(...ordered.slice(1));
+      }
+      for (const wildCandidates of wildByLeague.values()) {
+        wildCandidates.sort((a, b) => (wins.get(Number(b.id)) - wins.get(Number(a.id))) || ((Number(b.pct) || 0) - (Number(a.pct) || 0)));
+        wildCandidates.slice(0, 3).forEach(team => qualified.add(Number(team.id)));
+      }
+      if (qualified.has(Number(teamId))) playoffHits += 1;
+    }
+    return {
+      status: 'estimated',
+      source: 'SKIP estimate',
+      estimate: Number(((playoffHits / count) * 100).toFixed(1)),
+      simulationCount: count,
+      remainingGames: games.length,
+      retrievedAt: new Date().toISOString(),
+      method: 'Deterministic Monte Carlo using current MLB winning percentages, home-field adjustment, and remaining MLB schedule.',
+    };
+  } catch {
+    return { status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() };
+  }
+}
 // MiLB levels
 export const getTripleAStandings = (season = SEASON) => fetchStandings('117,112',     season);
 export const getDoubleAStandings = (season = SEASON) => fetchStandings('113,110,111', season);
@@ -976,6 +1119,16 @@ export async function getSavantData(year = SEASON) {
 export async function getTeamExitVelocity(teamAbbr, year = SEASON) {
   if (!teamAbbr) return null;
   const arr = await fetchLeaderboard(`/api/savant?endpoint=team_exit_velocity&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 20_000 });
+  return Array.isArray(arr) ? arr : null;
+}
+export async function getTeamBattedBalls(teamAbbr, year = SEASON) {
+  if (!teamAbbr) return null;
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 30_000 });
+  return Array.isArray(arr) ? arr : null;
+}
+export async function getTeamBattedBallsAgainst(teamAbbr, year = SEASON) {
+  if (!teamAbbr) return null;
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls_against&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 30_000 });
   return Array.isArray(arr) ? arr : null;
 }
 
@@ -1246,9 +1399,11 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
       const values = teamRows.map(row => Number(row[key])).filter(Number.isFinite);
       return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
     };
+    const freshness = teamRows.__providerMeta?.freshness || 'live';
     return {
-      status: teamRows.length ? 'live' : 'source-gap',
+      status: teamRows.length ? freshness === 'stale-cached' ? 'cached' : 'live' : 'source-gap',
       source: 'Baseball Savant',
+      freshness,
       retrievedAt: new Date().toISOString(),
       sampleSize: teamRows.length,
       expectedBA: average('est_ba'),

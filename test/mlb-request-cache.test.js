@@ -8,6 +8,7 @@ const {
   getAllTeamStats,
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
+  getTeamScheduleSplits,
   mlb,
   __resetMlbClientStateForTests,
   fetchTeamFinancials,
@@ -59,6 +60,21 @@ describe('MLB request cache optimization', () => {
     await getTeamPlayerStats(9997, 'hitting', 2098);
     await getTeamPlayerStats(9997, 'hitting', 2098);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('aggregates schedule-derived Home/Away and Day/Night W–L rows and caches the result', async () => {
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ dates: [{ games: [{ status: { abstractGameState: 'Final' }, dayNight: 'day', teams: { home: { team: { id: 9995 }, isWinner: true }, away: { team: { id: 9994 }, isWinner: false } } }] }] }),
+      text: async () => '',
+    });
+    const rows = await getTeamScheduleSplits(9995, 2026);
+    expect(rows.find(row => row.split === 'Home')).toMatchObject({ w: expect.any(Number), l: 0, ops: '—', era: '—' });
+    expect(rows.find(row => row.split === 'Day')).toMatchObject({ w: expect.any(Number), l: 0 });
+    const calls = fetch.mock.calls.length;
+    await getTeamScheduleSplits(9995, 2026);
+    expect(fetch).toHaveBeenCalledTimes(calls);
   });
 
   it('caches affiliate schedule windows for one minute', async () => {

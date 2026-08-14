@@ -95,3 +95,27 @@
 - [x] Replace resolvable Source gap states with verified values or clearly labeled derived rollups; improve genuinely unavailable states with specific provider messaging and recovery actions.
 - [x] Add regression coverage for resolved source states and honest unavailable fallbacks.
 - [x] Verify desktop/mobile rendering and publish the Source gap replacement update.
+
+- [x] Inventory FanGraphs and Baseball Savant proxy/client request paths, cache behavior, and current 429 handling.
+- [x] Implement provider-specific caching, in-flight deduplication, bounded 429 backoff, and verified stale fallbacks with truthful freshness metadata.
+- [x] Add regression coverage for live, cached, stale, throttled, and recovery states.
+- [ ] Verify desktop/mobile freshness labels, run the full suite, and publish the provider-reliability update.
+
+- [x] Reconcile the supplied specification with current FanGraphs/Savant/MLB data contracts.
+- [ ] Add verified FanGraphs aggregate Team WAR coverage with cache and stale fallback metadata.
+- [x] Add verified Savant team batted-ball and against-team endpoints for spray, xwOBA, contact quality, and exit-velocity rollups.
+- [ ] Add MLB schedule-based Home/Away and Day/Night split aggregation without fabricating OPS/ERA splits.
+- [x] Decide whether Playoff Odds remains an explicit gap or becomes a clearly labeled SKIP estimate before implementing that field.
+- [x] Implement a clearly labeled SKIP Playoff Odds estimate using verified standings and remaining MLB schedule data; never attribute it to FanGraphs.
+- [x] Replace the oversized full-season playoff-estimate schedule request with bounded sequential date chunks and honor per-request timeout options.
+- [x] Wire team_batted_balls and team_batted_balls_against into OverviewPage so spray, xwOBA, contact-quality, and exit-velocity panels consume verified rows.
+- [x] Add rendered tests for team spray/contact-quality success and honest empty fallback states.
+- [ ] Capture post-change desktop/mobile screenshots and publish a fresh provider-reliability checkpoint.
+
+- [x] Finish wiring verified team and opponent Savant rows into spray, batted-ball, exit-velocity, and contact-quality panels.
+- [ ] Add verified aggregate FanGraphs Team WAR parsing with cache and stale fallback metadata.
+- [x] Add schedule-derived Home/Away and Day/Night W–L split rows; keep OPS/ERA split fields explicitly unavailable until boxscore data is connected.
+- [ ] Add confirmed MLB venue metadata, recorded game weather, and official MLB media links where the current page has a relevant surface.
+- [ ] Add tests, desktop/mobile screenshots, and publish the specification-aligned release.
+- [x] Wire Advanced Models xwOBA and the intended exit-velocity dependency to verified team_batted_balls rows, or explicitly narrow their source contract.
+- [ ] Save a fresh checkpoint after the final provider-reliability and specification-aligned verification pass.

@@ -257,6 +257,10 @@ const ENDPOINTS = {
   // The client bins launch_speed locally; no proxy or seeded values are used.
   team_exit_velocity: (y, { team } = {}) =>
     `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=${y}%7C&hfSit=&player_type=batter&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&batters_lookup%5B%5D=&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
+  team_batted_balls: (y, { team } = {}) =>
+    `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=${y}%7C&hfSit=&player_type=batter&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
+  team_batted_balls_against: (y, { team } = {}) =>
+    `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=${y}%7C&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
 };
 
 // Robust CSV parser — handles quoted fields and embedded commas
@@ -317,11 +321,28 @@ async function fetchWithRedirects(url, maxRedirects = 3) {
   throw new Error('Too many redirects');
 }
 
+const SAVANT_CACHE_TTL_MS = 60 * 60_000;
+const SAVANT_STALE_TTL_MS = 6 * 60 * 60_000;
+const SAVANT_COOLDOWN_MS = 30_000;
+const savantCache = new Map();
+const savantInFlight = new Map();
+let savantCooldownUntil = 0;
+
+function savantCacheKey(url) { return url; }
+function parseSavantRetryAfterMs(response) {
+  const value = response?.headers?.get?.('Retry-After');
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(1_000, Math.min(120_000, seconds * 1_000));
+  return SAVANT_COOLDOWN_MS;
+}
+function staleSavant(entry) {
+  return entry && entry.staleExpiresAt > Date.now() ? entry : null;
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req, 'savant')) return rateLimitResponse(res);
 
   const { endpoint, year, playerId, team } = req.query ?? {};
   const y = String(year || '2026');
@@ -341,77 +362,116 @@ export default async function handler(req, res) {
   if (endpoint === 'team_exit_velocity' && !/^[A-Za-z0-9]{2,5}$/.test(String(team || ''))) {
     return res.status(400).json({ error: 'team_exit_velocity requires an MLB team abbreviation' });
   }
+  if (['team_batted_balls', 'team_batted_balls_against'].includes(endpoint) && !/^[A-Za-z]{2,3}$/.test(String(team || ''))) {
+    return res.status(400).json({ error: `${endpoint} requires an MLB team abbreviation` });
+  }
 
   const url = ENDPOINTS[endpoint](y, { playerId, team });
+  const key = savantCacheKey(url);
+  const cached = savantCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=1800');
+    res.setHeader('X-Provider-Cache', 'HIT');
+    res.setHeader('X-Provider-Freshness', 'cached');
+    return res.status(200).json(cached.data);
+  }
+  const existing = savantInFlight.get(key);
+  if (existing) {
+    try {
+      const data = await existing;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=1800');
+      res.setHeader('X-Provider-Cache', 'COALESCED');
+      res.setHeader('X-Provider-Freshness', 'live');
+      return res.status(200).json(data);
+    } catch (error) {
+      if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+      return res.status(error?.status || 502).json(error?.payload || { error: 'Savant request failed' });
+    }
+  }
+  const stale = staleSavant(cached);
+  if (savantCooldownUntil > Date.now()) {
+    if (stale) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+      res.setHeader('X-Provider-Cache', 'STALE');
+      res.setHeader('X-Provider-Freshness', 'stale-cached');
+      return res.status(200).json(stale.data);
+    }
+    const retryAfter = Math.ceil((savantCooldownUntil - Date.now()) / 1000);
+    res.setHeader('Retry-After', String(retryAfter));
+    return res.status(429).json({ error: 'Baseball Savant rate limit cooldown active', retryAfter, url });
+  }
+  if (isRateLimited(req, 'savant')) return rateLimitResponse(res);
 
-  try {
+  const upstreamRequest = (async () => {
     const upstream = await fetchWithRedirects(url);
-
     if (!upstream.ok) {
-      return res.status(upstream.status).json({ error: `Savant returned ${upstream.status}`, url });
+      const retryAfter = parseSavantRetryAfterMs(upstream);
+      if (upstream.status === 429) savantCooldownUntil = Math.max(savantCooldownUntil, Date.now() + retryAfter);
+      throw { status: upstream.status, retryAfter: Math.ceil(retryAfter / 1000), payload: { error: `Savant returned ${upstream.status}`, url } };
     }
-
-    const body    = await upstream.text();
+    const body = await upstream.text();
     const trimmed = body.trim();
-
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-      return res.status(502).json({
-        error: 'Savant returned HTML — endpoint may be unavailable for this year',
-        year: y,
-        url,
-      });
+      throw { status: 502, payload: { error: 'Savant returned HTML — endpoint may be unavailable for this year', year: y, url } };
     }
-
     let data = csvToJson(trimmed);
-
     if (endpoint === 'contact_points') {
-      // Most rows in a full pitch-by-pitch feed are takes (balls, called
-      // strikes) with no swing at all, so no intercept point — drop them
-      // server-side rather than shipping thousands of useless rows to the
-      // client just to filter them out there. A row only survives if it
-      // has a real X *and* Y intercept value.
-      data = data.filter(r => r.intercept_ball_minus_batter_pos_x_inches != null
-                            && r.intercept_ball_minus_batter_pos_y_inches != null);
+      data = data.filter(r => r.intercept_ball_minus_batter_pos_x_inches != null && r.intercept_ball_minus_batter_pos_y_inches != null);
     }
-
     if (endpoint === 'team_exit_velocity') {
-      // Keep only documented batted-ball fields and rows with real launch speed.
-      // The upstream CSV can include pitch-level rows without a batted-ball result.
+      data = data.filter(r => r.launch_speed != null && Number.isFinite(Number(r.launch_speed))).map(r => ({
+        launch_speed: Number(r.launch_speed),
+        launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
+        launch_speed_angle: r.launch_speed_angle == null ? null : Number(r.launch_speed_angle),
+        bb_type: r.bb_type || null,
+        events: r.events || null,
+        game_date: r.game_date || null,
+      })).slice(0, 50000);
+    }
+    if (endpoint === 'team_batted_balls' || endpoint === 'team_batted_balls_against') {
       data = data
-        .filter(r => r.launch_speed != null && Number.isFinite(Number(r.launch_speed)))
+        .filter(r => r.hc_x != null && r.hc_y != null)
         .map(r => ({
-          launch_speed: Number(r.launch_speed),
-           launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
-           launch_speed_angle: r.launch_speed_angle == null ? null : Number(r.launch_speed_angle),
-           bb_type: r.bb_type || null,
+          hc_x: Number(r.hc_x),
+          hc_y: Number(r.hc_y),
+          bb_type: r.bb_type || null,
+          launch_speed: r.launch_speed == null ? null : Number(r.launch_speed),
+          xwoba: r.estimated_woba_using_speedangle == null ? null : Number(r.estimated_woba_using_speedangle),
           events: r.events || null,
-          game_date: r.game_date || null,
         }))
+        .filter(r => Number.isFinite(r.hc_x) && Number.isFinite(r.hc_y))
         .slice(0, 50000);
     }
-
     if (endpoint === 'pitcher_pitches') {
-      // Unlike contact_points, every row here is wanted (every pitch, not
-      // just contact events — velocity distribution and the LHH/RHH usage
-      // split both need takes and misses too, not just balls in play). But
-      // the raw Statcast Search schema is 90+ columns per row and a
-      // full-time starter's season is 2500-3000+ pitches — trimming to the
-      // 3 fields PitchShapePanel.jsx actually reads keeps this from being
-      // needlessly heavy over the wire for no benefit, the same reasoning
-      // as contact_points' row-filter above, just column-wise instead of
-      // row-wise.
-      data = data
-        .filter(r => r.pitch_type != null)
-        .map(r => ({ pitch_type: r.pitch_type, release_speed: r.release_speed, stand: r.stand }));
+      data = data.filter(r => r.pitch_type != null).map(r => ({ pitch_type: r.pitch_type, release_speed: r.release_speed, stand: r.stand }));
     }
-
+    return data;
+  })();
+  savantInFlight.set(key, upstreamRequest);
+  try {
+    const data = await upstreamRequest;
+    savantCache.set(key, { data, expiresAt: Date.now() + SAVANT_CACHE_TTL_MS, staleExpiresAt: Date.now() + SAVANT_CACHE_TTL_MS + SAVANT_STALE_TTL_MS });
+    if (savantCache.size > 300) savantCache.delete(savantCache.keys().next().value);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    // Cache for 1 hour — Savant data only updates daily
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=1800');
+    res.setHeader('X-Provider-Cache', 'MISS');
+    res.setHeader('X-Provider-Freshness', 'live');
     return res.status(200).json(data);
-
-  } catch (err) {
-    console.error('[savant-proxy] error:', err.message);
-    return res.status(500).json({ error: err.message, url });
+  } catch (error) {
+    if (stale) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+      res.setHeader('X-Provider-Cache', 'STALE');
+      res.setHeader('X-Provider-Freshness', 'stale-cached');
+      return res.status(200).json(stale.data);
+    }
+    if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
+    console.error('[savant-proxy] error:', error?.payload?.error || error?.message || error);
+    return res.status(error?.status || 502).json(error?.payload || { error: 'Savant request failed', url });
+  } finally {
+    if (savantInFlight.get(key) === upstreamRequest) savantInFlight.delete(key);
   }
 }
