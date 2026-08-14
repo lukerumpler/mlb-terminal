@@ -51,7 +51,11 @@ describe('SKIP app — full tab cycle', () => {
       const user = userEvent.setup();
       render(<App />);
 
-      const navButton = await screen.findByRole('button', { name: new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) });
+      const navButton = await waitFor(() => {
+        const button = document.querySelector(`.skip-sidebar button[title="${label.replace(/"/g, '\\"')}"]`);
+        if (!button) throw new Error(`Workspace navigation button not found: ${label}`);
+        return button;
+      });
       await user.click(navButton);
 
       // Let lazy() + Suspense + any first-render useEffect settle.

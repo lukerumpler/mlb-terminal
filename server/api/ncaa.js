@@ -15,6 +15,8 @@ import { applyCors, isRateLimited, rateLimitResponse } from './_shared.js';
 // invocations, not per-client throttling.
 
 const NCAA_BASE = 'https://ncaa-api.henrygd.me';
+const responseCache = new Map();
+const inFlightRequests = new Map();
 
 const CACHE_RULES = {
   '/scoreboard': { s: 30,  swr: 15  }, // live scores — short TTL
@@ -39,8 +41,6 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req, 'ncaa')) return rateLimitResponse(res);
-
   const urlObj = new URL(req.url, 'https://placeholder.invalid');
   const path   = urlObj.searchParams.get('path');
 
@@ -63,8 +63,32 @@ export default async function handler(req, res) {
     .join('&');
 
   const ncaaUrl = `${NCAA_BASE}${path}${forwardedQs ? '?' + forwardedQs : ''}`;
+  const rule = getCacheRule(path);
+  const cacheKey = `${path}?${forwardedQs}`;
+  const cached = responseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    res.setHeader('Cache-Control', `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`);
+    res.setHeader('X-Proxy-Source', ncaaUrl);
+    res.setHeader('X-Proxy-Cache', 'HIT');
+    return res.status(200).json(cached.data);
+  }
+  if (cached) responseCache.delete(cacheKey);
+  const existingRequest = inFlightRequests.get(cacheKey);
+  if (existingRequest) {
+    try {
+      const data = await existingRequest;
+      res.setHeader('Cache-Control', `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`);
+      res.setHeader('X-Proxy-Source', ncaaUrl);
+      res.setHeader('X-Proxy-Cache', 'COALESCED');
+      return res.status(200).json(data);
+    } catch (error) {
+      return res.status(error?.status || 502).json(error?.payload || { error: 'NCAA upstream request failed' });
+    }
+  }
+  if (isRateLimited(req, 'ncaa')) return rateLimitResponse(res);
 
-  let ncaaRes;
+  const upstreamRequest = (async () => {
+    let ncaaRes;
   try {
     ncaaRes = await fetch(ncaaUrl, {
       headers: {
@@ -92,16 +116,26 @@ export default async function handler(req, res) {
     });
   }
 
-  let data;
+    let data;
+    try {
+      data = await ncaaRes.json();
+    } catch (err) {
+      throw { status: 502, payload: { error: 'NCAA API returned non-JSON response', url: ncaaUrl } };
+    }
+    return data;
+  })();
+  inFlightRequests.set(cacheKey, upstreamRequest);
   try {
-    data = await ncaaRes.json();
-  } catch (err) {
-    return res.status(502).json({ error: 'NCAA API returned non-JSON response', url: ncaaUrl });
+    const data = await upstreamRequest;
+    responseCache.set(cacheKey, { data, expiresAt: Date.now() + rule.s * 1000 });
+    if (responseCache.size > 300) responseCache.delete(responseCache.keys().next().value);
+    res.setHeader('Cache-Control', `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`);
+    res.setHeader('X-Proxy-Source', ncaaUrl);
+    res.setHeader('X-Proxy-Cache', 'MISS');
+    return res.status(200).json(data);
+  } catch (error) {
+    return res.status(error?.status || 502).json(error?.payload || { error: 'NCAA upstream request failed' });
+  } finally {
+    if (inFlightRequests.get(cacheKey) === upstreamRequest) inFlightRequests.delete(cacheKey);
   }
-
-  const rule = getCacheRule(path);
-  res.setHeader('Cache-Control', `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`);
-  res.setHeader('X-Proxy-Source', ncaaUrl);
-
-  return res.status(200).json(data);
 }

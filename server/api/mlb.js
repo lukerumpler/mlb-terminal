@@ -26,6 +26,10 @@ const CACHE_RULES = {
 // per-IP limiter or re-hit Stats API. This is intentionally best-effort; the
 // client cache remains the source of truth for verified local snapshots.
 const responseCache = new Map();
+// Overview, ticker, and affiliate panels can request the same resource at
+// nearly the same time. Share one upstream promise during a cache miss so a
+// warm proxy instance does not create a burst of duplicate MLB requests.
+const inFlightRequests = new Map();
 
 function responseCacheKey(path, forwardedQs) {
   return `${path}?${forwardedQs}`;
@@ -81,60 +85,81 @@ export default async function handler(req, res) {
   }
   if (cached) responseCache.delete(cacheKey);
 
-  // Count only cache misses. This prevents a normal page reload from spending
-  // rate-limit budget on responses already held by the warm proxy instance.
+  const existingRequest = inFlightRequests.get(cacheKey);
+  if (existingRequest) {
+    try {
+      const result = await existingRequest;
+      setProxyHeaders(res, rule, result.source, 'COALESCED');
+      return res.status(200).json(result.data);
+    } catch (error) {
+      if (error?.retryAfter) res.setHeader('Retry-After', error.retryAfter);
+      return res.status(error?.status || 502).json(error?.payload || { error: 'MLB upstream request failed' });
+    }
+  }
+
+  // Count only cache misses that will create an upstream request. Requests
+  // arriving while that miss is in flight share the same promise and do not
+  // spend additional rate-limit budget.
   if (isRateLimited(req, 'mlb')) return rateLimitResponse(res);
 
   const mlbUrl = `${MLB_BASE}${path}${forwardedQs ? '?' + forwardedQs : ''}`;
-
-  let mlbRes;
-  try {
-    mlbRes = await fetch(mlbUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MLBDashboard/1.0)',
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch (err) {
-    const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
-    console.error('[mlb-proxy] fetch error:', err.message);
-    return res.status(isTimeout ? 504 : 502).json({
-      error: isTimeout ? 'MLB API timed out' : 'Failed to reach MLB API',
-      detail: err.message,
-      url: mlbUrl,
-    });
-  }
-
-  if (!mlbRes.ok) {
-    const body = await mlbRes.text().catch(() => '');
-    console.error('[mlb-proxy] MLB returned', mlbRes.status, '| url:', mlbUrl);
-    return res.status(mlbRes.status).json({
-      error: `MLB API responded with ${mlbRes.status}`,
-      url: mlbUrl,
-      body: body.slice(0, 500),
-    });
-  }
-
-  let data;
-  try {
-    const body = await mlbRes.text();
-    if (!body.trim()) {
-      console.error('[mlb-proxy] empty response | url:', mlbUrl);
-      return res.status(502).json({ error: 'MLB API returned an empty response', url: mlbUrl });
+  const upstreamRequest = (async () => {
+    let mlbRes;
+    try {
+      mlbRes = await fetch(mlbUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MLBDashboard/1.0)',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
+      console.error('[mlb-proxy] fetch error:', err.message);
+      throw { status: isTimeout ? 504 : 502, payload: {
+        error: isTimeout ? 'MLB API timed out' : 'Failed to reach MLB API',
+        detail: err.message,
+        url: mlbUrl,
+      }};
     }
-    data = JSON.parse(body);
-  } catch (err) {
-    console.error('[mlb-proxy] JSON parse error | url:', mlbUrl, '| detail:', err.message);
-    return res.status(502).json({ error: 'MLB API returned non-JSON response', url: mlbUrl });
-  }
 
-  responseCache.set(cacheKey, { data, source: mlbUrl, expiresAt: Date.now() + rule.s * 1000 });
-  if (responseCache.size > 500) {
-    const oldestKey = responseCache.keys().next().value;
-    if (oldestKey) responseCache.delete(oldestKey);
-  }
-  setProxyHeaders(res, rule, mlbUrl, 'MISS');
+    if (!mlbRes.ok) {
+      const body = await mlbRes.text().catch(() => '');
+      const retryAfter = mlbRes.headers?.get?.('Retry-After');
+      console.error('[mlb-proxy] MLB returned', mlbRes.status, '| url:', mlbUrl);
+      throw { status: mlbRes.status, retryAfter, payload: {
+        error: `MLB API responded with ${mlbRes.status}`,
+        url: mlbUrl,
+        body: body.slice(0, 500),
+      }};
+    }
 
-  return res.status(200).json(data);
+    let data;
+    try {
+      const body = await mlbRes.text();
+      if (!body.trim()) throw Object.assign(new Error('empty response'), { emptyBody: true });
+      data = JSON.parse(body);
+    } catch (err) {
+      console.error('[mlb-proxy] JSON parse error | url:', mlbUrl, '| detail:', err.message);
+      throw { status: 502, payload: { error: err.emptyBody ? 'MLB API returned an empty response' : 'MLB API returned non-JSON response', url: mlbUrl } };
+    }
+    return { data, source: mlbUrl };
+  })();
+
+  inFlightRequests.set(cacheKey, upstreamRequest);
+  try {
+    const result = await upstreamRequest;
+    responseCache.set(cacheKey, { data: result.data, source: result.source, expiresAt: Date.now() + rule.s * 1000 });
+    if (responseCache.size > 500) {
+      const oldestKey = responseCache.keys().next().value;
+      if (oldestKey) responseCache.delete(oldestKey);
+    }
+    setProxyHeaders(res, rule, result.source, 'MISS');
+    return res.status(200).json(result.data);
+  } catch (error) {
+    if (error?.retryAfter) res.setHeader('Retry-After', error.retryAfter);
+    return res.status(error?.status || 502).json(error?.payload || { error: 'MLB upstream request failed' });
+  } finally {
+    if (inFlightRequests.get(cacheKey) === upstreamRequest) inFlightRequests.delete(cacheKey);
+  }
 }

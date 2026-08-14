@@ -83,3 +83,10 @@
 - [x] Improve mobile dashboard navigation with a compact, accessible navigation control while preserving the desktop sidebar.
 - [x] Add responsive interaction coverage and verify the mobile navigation at desktop and mobile sizes.
 - [x] Save and publish the validated mobile navigation update.
+
+- [x] Inventory MLB, FanGraphs, Savant, affiliate, Nitter, and NCAA feed request paths and recent 429/error behavior.
+- [x] Reduce avoidable feed bursts with bounded retries, request deduplication, cache-aware handling, and strict origin/rate-limit safeguards where applicable.
+- [x] Add regression coverage for successful uploads, throttled responses, cached fallbacks, and honest source-gap labels.
+- [x] Validate dashboard data rendering at desktop/mobile sizes and publish the repaired data-feed update.
+- [x] Preserve the explicit empty-body MLB proxy error contract discovered by the full-suite regression.
+- [x] Make the Overview smoke test target the workspace navigation control without colliding with page-level Overview buttons.
