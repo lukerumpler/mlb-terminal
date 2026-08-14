@@ -1,5 +1,6 @@
 const AGGREGATE_KEY = 'skip-team-aggregate-cache-v1';
 const PLAYERS_KEY = 'skip-team-player-cache-v1';
+const SAVANT_KEY = 'skip-team-savant-cache-v1';
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -48,4 +49,20 @@ export function saveTeamPlayersCache(teamId, season, data) {
   return cached;
 }
 
-export const TEAM_DATA_CACHE_KEYS = { AGGREGATE_KEY, PLAYERS_KEY };
+export function readTeamSavantCache(teamAbbr, season) {
+  const all = readJson(SAVANT_KEY, {});
+  const cached = all?.[`${season}:${String(teamAbbr || '').toUpperCase()}`];
+  return cached && cached.data ? cached : null;
+}
+
+export function saveTeamSavantCache(teamAbbr, season, data) {
+  const abbr = String(teamAbbr || '').toUpperCase();
+  if (!abbr || !Number.isFinite(Number(season)) || !data) return null;
+  const all = readJson(SAVANT_KEY, {});
+  const key = `${season}:${abbr}`;
+  const cached = { season:Number(season), teamAbbr:abbr, updatedAt:Date.now(), data };
+  writeJson(SAVANT_KEY, { ...all, [key]: cached });
+  return cached;
+}
+
+export const TEAM_DATA_CACHE_KEYS = { AGGREGATE_KEY, PLAYERS_KEY, SAVANT_KEY };

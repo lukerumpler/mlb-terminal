@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 
 let feedAttempt = 0;
 let modelAttempt = 0;
+let savantMode = 'pending';
 
 vi.mock('../client/src/api/mlb.js', async () => {
   const actual = await vi.importActual('../client/src/api/mlb.js');
@@ -14,6 +15,9 @@ vi.mock('../client/src/api/mlb.js', async () => {
     getStandings: vi.fn(async () => feedAttempt > 0 ? { LAD: [{ id: 119, abbr: 'LAD', w: 73, l: 48, pct: .603, rs: 606, ra: 464, diff: 142 }] } : Promise.reject(new Error('MLB feed stalled'))),
     getAllTeamStats: vi.fn(async group => feedAttempt > 0 ? { 119: { teamId: 119, teamAbbr: 'LAD', teamName: 'Los Angeles Dodgers', ops: .802, homeRuns: 98, era: 2.98, whip: 1.06, strikeOuts: 628, stolenBases: 54 } } : Promise.reject(new Error(`MLB ${group} feed stalled`))),
     getTeamPlayerStats: vi.fn().mockResolvedValue([]),
+    getTeamExitVelocity: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve([])),
+    getPlayerContactPoints: vi.fn().mockResolvedValue([]),
+    getPitcherPitches: vi.fn().mockResolvedValue([]),
     fetchTeamFinancials: vi.fn().mockResolvedValue(null),
     getTeamModelSources: vi.fn(async () => modelAttempt > 0
       ? { found: true, retrievedAt: '2026-08-14T02:03:00.000Z', source: 'FanGraphs', playoffOdds: 72.4, teamWar: 28.6, statuses: { playoffOdds: 'live', teamWar: 'live' } }
@@ -28,6 +32,20 @@ describe('Team Overview model source and retry interaction', () => {
     cleanup();
     feedAttempt = 0;
     modelAttempt = 0;
+    savantMode = 'pending';
+  });
+
+  it('shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending', async () => {
+    render(<OverviewPage />);
+    expect(await screen.findByText('Loading verified batted-ball rows')).toBeInTheDocument();
+    expect(await screen.findByText('Loading verified pitch rows')).toBeInTheDocument();
+  });
+
+  it('shows explicit unavailable states when Savant returns no verified rows', async () => {
+    savantMode = 'empty';
+    render(<OverviewPage />);
+    expect(await screen.findByText('Team batted-ball feed unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Team pitch arsenal feed unavailable')).toBeInTheDocument();
   });
 
   it('shows freshness/source-gap state, exposes retry, and recovers model and MLB data after retry', async () => {

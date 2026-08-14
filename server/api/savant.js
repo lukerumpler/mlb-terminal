@@ -381,8 +381,9 @@ export default async function handler(req, res) {
         .filter(r => r.launch_speed != null && Number.isFinite(Number(r.launch_speed)))
         .map(r => ({
           launch_speed: Number(r.launch_speed),
-          launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
-          bb_type: r.bb_type || null,
+           launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
+           launch_speed_angle: r.launch_speed_angle == null ? null : Number(r.launch_speed_angle),
+           bb_type: r.bb_type || null,
           events: r.events || null,
           game_date: r.game_date || null,
         }))

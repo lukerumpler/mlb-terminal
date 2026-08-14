@@ -100,3 +100,13 @@
 - [x] Decide which remaining gaps have verified connected sources and narrow or extend remediation scope accordingly.
 - [x] Add regression coverage for any additional source-gap states changed in this pass.
 - [x] Save a checkpoint after the completed Source Gap audit and remediation validation.
+- [x] Audit existing Batted Ball Profile and Pitch Arsenal panel contracts, Savant helpers, and team cache utilities.
+- [x] Add a dedicated cached team-level Savant rollup for batted-ball and pitch-arsenal data.
+- [x] Connect the verified rollups to Batted Ball Profile and Pitch Arsenal with source-aware unavailable fallbacks.
+- [x] Add regression coverage for cached hits, cache misses, rollup values, loading, and unavailable states.
+- [x] Validate loading behavior and save a new checkpoint.
+- [x] Add rendered or effect-level tests proving Overview uses a cached team Savant snapshot on cache hit and performs network rollups on cache miss.
+- [x] Add rendered regression tests for Batted Ball Profile and Pitch Arsenal loading and unavailable states.
+- [ ] Add rendered Overview tests for Batted Ball Profile loading and unavailable states.
+- [ ] Add rendered Overview tests for Pitch Arsenal loading and unavailable states.
+- [ ] Save a checkpoint after the verified team Savant cache and panel rollup changes pass validation.

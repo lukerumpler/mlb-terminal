@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getPlayerContactPoints, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
@@ -10,7 +10,7 @@ import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
-import { readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache } from '../lib/teamDataCache.js';
+import { readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache } from '../lib/teamDataCache.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -144,6 +144,10 @@ function formatLeaderValue(value, digits = 0) {
   return Number.isFinite(number) ? number.toFixed(digits) : String(value);
 }
 
+function formatPanelMetric(value, suffix = '') {
+  return value == null || value === '' ? '—' : `${value}${suffix}`;
+}
+
 function getLeaders(hittingRows = [], pitchingRows = []) {
   const top = (rows, key, direction = 'desc') => [...rows]
     .filter(row => Number.isFinite(Number(row.stat?.[key])))
@@ -166,6 +170,84 @@ function getLeaders(hittingRows = [], pitchingRows = []) {
 
 function getBattedBall() { return null; }
 function getPitchArsenal() { return null; }
+
+export function buildBattedBallProfile(rows = []) {
+  const speeds = rows.map(row => Number(row?.launch_speed)).filter(Number.isFinite);
+  const angles = rows.map(row => Number(row?.launch_angle)).filter(Number.isFinite);
+  if (!speeds.length) return null;
+  const count = speeds.length;
+  const pct = value => Number((value / count * 100).toFixed(1));
+  const bbTypes = rows.map(row => String(row?.bb_type || '').toLowerCase());
+  const barrels = rows.filter(row => Number(row?.launch_speed_angle) === 6).length;
+  return {
+    barrelPct: pct(barrels),
+    hardHitPct: pct(speeds.filter(value => value >= 95).length),
+    sweetSpot: pct(angles.filter(value => value >= 8 && value <= 32).length),
+    avgEV: (speeds.reduce((sum, value) => sum + value, 0) / count).toFixed(1),
+    maxEV: Math.max(...speeds).toFixed(1),
+    launchAngle: angles.length ? (angles.reduce((sum, value) => sum + value, 0) / angles.length).toFixed(1) : null,
+    pullPct: null,
+    centerPct: null,
+    oppoPct: null,
+    gbPct: pct(bbTypes.filter(value => value === 'ground_ball').length),
+    fbPct: pct(bbTypes.filter(value => value === 'fly_ball' || value === 'popup').length),
+    ldPct: pct(bbTypes.filter(value => value === 'line_drive').length),
+    sampleSize: count,
+  };
+}
+
+const ARSENAL_COLORS = [C.amber, C.teal, C.rust, C.purple, C.slate, C.navy];
+export function buildPitchArsenalRows(rows = []) {
+  const typed = rows.filter(row => row?.pitch_type);
+  if (!typed.length) return null;
+  const groups = new Map();
+  typed.forEach(row => {
+    const type = String(row.pitch_type);
+    const group = groups.get(type) || { type, count: 0, speeds: [] };
+    group.count += 1;
+    const speed = Number(row.release_speed);
+    if (Number.isFinite(speed)) group.speeds.push(speed);
+    groups.set(type, group);
+  });
+  const total = typed.length;
+  return [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 8).map((group, index) => ({
+    type: group.type,
+    pct: Number((group.count / total * 100).toFixed(1)),
+    stuffPlus: null,
+    avgVelocity: group.speeds.length ? Number((group.speeds.reduce((sum, value) => sum + value, 0) / group.speeds.length).toFixed(1)) : null,
+    color: ARSENAL_COLORS[index % ARSENAL_COLORS.length],
+    count: group.count,
+  }));
+}
+
+export async function resolveTeamSavantSnapshot({
+  teamAbbr,
+  season,
+  cached,
+  hitters = [],
+  pitchers = [],
+  now = Date.now(),
+  cacheTtlMs = 60 * 60 * 1000,
+  getTeamExitVelocityFn = getTeamExitVelocity,
+  getPlayerContactPointsFn = getPlayerContactPoints,
+  getPitcherPitchesFn = getPitcherPitches,
+  saveCacheFn = () => {},
+} = {}) {
+  if (cached && now - Number(cached.updatedAt || 0) < cacheTtlMs) {
+    return { snapshot: cached.data, source: 'Baseball Savant Statcast Search · cached verified roster rollup', cacheHit: true };
+  }
+  const directRows = await getTeamExitVelocityFn(teamAbbr, season).catch(() => null);
+  const contactRows = Array.isArray(directRows) && directRows.length
+    ? directRows
+    : (await Promise.all(hitters.filter(row => row?.id).map(row => getPlayerContactPointsFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
+  const pitchRows = (await Promise.all(pitchers.filter(row => row?.id).map(row => getPitcherPitchesFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
+  const source = Array.isArray(directRows) && directRows.length
+    ? 'Baseball Savant Statcast Search · team query'
+    : (contactRows.length || pitchRows.length ? 'Baseball Savant Statcast Search · verified roster rollup' : '');
+  const snapshot = { exitVelocityRows: contactRows, battedBallRows: contactRows, pitchRows };
+  saveCacheFn(teamAbbr, season, snapshot);
+  return { snapshot, source, cacheHit: false };
+}
 
 export function buildExitVelocityBins(rows = []) {
   const speeds = rows
@@ -346,6 +428,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
   const [teamExitVelocitySource, setTeamExitVelocitySource] = useState('');
   const [teamExitVelocityState, setTeamExitVelocityState] = useState('idle');
+  const [teamBattedBallData, setTeamBattedBallData] = useState(null);
+  const [teamPitchArsenalData, setTeamPitchArsenalData] = useState(null);
+  const [teamSavantSource, setTeamSavantSource] = useState('');
+  const [teamSavantState, setTeamSavantState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
   const [feedRetryToken, setFeedRetryToken] = useState(0);
   const [teamModelData, setTeamModelData] = useState(null);
@@ -438,32 +524,49 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
   useEffect(() => {
     let alive = true;
+    const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
+    const applySnapshot = (snapshot, source) => {
+      const exitRows = snapshot?.exitVelocityRows || [];
+      const batted = snapshot?.battedBallRows || [];
+      const pitches = snapshot?.pitchRows || [];
+      setTeamExitVelocityRows(exitRows);
+      setTeamExitVelocitySource(source);
+      setTeamExitVelocityState(exitRows.length ? 'ready' : 'unavailable');
+      setTeamBattedBallData(buildBattedBallProfile(batted));
+      setTeamPitchArsenalData(buildPitchArsenalRows(pitches));
+      setTeamSavantSource(source);
+      setTeamSavantState(exitRows.length || batted.length || pitches.length ? 'ready' : 'unavailable');
+    };
+    if (cached && Date.now() - Number(cached.updatedAt || 0) < 60 * 60 * 1000) {
+      applySnapshot(cached.data, 'Baseball Savant Statcast Search · cached verified roster rollup');
+      return () => { alive = false; };
+    }
     setTeamExitVelocityRows([]);
     setTeamExitVelocitySource('');
     setTeamExitVelocityState('loading');
-    const loadTeamRows = async () => {
-      const directRows = await getTeamExitVelocity(teamBase?.abbr, CURRENT_SEASON).catch(() => null);
-      if (Array.isArray(directRows) && directRows.length) {
-        return { rows: directRows, source: 'Baseball Savant Statcast Search · team query' };
-      }
-      const hitters = (liveTeamPlayers.hitting || [])
-        .filter(row => row?.id)
-        .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
-        .slice(0, 12);
-      const responses = await Promise.all(hitters.map(row => getPlayerContactPoints(row.id, CURRENT_SEASON).catch(() => null)));
-      const rows = responses.flatMap(result => Array.isArray(result) ? result : []);
-      return rows.length ? { rows, source: 'Baseball Savant Statcast Search · verified roster-player rollup' } : { rows: [], source: '' };
-    };
-    loadTeamRows().then(({ rows, source }) => {
+    setTeamBattedBallData(null);
+    setTeamPitchArsenalData(null);
+    setTeamSavantSource('');
+    setTeamSavantState('loading');
+    const hitters = (liveTeamPlayers.hitting || [])
+      .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
+      .slice(0, 12);
+    const pitchers = (liveTeamPlayers.pitching || [])
+      .sort((a, b) => (Number(b?.stat?.inningsPitched || b?.stat?.ip) || 0) - (Number(a?.stat?.inningsPitched || a?.stat?.ip) || 0))
+      .slice(0, 12);
+    resolveTeamSavantSnapshot({
+      teamAbbr: teamBase?.abbr,
+      season: CURRENT_SEASON,
+      cached,
+      hitters,
+      pitchers,
+      saveCacheFn: saveTeamSavantCache,
+    }).then(({ snapshot, source }) => {
       if (!alive) return;
-      setTeamExitVelocityRows(rows);
-      setTeamExitVelocitySource(source);
-      setTeamExitVelocityState(rows.length ? 'ready' : 'unavailable');
+      applySnapshot(snapshot, source);
     }).catch(() => {
       if (!alive) return;
-      setTeamExitVelocityRows([]);
-      setTeamExitVelocitySource('');
-      setTeamExitVelocityState('unavailable');
+      applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
   }, [teamBase?.abbr, feedRetryToken, liveTeamPlayers]);
@@ -753,10 +856,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const { splits, leaders, bb, arsenal, fo } = useMemo(() => ({
     splits:  getSplits(),
     leaders: getLeaders(liveTeamPlayers.hitting, liveTeamPlayers.pitching),
-    bb:      getBattedBall(),
-    arsenal: getPitchArsenal(),
+    bb:      teamBattedBallData,
+    arsenal: teamPitchArsenalData,
     fo:      getFrontOffice(team),
-  }), [team, liveTeamPlayers]);
+  }), [team, liveTeamPlayers, teamBattedBallData, teamPitchArsenalData]);
   const evBins = useMemo(() => buildExitVelocityBins(teamExitVelocityRows), [teamExitVelocityRows]);
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
   const offRows=[['OPS',formatTeamMetric(team.ops,3)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',formatTeamMetric(team.avg,3)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
@@ -1139,17 +1242,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              panels) — fixing it now that a debug pass finally had room
              for it, since "lower priority" isn't the same as "not a real
              gap", and half this page turned out to share the pattern. */}
-        <Panel title="Batted Ball Profile" accent={C.amber} badge={bb ? 'Savant' : 'Coverage gap'}>
+        <Panel title="Batted Ball Profile" accent={C.amber} badge={bb ? (teamSavantState === 'ready' ? 'Savant' : 'Cached') : teamSavantState === 'loading' ? 'Loading' : 'Coverage gap'}>
           {bb ? (
           <div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
             {[
-              ['Barrel %',     bb.barrelPct+'%',  parseFloat(bb.barrelPct) >= 9 ? C.teal : C.amber],
-              ['Hard Hit %',   bb.hardHitPct+'%', parseFloat(bb.hardHitPct) >= 42 ? C.teal : C.amber],
-              ['Sweet Spot %', bb.sweetSpot+'%',  parseFloat(bb.sweetSpot) >= 33 ? C.teal : C.amber],
-              ['Avg EV',       bb.avgEV+' mph',   parseFloat(bb.avgEV) >= 89 ? C.teal : C.slate],
-              ['Max EV',       bb.maxEV+' mph',   C.text],
-              ['Launch Angle', bb.launchAngle+'°',C.text],
+              ['Barrel %',     formatPanelMetric(bb.barrelPct, '%'),  parseFloat(bb.barrelPct) >= 9 ? C.teal : C.amber],
+              ['Hard Hit %',   formatPanelMetric(bb.hardHitPct, '%'), parseFloat(bb.hardHitPct) >= 42 ? C.teal : C.amber],
+              ['Sweet Spot %', formatPanelMetric(bb.sweetSpot, '%'),  parseFloat(bb.sweetSpot) >= 33 ? C.teal : C.amber],
+              ['Avg EV',       formatPanelMetric(bb.avgEV, ' mph'),   parseFloat(bb.avgEV) >= 89 ? C.teal : C.slate],
+              ['Max EV',       formatPanelMetric(bb.maxEV, ' mph'),   C.text],
+              ['Launch Angle', formatPanelMetric(bb.launchAngle, '°'),C.text],
             ].map(([l,v,c],i,arr)=>(
               <div key={l} style={{padding:'8px 14px',borderBottom:i<arr.length-2?`0.5px solid ${C.borderLight}`:'none',borderRight:i%2===0?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2})}>{l}</div>
@@ -1160,7 +1263,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={{borderTop:`0.5px solid ${C.border}`,padding:'10px 14px'}}>
             <div style={sans({fontSize:9.5,fontWeight:700,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8})}>Spray Direction</div>
             <div style={{display:'flex',gap:10,marginBottom:8}}>
-              {[['Pull %',bb.pullPct+'%'],['Center %',bb.centerPct+'%'],['Oppo %',bb.oppoPct+'%']].map(([l,v])=>(
+              {[['Pull %',formatPanelMetric(bb.pullPct, '%')],['Center %',formatPanelMetric(bb.centerPct, '%')],['Oppo %',formatPanelMetric(bb.oppoPct, '%')]].map(([l,v])=>(
                 <div key={l} style={{flex:1,textAlign:'center',background:C.surface2,borderRadius:6,padding:'6px 4px'}}>
                   <div style={px({fontSize:14,fontWeight:800,color:C.navy})}>{v}</div>
                   <div style={sans({fontSize:9,color:C.text3,marginTop:2})}>{l}</div>
@@ -1168,7 +1271,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               ))}
             </div>
             <div style={{display:'flex',gap:10}}>
-              {[['GB %',bb.gbPct+'%',C.teal],['FB %',bb.fbPct+'%',C.amber],['LD %',bb.ldPct+'%',C.rust]].map(([l,v,c])=>(
+              {[['GB %',formatPanelMetric(bb.gbPct, '%'),C.teal],['FB %',formatPanelMetric(bb.fbPct, '%'),C.amber],['LD %',formatPanelMetric(bb.ldPct, '%'),C.rust]].map(([l,v,c])=>(
                 <div key={l} style={{flex:1,textAlign:'center',background:C.surface2,borderRadius:6,padding:'6px 4px'}}>
                   <div style={px({fontSize:14,fontWeight:800,color:c})}>{v}</div>
                   <div style={sans({fontSize:9,color:C.text3,marginTop:2})}>{l}</div>
@@ -1176,15 +1279,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               ))}
             </div>
             <div style={sans({fontSize:9,color:C.text4,marginTop:8,lineHeight:1.4})}>
-              Source: Baseball Savant Statcast team batted-ball data.
+              Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · {bb.sampleSize?.toLocaleString() || '—'} batted balls.
             </div>
           </div>
           </div>
           ) : (
             <div style={{padding:'28px 18px',textAlign:'center'}}>
               <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team batted-ball feed not connected</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>The current team aggregate feed has no Statcast batted-ball rows. Player-level Statcast panels remain the authoritative view until a team query is connected.</div>
+              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>{teamSavantState === 'loading' ? 'Loading verified batted-ball rows' : 'Team batted-ball feed unavailable'}</div>
+              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>{teamSavantState === 'loading' ? 'Checking the team feed and verified roster-player Statcast rollup.' : 'No verified team or roster-player batted-ball rows were returned by Baseball Savant for this season.'}</div>
             </div>
           )}
         </Panel>
@@ -1228,16 +1331,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 <span style={sans({fontSize:9.5,fontWeight:700,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em'})}>MLB Rank</span>
               </div>
               {arsenal.map((p,i,arr)=>{
-                const rank = Math.round(3 + (1 - p.stuffPlus/120) * 25);
-                const col = p.stuffPlus >= 110 ? C.teal : p.stuffPlus >= 100 ? C.amber : C.slate;
+                const rank = p.stuffPlus == null ? null : Math.round(3 + (1 - p.stuffPlus/120) * 25);
+                const col = p.stuffPlus == null ? C.text3 : p.stuffPlus >= 110 ? C.teal : p.stuffPlus >= 100 ? C.amber : C.slate;
                 return (
                   <div key={p.type} style={{display:'grid',gridTemplateColumns:'1fr auto auto',padding:'7px 14px',gap:8,borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none',alignItems:'center'}}>
                     <div style={{display:'flex',alignItems:'center',gap:6}}>
                       <div style={{width:7,height:7,borderRadius:'50%',background:p.color,flexShrink:0}}/>
                       <span style={sans({fontSize:11,color:C.text})}>{p.type}</span>
                     </div>
-                    <span style={px({fontSize:12,fontWeight:700,color:col})}>{p.stuffPlus}</span>
-                    <span style={{...px({fontSize:10,fontWeight:700,color:col}),background:`color-mix(in srgb, ${col} 9%, transparent)`,padding:'1px 7px',borderRadius:10,textAlign:'center'}}>{ord(rank)}</span>
+                    <span style={px({fontSize:12,fontWeight:700,color:col})}>{formatPanelMetric(p.stuffPlus)}</span>
+                    <span style={{...px({fontSize:10,fontWeight:700,color:col}),background:`color-mix(in srgb, ${col} 9%, transparent)`,padding:'1px 7px',borderRadius:10,textAlign:'center'}}>{rank == null ? '—' : ord(rank)}</span>
                   </div>
                 );
               })}
@@ -1245,12 +1348,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           )) : (
             <div style={{padding:'28px 18px',textAlign:'center'}}>
               <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team pitch arsenal feed not connected</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Pitch-type usage and Stuff+ are available on individual player profiles; the team-level Statcast query is not part of the current feed.</div>
+              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>{teamSavantState === 'loading' ? 'Loading verified pitch rows' : 'Team pitch arsenal feed unavailable'}</div>
+              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>{teamSavantState === 'loading' ? 'Checking the verified roster-player Statcast pitch rollup.' : 'No verified roster-player pitch rows were returned by Baseball Savant for this season.'}</div>
             </div>
           )}
           <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
-            Source: Baseball Savant pitch-arsenal data when available; no seeded team values are shown.
+            Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · usage is based on verified pitch rows; Stuff+ remains unavailable in this rollup.
           </div>
         </Panel>
 
