@@ -1982,6 +1982,12 @@ function PlayerProfile({ player, derived, onCompare }) {
   const quickStats = player.isPitcher
     ? [['ERA',s.era?(+s.era).toFixed(2):'—'],['K',dashIfMissing(s.strikeOuts)],['W',dashIfMissing(s.wins)],['WHIP',s.whip?(+s.whip).toFixed(3):'—']]
     : [['AVG',fmt(s.avg)],['HR',dashIfMissing(s.homeRuns)],['RBI',dashIfMissing(s.rbi)],['OPS',fmt(s.ops)]];
+  const performanceSummary = [
+    { label:'WAR', value:dashIfMissing(player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', source:(player.war ?? s.war ?? player.fangraphs?.war) != null ? 'Verified provider' : 'Unavailable', tone:C.purple },
+    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', tone:C.amber },
+    { label:'wRC+', value:dashIfMissing(s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', source:(s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus) != null ? 'Verified provider' : 'Unavailable', tone:C.teal },
+    { label:'Statcast', value:player.savant?.est_woba != null ? fmt(player.savant.est_woba, 3) : (player.savant?.avg_hit_speed != null ? fmt(player.savant.avg_hit_speed, 1) : '—'), detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', source:player.savant ? 'Baseball Savant' : 'Unavailable', tone:C.navy },
+  ];
 
   const runPdfExport = async kind => {
     if (pdfExportState === 'loading') return;
@@ -2205,6 +2211,21 @@ function PlayerProfile({ player, derived, onCompare }) {
           <div style={px({ fontSize:9.5, color:C.text4 })}>{seasonLabel}</div>
         </div>
             </div>
+
+      <div className="skip-performance-summary" role="region" aria-label="Performance Summary">
+        <div className="skip-performance-summary-heading">Performance Summary <span>Current season · verified inputs only</span></div>
+        <div className="skip-performance-summary-grid">
+          {performanceSummary.map(metric => (
+            <div className="skip-performance-summary-card" key={metric.label}>
+              <div className="skip-performance-summary-card-label">{metric.label}</div>
+              <div className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</div>
+              <div className="skip-performance-summary-card-detail">{metric.detail}</div>
+              <div className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${p.fullName || player.fullName || 'Player'} · ${seasonLabel}`} entries={profileProvenance} />
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
