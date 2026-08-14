@@ -86,3 +86,13 @@
 - [x] Verify Overview and Profile at desktop and mobile widths and save a checkpoint.
 - [x] Capture direct desktop and mobile verification for the updated Player Profile spacing surfaces.
 - [x] Save a new checkpoint covering the Overview/Profile spacing refinements after final verification.
+- [ ] Audit every current Source gap label and map it to its data contract and source availability.
+- [ ] Fill source gaps with verified existing MLB, Baseball Savant, Spotrac, or other documented source data where available.
+- [ ] Preserve explicit unavailable states and provenance for metrics that cannot be verified.
+- [ ] Add regression coverage for source-backed values and unavailable fallbacks.
+- [ ] Run validation, inspect the affected Overview/Profile surfaces, and save a checkpoint.
+- [ ] Audit the Exit Velocity Distribution panel and its current team batted-ball data flow.
+- [ ] Replace the user-facing Exit Velocity Coverage gap with verified team-level data where the connected sources support it.
+- [ ] Preserve an explicit, provenance-backed unavailable state when team-level exit-velocity data cannot be verified.
+- [ ] Add regression coverage for Exit Velocity ready and unavailable states.
+- [ ] Run validation, inspect the affected Team Overview surface, and save a checkpoint.

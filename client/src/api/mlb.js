@@ -845,6 +845,12 @@ export async function getSavantData(year = SEASON) {
   return Array.isArray(arr) ? arr : null;
 }
 
+export async function getTeamExitVelocity(teamAbbr, year = SEASON) {
+  if (!teamAbbr) return null;
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_exit_velocity&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 20_000 });
+  return Array.isArray(arr) ? arr : null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TOP PROSPECT STATS — mirrors mlb.com/prospects/stats/top-prospects
 // Pulls hitting + pitching leaders across Triple-A and Double-A simultaneously.

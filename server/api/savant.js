@@ -253,6 +253,10 @@ const ENDPOINTS = {
   // that needed independent verification).
   pitcher_pitches: (y, { playerId } = {}) =>
     `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&pitchers_lookup%5B%5D=${playerId}&team=&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&player_event_sort=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
+  // Raw team-season batted-ball rows for a real exit-velocity distribution.
+  // The client bins launch_speed locally; no proxy or seeded values are used.
+  team_exit_velocity: (y, { team } = {}) =>
+    `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=&hfSit=&player_type=batter&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&batters_lookup%5B%5D=&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
 };
 
 // Robust CSV parser — handles quoted fields and embedded commas
@@ -319,7 +323,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (isRateLimited(req)) return rateLimitResponse(res);
 
-  const { endpoint, year, playerId } = req.query ?? {};
+  const { endpoint, year, playerId, team } = req.query ?? {};
   const y = String(year || '2026');
 
   if (!endpoint || !ENDPOINTS[endpoint]) {
@@ -334,7 +338,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `${endpoint} requires a numeric playerId query param` });
   }
 
-  const url = ENDPOINTS[endpoint](y, { playerId });
+  if (endpoint === 'team_exit_velocity' && !/^[A-Za-z0-9]{2,5}$/.test(String(team || ''))) {
+    return res.status(400).json({ error: 'team_exit_velocity requires an MLB team abbreviation' });
+  }
+
+  const url = ENDPOINTS[endpoint](y, { playerId, team });
 
   try {
     const upstream = await fetchWithRedirects(url);
@@ -364,6 +372,21 @@ export default async function handler(req, res) {
       // has a real X *and* Y intercept value.
       data = data.filter(r => r.intercept_ball_minus_batter_pos_x_inches != null
                             && r.intercept_ball_minus_batter_pos_y_inches != null);
+    }
+
+    if (endpoint === 'team_exit_velocity') {
+      // Keep only documented batted-ball fields and rows with real launch speed.
+      // The upstream CSV can include pitch-level rows without a batted-ball result.
+      data = data
+        .filter(r => r.launch_speed != null && Number.isFinite(Number(r.launch_speed)))
+        .map(r => ({
+          launch_speed: Number(r.launch_speed),
+          launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
+          bb_type: r.bb_type || null,
+          events: r.events || null,
+          game_date: r.game_date || null,
+        }))
+        .slice(0, 50000);
     }
 
     if (endpoint === 'pitcher_pitches') {
