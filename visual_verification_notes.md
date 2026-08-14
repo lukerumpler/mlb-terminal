@@ -1,5 +1,7 @@
 # Visual verification notes
 
-The desktop Overview screenshot shows a thin Dodgers-blue team accent along the page top, a blue breadcrumb link (`Overview / Los Angeles Dodgers`), a matching blue title rail, and the blue command-center label. Existing panels and team branding remain aligned, while remote source-confidence labels remain visible rather than being hidden.
+The desktop Overview shell now shows a compact `RECENT` pill in the top header beside the data freshness indicator. It preserves the existing Bloomberg-style density and does not displace the page title or freshness status. The selected team breadcrumb and blue identity accents remain intact.
 
-The mobile screenshot shows the breadcrumb remains on one line without horizontal overflow, the team accent line and title rail remain readable, and the compact header indicator still fits beside the top branding. The responsive two-column stat strip remains intact. The team-specific color is used as a structural accent and active-state color, not as small body text, to preserve contrast for dark team colors.
+At a 375px mobile viewport, the responsive header retains the Recent History control area without horizontal overflow. The main Overview content remains readable with the sidebar collapsed to icons, the team selector fits within the content column, and the live ticker remains docked at the bottom. The desktop-only freshness/platform labels collapse as intended, while the Recent History trigger remains available for backtracking.
+
+The player profile hierarchy refinements add labeled primary, analytics, and scouting/trajectory column rhythm while preserving all existing profile panels and metrics. The hierarchy labels are small, muted, and accent-coded rather than replacing analytical content.
