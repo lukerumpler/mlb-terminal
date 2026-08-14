@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTeamAggregateCache, readTeamPlayersCache, saveTeamAggregateCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache } from '../client/src/lib/teamDataCache.js';
-import { buildBattedBallProfile, buildPitchArsenalRows, formatDataAge, resolveTeamSavantSnapshot } from '../client/src/pages/OverviewPage.jsx';
+import { buildBattedBallProfile, buildPitchArsenalRows, buildLiveRunDiffData, formatDataAge, resolveTeamSavantSnapshot } from '../client/src/pages/OverviewPage.jsx';
 
 describe('team data cache and freshness helpers', () => {
+  it('normalizes a verified current-season run differential without retaining mock game rows', () => {
+    expect(buildLiveRunDiffData({ diff: 42 }, 2026)).toEqual([{ game: '2026', diff: 42, cum: 42 }]);
+    expect(buildLiveRunDiffData({ diff: null }, 2026)).toEqual([]);
+  });
+
   beforeEach(() => localStorage.clear());
   afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 

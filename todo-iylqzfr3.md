@@ -80,3 +80,14 @@
 - [x] Add focused Vitest coverage for the source-confidence strip and source-aware profile states
 - [x] Capture a loaded player profile preview showing the new data-confidence strip
 - [x] Save a new checkpoint after the source-aware profile update
+- [x] Audit Overview mock values and existing MLB API adapter/routes
+- [x] Implement server-side MLB Stats API loading for real season and career stats
+- [x] Replace Overview mock values with verified live data and explicit unavailable states
+- [x] Preserve source labels, loading states, and fallback behavior without fabricated values
+- [x] Add Vitest coverage for live-data normalization and Overview rendering
+- [x] Run typecheck, tests, and visual verification of the Overview tab
+- [x] Save a checkpoint containing the live MLB Stats API Overview integration
+- [x] Add rendered Overview coverage for the MLB Stats API run-differential badge and unavailable state
+- [x] Capture an Overview preview showing the updated live run-differential panel
+- [x] Clarify the completed Overview scope as current-season team data, not player career stats
+- [x] Save the final live Overview checkpoint

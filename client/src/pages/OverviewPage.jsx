@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { TEAMS, RUN_DIFF_DATA, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
+import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamSavantMetrics } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -62,6 +62,13 @@ function percentileLabel(value) {
 function formatTeamMetric(value, digits = 0) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   return Number(value).toFixed(digits);
+}
+
+export function buildLiveRunDiffData(team, season = CURRENT_SEASON) {
+  if (team?.diff == null || team?.diff === '') return [];
+  const diff = Number(team.diff);
+  if (!Number.isFinite(diff)) return [];
+  return [{ game: String(season), diff, cum: diff }];
 }
 function freshnessLabel(value) {
   if (!value) return 'not retrieved';
@@ -835,6 +842,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const rd = team.rs == null || team.ra == null || !Number.isFinite(Number(team.rs)) || !Number.isFinite(Number(team.ra))
     ? null
     : Number(team.rs) - Number(team.ra);
+  const liveRunDiffData = useMemo(() => buildLiveRunDiffData({ ...team, diff: rd }, CURRENT_SEASON), [team, rd]);
 
   const D=useMemo(()=>{
     const records = Object.values(liveTeamData?.byAbbr || {});
@@ -1248,12 +1256,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </Suspense>
             </Panel>
           </div>
-          <Panel title="Run Differential — 2026" accent={teamAccent}>
+          <Panel title={`Run Differential — ${CURRENT_SEASON}`} accent={teamAccent} badge={liveRunDiffData.length ? 'MLB Stats API' : 'Unavailable'}>
             <div style={{padding:'8px 2px 4px'}}>
-              <Suspense fallback={<ChartFallback height={144}/>}>
-                <RunDiffChart data={RUN_DIFF_DATA} accent={teamAccent}/>
-              </Suspense>
+              {liveRunDiffData.length ? <Suspense fallback={<ChartFallback height={144}/> }>
+                <RunDiffChart data={liveRunDiffData} accent={teamAccent}/>
+              </Suspense> : <div style={sans({minHeight:126,display:'flex',alignItems:'center',justifyContent:'center',padding:'14px',textAlign:'center',fontSize:10,color:C.text4,lineHeight:1.45})}>No verified current-season run differential was returned by the MLB Stats API.</div>}
             </div>
+            <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: MLB Stats API standings · current-season cumulative snapshot.</div>
           </Panel>
         </div>
 

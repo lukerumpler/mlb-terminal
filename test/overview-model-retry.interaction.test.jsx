@@ -46,6 +46,7 @@ describe('Team Overview model source and retry interaction', () => {
     render(<OverviewPage />);
     expect(await screen.findByText('Team batted-ball feed unavailable')).toBeInTheDocument();
     expect(await screen.findByText('Team pitch arsenal feed unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('No verified current-season run differential was returned by the MLB Stats API.')).toBeInTheDocument();
   });
 
   it('shows freshness/source-gap state, exposes retry, and recovers model and MLB data after retry', async () => {
@@ -63,6 +64,7 @@ describe('Team Overview model source and retry interaction', () => {
     await user.click(screen.getByRole('button', { name: 'RETRY' }));
 
     expect(await screen.findByText('LIVE MLB DATA')).toBeInTheDocument();
+    expect((await screen.findAllByText(/MLB Stats API/)).length).toBeGreaterThan(0);
     expect(await screen.findByText('72.4%')).toBeInTheDocument();
     await waitFor(() => expect(document.body.textContent).toMatch(/28\.6/));
     expect(document.body.textContent).toMatch(/Playoff odds:\s*live/);
