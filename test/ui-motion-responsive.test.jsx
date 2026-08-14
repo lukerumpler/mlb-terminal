@@ -24,8 +24,7 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(appSource).toContain('className="skip-low-data-indicator"');
     expect(appSource).toContain('Low Data Mode is active');
     expect(appSource).toContain("onClick={() => setTab('settings')}");
-    expect(appSource).toContain('aria-label="Open navigation"');
-    expect(appSource).toContain('aria-label="Close navigation"');
+    expect(appSource).toContain("aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}");
     expect(appSource).toContain('skip-mobile-nav-backdrop');
     expect(appSource).toContain('skip-mobile-nav-open');
     expect(appSource).toContain('setMobileNavOpen(false)');
@@ -78,6 +77,11 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(indexSource).toContain('.skip-metric-info-popover');
     expect(appSource).toContain('skip-utility-section');
     expect(tickerSource).toContain('className="skip-ticker-message"');
+    expect(tickerSource).toContain('className="skip-ticker-shell"');
+    expect(indexSource).toContain('-webkit-overflow-scrolling:touch');
+    expect(indexSource).toContain('touch-action:pan-y');
+    expect(appSource).toContain('aria-controls="skip-mobile-nav"');
+    expect(appSource).toContain('mobileNavFirstItemRef');
     expect(indexSource).toContain('.skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }');
     expect(overviewSource).toContain('className="skip-affiliate-overview-grid"');
     expect(overviewSource).toContain('className="skip-affiliate-savant-grid"');

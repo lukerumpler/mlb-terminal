@@ -105,8 +105,12 @@ describe('Team Overview model source and retry interaction', () => {
 
   it('leaves model panels in explicit unavailable state after a FanGraphs 502', async () => {
     modelMode = '502';
-    render(<OverviewPage />);
+    const { container } = render(<OverviewPage />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/));
+    const providers = [...container.querySelectorAll('.skip-overview-source-name')].map(node => node.textContent);
+    expect(providers.filter(provider => provider === 'FanGraphs')).toHaveLength(6);
+    expect(providers.filter(provider => provider === 'Savant')).toHaveLength(4);
+    expect(container.querySelector('.skip-status-unavailable')).toBeInTheDocument();
     expect(document.body.textContent).toContain('FanGraphs · not retrieved');
     expect(document.body.textContent).toContain('Unavailable');
     expect(document.body.textContent).not.toMatch(/Playoff odds:\s*Loading/);
@@ -115,7 +119,7 @@ describe('Team Overview model source and retry interaction', () => {
 
   it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    const { container } = render(<OverviewPage />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/));
     expect(document.body.textContent).toMatch(/Playoff odds:\s*Provider unavailable/);
@@ -137,5 +141,6 @@ describe('Team Overview model source and retry interaction', () => {
     expect(document.body.textContent).toMatch(/Playoff odds:\s*FanGraphs/);
     expect(document.body.textContent).toMatch(/Team WAR:\s*Live/);
     expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs\s*·\s*retrieved\s+\d{1,2}:\d{2}/);
+    expect(container.querySelectorAll('.skip-status-verified').length).toBeGreaterThanOrEqual(2);
   }, 20000);
 });

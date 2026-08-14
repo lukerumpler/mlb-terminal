@@ -11170,3 +11170,9 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Improve measurable frontend performance, low-data behavior, responsive layout, and accessibility where regressions are found.
 - [x] Add regression coverage for every optimization or bug fix and run focused validation.
 - [x] Run the complete release gate, review desktop/mobile previews, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Mobile Experience & Source-Health Badges
+- [x] Refine touch scrolling momentum, gesture inertia, and menu drawer backdrop handling for iOS and Android.
+- [x] Integrate verified FanGraphs WAR and Baseball Savant source-health badges into affected metric and overview cards.
+- [x] Add unit and rendering regression tests for touch navigation and badge rendering.
+- [x] Run full release gates, verify desktop/mobile viewports, and publish the verified checkpoint.

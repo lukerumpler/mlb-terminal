@@ -20,6 +20,7 @@ describe('StatusBadge', () => {
     ['cached-fallback', 'Stale Fallback'],
     ['unavailable', 'Unavailable'],
     ['coverage-gap', 'Coverage Gap'],
+    ['loading', 'Loading'],
   ])('renders the %s status as visible text', (status, label) => {
     render(<StatusBadge status={status} />);
     expect(screen.getByRole('status', { name:`Data status: ${label}` })).toHaveTextContent(label);

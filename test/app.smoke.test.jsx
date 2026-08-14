@@ -31,6 +31,23 @@ describe('SKIP app — mobile navigation', () => {
     expect(document.querySelector('.skip-topbar')?.textContent).toContain('Players');
   });
 
+  it('supports touch-safe Escape dismissal and focus restoration for the mobile drawer', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(window, 'innerWidth', { configurable:true, value:390 });
+    render(<App />);
+    const openButton = document.querySelector('.skip-mobile-nav-toggle');
+    const firstNavItem = document.querySelector('.skip-sidebar button[title="Overview"]');
+    expect(openButton).toBeTruthy();
+    expect(firstNavItem).toBeTruthy();
+    await user.click(openButton);
+    await waitFor(() => expect(document.activeElement).toBe(firstNavItem));
+    expect(document.body.style.overflow).toBe('hidden');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeNull());
+    expect(document.body.style.overflow).toBe('');
+    await waitFor(() => expect(document.activeElement).toBe(openButton));
+  });
+
   it('keeps the desktop sidebar mounted when the mobile drawer is inactive', () => {
     Object.defineProperty(window, 'innerWidth', { configurable:true, value:1280 });
     render(<App />);

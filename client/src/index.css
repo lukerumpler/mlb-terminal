@@ -696,17 +696,19 @@
 /* Mobile navigation drawer: keep the desktop rail intact while giving small screens a full-label, thumb-friendly menu. */
 .skip-mobile-nav-backdrop { display:none; }
 @media (max-width:720px) {
-  .skip-mobile-nav-toggle { display:inline-flex !important; flex-shrink:0; }
-  .skip-sidebar { position:fixed !important; inset:0 auto 0 0; z-index:80; width:min(286px, calc(100vw - 48px)) !important; transform:translateX(-105%); transition:transform 180ms cubic-bezier(.23,1,.32,1), box-shadow 180ms ease; box-shadow:none !important; }
+  .skip-mobile-nav-toggle { display:inline-flex !important; flex-shrink:0; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .skip-sidebar { position:fixed !important; inset:0 auto 0 0; z-index:80; width:min(286px, calc(100vw - 48px)) !important; transform:translateX(-105%); transition:transform 180ms cubic-bezier(.23,1,.32,1), box-shadow 180ms ease; box-shadow:none !important; overscroll-behavior:contain; }
   .skip-sidebar.skip-mobile-nav-open { transform:translateX(0); box-shadow:14px 0 34px rgba(20,31,48,.18) !important; }
   .skip-sidebar .skip-nav-section, .skip-sidebar .skip-nav-label, .skip-sidebar .skip-nav-shortcut, .skip-sidebar .skip-utility-label { display:block; }
   .skip-sidebar .skip-nav-section { padding:10px 10px 4px; }
-  .skip-sidebar > div:nth-child(2) > button { justify-content:flex-start; gap:8px !important; padding:9px 10px !important; min-height:42px; }
+  .skip-sidebar > div:nth-child(2) > button { justify-content:flex-start; gap:8px !important; padding:9px 10px !important; min-height:42px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
   .skip-sidebar > div:nth-child(2) > button > span:first-child { width:24px !important; }
   .skip-sidebar > div:nth-child(2) > button > span:last-child:not(.skip-nav-label):not(.skip-nav-shortcut) { margin-left:auto !important; }
+  .skip-mobile-nav-scroll { min-height:0; overflow-y:auto; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; scrollbar-width:thin; }
   .skip-sidebar-insight { display:block; }
-  .skip-mobile-nav-backdrop { display:block; position:fixed; inset:0; z-index:70; border:0; background:rgba(15,24,38,.34); backdrop-filter:blur(2px); }
-  .skip-topbar { position:relative; z-index:60; }
+  .skip-mobile-nav-backdrop { display:block; position:fixed; inset:0; z-index:70; border:0; padding:0; background:rgba(15,24,38,.34); backdrop-filter:blur(2px); touch-action:none; -webkit-tap-highlight-color:transparent; }
+  .skip-topbar { position:relative; z-index:60; padding-top:max(0px, env(safe-area-inset-top)); height:calc(46px + env(safe-area-inset-top)) !important; }
+  .skip-content { overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; }
   .skip-topbar > div:nth-child(3) { display:block; }
   .skip-topbar > div:nth-child(4), .skip-topbar > div:nth-child(5), .skip-topbar > div:nth-child(6), .skip-topbar > div:nth-child(7) { display:none; }
 }
@@ -823,6 +825,11 @@
 .skip-status-tier-2{--status-color:var(--status-tier-2);--status-bg:var(--status-tier-2-bg);--status-border:var(--status-tier-2-border)}
 .skip-status-tier-3{--status-color:var(--status-tier-3);--status-bg:var(--status-tier-3-bg);--status-border:var(--status-tier-3-border)}
 .skip-status-cached,.skip-status-cached-fallback{--status-color:var(--status-cached);--status-bg:var(--status-cached-bg);--status-border:var(--status-cached-border)}
+.skip-status-loading{--status-color:var(--status-estimated);--status-bg:var(--status-estimated-bg);--status-border:var(--status-estimated-border)}
+.skip-overview-source-badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:0;max-width:100%;vertical-align:middle}
+.skip-overview-source-name{color:var(--text4,#9c8570);font:700 7px/1 'DM Mono',monospace;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skip-overview-source-badges{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap}
+.skip-stat-strip .skip-overview-source-badge{margin-top:1px}
 
 .skip-metric-info{display:inline-flex;align-items:center;gap:4px;position:relative;min-width:0}
 .skip-metric-info-button{width:14px;height:14px;padding:0;border:1px solid var(--text4,#999);border-radius:50%;background:transparent;color:var(--text3,#777);font:800 8px/12px 'DM Mono',monospace;text-align:center;cursor:pointer}
@@ -835,9 +842,12 @@
 @media (max-width:720px) {
   .skip-utility-section { display:none; }
   .skip-ticker-message { padding-left:12px !important; padding-right:12px !important; }
+  .skip-ticker-shell { height:calc(32px + env(safe-area-inset-bottom)) !important; padding-bottom:env(safe-area-inset-bottom); }
 }
 
 @media (max-width:720px) {
+  .skip-overview-source-badges{justify-content:flex-start}
+  .skip-overview-source-name{max-width:68px}
   .skip-overview-page .overview-team-context { overflow:visible; flex-wrap:wrap !important; gap:10px !important; }
   .skip-overview-page .overview-team-context > label { flex:1 1 100%; min-width:0; }
   .skip-overview-page .overview-team-context > label select { width:calc(100% - 30px); max-width:none; }

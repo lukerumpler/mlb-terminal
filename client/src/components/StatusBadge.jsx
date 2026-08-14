@@ -10,6 +10,7 @@ const STATUS_META = {
   'cached-fallback': { label:'Stale Fallback', symbol:'↻' },
   unavailable: { label:'Unavailable', symbol:'—' },
   'coverage-gap': { label:'Coverage Gap', symbol:'!' },
+  loading: { label:'Loading', symbol:'…' },
 };
 
 export function normalizeStatus(status, fallback = 'unavailable') {
@@ -20,6 +21,7 @@ export function normalizeStatus(status, fallback = 'unavailable') {
   if (value === 'tier-1' || value === 'tier-2' || value === 'tier-3') return value;
   if (value === 'cached' || value === 'fresh-cached') return 'cached';
   if (value === 'cached-fallback' || value === 'stale-cached' || value === 'fallback') return 'cached-fallback';
+  if (value === 'loading' || value === 'pending' || value === 'connecting') return 'loading';
   if (value === 'unavailable' || value === 'upstream-unavailable' || value === 'request-failed' || value === 'error') return 'unavailable';
   return fallback;
 }
