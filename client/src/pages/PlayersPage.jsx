@@ -1838,6 +1838,7 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [noteTags, setNoteTags] = useState('');
   const [noteSort, setNoteSort] = useState('date-desc');
   const [noteFilterTag, setNoteFilterTag] = useState('');
+  const [noteSearch, setNoteSearch] = useState('');
   const [bulkTag, setBulkTag] = useState('');
   const [bulkTagReplacement, setBulkTagReplacement] = useState('');
   const [importMode, setImportMode] = useState('merge');
@@ -1845,11 +1846,18 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
-  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); setBulkTag(''); setBulkTagReplacement(''); }, [player.id]);
+  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); setNoteSearch(''); setBulkTag(''); setBulkTagReplacement(''); }, [player.id]);
   useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
   const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
   const availableNoteTags = useMemo(() => [...new Set(observations.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b)), [observations]);
-  const visibleObservations = useMemo(() => noteFilterTag ? sortedObservations.filter(note => note.tags?.includes(noteFilterTag)) : sortedObservations, [noteFilterTag, sortedObservations]);
+  const visibleObservations = useMemo(() => {
+    const query = noteSearch.trim().toLowerCase();
+    return sortedObservations.filter(note => {
+      const matchesTag = !noteFilterTag || note.tags?.includes(noteFilterTag);
+      const haystack = [note.text, note.category, ...(note.tags || [])].join(' ').toLowerCase();
+      return matchesTag && (!query || haystack.includes(query));
+    });
+  }, [noteFilterTag, noteSearch, sortedObservations]);
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -2137,7 +2145,9 @@ function PlayerProfile({ player, derived, onCompare }) {
                   </div>
                   <div className="skip-notes-help">Use commas for multiple tags. Tags are saved per player in this browser.</div>
                 </form>
-                <div className="skip-notes-toolbar"><span>{visibleObservations.length} shown · {observations.length} saved</span><div className="skip-notes-toolbar-controls"><select aria-label="Filter observations by tag" value={noteFilterTag} onChange={event => setNoteFilterTag(event.target.value)}><option value="">All tags</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><select aria-label="Sort observations" value={noteSort} onChange={event => setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div></div>
+                                <div className="skip-notes-toolbar"><span>{visibleObservations.length} shown · {observations.length} saved</span><div className="skip-notes-toolbar-controls"><input className="skip-notes-search" aria-label="Search observations" value={noteSearch} onChange={event => setNoteSearch(event.target.value)} placeholder="Search notes…" /><select aria-label="Filter observations by tag" value={noteFilterTag} onChange={event => setNoteFilterTag(event.target.value)}><option value="">All tags</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><select aria-label="Sort observations" value={noteSort} onChange={event =>
+ setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div></div>
+
                 <div className="skip-notes-management"><div className="skip-notes-management-heading">Tag management</div><div className="skip-notes-management-row"><select aria-label="Bulk tag" value={bulkTag} onChange={event => setBulkTag(event.target.value)}><option value="">Choose tag</option>{availableNoteTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}</select><input aria-label="Replacement tag" value={bulkTagReplacement} onChange={event => setBulkTagReplacement(event.target.value)} placeholder="Replacement tag" /><button type="button" onClick={renameBulkTag} disabled={!bulkTag || !bulkTagReplacement.trim()}>Rename</button><button type="button" className="is-danger" onClick={removeBulkTag} disabled={!bulkTag}>Remove</button></div><div className="skip-notes-help">Rename or remove the selected tag across every saved observation.</div></div>
                 <div className="skip-notes-backup"><div><div className="skip-notes-management-heading">Backup &amp; restore</div><div className="skip-notes-help">JSON backup for this player’s saved observations.</div></div><div className="skip-notes-backup-actions"><button type="button" onClick={exportObservations} disabled={!observations.length}>Export JSON</button><select aria-label="Import mode" value={importMode} onChange={event => setImportMode(event.target.value)}><option value="merge">Merge import</option><option value="replace">Replace all</option></select><button type="button" onClick={() => importInputRef.current?.click()}>Import JSON</button><input ref={importInputRef} type="file" accept="application/json,.json" onChange={importObservations} hidden /></div></div>
                 {visibleObservations.length ? <div className="skip-notes-list">{visibleObservations.map(note => <article className="skip-note-card" key={note.id}><div className="skip-note-meta"><span className="skip-note-category">{note.category}</span><time dateTime={new Date(note.createdAt).toISOString()}>{new Date(note.createdAt).toLocaleDateString()}</time></div><div className="skip-note-text">{note.text}</div>{note.tags?.length ? <div className="skip-note-tags">{note.tags.map(tag => <button type="button" key={tag} onClick={() => setNoteFilterTag(tag)} aria-label={`Filter by tag ${tag}`}>#{tag}</button>)}</div> : null}<div className="skip-note-actions"><button type="button" onClick={() => beginEditObservation(note)}>Edit</button>{deleteNoteId === note.id ? <><span>Delete this note?</span><button type="button" className="is-danger" onClick={confirmDeleteObservation}>Confirm</button><button type="button" onClick={() => setDeleteNoteId(null)}>Cancel</button></> : <button type="button" onClick={() => setDeleteNoteId(note.id)}>Delete</button>}</div></article>)}</div> : <div className="skip-notes-empty">{noteFilterTag ? `No observations tagged #${noteFilterTag}.` : 'Your saved scouting observations will appear here.'}</div>}

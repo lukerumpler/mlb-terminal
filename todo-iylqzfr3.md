@@ -64,3 +64,9 @@
 - [x] Add direct helper coverage for export payload generation and merge/replace import application
 - [x] Capture a loaded player Notes-tab preview showing bulk tag and backup controls
 - [x] Save the final checkpoint for the bulk tag and backup update
+- [x] Inspect the latest Notes filter state and saved observation rendering
+- [x] Add keyword text search across observation text, category, and tags
+- [x] Preserve tag filtering, date/category sorting, edit/delete, and backup controls
+- [x] Add Vitest coverage for keyword search and combined filters
+- [x] Run typecheck, tests, and visual verification for the Notes search update
+- [x] Save a checkpoint containing the Notes search update

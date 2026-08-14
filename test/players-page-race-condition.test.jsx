@@ -266,6 +266,10 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getAllByText('Medical')[1]).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Sort observations' })).toHaveValue('category');
 
+    await user.type(screen.getByRole('textbox', { name: 'Search observations' }), 'quiet');
+    expect(screen.getByText('Keep the hands quiet in two-strike counts.')).toBeInTheDocument();
+    expect(screen.queryByText('Check recovery notes after the next series.')).not.toBeInTheDocument();
+    await user.clear(screen.getByRole('textbox', { name: 'Search observations' }));
     await user.selectOptions(screen.getByRole('combobox', { name: 'Filter observations by tag' }), 'two-strike');
     expect(screen.getByText('Keep the hands quiet in two-strike counts.')).toBeInTheDocument();
     expect(screen.queryByText('Check recovery notes after the next series.')).not.toBeInTheDocument();
