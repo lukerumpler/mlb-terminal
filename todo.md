@@ -11064,3 +11064,19 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Keep freshness timestamps source-specific, Low Data Mode-safe, and honest when a feed has never succeeded or is unavailable.
 - [x] Add regression tests for timestamp persistence/formatting, feed success tracking, and selectable historical season windows.
 - [x] Verify responsive UI, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Division-rival financial trend overlay
+
+- [ ] Add source-backed division-rival financial trend rows using the existing selectable CBT history range.
+- [ ] Add a side-by-side overlay control and team-specific colors/logos to the Franchise CBT Trend panel.
+- [ ] Preserve missing source rows as unavailable and keep the overlay compatible with Low Data Mode and freshness tracking.
+- [ ] Add regression tests for division grouping, rival row normalization, and overlay selection behavior.
+- [ ] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Clickable player and team navigation (including MiLB)
+
+- [x] Add global navigation events and handlers so clicking any player name or team name opens their respective profile or overview tab.
+- [x] Support MiLB player profiles by routing player ID clicks through the existing MLB Stats API search and identity loader.
+- [x] Make player and team links styled, accessible, and responsive across tables, rankings, and leaderboards.
+- [x] Add regression tests for player/team navigation events and MiLB profile resolution.
+- [x] Verify UI behavior, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a checkpoint.

@@ -1546,6 +1546,7 @@ function PlayersPage() {
     return () => { mountedRef.current = false; clearTimeout(timerRef.current); };
   }, []);
 
+
   const onInput = useCallback(e => {
     const q = e.target.value;
     setQuery(q);
@@ -1580,6 +1581,19 @@ function PlayersPage() {
     }
     if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
   }, []);
+
+  useEffect(() => {
+    const onOpenExternalPlayer = e => {
+      const detail = e.detail;
+      if (detail && detail.id) {
+        pickPlayer({ id: detail.id, fullName: detail.fullName || detail.name || 'Player' });
+      }
+    };
+    window.addEventListener('skip-open-player', onOpenExternalPlayer);
+    return () => {
+      window.removeEventListener('skip-open-player', onOpenExternalPlayer);
+    };
+  }, [pickPlayer]);
 
   const derived = useMemo(() => {
     if (!player) return null;

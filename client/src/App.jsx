@@ -137,8 +137,26 @@ export default function App() {
       const nextTab = e.detail?.tab;
       if (TABS.some(item => item.key === nextTab)) setTab(nextTab);
     };
+    const onOpenPlayer = e => {
+      setTab('players');
+    };
+    const onOpenTeam = e => {
+      const teamAbbr = e.detail?.abbr;
+      if (teamAbbr) {
+        setTab('overview');
+        window.dispatchEvent(new CustomEvent('skip-select-team', { detail:{ abbr:teamAbbr } }));
+      } else {
+        setTab('overview');
+      }
+    };
     window.addEventListener('skip-navigate', onNavigate);
-    return () => window.removeEventListener('skip-navigate', onNavigate);
+    window.addEventListener('skip-open-player', onOpenPlayer);
+    window.addEventListener('skip-open-team', onOpenTeam);
+    return () => {
+      window.removeEventListener('skip-navigate', onNavigate);
+      window.removeEventListener('skip-open-player', onOpenPlayer);
+      window.removeEventListener('skip-open-team', onOpenTeam);
+    };
   }, []);
 
   useEffect(() => {

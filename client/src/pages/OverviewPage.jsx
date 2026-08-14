@@ -263,6 +263,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setMinBattingPa(Number(rosterDefaults.battingPa) || 0);
     setMinPitchingIp(Number(rosterDefaults.pitchingIp) || 0);
   }, [rosterDefaults.battingPa, rosterDefaults.pitchingIp]);
+
+  useEffect(() => {
+    const onSelectTeam = e => {
+      const abbr = e.detail?.abbr?.toLowerCase();
+      if (abbr) {
+        const foundKey = Object.keys(TEAMS).find(key => key.toLowerCase() === abbr || TEAMS[key].abbr.toLowerCase() === abbr);
+        if (foundKey) setSelTeam(foundKey);
+      }
+    };
+    window.addEventListener('skip-select-team', onSelectTeam);
+    return () => window.removeEventListener('skip-select-team', onSelectTeam);
+  }, []);
   const teamBase=TEAMS[selTeam];
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
