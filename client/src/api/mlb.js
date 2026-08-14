@@ -206,6 +206,36 @@ export async function getCareerSplits(id, group) {
   } catch { return []; }
 }
 
+// Handedness splits are returned as situational rows by the MLB stats API.
+// Keep this normalization deliberately narrow: only explicit vl/vr (or
+// clearly named left/right descriptions) become LHP/RHP rows; unknown rows are
+// discarded rather than being presented as a made-up comparison.
+export function normalizeHandednessSplits(splits) {
+  if (!Array.isArray(splits)) return [];
+  return splits.map(split => {
+    const marker = String(split?.split?.code ?? split?.split?.description ?? split?.split?.name ?? '').toLowerCase();
+    const side = marker === 'vl' || marker.includes('left') ? 'LHP'
+      : marker === 'vr' || marker.includes('right') ? 'RHP' : null;
+    if (!side || !split?.stat || typeof split.stat !== 'object') return null;
+    return { side, stat: split.stat };
+  }).filter(Boolean);
+}
+
+export async function getHandednessSplits(id, season) {
+  const tryYear = async yr => {
+    try {
+      const data = await mlb(`/people/${id}/stats`, { stats:'season', group:'hitting', season:yr, sitCodes:'vl,vr' });
+      const grp = findStatGroup(data.stats, 'hitting');
+      const rows = normalizeHandednessSplits(grp?.splits);
+      return rows.length ? { rows, season:yr, isFallback:false } : null;
+    } catch { return null; }
+  };
+  const current = await tryYear(season);
+  if (current) return current;
+  const previous = await tryYear(season - 1);
+  return previous ? { ...previous, isFallback:true } : { rows:[], season, isFallback:false };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // PLAYER API
 // ═══════════════════════════════════════════════════════════════════════════
@@ -273,12 +303,13 @@ export async function loadFullPlayer(person, season = SEASON) {
   const profile = await getPlayerProfile(id);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
-  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, teamFinancials] = await Promise.all([
+  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials] = await Promise.all([
     getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
     getSeasonStatsSafe(id, 'pitching', season, profileSportId),
     getCareerSplits(id, 'hitting'),
     getCareerSplits(id, 'pitching'),
     fetchContractData(id, person.fullName),
+    getHandednessSplits(id, season),
     fetchTeamFinancials(currentTeamAbbreviation, season),
   ]);
 
@@ -488,6 +519,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     hittingStats:  hittingResult?.stat    || {},
     pitchingStats: pitchingResult?.stat   || {},
     contractData:  contractRaw,
+    handednessSplits: handednessResult,
     teamFinancials,
   };
 }

@@ -19,3 +19,9 @@
 - [x] Add Vitest coverage for profile tabs and chart expansion interactions
 - [x] Run typecheck, tests, and visual verification for the updated profile experience
 - [x] Save a checkpoint containing the profile navigation and chart expansion update
+- [x] Inspect the player split data shape and current Splits tab implementation
+- [x] Add a side-by-side LHP versus RHP comparison panel in the Splits tab
+- [x] Handle unavailable handedness split data without inventing values
+- [x] Add Vitest coverage for split normalization and rendered comparison interaction
+- [x] Run typecheck, tests, and visual verification for the Splits tab update
+- [x] Save a checkpoint containing the handedness split comparison
