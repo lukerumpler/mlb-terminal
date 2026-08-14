@@ -995,3 +995,63 @@ export async function getFirstRoundResults(year) {
   const { picks, ...rest } = await getDraftResults(year);
   return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
 }
+
+export async function getTeamModelSources(teamAbbr, season = SEASON) {
+  const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
+  try {
+    const response = await fetch(`/api/fangraphs-models?${params.toString()}`, { signal: AbortSignal.timeout(12_000) });
+    if (!response.ok) throw new Error(`Model source request failed (${response.status})`);
+    return await response.json();
+  } catch {
+    return {
+      found: false,
+      retrievedAt: new Date().toISOString(),
+      source: 'FanGraphs',
+      sourceUrls: {
+        playoffOdds: 'https://www.fangraphs.com/standings/playoff-odds/fg/mlb',
+        teamWar: 'https://www.fangraphs.com/depthcharts.aspx?position=Team',
+      },
+      playoffOdds: null,
+      teamWar: null,
+      statuses: { playoffOdds: 'request-failed', teamWar: 'request-failed' },
+    };
+  }
+}
+
+export const MILB_STANDINGS_LEAGUES = {
+  11: '117,112',
+  12: '113,110,111',
+  13: '214,215,223',
+  14: '302,303',
+};
+
+export async function getMinorLeagueTeamOverview(teamId, levelId = 11, season = SEASON) {
+  const leagueId = MILB_STANDINGS_LEAGUES[levelId];
+  if (!teamId || !leagueId) return null;
+  try {
+    const [teamResult, hittingResult, pitchingResult] = await Promise.allSettled([
+      mlb(`/teams/${teamId}`, { hydrate: 'venue,league,division,sport' }),
+      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'hitting', season, sportIds: levelId }),
+      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'pitching', season, sportIds: levelId }),
+    ]);
+    const team = teamResult.status === 'fulfilled' ? teamResult.value?.teams?.[0] : null;
+    const hitting = hittingResult.status === 'fulfilled' ? findStatGroup(hittingResult.value?.stats, 'hitting')?.splits?.[0]?.stat || {} : {};
+    const pitching = pitchingResult.status === 'fulfilled' ? findStatGroup(pitchingResult.value?.stats, 'pitching')?.splits?.[0]?.stat || {} : {};
+    if (!team && !Object.keys(hitting).length && !Object.keys(pitching).length) return null;
+    return {
+      id: team?.id || teamId,
+      name: team?.name || '',
+      abbr: team?.abbreviation || '',
+      levelId,
+      level: team?.sport?.name || '',
+      league: team?.league?.name || '',
+      division: team?.division?.name || '',
+      venue: team?.venue?.name || '',
+      hitting,
+      pitching,
+      retrievedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}

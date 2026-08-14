@@ -38,3 +38,19 @@
 - [x] Save and publish the completed unavailable-data remediation update.
 
 - [x] Bound the Overview live-feed loading state with an explicit timeout/error message so a stalled upstream cannot leave the page connecting forever.
+
+- [ ] Add source-backed playoff odds to Team Overview with source and last-updated freshness metadata.
+- [ ] Add source-backed team-WAR model data to Team Overview with source and last-updated freshness metadata.
+- [ ] Add a retry button and bounded retry state for stalled MLB aggregate/player feeds.
+- [ ] Add focused tests for odds, team-WAR, freshness, retry, and failure states; verify desktop/mobile presentation.
+- [ ] Save and publish the completed model-source and retry update.
+
+- [ ] Sort the Team Overview selector by league, then division, then alphabetical team name.
+- [ ] Add regression coverage for deterministic selector ordering and preserve selected-team behavior.
+- [ ] Verify the selector on desktop/mobile and save a published checkpoint.
+
+- [ ] Add affiliate lookup from an MLB team to its current minor-league clubs and levels.
+- [ ] Add a minor-league team overview mode with level, affiliate, team identity, and available live metrics.
+- [ ] Support the San Francisco Giants → Triple-A Sacramento River Cats example through the real MLB affiliate data path.
+- [ ] Add tests for affiliate mapping, level selection, loading/error states, and MLB overview preservation.
+- [ ] Verify the minor-league overview on desktop/mobile and save a published checkpoint.

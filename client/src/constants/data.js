@@ -35,6 +35,32 @@ export const TEAMS = {
   mil: { name:'Milwaukee Brewers', abbr:'MIL', color:'#12284B', id:158,  w: 74, l: 47, pct: 0.612, rs: 592, ra: 462, era:3.72, ops:0.741, hr:72,  avg:0.249, obp:0.327, slg:0.414, whip:1.11, k:567, sb:47, wrcPlus:95, fip:3.92, drs:-6, bsr:17.1, war:8.6, div:'NL Central' },
 };
 
+export function sortTeamsByLeagueDivisionName(entries = Object.entries(TEAMS)) {
+  const leagueRank = { AL: 0, NL: 1 };
+  return [...entries].sort(([, a], [, b]) => {
+    const [aLeague = '', ...aDivisionParts] = String(a?.div || '').split(' ');
+    const [bLeague = '', ...bDivisionParts] = String(b?.div || '').split(' ');
+    const leagueCompare = (leagueRank[aLeague] ?? 99) - (leagueRank[bLeague] ?? 99);
+    if (leagueCompare !== 0) return leagueCompare;
+    const divisionCompare = aDivisionParts.join(' ').localeCompare(bDivisionParts.join(' '), 'en', { sensitivity: 'base' });
+    if (divisionCompare !== 0) return divisionCompare;
+    return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
+  });
+};
+
+export function sortTeamsByLeagueDivisionName(entries = Object.entries(TEAMS)) {
+  const leagueRank = { AL: 0, NL: 1 };
+  return [...entries].sort(([, a], [, b]) => {
+    const [aLeague = '', ...aDivisionParts] = String(a?.div || '').split(' ');
+    const [bLeague = '', ...bDivisionParts] = String(b?.div || '').split(' ');
+    const leagueCompare = (leagueRank[aLeague] ?? 99) - (leagueRank[bLeague] ?? 99);
+    if (leagueCompare !== 0) return leagueCompare;
+    const divisionCompare = aDivisionParts.join(' ').localeCompare(bDivisionParts.join(' '), 'en', { sensitivity: 'base' });
+    if (divisionCompare !== 0) return divisionCompare;
+    return String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' });
+  });
+}
+
 // ─── TOP 100 PROSPECTS — Live from MLB.com/prospects/stats/top-prospects ──────
 // Batters: Rk, Name, Team, Age, Level, PA, AB, R, H, 2B, 3B, HR, RBI, BB, SO, SB, AVG, OBP, SLG, OPS
 // Pitchers: Rk, Name, Team, Age, Level, G, IP, H, BB, SO, ERA, WHIP, W, L
