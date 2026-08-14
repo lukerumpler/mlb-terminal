@@ -21,8 +21,9 @@ import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
-import { buildMultiYearTaxProjection } from '../../../shared/luxuryTax.js';
+import { buildMultiYearTaxProjection, getRepeaterTierExplanation } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
+import { useLowDataMode } from '../lib/lowData.js';
 
 function pctBar(pct, color) {
   return (
@@ -37,6 +38,7 @@ const TT = { ...WARM_TOOLTIP, wrapperStyle:{ zIndex:9999 } };
 /* ─── Player photo ────────────────────────────────────────────────── */
 function PlayerPhoto({ id, name, size = 96 }) {
   const [err, setErr] = useState(false);
+  const lowDataMode = useLowDataMode();
   // This component isn't remounted per-player (no `key` on it in the
   // parent), so state persists across different players searched in the
   // same session. Without this, one player's photo failing to load
@@ -56,7 +58,7 @@ function PlayerPhoto({ id, name, size = 96 }) {
     '</svg>'
   )}`;
   return (
-    <img src={err ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
+    <img src={err || lowDataMode ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
       style={{ width:size, height:h, borderRadius:10, objectFit:'cover', objectPosition:'center top',
         border:`1px solid ${C.border}`, flexShrink:0, background:C.surface2, display:'block' }} />
   );
@@ -117,13 +119,14 @@ export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviat
 function PlayerVideoThumbnail({ item, playerName, accent }) {
   const [imageError, setImageError] = useState(false);
   const [saveData, setSaveData] = useState(false);
+  const lowDataMode = useLowDataMode();
   useEffect(() => { setImageError(false); }, [item.thumbnail]);
   useEffect(() => {
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if (connection?.saveData) setSaveData(true);
   }, []);
   const initials = playerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'MLB';
-  const canLoadThumbnail = shouldLoadPlayerVideoThumbnail({ saveData, thumbnail:item.thumbnail });
+  const canLoadThumbnail = !lowDataMode && shouldLoadPlayerVideoThumbnail({ saveData, thumbnail:item.thumbnail });
   const tooltipId = `video-tooltip-${item.id}`;
   return (
     <div className="skip-video-thumbnail-wrap" style={{ position:'relative', minWidth:0 }}>
@@ -1262,6 +1265,7 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
     years: 5,
   });
   const hasTaxProjection = taxProjection.status === 'available';
+  const [activeTierTooltip, setActiveTierTooltip] = useState(null);
 
   return (
     <Panel title="Market & Contract Intelligence" accent={C.purple} badge="Financial Model">
@@ -1302,7 +1306,13 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
                   <td style={{ padding:'5px', color:C.amber, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{row.season}</td>
                   <td style={{ padding:'5px', textAlign:'right', color:C.text2, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.projectedAav)}</td>
                   <td style={{ padding:'5px', textAlign:'right', color:row.overage > 0 ? C.rust : C.teal, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.overage)}</td>
-                  <td style={{ padding:'5px', textAlign:'right', color:row.repeaterYears == null ? C.text4 : C.text2, fontSize:8.5 }}>{row.repeaterTier}</td>
+                  <td style={{ padding:'5px', textAlign:'right', color:row.repeaterYears == null ? C.text4 : C.text2, fontSize:8.5 }}>
+                    <div style={{ position:'relative', display:'inline-flex', alignItems:'center', justifyContent:'flex-end', gap:4 }} onMouseLeave={() => setActiveTierTooltip(null)}>
+                      <span>{row.repeaterTier}</span>
+                      <button type="button" className="skip-cbt-tier-info" aria-label={`Explain ${row.repeaterTier} for ${row.season}`} aria-describedby={`cbt-tier-tooltip-${row.season}`} onMouseEnter={() => setActiveTierTooltip(row.season)} onFocus={() => setActiveTierTooltip(row.season)} onBlur={() => setActiveTierTooltip(null)} style={{ width:16, height:16, padding:0, border:`1px solid ${row.repeaterYears == null ? C.border : C.amberMid}`, borderRadius:'50%', background:C.surface3, color:row.repeaterYears == null ? C.text3 : C.amber, cursor:'help', ...px({ fontSize:9, fontWeight:800, lineHeight:1 }) }}>i</button>
+                      {activeTierTooltip === row.season && (() => { const info = getRepeaterTierExplanation(row.repeaterYears); return <div id={`cbt-tier-tooltip-${row.season}`} role="tooltip" className="skip-cbt-tier-tooltip" style={{ position:'absolute', right:0, top:'calc(100% + 6px)', zIndex:20, width:220, padding:'9px 10px', border:`1px solid ${C.border}`, borderRadius:7, background:C.surface, boxShadow:'0 10px 24px rgba(0,0,0,.18)', textAlign:'left' }}><div style={sans({ fontSize:9.5, fontWeight:800, color:C.text, marginBottom:3 })}>{info.title}</div><div style={px({ fontSize:9, fontWeight:800, color:row.repeaterYears == null ? C.text3 : C.amber, marginBottom:4 })}>{info.rate}</div><div style={sans({ fontSize:9.5, color:C.text2, lineHeight:1.4 })}>{info.detail}</div></div>; })()}
+                    </div>
+                  </td>
                   <td style={{ padding:'5px', textAlign:'right', color:row.estimatedTax == null ? C.text4 : C.rust, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.estimatedTax)}</td>
                 </tr>)}</tbody>
               </table>

@@ -23,6 +23,14 @@ export function getRepeaterTier(consecutiveYears) {
   return { key: 'third-plus-year', label: 'Third consecutive year or more', baseRate: 0.50 };
 }
 
+export function getRepeaterTierExplanation(consecutiveYears) {
+  const tier = getRepeaterTier(consecutiveYears);
+  if (tier.key === 'first-year') return { title:tier.label, rate:'20% base rate', detail:'Modeled as a first-year CBT payer. A season below the threshold resets the consecutive-year count.' };
+  if (tier.key === 'second-year') return { title:tier.label, rate:'30% base rate', detail:'The second consecutive year carries a higher base rate. Overages from $20M to $40M add a 12-point surcharge.' };
+  if (tier.key === 'third-plus-year') return { title:tier.label, rate:'50% base rate', detail:'The third-or-more consecutive year carries the highest base rate. Larger overage bands can add substantial surcharges.' };
+  return { title:'History unavailable', rate:'Tax rate not assigned', detail:'The current public financial feed does not provide verified consecutive-year CBT history, so SKIP does not assume a repeater rate or tax bill.' };
+}
+
 export function getSurchargeBand(overage) {
   const amount = numeric(overage);
   if (amount == null || amount < 0) return { key: 'unknown', label: 'Unavailable', rate: null };

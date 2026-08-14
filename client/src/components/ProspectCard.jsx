@@ -3,6 +3,7 @@ import { trueIP } from '../lib/formatting.js';
 import { SEASON } from '../constants/data.js';
 import { percentile } from '../lib/percentile.js';
 import { usePngExport } from '../lib/usePngExport.js';
+import { useLowDataMode } from '../lib/lowData.js';
 
 /* ── Draft Prospect Profile Card ──────────────────────────────────────
    Styled after a printed scouting portfolio: cream paper, navy ink, a
@@ -35,6 +36,7 @@ const CARD = {
 
 function CardPhoto({ id, name }) {
   const [err, setErr] = useState(false);
+  const lowDataMode = useLowDataMode();
   const primary = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${id}/headshot/67/current`;
   const fallback = `data:image/svg+xml,${encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">' +
@@ -43,7 +45,7 @@ function CardPhoto({ id, name }) {
     `<ellipse cx="48" cy="88" rx="30" ry="20" fill="${CARD.line}"/></svg>`
   )}`;
   return (
-    <img src={err ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
+    <img src={err || lowDataMode ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
       style={{ width: 92, height: 92, objectFit: 'cover', objectPosition: 'center top',
         border: `1px solid ${CARD.line}`, borderRadius: 2, display: 'block', flexShrink: 0,
         background: CARD.panel }} />

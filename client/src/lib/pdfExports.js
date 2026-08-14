@@ -306,3 +306,92 @@ export async function downloadExecutiveScoutingSummaryPdf(model) {
   const fileName = `skip-${model.playerName.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}-executive-summary-${model.season}.pdf`;
   pdf.save(fileName);
 }
+
+export function buildSideBySideValuationModel({ players = [], summary } = {}) {
+  const normalized = players.slice(0, 2).map((player, index) => ({
+    playerName: safe(player?.playerName || player?.name, `Player ${index + 1}`),
+    teamName: safe(player?.teamName || player?.team),
+    position: safe(player?.position),
+    season: safe(player?.season),
+    verdict: safe(player?.verdict),
+    score: Number.isFinite(Number(player?.score)) ? Number(player.score) : null,
+    archetype: safe(player?.archetype),
+    axes: Array.isArray(player?.axes) ? player.axes.filter(axis => Number.isFinite(Number(axis?.value ?? axis?.pct))).map(axis => ({ label: safe(axis.label || axis.axis), value: Math.max(0, Math.min(100, Number(axis.value ?? axis.pct))) })) : [],
+    headlineRows: Array.isArray(player?.headlineRows) ? player.headlineRows.map(row => ({ label: safe(row?.label), value: safe(row?.value) })) : [],
+    teamFinancials: player?.teamFinancials || null,
+    projection: player?.projection || null,
+  }));
+  return {
+    title: 'SKIP SIDE-BY-SIDE VALUATION',
+    season: safe(normalized[0]?.season || normalized[1]?.season),
+    players: normalized,
+    summary: summary ? {
+      headline: safe(summary.headline),
+      recommendation: safe(summary.recommendation),
+      caveat: safe(summary.caveat),
+    } : null,
+    sources: [
+      'MLB Stats API and Baseball Savant percentile inputs supplied to SKIP',
+      'AI comparison summary is source-grounded to the displayed axes and may use deterministic fallback text',
+      'Team financial and CBT fields are shown only when an upstream source supplied them',
+    ],
+  };
+}
+
+export async function downloadSideBySideValuationPdf(model) {
+  const { jsPDF } = await import('jspdf');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter', compress: true });
+  const width = pdf.internal.pageSize.getWidth();
+  const players = Array.isArray(model.players) ? model.players.slice(0, 2) : [];
+  pdf.setFillColor(...COLORS.navy);
+  pdf.rect(0, 0, width, 86, 'F');
+  setFont(pdf, 9, [222, 232, 231], true);
+  pdf.text(model.title, 42, 28);
+  setFont(pdf, 19, [255, 255, 255], true);
+  pdf.text(players.map(player => player.playerName).join('  vs  ') || 'Player comparison', 42, 55);
+  setFont(pdf, 9, [207, 216, 220]);
+  pdf.text(`Baseball Savant percentile profiles · ${model.season}`, 42, 72);
+
+  let y = 116;
+  section(pdf, 'Side-by-side decision view', 42, y, width - 84, COLORS.amber); y += 28;
+  const gap = 16;
+  const colWidth = (width - 84 - gap) / 2;
+  players.forEach((player, index) => {
+    const x = 42 + index * (colWidth + gap);
+    pdf.setFillColor(...COLORS.pale);
+    pdf.roundedRect(x, y, colWidth, 58, 4, 4, 'F');
+    setFont(pdf, 12, COLORS.navy, true); pdf.text(player.playerName, x + 10, y + 20);
+    setFont(pdf, 8.5, COLORS.muted); pdf.text(`${player.teamName} · ${player.position}`, x + 10, y + 36);
+    setFont(pdf, 9, COLORS.amber, true); pdf.text(player.score == null ? '—' : `${player.score}/100`, x + colWidth - 10, y + 25, { align:'right' });
+    setFont(pdf, 7.5, COLORS.muted); pdf.text(player.verdict, x + colWidth - 10, y + 42, { align:'right' });
+  });
+  y += 82;
+  players.forEach((player, index) => {
+    const x = 42 + index * (colWidth + gap);
+    setFont(pdf, 8.5, index === 0 ? COLORS.amber : COLORS.teal, true);
+    pdf.text(`${player.playerName} · PERCENTILE RADAR`, x, y);
+    drawRadar(pdf, player.axes, x + 22, y + 12, 76);
+  });
+  y += 190;
+  players.forEach((player, index) => {
+    const x = 42 + index * (colWidth + gap);
+    setFont(pdf, 8.5, COLORS.navy, true); pdf.text(`${player.playerName} · KEY SIGNALS`, x, y);
+    drawRows(pdf, player.headlineRows.length ? player.headlineRows.slice(0, 4) : [{ label:'Performance inputs', value:'Unavailable' }], x, y + 18, colWidth);
+    drawRows(pdf, [
+      { label:'Archetype', value:player.archetype },
+      { label:'Team tax payroll', value:formatPdfCurrency(player.teamFinancials?.tax?.taxPayroll) },
+      { label:'Repeater tier', value:safe(player.teamFinancials?.tax?.repeaterTier, 'History unavailable') },
+    ], x, y + 112, colWidth);
+  });
+  y += 230;
+  if (model.summary) {
+    section(pdf, 'Comparison read', 42, y, width - 84, COLORS.teal); y += 24;
+    setFont(pdf, 10, COLORS.ink, true); y = wrap(pdf, model.summary.headline, 42, y, width - 84, 14) + 6;
+    setFont(pdf, 9, COLORS.ink); y = wrap(pdf, model.summary.recommendation, 42, y, width - 84, 13) + 6;
+    setFont(pdf, 8, COLORS.muted); wrap(pdf, model.summary.caveat, 42, y, width - 84, 12);
+  }
+  addFooter(pdf, { ...model, season:model.season });
+  pdf.setProperties({ title:model.title, subject:'SKIP side-by-side player valuation comparison', author:'SKIP Baseball Intelligence Terminal' });
+  const fileName = `skip-${players.map(player => player.playerName.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()).join('-vs-') || 'player-comparison'}-${model.season}.pdf`;
+  pdf.save(fileName);
+}

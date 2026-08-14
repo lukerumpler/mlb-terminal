@@ -4,6 +4,7 @@ import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, saniti
 import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
+import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
 // pages) ships as its own chunk and loads on demand instead of bloating the
@@ -84,6 +85,10 @@ export default function App() {
   // real status means we only ever show genuinely live data as live.
   const [tickerStatus, setTickerStatus] = useState('loading');
   const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
+  const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
+  const toggleLowDataMode = useCallback(() => {
+    setLowDataModeState(current => setLowDataMode(!current));
+  }, []);
   const updateRosterDefaults = useCallback((next) => {
     setRosterDefaults(current => {
       const value = sanitizeRosterDefaults(typeof next === 'function' ? next(current) : next);
@@ -285,7 +290,7 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} />}
             </Suspense>
           </PageErrorBoundary>
         </div>

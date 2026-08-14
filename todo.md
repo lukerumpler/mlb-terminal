@@ -11024,3 +11024,9 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add reusable PDF export templates for individual player valuation cards and executive scouting summaries.
 - [x] Integrate team luxury-tax penalty repeater tier tracking into multi-year contract projection models with transparent assumptions and source notes.
 - [x] Add regression tests, verify download flows and responsive UI, run release checks, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Low-data mode, comparison PDF, and CBT tooltips
+- [ ] Add a persisted Low Data Mode toggle that disables or defers heavy assets such as video thumbnails and high-resolution images.
+- [ ] Add a side-by-side two-player valuation PDF export using existing comparison data and clear source notes.
+- [ ] Add accessible interactive tooltips explaining CBT repeater tiers and their financial implications.
+- [ ] Add regression tests, verify responsive/settings/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.

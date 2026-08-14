@@ -8,6 +8,7 @@ import { SEASON } from '../constants/data.js';
 import { searchPlayers, loadFullPlayer } from '../api/mlb.js';
 import { percentileColor, percentileLabel } from '../lib/percentile.js';
 import { Spinner } from './ui/spinner.tsx';
+import { buildSideBySideValuationModel, downloadSideBySideValuationPdf } from '../lib/pdfExports.js';
 
 function displayName(player) {
   return player?.profile?.fullName || player?.fullName || 'Player';
@@ -87,6 +88,7 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
+  const [comparisonPdfState, setComparisonPdfState] = useState('idle');
   const timerRef = useRef(null);
   const mountedRef = useRef(true);
   const requestRef = useRef(0);
@@ -153,6 +155,32 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
 
   const primaryAxes = useMemo(() => getAxes(primary, isPitcher), [getAxes, primary, isPitcher]);
   const secondaryAxes = useMemo(() => secondary ? getAxes(secondary, isPitcher) : [], [getAxes, secondary, isPitcher]);
+  const exportComparisonPdf = async () => {
+    if (!secondary || comparisonPdfState === 'loading') return;
+    setComparisonPdfState('loading');
+    try {
+      const toPdfPlayer = (player, axes) => ({
+        playerName: displayName(player),
+        teamName: player?.profile?.currentTeam?.name || player?.currentTeam?.name,
+        position: player?.profile?.primaryPosition?.abbreviation || player?.primaryPosition?.abbreviation,
+        season: SEASON,
+        verdict: 'Source-backed percentile comparison',
+        archetype: isPitcher ? 'Pitcher profile' : 'Position-player profile',
+        axes: axes.map(axis => ({ label:axis.axis, value:axis.pct })),
+        headlineRows: axes.slice(0, 4).map(axis => ({ label:axis.axis, value:axis.rawLabel })),
+      });
+      await downloadSideBySideValuationPdf(buildSideBySideValuationModel({
+        players: [toPdfPlayer(primary, primaryAxes), toPdfPlayer(secondary, secondaryAxes)],
+        summary,
+      }));
+      setComparisonPdfState('ready');
+      window.setTimeout(() => setComparisonPdfState('idle'), 2200);
+    } catch (exportError) {
+      console.error('[SKIP] comparison PDF export failed', exportError);
+      setComparisonPdfState('error');
+      window.setTimeout(() => setComparisonPdfState('idle'), 2500);
+    }
+  };
 
   useEffect(() => {
     if (!secondary || !secondaryAxes.length || !primaryAxes.length) {
@@ -254,6 +282,15 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
           </section>
         )}
 
+        {secondary && (
+          <div style={{ padding:'10px 18px', borderTop:`0.5px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+            <div style={sans({ fontSize:9.5, color:C.text4, lineHeight:1.4 })}>Export the two displayed percentile profiles and the current comparison read as a decision-ready PDF.</div>
+            <button type="button" onClick={exportComparisonPdf} disabled={comparisonPdfState === 'loading'} aria-label="Download side-by-side valuation report"
+              style={{ minHeight:30, padding:'6px 10px', border:`1px solid ${C.teal}`, borderRadius:6, background:comparisonPdfState === 'ready' ? C.tealSoft : C.surface3, color:C.teal, cursor:comparisonPdfState === 'loading' ? 'wait' : 'pointer', opacity:comparisonPdfState === 'loading' ? .7 : 1, ...px({ fontSize:9, fontWeight:800, letterSpacing:'.04em' }) }}>
+              {comparisonPdfState === 'ready' ? 'COMPARISON PDF READY' : comparisonPdfState === 'error' ? 'RETRY COMPARISON PDF' : 'DOWNLOAD COMPARISON PDF'}
+            </button>
+          </div>
+        )}
         <div style={{ padding:'10px 18px', borderTop:`0.5px solid ${C.border}` }}>
           <div style={sans({ fontSize:10, color:C.text3, lineHeight:1.5 })}>Radar widths are percentile ranks against the live qualified Baseball Savant population. Raw values are shown only as context; unavailable fields remain unfilled.</div>
         </div>

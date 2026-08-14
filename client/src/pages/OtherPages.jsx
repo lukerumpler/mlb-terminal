@@ -1608,7 +1608,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1645,6 +1645,20 @@ function SettingsPage({ theme, toggleTheme, rosterDefaults = DEFAULT_ROSTER_DEFA
               style={{ flexShrink:0, padding:'7px 14px', display:'flex', alignItems:'center', gap:8, background:C.surface3, border:`0.5px solid ${C.border}`, borderRadius:7, cursor:'pointer', color:C.text2 }}>
               <span style={{ fontSize:14 }}>{theme === 'dark' ? '☀' : '☾'}</span>
               <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            </button>
+          )}
+        </div>
+      </Panel>
+      <Panel title="Performance & Data Use" accent={C.teal}>
+        <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:14 }}>
+          <div>
+            <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Low Data Mode</div>
+            <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>Skips player video thumbnails and high-resolution headshots while keeping text, statistics, external search links, and PDF exports available.</div>
+          </div>
+          {toggleLowDataMode && (
+            <button type="button" onClick={toggleLowDataMode} role="switch" aria-checked={lowDataMode} aria-label="Toggle Low Data Mode"
+              style={{ flexShrink:0, minWidth:104, padding:'7px 12px', border:`1px solid ${lowDataMode ? C.tealMid : C.border}`, borderRadius:7, background:lowDataMode ? C.tealSoft : C.surface3, color:lowDataMode ? C.teal : C.text2, cursor:'pointer', ...px({ fontSize:10, fontWeight:800, letterSpacing:'.05em' }) }}>
+              {lowDataMode ? 'LOW DATA ON' : 'LOW DATA OFF'}
             </button>
           )}
         </div>
