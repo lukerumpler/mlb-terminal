@@ -32,6 +32,10 @@ function mockPlayer(id, fullName) {
     isPitcher: false,
     pitchArsenal: null, pitchArsenalPopulation: null, contactPoints: null, pitcherPitches: null,
     stats: {}, statSeason: 2026, isFallback: false, careerStats: null, splits: null, comps: [],
+    handednessSplits: { season: 2026, rows: [
+      { side: 'LHP', stat: { avg: '.285', obp: '.360', slg: '.510', ops: '.870', homeRuns: 6, strikeoutRate: '21.4' } },
+      { side: 'RHP', stat: { avg: '.310', obp: '.395', slg: '.590', ops: '.985', homeRuns: 12, strikeoutRate: '18.2' } },
+    ] },
   };
 }
 
@@ -200,6 +204,26 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getByRole('dialog', { name: /Player Geometry Engine/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Close expanded chart/i }));
     expect(screen.queryByRole('dialog', { name: /Player Geometry Engine/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the side-by-side LHP and RHP comparison in Splits', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Split Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Split Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Split');
+    await waitFor(() => expect(screen.getByText('Split Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Split Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Splits' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Splits' }));
+
+    expect(screen.getByText('Pitcher Handedness Splits')).toBeInTheDocument();
+    expect(screen.getAllByText('LHP').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('RHP').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('0.285')).toBeInTheDocument();
+    expect(screen.getByText('0.985')).toBeInTheDocument();
   });
 
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {

@@ -320,6 +320,15 @@ function PlayersEmptyState({ onPick }) {
 // Coerce to a finite number, falling back to `def` only when the value is
 // genuinely missing/invalid — unlike `parseFloat(x||def)||def`, this does NOT
 // mistake a real value of 0 (e.g. 0 stolen bases, 0 K/9 in a tiny sample) for "missing".
+export function buildHandednessComparison(payload) {
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const bySide = rows.reduce((acc, row) => {
+    if (row?.side === 'LHP' || row?.side === 'RHP') acc[row.side] = row.stat || {};
+    return acc;
+  }, {});
+  return ['LHP', 'RHP'].map(side => ({ side, stat: bySide[side] || null }));
+}
+
 function numOr(val, def) {
   const n = parseFloat(val);
   return Number.isFinite(n) ? n : def;
@@ -1525,6 +1534,39 @@ function PlayersPage() {
   );
 }
 
+function HandednessSplitComparison({ splits }) {
+  const columns = [
+    ['AVG', stat => stat.avg, 3],
+    ['OBP', stat => stat.obp, 3],
+    ['SLG', stat => stat.slg, 3],
+    ['OPS', stat => stat.ops, 3],
+    ['HR', stat => stat.homeRuns, 0],
+    ['K%', stat => stat.strikeoutRate ?? stat.strikePercentage, 1],
+  ];
+  const comparison = buildHandednessComparison(splits);
+  const available = comparison.some(row => row.stat);
+  return (
+    <Panel title="Pitcher Handedness Splits" accent={C.teal} badge={splits?.isFallback ? `${splits.season} fallback` : 'Season'}>
+      {!available ? (
+        <div className="skip-profile-split-empty" role="status">No verified left/right pitcher split data is available for this player and season.</div>
+      ) : (
+        <div className="skip-handedness-comparison">
+          <div className="skip-handedness-header"><span>Metric</span><span className="skip-handedness-side lhp">LHP</span><span className="skip-handedness-side rhp">RHP</span></div>
+          {columns.map(([label, getter, digits]) => {
+            const values = comparison.map(row => {
+              const raw = Number(getter(row.stat || {}));
+              return Number.isFinite(raw) ? raw : null;
+            });
+            const formatted = values.map(value => value == null ? '—' : value.toFixed(digits));
+            return <div className="skip-handedness-row" key={label}><span>{label}</span><strong className={values[0] != null && values[1] != null && values[0] > values[1] ? 'is-leading' : ''}>{formatted[0]}</strong><strong className={values[0] != null && values[1] != null && values[1] > values[0] ? 'is-leading' : ''}>{formatted[1]}</strong></div>;
+          })}
+          <div className="skip-handedness-note">Higher values are not automatically better for every metric. Use the split line alongside role, sample size, and the player’s overall profile.</div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* ─── Contract panel (stable component — not IIFE) ─────────────────── */
 function ContractPanel({ contractData: ct }) {
   const hasVerifiedContract = Boolean(ct?.contractAvailable);
@@ -1753,9 +1795,12 @@ function PlayerProfile({ player, derived, onCompare }) {
             </div>
           )}
           {activeTab === 'splits' && (
-            <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
+            <div className="skip-profile-tab-grid splits-grid">
+              <HandednessSplitComparison splits={player.handednessSplits} />
+              <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
               <div style={{ overflowX:'auto' }}><table className="skip-profile-splits-table"><thead><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
-            </Panel>
+              </Panel>
+            </div>
           )}
           {activeTab === 'notes' && (
             <div className="skip-profile-tab-grid">
