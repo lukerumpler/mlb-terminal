@@ -67,13 +67,16 @@ describe('Team Overview model source and retry interaction', () => {
     expect(await screen.findByText('No verified current-season run differential was returned by the MLB Stats API.')).toBeInTheDocument();
   });
 
-  it('shows freshness/source-gap state, exposes retry, and recovers model and MLB data after retry', async () => {
+  it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/));
-    expect(document.body.textContent).toMatch(/Playoff odds:\s*upstream-unavailable/);
-    expect(document.body.textContent).toMatch(/Team WAR:\s*upstream-unavailable/);
+    expect(document.body.textContent).toMatch(/Playoff odds:\s*Provider unavailable/);
+    expect(document.body.textContent).toMatch(/Playoff Odds/);
+    expect(document.body.textContent).toMatch(/Team WAR/);
+    expect(document.body.textContent).toContain('Unavailable');
+    expect(document.body.textContent).toMatch(/Team WAR:\s*Provider unavailable/);
     expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs\s*·\s*retrieved\s+\d{1,2}:\d{2}/);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'RETRY' })).toBeInTheDocument(), { timeout: 14000, interval: 100 });
@@ -85,8 +88,8 @@ describe('Team Overview model source and retry interaction', () => {
     expect((await screen.findAllByText(/MLB Stats API/)).length).toBeGreaterThan(0);
     expect(await screen.findByText('72.4%')).toBeInTheDocument();
     await waitFor(() => expect(document.body.textContent).toMatch(/28\.6/));
-    expect(document.body.textContent).toMatch(/Playoff odds:\s*live/);
-    expect(document.body.textContent).toMatch(/Team WAR:\s*live/);
+    expect(document.body.textContent).toMatch(/Playoff odds:\s*Live/);
+    expect(document.body.textContent).toMatch(/Team WAR:\s*Live/);
     expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs\s*·\s*retrieved\s+\d{1,2}:\d{2}/);
   }, 20000);
 });

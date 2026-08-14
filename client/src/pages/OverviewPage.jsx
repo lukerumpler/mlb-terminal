@@ -93,6 +93,20 @@ function MetricValue({ value, loading, width = 42 }) {
   return loading ? <SkeletonBlock width={width} height={18} radius={4} style={{ margin:'0 auto' }} /> : value;
 }
 
+function humanizeFeedStatus(status, fallback = 'Unavailable') {
+  const labels = {
+    'live': 'Live',
+    'ready': 'Verified',
+    'cached': 'Cached verified data',
+    'loading': 'Loading',
+    'source-gap': 'Provider unavailable',
+    'upstream-unavailable': 'Provider unavailable',
+    'request-failed': 'Request failed',
+    'unparsed': 'Provider returned unreadable data',
+  };
+  return labels[status] || (status ? String(status).replaceAll('-', ' ') : fallback);
+}
+
 function sumPlayerStat(rows = [], keys = []) {
   const values = rows.map(row => {
     for (const key of keys) {
@@ -703,8 +717,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [liveTeamData, team, liveTeamPlayers]);
   const displayedInsights = aiInsights || rosterInsights;
-  const playoffOddsValue = teamModelData?.playoffOdds == null ? 'Source gap' : `${Number(teamModelData.playoffOdds).toFixed(1)}%`;
-  const teamWarValue = teamModelData?.teamWar == null ? 'Source gap' : Number(teamModelData.teamWar).toFixed(1);
+  const playoffOddsValue = teamModelData?.playoffOdds == null ? 'Unavailable' : `${Number(teamModelData.playoffOdds).toFixed(1)}%`;
+  const teamWarValue = teamModelData?.teamWar == null ? 'Unavailable' : Number(teamModelData.teamWar).toFixed(1);
   const modelFreshness = freshnessLabel(teamModelData?.retrievedAt);
   const rosterPositions = useMemo(() => [...new Set([
     ...(liveTeamPlayers.hitting || []).map(row => row.position),
@@ -1008,8 +1022,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </label>
         <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
-            <div key={i} title={v === 'Source gap' ? `${l} unavailable: no connected authoritative source feed` : undefined} style={{textAlign:'center'}}>
-              <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Source gap' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
+            <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center'}}>
+              <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
@@ -1028,11 +1042,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>
             {[['xBA',affiliateSavant?.expectedBA,3],['xSLG',affiliateSavant?.expectedSLG,3],['Hard-hit %',affiliateSavant?.hardHitPercent,1],['Barrel %',affiliateSavant?.barrelPercent,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}{value!=null && label.includes('%')?'%':''}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</div></div>)}
           </div>
-          <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · {affiliateSavant?.retrievedAt ? `retrieved ${new Date(affiliateSavant.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateSavant?.status || 'not retrieved'}</div>
+          <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · {affiliateSavant?.retrievedAt ? `retrieved ${new Date(affiliateSavant.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSavant?.status, 'Not retrieved')}</div>
           {affiliateOverviewState==='error' && <div style={{padding:'0 14px 12px',...sans({fontSize:10,color:C.rust})}}>The selected affiliate’s live overview is unavailable right now. The MLB parent overview remains available above.</div>}
         </>}
-        {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Triple-A standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateStandings?.status || 'loading'}</div>{affiliateStandings?.rows?.length ? affiliateStandings.rows.slice(0,12).map((row,index)=><div key={row.id || row.name} style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
-        {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : affiliateSchedule?.status || 'loading'}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
+        {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Triple-A standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateStandings?.status, 'Loading')}</div>{affiliateStandings?.rows?.length ? affiliateStandings.rows.slice(0,12).map((row,index)=><div key={row.id || row.name} style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
+        {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSchedule?.status, 'Loading')}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
       </Panel>}
 
       <StatStrip items={[
@@ -1043,13 +1057,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         {val:<MetricValue value={formatTeamMetric(team.avg,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
-        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR',   sub:`FanGraphs · ${modelFreshness}`, color:teamWarValue === 'Source gap' ? C.text4 : C.purple},
+        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR',   sub:`FanGraphs · ${modelFreshness}`, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple},
       ]}/>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
-        <span>Playoff odds: {teamModelData?.statuses?.playoffOdds || teamModelState} · Team WAR: {teamModelData?.statuses?.teamWar || teamModelState}</span>
+        <span>Playoff odds: {humanizeFeedStatus(teamModelData?.statuses?.playoffOdds || teamModelState)} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
       </div>
-      <Panel title="Advanced Models & Savant" accent={C.purple} badge={teamSavantData?.status === 'live' ? 'Baseball Savant' : teamSavantData?.status || 'Loading…'}>
+      <Panel title="Advanced Models & Savant" accent={C.purple} badge={teamSavantData?.status === 'live' ? 'Baseball Savant' : humanizeFeedStatus(teamSavantData?.status, 'Loading…')}>
         <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
           {[["Projected W",teamModelData?.advancedMetrics?.projectedWins,1],["Projected L",teamModelData?.advancedMetrics?.projectedLosses,1],["Off WAR",teamModelData?.advancedMetrics?.offenseWar,1],["Def WAR",teamModelData?.advancedMetrics?.defenseWar,1],["xwOBA",teamSavantData?.expectedWOBA,3],["Exit velo",teamSavantData?.exitVelocity,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</div></div>)}
         </div>
@@ -1497,8 +1511,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0,borderBottom:`0.5px solid ${C.border}`}}>
             {[
               ['SB', teamRollups.stolenBases ?? team.sb, C.teal],
-              ['Attempts', teamRollups.stolenBaseAttempts ?? 'Source gap', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
-              ['XB Hits', teamRollups.extraBaseHits ?? 'Source gap', teamRollups.extraBaseHits == null ? C.text4 : C.teal],
+              ['Attempts', teamRollups.stolenBaseAttempts ?? 'Unavailable', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
+              ['XB Hits', teamRollups.extraBaseHits ?? 'Unavailable', teamRollups.extraBaseHits == null ? C.text4 : C.teal],
             ].map(([l,v,c],i)=>(
               <div key={l} style={{padding:'12px 10px',textAlign:'center',borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={px({fontSize:22,fontWeight:800,color:c,lineHeight:1})}>{v}</div>
@@ -1508,11 +1522,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:6}}>
             {[
-              ['Sprint Speed','Source gap', C.text4],
-              ['Stolen Base Attempts',teamRollups.stolenBaseAttempts ?? 'Source gap', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
-              ['Caught Stealing', teamRollups.caughtStealing ?? 'Source gap', teamRollups.caughtStealing == null ? C.text4 : C.teal],
-              ['MLB Rank (BsR)',  'Source gap', C.text4],
-              ['Extra Base Rate', teamRollups.extraBaseRate == null ? 'Source gap' : `${(teamRollups.extraBaseRate * 100).toFixed(1)}%`, teamRollups.extraBaseRate == null ? C.text4 : C.teal],
+              ['Sprint Speed','Unavailable', C.text4],
+              ['Stolen Base Attempts',teamRollups.stolenBaseAttempts ?? 'Unavailable', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
+              ['Caught Stealing', teamRollups.caughtStealing ?? 'Unavailable', teamRollups.caughtStealing == null ? C.text4 : C.teal],
+              ['MLB Rank (BsR)',  'Unavailable', C.text4],
+              ['Extra Base Rate', teamRollups.extraBaseRate == null ? 'Unavailable' : `${(teamRollups.extraBaseRate * 100).toFixed(1)}%`, teamRollups.extraBaseRate == null ? C.text4 : C.teal],
             ].map(([l,v,c],i,arr)=>(
               <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0', borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <span style={sans({fontSize:11,color:C.text2})}>{l}</span>

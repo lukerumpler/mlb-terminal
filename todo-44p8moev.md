@@ -90,3 +90,8 @@
 - [x] Validate dashboard data rendering at desktop/mobile sizes and publish the repaired data-feed update.
 - [x] Preserve the explicit empty-body MLB proxy error contract discovered by the full-suite regression.
 - [x] Make the Overview smoke test target the workspace navigation control without colliding with page-level Overview buttons.
+
+- [x] Inventory every visible Source gap state and trace its verified live, cached, or derived data path.
+- [x] Replace resolvable Source gap states with verified values or clearly labeled derived rollups; improve genuinely unavailable states with specific provider messaging and recovery actions.
+- [x] Add regression coverage for resolved source states and honest unavailable fallbacks.
+- [x] Verify desktop/mobile rendering and publish the Source gap replacement update.
