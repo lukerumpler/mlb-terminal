@@ -11135,7 +11135,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Update React news components to display accessible Tier 1, Tier 2, Tier 3, cached, and unavailable badges.
 - [x] Complete RESILIENCE_GUIDE.md with configuration, feed provenance, and deployment steps.
 - [x] Add regression tests for fallback ordering, cache behavior, and badge rendering.
-- [ ] Run release gates and save a published checkpoint.
+- [x] Run release gates and save a published checkpoint.
 
 ## Attached Data-Gaps Specification
 - [x] Review and reconcile the attached FanGraphs, Savant, splits, weather, metadata, and playoff-odds requirements.
@@ -11151,5 +11151,5 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 
 ## Shared Checkpoint Reconciliation and Reapplication
 - [x] Merge latest origin/main changes while keeping uncommitted news fallback, CORS, guide, venue, and Savant updates.
-- [ ] Reapply and verify all 60 test files and build output.
-- [ ] Save final checkpoint.
+- [x] Reapply and verify all 60 test files and build output.
+- [x] Save final checkpoint.

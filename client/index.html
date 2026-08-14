@@ -144,6 +144,28 @@
       }
       @media (prefers-reduced-motion: reduce) { .skip-sidebar { transition:none !important; } }
     </style>
+    <style>
+      @media (max-width: 720px) {
+        .skip-overview-page .skip-affiliate-overview-grid {
+          display: flex !important;
+          flex-wrap: wrap !important;
+          align-items: flex-start !important;
+          gap: 8px !important;
+        }
+        .skip-overview-page .skip-affiliate-overview-grid > div:first-child {
+          flex: 1 1 100% !important;
+          width: 100% !important;
+          grid-column: auto !important;
+        }
+        .skip-overview-page .skip-affiliate-overview-grid > div:not(:first-child) {
+          flex: 1 1 0 !important;
+          min-width: 0 !important;
+          text-align: center !important;
+          padding-left: 4px !important;
+          padding-right: 4px !important;
+        }
+      }
+    </style>
     <script>
       // Apply saved/system theme before first paint to avoid a flash of the wrong theme.
       (function () {
