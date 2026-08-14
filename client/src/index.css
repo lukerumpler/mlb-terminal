@@ -761,3 +761,10 @@
   .overview-team-context { width:100%; min-width:0; }
   .overview-team-context > label { flex:1 1 100% !important; width:100% !important; min-width:0 !important; }
 }
+
+.skip-ticker-skeleton{display:inline-flex;align-items:center;gap:7px;min-width:180px}
+.skip-ticker-skeleton i{display:block;width:58px;height:7px;border-radius:4px;background:rgba(255,255,255,.18);animation:skip-ticker-pulse 1.1s ease-in-out infinite}
+.skip-ticker-skeleton i:nth-child(2){width:86px;animation-delay:.14s}
+.skip-ticker-skeleton i:nth-child(3){width:42px;animation-delay:.28s}
+@keyframes skip-ticker-pulse{0%,100%{opacity:.34}50%{opacity:.9}}
+@media (prefers-reduced-motion: reduce){.skip-ticker-skeleton i{animation:none;opacity:.6}}

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const projectRoot = path.resolve(import.meta.dirname, '..');
 const appSource = fs.readFileSync(path.join(projectRoot, 'client/src/App.jsx'), 'utf8');
+const tickerSource = fs.readFileSync(path.join(projectRoot, 'client/src/components/LiveScoreTicker.jsx'), 'utf8');
 const documentSource = fs.readFileSync(path.join(projectRoot, 'client/index.html'), 'utf8');
 const playersSource = fs.readFileSync(path.join(projectRoot, 'client/src/pages/PlayersPage.jsx'), 'utf8');
 const prospectsSource = fs.readFileSync(path.join(projectRoot, 'client/src/pages/ProspectsPage.jsx'), 'utf8');
@@ -76,7 +77,7 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(playersSource).toContain('import MetricInfo from');
     expect(indexSource).toContain('.skip-metric-info-popover');
     expect(appSource).toContain('skip-utility-section');
-    expect(appSource).toContain('className="skip-ticker-message"');
+    expect(tickerSource).toContain('className="skip-ticker-message"');
     expect(indexSource).toContain('.skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }');
     expect(overviewSource).toContain('className="skip-affiliate-overview-grid"');
     expect(overviewSource).toContain('className="skip-affiliate-savant-grid"');

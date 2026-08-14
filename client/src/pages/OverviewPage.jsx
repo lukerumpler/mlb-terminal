@@ -13,6 +13,7 @@ import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
+import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
 import { readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache } from '../lib/teamDataCache.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -647,6 +648,28 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const provenanceTriggerRef = useRef(null);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
+  const [verifiedTrends, setVerifiedTrends] = useState({});
+  const trendSnapshotScope = `${selTeam}:${CURRENT_SEASON}`;
+  const verifiedTrendMetrics = useMemo(() => {
+    const verified = liveTeamDataMode === 'live' || liveTeamDataMode === 'cached';
+    const source = liveTeamDataMode === 'live' ? 'MLB Stats API · live verified aggregate' : 'MLB Stats API · cached verified aggregate';
+    return {
+      ops: { label:'Team OPS', value:team.ops, status:verified ? 'verified' : 'unavailable', source },
+      era: { label:'Team ERA', value:team.era, status:verified ? 'verified' : 'unavailable', source },
+      whip: { label:'WHIP', value:team.whip, status:verified ? 'verified' : 'unavailable', source },
+      runDiff: { label:'Run differential', value:team.rs != null && team.ra != null ? team.rs - team.ra : null, status:verified ? 'verified' : 'unavailable', source },
+    };
+  }, [team, liveTeamDataMode]);
+  useEffect(() => {
+    if (liveTeamDataMode !== 'live' && liveTeamDataMode !== 'cached') {
+      setVerifiedTrends({});
+      return;
+    }
+    const previous = readVerifiedSnapshot(trendSnapshotScope);
+    const derived = deriveVerifiedTrends(verifiedTrendMetrics, previous);
+    setVerifiedTrends(Object.fromEntries(Object.entries(derived).map(([key, value]) => [key, { ...value, displayDelta: formatTrendDelta(value.delta, key === 'ops' ? 3 : 2) }])));
+    captureVerifiedSnapshot(trendSnapshotScope, verifiedTrendMetrics, liveTeamDataUpdatedAt || Date.now());
+  }, [trendSnapshotScope, verifiedTrendMetrics, liveTeamDataMode, liveTeamDataUpdatedAt]);
 
   useEffect(() => {
     let alive = true;
@@ -1139,10 +1162,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>}
 
       <StatStrip items={[
-        {val:<MetricValue value={formatTeamMetric(team.ops,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense'},
+        {val:<MetricValue value={formatTeamMetric(team.ops,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense', trend:verifiedTrends.ops},
         {val:<MetricValue value={formatTeamMetric(team.hr)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Home Runs',  sub:'Power'},
-        {val:<MetricValue value={formatTeamMetric(team.era,2)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team ERA',   sub:'Pitching'},
-        {val:<MetricValue value={formatTeamMetric(team.whip,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'WHIP',      sub:'Command'},
+        {val:<MetricValue value={formatTeamMetric(team.era,2)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team ERA',   sub:'Pitching', trend:verifiedTrends.era},
+        {val:<MetricValue value={formatTeamMetric(team.whip,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'WHIP',      sub:'Command', trend:verifiedTrends.whip},
         {val:<MetricValue value={formatTeamMetric(team.avg,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},

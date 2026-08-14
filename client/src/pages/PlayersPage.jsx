@@ -24,6 +24,7 @@ import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
+import ScoutingGradesPreview from '../components/ScoutingGradesPreview.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
@@ -2226,9 +2227,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
           {activeTab === 'defense' && (
             <div className="skip-profile-tab-grid">
-              <Panel title="Scouting Grades" accent={C.teal} badge="20–80 Scale">
-                <div style={{ padding:'8px 14px 12px' }}>{gradeRows.map(g => <GradeBar key={g.lbl} lbl={g.lbl} val={g.val} desc={g.desc} />)}</div>
-              </Panel>
+              <ScoutingGradesPreview />
               <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
               <Panel title="Development Timeline" accent={C.amber}><DevTimeline age={p?.currentAge} /></Panel>
             </div>
@@ -2449,12 +2448,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
         {/* ── COL 3: Scouting & trajectory — grades, dev, trend, career ── */}
         <div className="skip-profile-tertiary-column" style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <Panel title="Scouting Grades" accent={C.teal} badge="20–80 Scale">
-            {archQuote && <SkipInline quote={archQuote} color={C.teal} />}
-            <div style={{ paddingTop:4, paddingBottom:6 }}>
-              {gradeRows.map(g => <GradeBar key={g.lbl} lbl={g.lbl} val={g.val} desc={g.desc} />)}
-            </div>
-          </Panel>
+          <ScoutingGradesPreview />
 
           {/* Development timeline */}
           <Panel title="Development Timeline" accent={C.amber}>

@@ -5,6 +5,7 @@ import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, saniti
 import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
+import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
@@ -185,39 +186,40 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    const refresh = () => {
-      getTodaysGames().then(games => {
-        if (!alive) return;
-        if (!games.length) {
-          // Genuinely no games right now (off day, etc.) vs. a fetch that
-          // hasn't resolved yet — and if we already have live ticks on
-          // screen from an earlier successful poll, a later empty response
-          // shouldn't blank them out and flip back to a "no games" message.
-          setTickerStatus(prev => (prev === 'live' ? prev : 'empty'));
-          return;
-        }
-        const ticks = games.map(g => {
-          const sc = g.away.runs != null
-            ? `${g.away.abbr} ${g.away.runs}, ${g.home.abbr} ${g.home.runs}`
-            : `${g.away.abbr} vs ${g.home.abbr}`;
-          const status = g.status === 'Final' ? '(F)' : g.inning
-            ? `(${g.inningHalf === 'top' ? '▲' : '▼'}${g.inning})` : '(Pre)';
-          return `${sc} ${status}`;
-        });
-        setLiveTicker(ticks);
-        setTickerStatus('live');
-      }).catch(() => { if (alive) setTickerStatus(prev => (prev === 'live' ? prev : 'error')); });
-    };
-    refresh();
-    // Cheap to poll — mlb() de-dupes/caches, so this just picks up whatever
-    // OverviewPage/LeaguePage already fetched instead of always hitting the
-    // network itself. Keeps the "LIVE" badge honest instead of freezing
-    // after the very first mount.
-    const id = setInterval(refresh, 30_000);
-    return () => { alive = false; clearInterval(id); };
+  const refreshTicker = useCallback(() => {
+    setTickerStatus(current => current === 'live' ? 'refreshing' : 'loading');
+    return getTodaysGames().then(games => {
+      if (!games.length) {
+        setLiveTicker([]);
+        setTickerStatus('empty');
+        return [];
+      }
+      const ticks = games.map(g => {
+        const sc = g.away.runs != null
+          ? `${g.away.abbr} ${g.away.runs}, ${g.home.abbr} ${g.home.runs}`
+          : `${g.away.abbr} vs ${g.home.abbr}`;
+        const status = g.status === 'Final' ? '(F)' : g.inning
+          ? `(${g.inningHalf === 'top' ? '▲' : '▼'}${g.inning})` : '(Pre)';
+        return `${sc} ${status}`;
+      });
+      setLiveTicker(ticks);
+      setTickerStatus('live');
+      return ticks;
+    }).catch(() => {
+      setTickerStatus(current => current === 'live' || current === 'refreshing' ? 'stale' : 'error');
+      return [];
+    });
   }, []);
+  useEffect(() => {
+    refreshTicker();
+    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') refreshTicker(); };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [refreshTicker]);
 
   return (
     <>
@@ -369,34 +371,7 @@ export default function App() {
           </PageErrorBoundary>
         </div>
 
-        {/* Live ticker */}
-        <div style={{ height:32, flexShrink:0, background:C.navy, borderTop:`1px solid rgba(255,255,255,.1)`, display:'flex', alignItems:'center', overflow:'hidden' }}>
-          <div style={{ flexShrink:0, padding:'0 14px', height:'100%', display:'flex', alignItems:'center', borderRight:'1px solid rgba(255,255,255,.12)', gap:6 }}>
-            <div style={{
-              width:6, height:6, borderRadius:'50%',
-              background: tickerStatus === 'live' ? C.teal : 'rgba(255,255,255,.3)',
-              animation: tickerStatus === 'live' ? 'pulse 1.6s ease-in-out infinite' : 'none',
-            }} />
-            <span style={px({ fontSize:10, color: tickerStatus === 'live' ? C.teal : 'rgba(255,255,255,.45)', letterSpacing:'.12em', fontWeight:500 })}>
-              {tickerStatus === 'live' ? 'LIVE' : tickerStatus === 'error' ? 'OFFLINE' : tickerStatus === 'empty' ? 'NO GAMES' : 'CONNECTING'}
-            </span>
-          </div>
-          <div style={{ overflow:'hidden', flex:1 }}>
-            {tickerStatus === 'live' ? (
-              <div style={{ display:'flex', alignItems:'center', whiteSpace:'nowrap', animation:'scrollx 50s linear infinite', ...px({ fontSize:11, color:'rgba(255,255,255,.72)' }) }}>
-                {[...liveTicker, ...liveTicker].map((s, i) => (
-                  <span key={i} style={{ padding:'0 20px', borderRight:'1px solid rgba(255,255,255,.1)' }}>{s}</span>
-                ))}
-              </div>
-            ) : (
-              <div className="skip-ticker-message" style={{ padding:'0 20px', ...px({ fontSize:11, color:'rgba(255,255,255,.45)' }) }}>
-                {tickerStatus === 'loading' && 'Connecting to live scores…'}
-                {tickerStatus === 'empty'   && 'No games in progress right now.'}
-                {tickerStatus === 'error'   && 'Live scores unavailable — retrying…'}
-              </div>
-            )}
-          </div>
-        </div>
+        <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />
       </div>
 
       <style>{`

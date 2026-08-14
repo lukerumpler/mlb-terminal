@@ -144,3 +144,12 @@
 - [x] Preserve or document data-dependent deferrals for live ticker architecture, delta baselines, playoff-odds prominence, scouting grades, and multi-layer projections.
 - [x] Add focused regression coverage for the applied UI-gap presentation and accessibility changes.
 - [x] Re-run validation, inspect responsive previews, and save a checkpoint for the compatible UI-gap improvements.
+- [x] Inspect current trend, schedule/ticker, player-profile, and grade-related code paths against the attached UI-gap deferrals.
+- [x] Implement source-verified snapshot baseline storage and derived trend arrows without synthetic history.
+- [x] Implement live-score ticker loading, error, retry, and refresh states using the existing schedule data contract.
+- [x] Implement a clearly labeled preview-only 20–80 scouting-grades section with no fabricated production grades.
+- [x] Add regression tests for trend baselines, ticker states, retry behavior, and scouting-grade preview semantics.
+- [x] Run type checks, full tests, production build, responsive previews, and save a checkpoint.
+- [x] Add rendered LiveScoreTicker tests for loading, empty, error, stale, retry, and updating states.
+- [x] Add a rendered StatStrip assertion proving verified trend arrows appear only when a baseline exists.
+- [x] Save a new checkpoint after the rendered coverage pass.

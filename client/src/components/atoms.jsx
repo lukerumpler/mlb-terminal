@@ -158,6 +158,11 @@ export function StatStrip({ items }) {
           {it.sub && (
             <div style={sans({ fontSize:10, color:C.text3 })}>{it.sub}</div>
           )}
+          {it.trend?.status === 'verified' && it.trend.direction && (
+            <div aria-label={`${it.lbl} trend ${it.trend.direction}`} style={px({ fontSize:9, fontWeight:800, color:it.trend.direction === 'up' ? C.teal : it.trend.direction === 'down' ? C.rust : C.text3 })}>
+              {it.trend.direction === 'up' ? '▲' : it.trend.direction === 'down' ? '▼' : '•'} {it.trend.displayDelta}
+            </div>
+          )}
         </div>
       ))}
     </div>
