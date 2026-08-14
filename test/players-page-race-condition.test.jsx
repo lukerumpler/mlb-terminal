@@ -237,6 +237,34 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getByRole('img', { name: /career comparison of LHP and RHP/i })).toBeInTheDocument();
   });
 
+  it('saves tagged observations and sorts them by category in the Notes tab', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Notes Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Notes Player'));
+    localStorage.removeItem('skip-player-notes:1');
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Notes');
+    await waitFor(() => expect(screen.getByText('Notes Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Notes Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Notes' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Notes' }));
+
+    await user.type(screen.getByRole('textbox', { name: 'Observation' }), 'Keep the hands quiet in two-strike counts.');
+    await user.type(screen.getByRole('textbox', { name: 'Custom tags' }), 'two-strike, timing');
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+    expect(screen.getByText('Keep the hands quiet in two-strike counts.')).toBeInTheDocument();
+    expect(screen.getByText('#two-strike')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Observation category' }), 'Medical');
+    await user.type(screen.getByRole('textbox', { name: 'Observation' }), 'Check recovery notes after the next series.');
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort observations' }), 'category');
+    expect(screen.getAllByText('Medical')[1]).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Sort observations' })).toHaveValue('category');
+  });
+
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {
     const user = userEvent.setup();
     const playerA = { id: 1, fullName: 'Slow Player A' };

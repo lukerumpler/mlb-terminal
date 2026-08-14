@@ -24,6 +24,7 @@ import { percentile, percentileColor, percentileLabel } from '../lib/percentile.
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
+import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes } from './playerNotes.js';
 
 function pctBar(pct, color) {
   return (
@@ -1767,6 +1768,14 @@ function PlayerProfile({ player, derived, onCompare }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedChart, setExpandedChart] = useState(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
+  const [noteText, setNoteText] = useState('');
+  const [noteCategory, setNoteCategory] = useState('Scouting');
+  const [noteTags, setNoteTags] = useState('');
+  const [noteSort, setNoteSort] = useState('date-desc');
+  const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
+  useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); }, [player.id]);
+  useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
+  const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -1871,6 +1880,16 @@ function PlayerProfile({ player, derived, onCompare }) {
     { lbl:'Power',   val:kpis.DPI,  color:C.rust   },
     { lbl:'Value',   val:kpis.TPVI, color:C.navy   },
   ];
+
+  const addObservation = event => {
+    event.preventDefault();
+    const text = noteText.trim();
+    if (!text) return;
+    const tags = [...new Set(noteTags.split(',').map(tag => tag.trim().replace(/^#/, '').toLowerCase()).filter(Boolean))].slice(0, 8);
+    setObservations(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, category: noteCategory, tags, createdAt: Date.now() }, ...current]);
+    setNoteText('');
+    setNoteTags('');
+  };
 
   return (
     <>
@@ -1993,10 +2012,23 @@ function PlayerProfile({ player, derived, onCompare }) {
             </div>
           )}
           {activeTab === 'notes' && (
-            <div className="skip-profile-tab-grid">
+            <div className="skip-profile-tab-grid skip-notes-grid">
               <Panel title="SKIP Read" accent={verdictAccent}><div style={sans({ padding:'14px', color:C.text2, lineHeight:1.6, fontSize:12 })}>{quote}</div></Panel>
               <Panel title="Strengths & Risks" accent={C.purple}><div style={{ padding:'12px 14px' }}><div style={sans({ fontSize:10, color:C.teal, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Strengths</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5, marginBottom:12 })}>{strengths.join(' · ') || 'No strengths available'}</div><div style={sans({ fontSize:10, color:C.rust, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Risks</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5 })}>{risks.join(' · ') || 'No risks available'}</div></div></Panel>
               <Panel title="Recommendation" accent={C.amber}><div style={sans({ padding:'14px', color:C.text2, lineHeight:1.6, fontSize:12 })}>{rec}</div></Panel>
+              <Panel title="Saved Observations" accent={C.teal} badge={`${observations.length} saved`}>
+                <form className="skip-notes-composer" onSubmit={addObservation}>
+                  <textarea aria-label="Observation" value={noteText} onChange={event => setNoteText(event.target.value)} placeholder="Capture a scouting observation…" rows={3} />
+                  <div className="skip-notes-form-row">
+                    <select aria-label="Observation category" value={noteCategory} onChange={event => setNoteCategory(event.target.value)}>{PLAYER_NOTE_CATEGORIES.map(category => <option key={category}>{category}</option>)}</select>
+                    <input aria-label="Custom tags" value={noteTags} onChange={event => setNoteTags(event.target.value)} placeholder="Tags, comma separated" />
+                    <button type="submit" disabled={!noteText.trim()}>Save note</button>
+                  </div>
+                  <div className="skip-notes-help">Use commas for multiple tags. Tags are saved per player in this browser.</div>
+                </form>
+                <div className="skip-notes-toolbar"><span>{observations.length ? 'Saved observations' : 'No saved observations yet'}</span><select aria-label="Sort observations" value={noteSort} onChange={event => setNoteSort(event.target.value)}><option value="date-desc">Newest first</option><option value="date-asc">Oldest first</option><option value="category">Category A–Z</option></select></div>
+                {sortedObservations.length ? <div className="skip-notes-list">{sortedObservations.map(note => <article className="skip-note-card" key={note.id}><div className="skip-note-meta"><span className="skip-note-category">{note.category}</span><time dateTime={new Date(note.createdAt).toISOString()}>{new Date(note.createdAt).toLocaleDateString()}</time></div><div className="skip-note-text">{note.text}</div>{note.tags?.length ? <div className="skip-note-tags">{note.tags.map(tag => <span key={tag}>#{tag}</span>)}</div> : null}</article>)}</div> : <div className="skip-notes-empty">Your saved scouting observations will appear here.</div>}
+              </Panel>
             </div>
           )}
         </div>

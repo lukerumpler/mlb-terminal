@@ -33,13 +33,13 @@
 - [x] Add Vitest coverage for tooltips, toggle state, and bar chart rendering
 - [x] Run typecheck, tests, and visual verification for the enhanced Splits tab
 - [x] Save a checkpoint containing the enhanced split comparison
-- [ ] Inspect the existing Notes tab and saved observation state
-- [ ] Add custom tags to saved observations
-- [ ] Add sorting by date and category for saved observations
-- [ ] Preserve note persistence and unavailable/empty states
-- [ ] Add Vitest coverage for tag creation and sorting interactions
-- [ ] Run typecheck, tests, and visual verification for the Notes tab update
-- [ ] Save a checkpoint containing the Notes tab enhancement
+- [x] Inspect the existing Notes tab and saved observation state
+- [x] Add custom tags to saved observations
+- [x] Add sorting by date and category for saved observations
+- [x] Preserve note persistence and unavailable/empty states
+- [x] Add Vitest coverage for tag creation and sorting interactions
+- [x] Run typecheck, tests, and visual verification for the Notes tab update
+- [x] Save a checkpoint containing the Notes tab enhancement
 - [x] Inspect the percentile profile radar geometry and label layout
 - [x] Correct the percentile profile graphic’s scale, spacing, and visual hierarchy
 - [x] Add focused regression coverage for the corrected percentile profile graphic
