@@ -11001,3 +11001,15 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add a source-backed team-strength radar beside Front Office Evaluation using the overall team rating fields and explicit unavailable values.
 - [x] Replace plain player video links with clickable thumbnails and clear external-source labels, without fabricating video records.
 - [x] Add regression tests, verify responsive visuals, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Team report export, video tooltips, and financial context
+- [ ] Add a downloadable Team Overview PDF report that includes the Team Strength radar and source/provenance notes.
+- [ ] Add hover and keyboard-focus tooltips to player video thumbnails with concise titles/descriptions and source labels.
+- [ ] Integrate verified team payroll and luxury-tax tracking data into contract valuation panels, with explicit unavailable states when no authoritative feed is available.
+- [ ] Add regression tests, verify responsive/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Low-bandwidth video follow-up
+- [ ] Reconcile the latest concurrent player-video implementation before editing shared video-card code.
+- [ ] Keep video references optional and low-data: no autoplay, no embedded players, lazy or deferred thumbnails, lightweight external search links, and accessible text fallbacks.
+- [ ] Preserve the team PDF export and payroll/luxury-tax work while resolving any shared-file merge issues.
+- [ ] Run focused and full tests, lint/check/build, responsive verification, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.

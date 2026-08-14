@@ -81,6 +81,7 @@ export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation
       href: `https://www.mlb.com/video/search?query=${encodeURIComponent(name)}`,
       thumbnail,
       query: name,
+      description: `Official MLB video search for ${name}: highlights, interviews, and team coverage when available.`,
     },
     {
       id: 'youtube',
@@ -89,6 +90,7 @@ export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation
       href: `https://www.youtube.com/results?search_query=${encodeURIComponent(youtubeQuery)}`,
       thumbnail,
       query: youtubeQuery,
+      description: `YouTube search for ${name}: highlights, interviews, analysis, and related baseball coverage.`,
     },
   ];
 }
@@ -97,10 +99,15 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
   const [imageError, setImageError] = useState(false);
   useEffect(() => { setImageError(false); }, [item.thumbnail]);
   const initials = playerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'MLB';
+  const tooltipId = `video-tooltip-${item.id}`;
   return (
-    <a href={item.href} target="_blank" rel="noreferrer noopener"
-      aria-label={`${item.label} for ${playerName}`}
-      style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none', transition:'transform 160ms ease, border-color 160ms ease' }}
+    <div className="skip-video-thumbnail-wrap" style={{ position:'relative', minWidth:0 }}>
+      <a href={item.href} target="_blank" rel="noreferrer noopener"
+        aria-label={`${item.label} for ${playerName}`}
+        aria-describedby={tooltipId}
+        title={item.description}
+        className="skip-video-thumbnail"
+        style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none', transition:'transform 160ms ease, border-color 160ms ease' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = accent; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = C.border; }}>
       <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
@@ -118,7 +125,9 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
         <div style={sans({ fontSize:10.5, fontWeight:800, color:C.text, lineHeight:1.25 })}>{item.label}</div>
         <div style={sans({ fontSize:8.5, color:C.text4, marginTop:3, lineHeight:1.35 })}>Opens live search results · source-safe</div>
       </div>
-    </a>
+      </a>
+      <div id={tooltipId} role="tooltip" className="skip-video-tooltip">{item.description}</div>
+    </div>
   );
 }
 
@@ -1032,7 +1041,29 @@ function DefensiveIntel({ pos }) {
 }
 
 /* ─── Market & Contract Intelligence ────────────────────────────── */
-function MarketIntelPanel({ kpis, ct, p }) {
+function formatFinancialValue(value) {
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  const sign = n < 0 ? '−' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs)}`;
+}
+
+export function getTeamFinancialRows(teamFinancials) {
+  const payroll = teamFinancials?.payroll || {};
+  const tax = teamFinancials?.tax || {};
+  return [
+    ['Team Payroll', payroll.payroll, C.navy],
+    ['Tax Payroll', tax.taxPayroll, C.purple],
+    ['CBT Threshold', tax.taxThreshold, C.slate],
+    ['Est. Tax Bill', tax.estimatedTaxBill, tax.estimatedTaxBill > 0 ? C.rust : C.teal],
+    ['Tax Space', tax.taxSpace, tax.taxSpace != null && Number(tax.taxSpace) < 0 ? C.rust : C.teal],
+  ].map(([label, value, color]) => ({ label, value:formatFinancialValue(value), color }));
+}
+
+function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
   const projWARperS  = ((kpis.TPVI||50) * 0.09 - 1.5).toFixed(1);
   const surplusM     = Math.round(((kpis.TPVI||50) - 50) * 3.8);
   const extProb      = Math.min(97, Math.max(12, Math.round(kpis.TPVI||50 + 18)));
@@ -1040,6 +1071,8 @@ function MarketIntelPanel({ kpis, ct, p }) {
   const contractRisk = kpis.TPVI >= 75 ? 'LOW' : kpis.TPVI >= 55 ? 'MEDIUM' : 'HIGH';
   const riskColor    = contractRisk==='LOW' ? C.teal : contractRisk==='MEDIUM' ? C.amber : C.rust;
   const surplusColor = surplusM >= 60 ? C.teal : surplusM >= 20 ? C.amber : C.rust;
+  const financialRows = getTeamFinancialRows(teamFinancials);
+  const hasFinancials = financialRows.some(row => row.value !== '—');
 
   return (
     <Panel title="Market & Contract Intelligence" accent={C.purple} badge="Financial Model">
@@ -1051,6 +1084,21 @@ function MarketIntelPanel({ kpis, ct, p }) {
             {surplusM >= 0 ? '+' : ''}${Math.abs(surplusM)}M
           </div>
           <div style={sans({ fontSize:10, color:C.text3, marginTop:4 })}>estimated above market rate</div>
+        </div>
+        <div style={{ marginBottom:10, padding:'9px 10px 8px', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:7 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+            <span style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, letterSpacing:'.06em', textTransform:'uppercase' })}>Team Payroll &amp; CBT</span>
+            <span style={px({ fontSize:8.5, color:hasFinancials ? C.teal : C.text4 })}>{hasFinancials ? 'LIVE SOURCE' : 'UNAVAILABLE'}</span>
+          </div>
+          {financialRows.map(row => (
+            <div key={row.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:`0.5px solid ${C.borderLight}` }}>
+              <span style={sans({ fontSize:10, color:C.text2 })}>{row.label}</span>
+              <span style={px({ fontSize:10.5, fontWeight:800, color:row.color })}>{row.value}</span>
+            </div>
+          ))}
+          <div style={sans({ fontSize:8.5, color:C.text4, lineHeight:1.35, marginTop:6 })}>
+            {hasFinancials ? <>Source: <a href={teamFinancials?.sourceUrls?.tax || 'https://www.spotrac.com/mlb/tax'} target="_blank" rel="noreferrer noopener" style={{ color:C.teal }}>Spotrac MLB payroll and tax trackers</a>. Tax figures are payroll-based estimates.</> : 'No verified team payroll or tax response is available for this player’s current team.'}
+          </div>
         </div>
         {[
           ['Projected WAR/$', projWARperS+' WAR/$M', C.teal],
@@ -1961,7 +2009,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
           <ContractPanel contractData={player.contractData} />
 
-          <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} />
+          <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} />
 
           {/* ── Comparison Engine ── */}
           <Panel title="Comparison Engine" accent={C.purple} badge="Model Reference">

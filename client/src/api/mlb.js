@@ -233,6 +233,26 @@ export async function getPlayerProfile(id) {
  * Passes both name (for HTML scraping) and id (for MLB API service time).
  * Returns null on any failure — never throws.
  */
+const teamFinancialsCache = new Map();
+
+export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
+  const team = String(teamAbbreviation || '').trim().toUpperCase();
+  if (!team) return null;
+  const cacheKey = `${team}:${season}`;
+  if (teamFinancialsCache.has(cacheKey)) return teamFinancialsCache.get(cacheKey);
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ team, season:String(season) });
+      const res = await fetch(`/api/team-financials?${params}`, { signal:AbortSignal.timeout(18_000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.found ? data : null;
+    } catch { return null; }
+  })();
+  teamFinancialsCache.set(cacheKey, promise);
+  return promise;
+}
+
 export async function fetchContractData(playerId, fullName) {
   try {
     const params = new URLSearchParams({ id: String(playerId) });
@@ -252,12 +272,14 @@ export async function loadFullPlayer(person, season = SEASON) {
   // All 6 requests run in parallel — contract never blocks stats
   const profile = await getPlayerProfile(id);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
-  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw] = await Promise.all([
+  const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
+  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, teamFinancials] = await Promise.all([
     getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
     getSeasonStatsSafe(id, 'pitching', season, profileSportId),
     getCareerSplits(id, 'hitting'),
     getCareerSplits(id, 'pitching'),
     fetchContractData(id, person.fullName),
+    fetchTeamFinancials(currentTeamAbbreviation, season),
   ]);
 
   // Savant & bat-tracking are optional — never block. Each tries current season then prior year
@@ -466,6 +488,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     hittingStats:  hittingResult?.stat    || {},
     pitchingStats: pitchingResult?.stat   || {},
     contractData:  contractRaw,
+    teamFinancials,
   };
 }
 

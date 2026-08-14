@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, memo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, RUN_DIFF_DATA } from '../constants/data.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats } from '../api/mlb.js';
@@ -212,6 +212,8 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
 
 function OverviewPage() {
   const [selTeam,setSelTeam]=useState('lad');
+  const overviewRef = useRef(null);
+  const [pdfExportState, setPdfExportState] = useState('idle');
   const [splitTab,setSplitTab]=useState('home');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
@@ -352,6 +354,47 @@ function OverviewPage() {
 
     return ()=>{ alive=false; };
   },[teamBase?.id]);
+  const exportTeamOverviewPdf = async () => {
+    if (!overviewRef.current || pdfExportState === 'loading') return;
+    setPdfExportState('loading');
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      await document.fonts?.ready;
+      const canvas = await html2canvas(overviewRef.current, {
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#f7f4ed',
+        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        useCORS: true,
+        logging: false,
+        ignoreElements: element => element.hasAttribute?.('data-export-ignore'),
+      });
+      const pdf = new jsPDF({ orientation:'portrait', unit:'pt', format:'letter', compress:true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageHeight = canvas.height * pageWidth / canvas.width;
+      const image = canvas.toDataURL('image/png');
+      let remaining = imageHeight;
+      let offset = 0;
+      pdf.setProperties({ title:`${team.name || 'Team'} Overview`, subject:'SKIP Baseball Intelligence Terminal team overview report', author:'SKIP Baseball Intelligence Terminal' });
+      while (remaining > 0) {
+        if (offset > 0) pdf.addPage();
+        pdf.addImage(image, 'PNG', 0, -offset, pageWidth, imageHeight, undefined, 'FAST');
+        remaining -= pageHeight;
+        offset += pageHeight;
+      }
+      const safeTeamName = String(team.name || selTeam || 'team').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+      pdf.save(`skip-${safeTeamName}-overview-${SEASON}.pdf`);
+      setPdfExportState('ready');
+      window.setTimeout(() => setPdfExportState(current => current === 'ready' ? 'idle' : current), 2200);
+    } catch (error) {
+      console.error('[overview-pdf] export failed', error);
+      setPdfExportState('error');
+      window.setTimeout(() => setPdfExportState(current => current === 'error' ? 'idle' : current), 3200);
+    }
+  };
+
   const rd = team.rs == null || team.ra == null || !Number.isFinite(Number(team.rs)) || !Number.isFinite(Number(team.ra))
     ? null
     : Number(team.rs) - Number(team.ra);
@@ -443,7 +486,7 @@ function OverviewPage() {
   const evBins = [];
 
   return (
-    <div className="page-enter" style={{display:'flex',flexDirection:'column',gap:14}}>
+    <div ref={overviewRef} className="page-enter" style={{display:'flex',flexDirection:'column',gap:14}}>
 
       {/* ── Selector + headline ── */}
       <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
@@ -452,9 +495,16 @@ function OverviewPage() {
           <h1 style={sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1})}>Season overview</h1>
           <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
         </div>
-        <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:liveTeamError?C.rustSoft:liveTeamData?C.tealSoft:C.amberSoft,border:`1px solid ${liveTeamError?C.rustMid:liveTeamData?C.tealMid:C.amberMid}`}}>
-          <span style={{width:6,height:6,borderRadius:'50%',background:liveTeamError?C.rust:liveTeamData?C.teal:C.amber,animation:liveTeamData||liveTeamError?'none':'pulse 1.2s ease-in-out infinite'}} />
-          <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'DATA UNAVAILABLE':liveTeamData?'LIVE MLB DATA':'LOADING MLB DATA'}</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button type="button" data-export-ignore onClick={exportTeamOverviewPdf} disabled={pdfExportState === 'loading'}
+            aria-label="Download the current team overview as a PDF"
+            style={{height:30,padding:'0 10px',border:`1px solid ${C.amberMid}`,borderRadius:7,background:pdfExportState==='ready'?C.tealSoft:pdfExportState==='error'?C.rustSoft:C.amberSoft,color:pdfExportState==='ready'?C.teal:pdfExportState==='error'?C.rust:C.amberDark,cursor:pdfExportState==='loading'?'wait':'pointer',opacity:pdfExportState==='loading'?.7:1,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>
+            {pdfExportState === 'loading' ? 'BUILDING PDF…' : pdfExportState === 'ready' ? 'PDF DOWNLOADED' : pdfExportState === 'error' ? 'PDF FAILED — RETRY' : 'DOWNLOAD PDF'}
+          </button>
+          <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:liveTeamError?C.rustSoft:liveTeamData?C.tealSoft:C.amberSoft,border:`1px solid ${liveTeamError?C.rustMid:liveTeamData?C.tealMid:C.amberMid}`}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:liveTeamError?C.rust:liveTeamData?C.teal:C.amber,animation:liveTeamData||liveTeamError?'none':'pulse 1.2s ease-in-out infinite'}} />
+            <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'DATA UNAVAILABLE':liveTeamData?'LIVE MLB DATA':'LOADING MLB DATA'}</span>
+          </div>
         </div>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
