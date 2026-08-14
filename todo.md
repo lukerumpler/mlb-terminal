@@ -11089,3 +11089,18 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify responsive layout, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 - [x] Stabilize the command-palette preservation regression under full-suite parallel load without changing its behavioral coverage.
+
+## Recent history header dropdown
+- [x] Implement recent history utility for persisting viewed players and teams with deduplication and cap.
+- [x] Add header dropdown component with quick-action links and clear history controls.
+- [x] Wire automatic view tracking into player selection and team overview selection.
+- [x] Add regression tests for recent history persistence and click-to-navigate behavior.
+- [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Recent history and Bloomberg × Apple visual refinement
+- [x] Implement recent history utility for persisting viewed players and teams with deduplication and a capped list.
+- [x] Add an accessible recent-history dropdown to the global header with quick navigation and clear-history controls.
+- [x] Wire automatic view tracking into player selection and team overview selection.
+- [x] Improve player profile spacing rhythm, section separation, and primary/secondary/tertiary metric hierarchy without removing analytical depth.
+- [x] Add regression tests for recent history persistence, navigation, and profile hierarchy hooks.
+- [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.

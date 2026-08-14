@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
 import { C, px, sans } from './constants/colors.js';
+import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
+import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
+import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
 // pages) ships as its own chunk and loads on demand instead of bloating the
@@ -89,6 +92,7 @@ export default function App() {
   const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
   const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
+  const [recentHistory, setRecentHistory] = useState(() => readRecentHistory());
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
   }, []);
@@ -99,6 +103,11 @@ export default function App() {
     const sync = () => setFeedFreshnessSuccesses(readFeedSuccesses());
     window.addEventListener('skip-feed-freshness-updated', sync);
     return () => window.removeEventListener('skip-feed-freshness-updated', sync);
+  }, []);
+  useEffect(() => {
+    const sync = () => setRecentHistory(readRecentHistory());
+    window.addEventListener('skip-recent-history-updated', sync);
+    return () => window.removeEventListener('skip-recent-history-updated', sync);
   }, []);
   const updateRosterDefaults = useCallback((next) => {
     setRosterDefaults(current => {
@@ -138,11 +147,15 @@ export default function App() {
       if (TABS.some(item => item.key === nextTab)) setTab(nextTab);
     };
     const onOpenPlayer = e => {
+      const detail = e.detail || {};
+      if (detail.id) recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
       setTab('players');
     };
     const onOpenTeam = e => {
-      const teamAbbr = e.detail?.abbr;
+      const teamAbbr = String(e.detail?.abbr || '').toUpperCase();
+      const team = Object.values(TEAMS).find(item => item.abbr === teamAbbr);
       if (teamAbbr) {
+        recordRecentView({ type:'team', abbr:teamAbbr, label:team?.name || teamAbbr, secondary:team?.div || 'Team overview' });
         setTab('overview');
         window.dispatchEvent(new CustomEvent('skip-select-team', { detail:{ abbr:teamAbbr } }));
       } else {
@@ -277,6 +290,7 @@ export default function App() {
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
           <div style={{ flex:1 }} />
+          <RecentHistoryDropdown items={recentHistory} onClear={() => setRecentHistory(readRecentHistory())} />
           {feedFreshnessSettings.enabled && (
             <button type="button" className="skip-freshness-indicator" onClick={() => setTab('settings')} aria-label="Open data freshness settings" title="Open data freshness settings"
               style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:26, padding:'4px 8px', border:`1px solid ${feedFreshnessSummary.successful ? C.tealMid : C.border}`, borderRadius:999, background:feedFreshnessSummary.successful ? C.tealSoft : C.surface3, color:feedFreshnessSummary.successful ? C.teal : C.text3, cursor:'pointer', ...px({ fontSize:9, fontWeight:800, letterSpacing:'.04em' }) }}>

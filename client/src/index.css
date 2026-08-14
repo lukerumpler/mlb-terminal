@@ -238,8 +238,16 @@
     padding: 0 12px !important;
   }
 
-  .skip-topbar > div:nth-child(3),
-  .skip-topbar > div:nth-child(4) {
+  .skip-topbar > div:nth-child(3) {
+    display: block;
+  }
+  .skip-topbar > div:nth-child(4),
+  .skip-topbar > div:nth-child(5),
+  .skip-topbar > div:nth-child(6),
+  .skip-topbar > div:nth-child(7) {
+    display: none;
+  }
+  .skip-history-label {
     display: none;
   }
 
@@ -308,6 +316,15 @@
 .skip-profile-metric-row { transition: background 160ms var(--profile-ease), transform 160ms var(--profile-ease); }
 .skip-profile-metric-row:hover { background: color-mix(in srgb, #d49a35 8%, transparent) !important; transform: translateX(2px); }
 .skip-profile-selection { min-height: 34px; }
+.skip-profile-hero-primary-metrics { background: color-mix(in srgb, var(--amber, #d49a35) 4%, var(--surface, #fff)); }
+.skip-profile-hero-secondary-metrics { background: color-mix(in srgb, var(--surface2, #f4f2ec) 58%, var(--surface, #fff)); }
+.skip-profile-primary-column, .skip-profile-secondary-column, .skip-profile-tertiary-column { position: relative; padding-top: 18px; }
+.skip-profile-primary-column::before, .skip-profile-secondary-column::before, .skip-profile-tertiary-column::before {
+  position: absolute; top: 0; left: 1px; color: var(--text4, #999); font: 800 8px/1 'DM Mono', monospace; letter-spacing: .12em; text-transform: uppercase;
+}
+.skip-profile-primary-column::before { content: 'Primary signals'; color: var(--amber, #b87812); }
+.skip-profile-secondary-column::before { content: 'Analytics layers'; color: var(--teal, #168c7a); }
+.skip-profile-tertiary-column::before { content: 'Scouting & trajectory'; color: var(--purple, #7656a8); }
 @media (max-width: 1100px) {
   .skip-player-hero { flex-wrap: wrap; overflow-x: visible !important; }
   .skip-profile-identity { flex: 1 1 100%; border-right: 0 !important; border-bottom: 0.5px solid rgba(255,255,255,.1); }
@@ -318,6 +335,7 @@
   .skip-profile-identity { min-width: 0 !important; padding: 12px !important; }
   .skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important; flex-basis: 92px; }
   .skip-player-main-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .skip-profile-primary-column, .skip-profile-secondary-column, .skip-profile-tertiary-column { padding-top: 16px; }
   .skip-profile-selection { align-items: flex-start !important; }
   .skip-profile-selection span:last-child { line-height: 1.35; }
 }

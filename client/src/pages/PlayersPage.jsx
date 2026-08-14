@@ -18,6 +18,7 @@ import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
+import { recordRecentView } from '../lib/recentHistory.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
@@ -1568,6 +1569,7 @@ function PlayersPage() {
   }, []);
 
   const pickPlayer = useCallback(async (person) => {
+    recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
     setQuery(person.fullName);
@@ -2094,7 +2096,7 @@ function PlayerProfile({ player, derived, onCompare }) {
         </div>
 
         {/* SKIP KPI scores */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(76px,1fr))', borderRight:`0.5px solid ${C.border}`, flexShrink:0 }}>
+        <div className="skip-profile-hero-primary-metrics" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(76px,1fr))', borderRight:`0.5px solid ${C.border}`, flexShrink:0 }}>
           {[['TPVI','True Value',kpis.TPVI],['CAS','Contact Auth',kpis.CAS],['DQS','Decision Qual',kpis.DQS],['DPI','Damage Pot',kpis.DPI]].map(([lbl,desc,val],i) => {
             const active = selectedMetric === lbl;
             const metricColor = val>=70?C.teal:val>=55?C.amber:val>=40?C.slate:C.rust;
@@ -2111,7 +2113,7 @@ function PlayerProfile({ player, derived, onCompare }) {
         </div>
 
         {/* Quick stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(68px,1fr))', borderRight:`0.5px solid ${C.border}`, flexShrink:0 }}>
+        <div className="skip-profile-hero-secondary-metrics" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(68px,1fr))', borderRight:`0.5px solid ${C.border}`, flexShrink:0 }}>
           {quickStats.map(([l,v],i) => (
             <div key={i} style={{ padding:'14px 12px', textAlign:'center', borderRight:i<3?`0.5px solid ${C.borderLight}`:'none', display:'flex', flexDirection:'column', justifyContent:'center' }}>
               <div style={px({ fontSize:24, fontWeight:700, color:C.navy, lineHeight:1 })}>{v}</div>
@@ -2234,10 +2236,10 @@ function PlayerProfile({ player, derived, onCompare }) {
       )}
 
       {/* ══ MAIN 4-COL GRID ═══════════════════════════════════════════════ */}
-      <div className="skip-player-main-grid" style={{ display:'grid', gridTemplateColumns:'minmax(175px,210px) 1fr 1fr minmax(200px,250px)', gap:12, alignItems:'start' }}>
+      <div className="skip-player-main-grid" style={{ display:'grid', gridTemplateColumns:'minmax(175px,210px) 1fr 1fr minmax(200px,250px)', gap:16, alignItems:'start' }}>
 
         {/* ── COL 1: At-a-glance — season line + SKIP composite grades ── */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skip-profile-primary-column" style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <Panel title="Season Stats" accent={teamAccent} badge={seasonLabel}>
             {seasonRows.map(([l,v], i) => (
               <KVRow key={l} label={l} value={v ?? '—'} last={i === seasonRows.length - 1}
@@ -2274,7 +2276,7 @@ function PlayerProfile({ player, derived, onCompare }) {
              (illustrative) and Share Card (an export of the Geometry
              Engine above, not new analysis) — last on purpose, so a scan
              top-to-bottom hits "real" before "stylized/derived". ── */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skip-profile-secondary-column" style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <Panel title="Player Geometry Engine" accent={C.amber} badge={<ChartExpandButton label="Expand" onClick={() => setExpandedChart('radar')} />}>
             <GeometryRadar kpis={kpis} isPitcher={player.isPitcher} focusMetric={selectedMetric} />
           </Panel>
@@ -2372,7 +2374,7 @@ function PlayerProfile({ player, derived, onCompare }) {
         </div>
 
         {/* ── COL 3: Scouting & trajectory — grades, dev, trend, career ── */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div className="skip-profile-tertiary-column" style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <Panel title="Scouting Grades" accent={C.teal} badge="20–80 Scale">
             {archQuote && <SkipInline quote={archQuote} color={C.teal} />}
             <div style={{ paddingTop:4, paddingBottom:6 }}>
