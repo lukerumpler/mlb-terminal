@@ -308,7 +308,9 @@ const fetchWithBackoff = async (
   for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(url, init);
-      if (response.ok || attempt === RETRY_MAX_RETRIES) {
+      // A 412 from the provider indicates a precondition or quota failure;
+      // retrying cannot change the account state and only adds latency/noise.
+      if (response.ok || response.status === 412 || attempt === RETRY_MAX_RETRIES) {
         return response;
       }
 

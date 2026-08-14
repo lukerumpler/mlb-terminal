@@ -142,3 +142,11 @@
 - [x] Add regression coverage for Sources removal and optimized error/loading behavior
 - [x] Run typecheck, focused tests, full tests, and responsive visual verification
 - [x] Save a checkpoint containing the debugged and optimized update
+
+- [x] Inspect the latest browser, server, and network logs for the highest-impact runtime failures
+- [x] Identify redundant requests, slow fetch paths, and avoidable render work
+- [x] Apply targeted error handling and performance optimizations
+- [x] Preserve source-backed unavailable states, caching, mobile behavior, and profile interactions
+- [x] Add regression coverage for the diagnosed failures and optimizations
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the debugged and optimized update

@@ -828,8 +828,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [teamBase?.abbr]);
 
+  const rosterInsightKey = useMemo(() => JSON.stringify({
+    team: { name:team.name, abbr:team.abbr, w:team.w, l:team.l, pct:team.pct, rs:team.rs, ra:team.ra, ops:team.ops, hr:team.hr, era:team.era, whip:team.whip, k:team.k, sb:team.sb },
+    roster: { hitting:liveTeamPlayers.hitting.slice(0, 12), pitching:liveTeamPlayers.pitching.slice(0, 12) },
+  }), [team.name, team.abbr, team.w, team.l, team.pct, team.rs, team.ra, team.ops, team.hr, team.era, team.whip, team.k, team.sb, liveTeamPlayers]);
+
   useEffect(() => {
-    if (!liveTeamData) return;
+    if (!liveTeamData || aiInsights) return;
     let alive = true;
     const input = {
       team: {
@@ -852,7 +857,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(() => { if (alive) setAiInsightsState('error'); });
     return () => { alive = false; };
-  }, [liveTeamData, team, liveTeamPlayers]);
+  }, [liveTeamData, rosterInsightKey]);
   const displayedInsights = aiInsights || rosterInsights;
   const playoffOddsValue = teamModelData?.playoffOdds != null
     ? `${Number(teamModelData.playoffOdds).toFixed(1)}%`
