@@ -6,6 +6,7 @@ import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx'
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
+import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
 import { openTab } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
@@ -605,6 +606,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const teamAccent = getTeamAccent(team);
   const teamRollups = useMemo(() => deriveTeamPlayerRollups(liveTeamPlayers), [liveTeamPlayers]);
   const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
+  const [provenanceOpen, setProvenanceOpen] = useState(false);
+  const provenanceTriggerRef = useRef(null);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
 
@@ -949,6 +952,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const aggregateSurface = liveTeamDataMode === 'live' ? C.tealSoft : liveTeamDataMode === 'cached' ? C.amberSoft : liveTeamDataMode === 'error' ? C.rustSoft : C.amberSoft;
   const aggregateBorder = liveTeamDataMode === 'live' ? C.tealMid : liveTeamDataMode === 'cached' ? C.amberMid : liveTeamDataMode === 'error' ? C.rustMid : C.amberMid;
   const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'VERIFIED ROSTER ROWS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
+  const overviewProvenance = useMemo(() => [
+    { label:'Team aggregate metrics', available: Boolean(liveTeamData), provider:'MLB Stats API', retrieved: liveTeamDataUpdatedAt ? new Date(liveTeamDataUpdatedAt).toLocaleString() : null, sampleSize: liveTeamData ? 'Current-season team aggregate' : null, method:'Direct team standings and aggregate-stat fields.' },
+    { label:'Roster insights', available: Boolean((liveTeamPlayers.hitting?.length || 0) + (liveTeamPlayers.pitching?.length || 0)), provider:'MLB Stats API', retrieved: teamPlayersUpdatedAt ? new Date(teamPlayersUpdatedAt).toLocaleString() : null, sampleSize: `${(liveTeamPlayers.hitting?.length || 0) + (liveTeamPlayers.pitching?.length || 0)} roster rows`, method:'Position-aware filters and minimum PA/IP thresholds applied in the browser.' },
+    { label:'Batted ball and exit velocity', available: Boolean(teamBattedBallData || teamExitVelocityRows.length), provider: teamSavantSource || 'Baseball Savant Statcast Search', retrieved: null, sampleSize: teamBattedBallData?.sampleSize ? `${teamBattedBallData.sampleSize.toLocaleString()} batted balls` : teamExitVelocityRows.length ? `${teamExitVelocityRows.length.toLocaleString()} rows` : null, method: teamSavantSource?.includes('rollup') ? 'Verified roster-player Statcast rows aggregated into team bins.' : 'Direct team Statcast rows transformed into launch-speed and batted-ball metrics.' },
+    { label:'Pitch arsenal', available: Boolean(teamPitchArsenalData), provider: teamSavantSource || 'Baseball Savant Statcast Search', retrieved: null, sampleSize: teamPitchArsenalData?.sampleSize ? `${teamPitchArsenalData.sampleSize.toLocaleString()} pitches` : null, method:'Verified pitch rows grouped by pitch type and usage.' },
+    { label:'Model context', available: Boolean(teamModelData?.found), provider: teamModelData?.source || 'FanGraphs', retrieved: teamModelData?.retrievedAt ? new Date(teamModelData.retrievedAt).toLocaleString() : null, sampleSize:'Not supplied by source', method:'Provider-supplied projection and valuation fields; no local estimation.' },
+  ], [liveTeamData, liveTeamDataUpdatedAt, liveTeamPlayers, teamPlayersUpdatedAt, teamBattedBallData, teamExitVelocityRows, teamPitchArsenalData, teamSavantSource, teamModelData]);
   const showInitialSkeleton = liveTeamDataMode === 'loading' && !liveTeamData && !liveTeamError;
 
   return (
@@ -956,6 +966,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
       {showInitialSkeleton && <TeamOverviewSkeleton />}
       <Breadcrumbs items={[{ label:'Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
+      <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${team.name || 'Team'} · ${CURRENT_SEASON} season`} entries={overviewProvenance} />
 
       {/* ── Selector + headline ── */}
       <div className="overview-command-header" style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
@@ -968,6 +979,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
           <button type="button" data-export-ignore onClick={exportTeamOverviewPdf} disabled={pdfExportState === 'loading'}
             aria-label="Download the current team overview as a PDF"
             style={{height:30,padding:'0 10px',border:`1px solid ${C.amberMid}`,borderRadius:7,background:pdfExportState==='ready'?C.tealSoft:pdfExportState==='error'?C.rustSoft:C.amberSoft,color:pdfExportState==='ready'?C.teal:pdfExportState==='error'?C.rust:C.amberDark,cursor:pdfExportState==='loading'?'wait':'pointer',opacity:pdfExportState==='loading'?.7:1,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>

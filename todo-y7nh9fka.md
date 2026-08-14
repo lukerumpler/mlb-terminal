@@ -127,3 +127,8 @@
 - [x] Verify desktop/mobile loading screens and save a checkpoint.
 - [x] Capture direct desktop and mobile verification for the Player Profile skeleton loading screen.
 - [x] Save a new checkpoint for the Team Overview and Player Profile skeleton-loading update after final verification.
+- [x] Audit existing metric source labels, retrieval timestamps, sample sizes, and transformation metadata on Overview and Player Profile.
+- [x] Implement an accessible responsive source provenance drawer with metric-level details.
+- [x] Connect Team Overview and Player Profile metrics to provenance entries without inventing missing metadata.
+- [x] Add regression coverage for drawer opening, metric details, unavailable metadata, and keyboard dismissal.
+- [x] Verify desktop/mobile drawer behavior and save a checkpoint.
