@@ -100,6 +100,27 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
   });
 
+  it('renders accessible highlight search shortcuts in the Player Video panel', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Video Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Video Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Video');
+    await waitFor(() => expect(screen.getByText('Video Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Video Player'));
+
+    await waitFor(() => expect(screen.getByText('Player Video')).toBeInTheDocument());
+    expect(screen.getByText('Highlight search shortcuts')).toBeInTheDocument();
+    const shortcut = screen.getByRole('link', { name:/Search Home run & extra-base plays/i });
+    expect(shortcut).toHaveAttribute('target', '_blank');
+    expect(shortcut.getAttribute('href')).toContain('youtube.com/results?search_query=');
+    expect(shortcut.getAttribute('href')).not.toContain('#t=');
+    await user.click(shortcut);
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+  });
+
   it('updates the selected metric when a profile KPI is clicked', async () => {
     const user = userEvent.setup();
     searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Interactive Player' }]);

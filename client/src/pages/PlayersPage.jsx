@@ -93,6 +93,19 @@ export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation
   ];
 }
 
+export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviation } = {}) {
+  const name = String(fullName || '').trim();
+  if (!name) return [];
+  const context = [teamAbbreviation, teamName].filter(Boolean).join(' ');
+  const base = `${name}${context ? ` ${context}` : ''} baseball MLB`;
+  return [
+    { id:'power', label:'Home run & extra-base plays', query:`${base} home run highlights` },
+    { id:'contact', label:'Contact & hard-hit plays', query:`${base} batting highlights hard hit` },
+    { id:'defense', label:'Defensive highlights', query:`${base} defensive highlights` },
+    { id:'pitching', label:'Strikeout & pitch-sequencing plays', query:`${base} strikeout pitching highlights` },
+  ].map(item => ({ ...item, href:`https://www.youtube.com/results?search_query=${encodeURIComponent(item.query)}` }));
+}
+
 function PlayerVideoThumbnail({ item, playerName, accent }) {
   const [imageError, setImageError] = useState(false);
   useEffect(() => { setImageError(false); }, [item.thumbnail]);
@@ -100,9 +113,7 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
   return (
     <a href={item.href} target="_blank" rel="noreferrer noopener"
       aria-label={`${item.label} for ${playerName}`}
-      style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none', transition:'transform 160ms ease, border-color 160ms ease' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = accent; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = C.border; }}>
+      style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none' }}>
       <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
         {!imageError && item.thumbnail ? (
           <img src={item.thumbnail} alt="" loading="lazy" onError={() => setImageError(true)}
@@ -124,6 +135,11 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
 
 function PlayerVideoPanel({ player, profile, accent }) {
   const playerName = profile?.fullName || `${profile?.useName || profile?.firstName || ''} ${profile?.useLastName || profile?.lastName || ''}`.trim();
+  const highlightSearches = buildPlayerHighlightSearches({
+    fullName: playerName,
+    teamName: profile?.currentTeam?.name,
+    teamAbbreviation: profile?.currentTeam?.abbreviation,
+  });
   const items = buildPlayerVideoLinks({
     id: player?.id,
     fullName: playerName,
@@ -134,14 +150,29 @@ function PlayerVideoPanel({ player, profile, accent }) {
     <Panel title="Player Video" accent={accent} badge="External Sources">
       <div style={{ padding:'10px 12px 11px' }}>
         {items.length ? (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8 }}>
-            {items.map(item => <PlayerVideoThumbnail key={item.id} item={item} playerName={playerName} accent={accent} />)}
-          </div>
+          <>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8 }}>
+              {items.map(item => <PlayerVideoThumbnail key={item.id} item={item} playerName={playerName} accent={accent} />)}
+            </div>
+            <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.borderLight}` }}>
+              <div style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 })}>Highlight search shortcuts</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:5 }}>
+                {highlightSearches.map(item => (
+                  <a key={item.id} href={item.href} target="_blank" rel="noreferrer noopener"
+                    aria-label={`Search ${item.label} for ${playerName}`}
+                    style={{ display:'block', padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:6, background:C.surface2, color:C.text2, textDecoration:'none' }}>
+                    <span style={px({ fontSize:9, fontWeight:800, color:accent, marginRight:5 })}>↗</span>
+                    <span style={sans({ fontSize:9.5, fontWeight:700 })}>{item.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </>
         ) : (
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.5 })}>Video search is unavailable until a verified player identity is loaded.</div>
         )}
         <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>
-          Preview art is the official MLB headshot. Cards open live MLB or YouTube search results; SKIP does not host or invent video records.
+          Preview art is the official MLB headshot. Search cards and highlight shortcuts open live source results; SKIP does not invent clip URLs or timestamps.
         </div>
       </div>
     </Panel>
