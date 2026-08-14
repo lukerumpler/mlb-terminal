@@ -528,6 +528,10 @@
 .skip-performance-summary-card-expanded { padding:9px 12px 11px; border-top:1px solid var(--borderLight, rgba(0,0,0,.08)); background:var(--surface2, #faf9f5); color:var(--text2, #555); font:9px/1.4 'Plus Jakarta Sans', sans-serif; }
 .skip-performance-summary-card-expanded strong { color:var(--text, #222); font-weight:800; }
 .skip-performance-summary-card.is-expanded { background:color-mix(in srgb, var(--teal, #168c7a) 4%, var(--surface, #fffdf8)); }
+.skip-summary-sparkline-wrap { display:flex; align-items:center; gap:8px; margin:9px 0 8px; color:var(--text4, #999); font:8px/1 'DM Mono', monospace; text-transform:uppercase; letter-spacing:.04em; }
+.skip-summary-sparkline { width:100%; max-width:180px; height:32px; overflow:visible; }
+.skip-summary-sparkline-unavailable { margin:9px 0 8px; padding:7px 8px; border:1px dashed var(--borderLight, rgba(0,0,0,.1)); border-radius:4px; color:var(--text4, #999); font:8px/1.2 'DM Mono', monospace; text-transform:uppercase; }
+@media (prefers-reduced-motion: reduce) { .skip-performance-summary-grid { scroll-behavior:auto; } }
 .skip-player-page .skip-player-hero { border-radius:8px !important; box-shadow:0 8px 22px rgba(25,35,40,.08); }
 .skip-player-page .skip-profile-identity { min-width:270px; padding:12px 14px !important; gap:12px !important; }
 .skip-player-page .skip-profile-photo-frame { width:92px; height:112px; border-radius:8px; }
@@ -564,7 +568,8 @@
   .skip-player-page .skip-profile-hero-secondary-metrics { flex:0 0 auto; }
   .skip-performance-summary-heading { align-items:flex-start; flex-direction:column; gap:5px; }
   .skip-performance-summary-heading span { margin-left:0; }
-  .skip-performance-summary-grid { grid-template-columns:repeat(4,minmax(112px,1fr)); overflow-x:auto; }
+  .skip-performance-summary-grid { grid-template-columns:repeat(4,minmax(112px,1fr)); overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; touch-action:pan-x; scrollbar-width:thin; }
+  .skip-performance-summary-card { scroll-snap-align:start; scroll-snap-stop:always; }
   .skip-performance-summary-card { min-height:92px; padding:0; }
   .skip-performance-summary-card-button { min-height:104px; padding:9px 10px; }
   .skip-performance-summary-card-value { font-size:20px; }

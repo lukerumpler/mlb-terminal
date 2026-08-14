@@ -5,6 +5,8 @@ import {
   metricPopulationPercentile,
   buildSavantPercentileAxes,
   normalizeSprayPoint,
+  buildRecentGameSeries,
+  MetricSparkline,
 } from '../client/src/pages/PlayersPage.jsx';
 import { computeAMD } from '../client/src/engine/skip.js';
 import { selectSeasonSplit, normalizeSeasonAdvancedStat } from '../client/src/api/mlb.js';
@@ -96,6 +98,13 @@ describe('player profile data accuracy guards', () => {
     const axes = comparisonAxes(player, () => [{ axis:'Power', pct:99, rawLabel:'99' }], false);
     expect(comparisonIdentity(player)).toEqual({ name:'Juan Soto', identity:'New York Mets · RF' });
     expect(axes[0]).toMatchObject({ axis:'Power', pct:99, label:'99th', color:expect.any(String) });
+  });
+
+  it('normalizes recent boxscore games into a chronological last-10 series', () => {
+    const recentGames = Array.from({ length:12 }, (_, index) => ({ batting:{ ops: .700 + index * .01 } }));
+    expect(buildRecentGameSeries({ recentGames }, 'ops', 10).map(value => Number(value.toFixed(2)))).toEqual([.79, .78, .77, .76, .75, .74, .73, .72, .71, .70]);
+    expect(buildRecentGameSeries({ recentGames:[{ batting:{ ops:null } }] }, 'ops', 10)).toEqual([]);
+    expect(MetricSparkline({ values:[.800], tone:'#168c7a' }).props.className).toBe('skip-summary-sparkline-unavailable');
   });
 
   it('normalizes only explicit provider WAR and wRC+ fields', () => {

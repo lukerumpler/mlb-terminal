@@ -124,3 +124,12 @@
 - [x] Add regression coverage for the six error paths, provider mappings, trends, and summary expansion
 - [x] Run typecheck, focused tests, full tests, and responsive loaded-player regression verification
 - [x] Save a checkpoint containing the repaired and enhanced Performance Summary
+
+- [x] Audit available recent-game data and current mobile Performance Summary rail behavior
+- [x] Add touch-friendly smooth snap-to-card scrolling for the mobile metric rail
+- [x] Add verified last-10-games sparkline data to expanded metric cards
+- [x] Show explicit unavailable states when a metric lacks a verified last-10-games series
+- [x] Preserve expanded definitions, provenance, mobile layout, and existing profile interactions
+- [x] Add regression coverage for snap-scroll CSS, sparkline normalization, and expanded rendering
+- [x] Run typecheck, tests, and responsive visual verification
+- [x] Save a checkpoint containing the mobile rail and sparkline enhancement

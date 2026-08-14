@@ -1894,6 +1894,31 @@ export function BoxscoreSplitPanel({ player }) {
     <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
   </Panel>;
 }
+export function buildRecentGameSeries(boxscoreSplits, metric = 'ops', limit = 10) {
+  const games = Array.isArray(boxscoreSplits?.recentGames) ? boxscoreSplits.recentGames : [];
+  return games.slice(0, limit).map(game => {
+    const raw = game?.batting?.[metric];
+    return raw == null || raw === '' ? null : Number(raw);
+  }).filter(Number.isFinite).reverse();
+}
+
+export function MetricSparkline({ values, tone }) {
+  const numeric = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
+  if (numeric.length < 2) return <div className="skip-summary-sparkline-unavailable">Last 10 games unavailable</div>;
+  const min = Math.min(...numeric);
+  const max = Math.max(...numeric);
+  const span = max - min || 1;
+  const points = numeric.map((value, index) => `${(index / (numeric.length - 1)) * 100},${28 - ((value - min) / span) * 22}`).join(' ');
+  return (
+    <div className="skip-summary-sparkline-wrap" aria-label={`Last ${numeric.length} games trend`}>
+      <svg className="skip-summary-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-hidden="true">
+        <polyline points={points} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span>Last {numeric.length} games</span>
+    </div>
+  );
+}
+
 function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
@@ -1993,12 +2018,13 @@ function PlayerProfile({ player, derived, onCompare }) {
   const priorOps = careerRows.slice(1).map(row => Number(row.stat?.ops)).find(Number.isFinite);
   const opsDelta = Number.isFinite(currentOps) && Number.isFinite(priorOps) ? currentOps - priorOps : null;
   const statcastValue = player.savant?.est_woba ?? player.savant?.avg_hit_speed ?? null;
+  const recentOpsSeries = buildRecentGameSeries(player.boxscoreSplits, 'ops', 10);
   const statcastPopulation = player.savant?.est_woba != null
     ? (player.statcastPopulation || []).map(row => row?.est_woba)
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
   const performanceSummary = [
     { label:'WAR', value:dashIfMissing(player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:player.advancedMetrics?.war != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.purple },
-    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, tone:C.amber },
+    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber },
     { label:'wRC+', value:dashIfMissing(player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:player.advancedMetrics?.wrcPlus != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.teal },
     { label:'Statcast', value:statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : '—', detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:player.savant ? 'Baseball Savant' : 'Unavailable', trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy },
   ];
@@ -2243,6 +2269,7 @@ function PlayerProfile({ player, derived, onCompare }) {
                 </button>
                 {isExpanded && <div className="skip-performance-summary-card-expanded" id={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`}>
                   <div>{metric.definition}</div>
+                  <MetricSparkline values={metric.series} tone={metric.tone} />
                   <strong>Provider:</strong> {metric.source}<br />
                   <strong>Context:</strong> {metric.trend}
                 </div>}

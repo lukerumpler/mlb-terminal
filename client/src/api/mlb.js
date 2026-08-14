@@ -521,7 +521,7 @@ function finalizeBoxscoreBucket(bucket, kind) {
 export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON) {
   const id = Number(playerId);
   const clubId = Number(teamId);
-  const unavailable = (reason = 'No completed official boxscores were returned for this player.') => ({ status: 'unavailable', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: 0, requestedGames: 0, reason, batting: [], pitching: [] });
+  const unavailable = (reason = 'No completed official boxscores were returned for this player.') => ({ status: 'unavailable', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: 0, requestedGames: 0, reason, batting: [], pitching: [], recentGames: [] });
   if (playerId == null || teamId == null || playerId === '' || teamId === '' || !Number.isFinite(id) || !Number.isFinite(clubId) || id <= 0 || clubId <= 0) return unavailable('The player does not have a current MLB team identifier.');
   try {
     const today = new Date();
@@ -554,7 +554,22 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
       }
     }
     const finalize = (map, kind) => [...map.values()].map(bucket => finalizeBoxscoreBucket(bucket, kind)).filter(row => row.games > 0);
-    return { status: 'live', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: results.length, requestedGames: games.length, windowLabel: `Most recent ${games.length} completed regular-season games`, batting: finalize(batting, 'batting'), pitching: finalize(pitching, 'pitching') };
+    const recentGames = results.slice(0, 10).map(({ game, row }) => {
+      const battingBucket = makeBoxscoreBucket('Game');
+      const pitchingBucket = makeBoxscoreBucket('Game');
+      battingBucket.games = 1;
+      pitchingBucket.games = 1;
+      addBoxscoreBatting(battingBucket, row.stats?.batting);
+      addBoxscorePitching(pitchingBucket, row.stats?.pitching);
+      return {
+        gamePk: game.gamePk,
+        date: game.gameDate || null,
+        opponent: row.side === 'home' ? game.teams?.away?.team?.name || null : game.teams?.home?.team?.name || null,
+        batting: finalizeBoxscoreBucket(battingBucket, 'batting'),
+        pitching: finalizeBoxscoreBucket(pitchingBucket, 'pitching'),
+      };
+    });
+    return { status: 'live', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: results.length, requestedGames: games.length, windowLabel: `Most recent ${games.length} completed regular-season games`, batting: finalize(batting, 'batting'), pitching: finalize(pitching, 'pitching'), recentGames };
   } catch (error) {
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }

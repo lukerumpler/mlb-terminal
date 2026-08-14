@@ -32,6 +32,7 @@ function mockPlayer(id, fullName) {
     isPitcher: false,
     pitchArsenal: null, pitchArsenalPopulation: null, contactPoints: null, pitcherPitches: null,
     stats: {}, statSeason: 2026, isFallback: false, careerStats: null, splits: null, comps: [],
+    boxscoreSplits: { status:'live', recentGames:[{ batting:{ ops:.720 } }, { batting:{ ops:.810 } }, { batting:{ ops:.930 } }] },
     handednessSplits: { season: 2026, rows: [
       { side: 'LHP', stat: { hits: 57, atBats: 200, plateAppearances: 225, baseOnBalls: 20, hitByPitch: 2, sacFlies: 3, doubles: 10, triples: 1, homeRuns: 6, strikeOuts: 43 } },
       { side: 'RHP', stat: { hits: 62, atBats: 200, plateAppearances: 234, baseOnBalls: 25, hitByPitch: 3, sacFlies: 4, doubles: 12, triples: 2, homeRuns: 12, strikeOuts: 42 } },
@@ -83,6 +84,9 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(css).toContain('.skip-performance-summary-card { min-width:0; padding:10px 12px 9px;');
     expect(css).toContain('.skip-performance-summary-card-trend { margin-top:6px;');
     expect(css).toContain('.skip-performance-summary-card-expanded { padding:9px 12px 11px;');
+    expect(css).toContain('scroll-snap-type:x mandatory; scroll-behavior:smooth;');
+    expect(css).toContain('.skip-performance-summary-card { scroll-snap-align:start; scroll-snap-stop:always; }');
+    expect(css).toContain('.skip-summary-sparkline { width:100%; max-width:180px; height:32px;');
     expect(css).toContain('.skip-player-page .skip-player-hero { flex-wrap:nowrap !important; overflow-x:auto !important;');
     expect(css).toContain('.skip-player-page .skip-profile-identity { flex:0 0 258px; min-width:258px !important;');
     expect(css).toContain('.skip-player-page .skip-player-hero { border-radius:8px !important;');
@@ -127,6 +131,11 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(warCard).toHaveAttribute('aria-expanded', 'true');
     expect(summary).toHaveTextContent('Wins Above Replacement');
     expect(summary).toHaveTextContent('Provider: MLB Stats API seasonAdvanced');
+    expect(summary.querySelector('.skip-summary-sparkline')).toBeNull();
+    const opsCard = screen.getByRole('button', { name:/OPS \.842/i });
+    await user.click(opsCard);
+    expect(summary.querySelector('.skip-summary-sparkline')).toBeInTheDocument();
+    expect(summary).toHaveTextContent('Last 3 games');
   });
 
   it('opens the side-by-side comparison modal and loads a second player through the live adapter', async () => {
