@@ -148,5 +148,5 @@
 - [x] Capture post-fix desktop/mobile verification showing the affiliate selector resolves or transitions to an explicit unavailable state.
 - [x] Add or rerun rendered Overview coverage proving a FanGraphs 502 leaves model panels in an explicit unavailable/fallback state rather than Loading.
 - [x] Verify whether the ERR_HTTP_HEADERS_SENT log recurs after current proxy repairs or document it as stale/non-blocking.
-- [ ] Save and publish a fresh checkpoint for the final data-loading repair after the verified fixes.
+- [x] Save and publish a fresh checkpoint for the final data-loading repair after the verified fixes.
 - [x] Preserve rendered regression evidence that affiliate lookup transitions from generic Loading to identity-ready or explicit unavailable status.
