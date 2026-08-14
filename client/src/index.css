@@ -660,7 +660,6 @@
 @media (prefers-reduced-motion:reduce){.skip-provenance-drawer{animation:none}.skip-provenance-trigger{transition:none}}
 
 
-<<<<<<< HEAD
 /* Overview feed states share one compact visual language. */
 .skip-overview-empty-state { min-height:126px; display:flex; align-items:center; justify-content:center; gap:10px; padding:18px 16px; text-align:left; border-top:1px solid var(--borderLight, rgba(0,0,0,.08)); background:linear-gradient(180deg, color-mix(in srgb, var(--surface2, #faf9f5) 58%, transparent), transparent); }
 .skip-overview-empty-mark { flex:0 0 auto; color:var(--text4, #999); font:800 22px/1 'DM Mono', monospace; }
