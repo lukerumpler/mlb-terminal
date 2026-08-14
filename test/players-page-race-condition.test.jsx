@@ -79,6 +79,11 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(css).toContain('.skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; gap:10px !important; }');
     expect(css).toContain('.skip-player-main-grid { grid-template-columns: 1fr !important; gap: 10px !important; }');
     expect(css).toContain('.skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important;');
+    expect(css).toContain('.skip-player-page .skip-player-hero { border-radius:8px !important;');
+    expect(css).toContain('.skip-player-page .skip-profile-source-strip { margin-top:6px; padding:7px 10px; gap:12px; border-radius:6px; }');
+    expect(css).toContain('.skip-player-page .skip-profile-tab-rail { margin-top:0; border-radius:6px; padding:3px; }');
+    expect(css).toContain('.skip-player-page .skip-player-main-grid { grid-template-columns:minmax(164px,190px) minmax(0,1.08fr) minmax(0,1.08fr) minmax(190px,225px) !important; gap:10px !important; }');
+    expect(css).toContain('.skip-player-page .skip-panel { border-radius:7px !important;');
   });
 
   it('shows a page-shaped Player Profile skeleton while the selected player is loading', async () => {

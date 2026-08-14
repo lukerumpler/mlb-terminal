@@ -98,3 +98,11 @@
 - [x] Add Vitest coverage for live radar normalization and rendered source states
 - [x] Run typecheck, tests, and visual verification for the radar update
 - [x] Save a checkpoint containing the live radar update
+
+- [x] Audit the current player profile structure against the supplied compact scouting-dashboard reference
+- [x] Refine player profile card spacing, borders, typography, and section hierarchy to match the reference
+- [x] Improve the player hero/header layout with compact identity, grade, confidence, and source areas
+- [x] Preserve existing profile tabs, chart expansion, split comparisons, and Notes interactions
+- [x] Add regression coverage for the reference-driven profile layout and responsive behavior
+- [x] Run typecheck, tests, and visual verification of the refined player profile
+- [x] Save a checkpoint containing the reference-driven player profile refinement

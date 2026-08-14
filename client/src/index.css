@@ -501,6 +501,49 @@
   .skip-profile-tab-rail button, .skip-profile-expand-button, .skip-chart-dialog-backdrop, .skip-chart-dialog { transition:none; animation:none; }
 }
 
+/* Reference-driven player profile rhythm: compact scouting-terminal cards with
+   breathable 10–12px gaps, stronger section hierarchy, and aligned metadata.
+   These rules are intentionally scoped to the player page so team/overview
+   surfaces keep their established layout. */
+.skip-player-page { gap:12px !important; }
+.skip-player-page .skip-player-hero { border-radius:8px !important; box-shadow:0 8px 22px rgba(25,35,40,.08); }
+.skip-player-page .skip-profile-identity { min-width:270px; padding:12px 14px !important; gap:12px !important; }
+.skip-player-page .skip-profile-photo-frame { width:92px; height:112px; border-radius:8px; }
+.skip-player-page .skip-profile-photo-frame img { width:92px !important; height:112px !important; }
+.skip-player-page .skip-profile-hero-primary-metrics { grid-template-columns:repeat(4,minmax(68px,1fr)) !important; }
+.skip-player-page .skip-profile-hero-secondary-metrics { grid-template-columns:repeat(4,minmax(60px,1fr)) !important; }
+.skip-player-page .skip-profile-kpi { padding:10px 8px !important; }
+.skip-player-page .skip-profile-kpi > div:first-child { font-size:26px !important; }
+.skip-player-page .skip-profile-hero-secondary-metrics > div { padding:11px 8px !important; }
+.skip-player-page .skip-profile-hero-secondary-metrics > div > div:first-child { font-size:21px !important; }
+.skip-player-page .skip-profile-source-strip { margin-top:6px; padding:7px 10px; gap:12px; border-radius:6px; }
+.skip-player-page .skip-profile-tab-rail { margin-top:0; border-radius:6px; padding:3px; }
+.skip-player-page .skip-profile-tab-rail button { min-height:30px; padding:6px 9px; font-size:9px; }
+.skip-player-page .skip-profile-tab-summary { gap:10px; }
+.skip-player-page .skip-profile-tab-grid { gap:10px; padding:10px; }
+.skip-player-page .skip-player-main-grid { grid-template-columns:minmax(164px,190px) minmax(0,1.08fr) minmax(0,1.08fr) minmax(190px,225px) !important; gap:10px !important; }
+.skip-player-page .skip-profile-primary-column,
+.skip-player-page .skip-profile-secondary-column,
+.skip-player-page .skip-profile-tertiary-column { gap:10px !important; padding-top:16px; }
+.skip-player-page .skip-panel { border-radius:7px !important; box-shadow:0 4px 14px rgba(25,35,40,.045); }
+.skip-player-page .skip-panel > div:first-child { min-height:30px !important; padding:7px 10px !important; }
+.skip-player-page .skip-panel > div:first-child span { font-size:9px !important; }
+.skip-player-page .skip-profile-primary-column .skip-panel > div:not(:first-child),
+.skip-player-page .skip-profile-secondary-column .skip-panel > div:not(:first-child),
+.skip-player-page .skip-profile-tertiary-column .skip-panel > div:not(:first-child) { min-width:0; }
+@media (max-width:1100px) {
+  .skip-player-page .skip-player-main-grid { grid-template-columns:minmax(165px,205px) minmax(0,1fr) !important; gap:10px !important; }
+}
+@media (max-width:720px) {
+  .skip-player-page { gap:8px !important; }
+  .skip-player-page .skip-profile-identity { padding:10px !important; gap:10px !important; }
+  .skip-player-page .skip-profile-photo-frame,
+  .skip-player-page .skip-profile-photo-frame img { width:82px !important; height:102px !important; }
+  .skip-player-page .skip-profile-kpi > div:first-child { font-size:22px !important; }
+  .skip-player-page .skip-profile-hero-secondary-metrics > div > div:first-child { font-size:18px !important; }
+  .skip-player-page .skip-profile-source-strip { gap:8px; padding:7px 9px; }
+}
+
 /* Overview decision surfaces: keep the radar beside Front Office Evaluation on
    wide terminals, then stack it cleanly below the decision cards at narrower
    widths so labels and chart axes remain readable. */
