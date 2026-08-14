@@ -99,4 +99,4 @@
 - [x] Inventory remaining visible Source gap metrics across Team Overview and Player Profile and document each source contract.
 - [x] Decide which remaining gaps have verified connected sources and narrow or extend remediation scope accordingly.
 - [x] Add regression coverage for any additional source-gap states changed in this pass.
-- [ ] Save a checkpoint after the completed Source Gap audit and remediation validation.
+- [x] Save a checkpoint after the completed Source Gap audit and remediation validation.
