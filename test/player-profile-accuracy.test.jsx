@@ -73,6 +73,19 @@ describe('player profile data accuracy guards', () => {
     expect(metricPopulationPercentile(90, [{ value: 70 }, { value: 80 }, { value: 90 }], ['value'], false)).toBe(0);
   });
 
+  it('keeps percentile radar inputs bounded and label-ready for clean geometry', () => {
+    const axes = buildSavantPercentileAxes({
+      savant: { est_woba: 0.410, est_slg: 0.560, avg_hit_speed: 92, whiff_percent: 18, oz_swing_percent: 24 },
+      expectedStatisticsPopulation: [{ est_woba: 0.300, est_slg: 0.400 }, { est_woba: 0.410, est_slg: 0.560 }, { est_woba: 0.450, est_slg: 0.620 }],
+      statcastPopulation: [{ avg_hit_speed: 82, whiff_percent: 30, oz_swing_percent: 34 }, { avg_hit_speed: 92, whiff_percent: 18, oz_swing_percent: 24 }, { avg_hit_speed: 98, whiff_percent: 12, oz_swing_percent: 18 }],
+      batTrackingPopulation: [{ avg_bat_speed: 68 }, { avg_bat_speed: 74 }, { avg_bat_speed: 80 }],
+      batTracking: { avg_bat_speed: 74 },
+    }, false);
+    expect(axes.length).toBeGreaterThanOrEqual(3);
+    expect(axes.every(axis => Number.isFinite(axis.pct) && axis.pct >= 0 && axis.pct <= 100)).toBe(true);
+    expect(axes.every(axis => typeof axis.axis === 'string' && typeof axis.rawLabel === 'string')).toBe(true);
+  });
+
   it('does not create a percentile radar from missing Savant populations', () => {
     expect(buildSavantPercentileAxes({ savant: { est_slg: 0.600 } }, false)).toEqual([]);
     expect(formatProfileMetric(0.598, 3)).toBe('0.598');

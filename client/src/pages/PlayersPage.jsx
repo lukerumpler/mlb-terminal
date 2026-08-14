@@ -922,22 +922,26 @@ function SavantPercentileProfile({ player, isPitcher, teamAccent, onExpand, expa
             </div>
             <div style={px({ fontSize:9, color:C.text4 })}>0–100 rank</div>
           </div>
-          <ResponsiveContainer width="100%" height={expanded ? 420 : 238}>
-            <RadarChart data={axes} margin={{ top:18, right:38, bottom:14, left:38 }}>
-              <PolarGrid stroke={C.border} />
-              <PolarAngleAxis dataKey="axis" tick={({ payload, x, y, textAnchor }) => {
-                const item = axes.find(entry => entry.axis === payload.value);
-                return (
-                  <g>
-                    <text x={x} y={y} textAnchor={textAnchor} fill={C.text2} fontSize={9} fontWeight={700} fontFamily="'Plus Jakarta Sans',sans-serif">{payload.value}</text>
-                    <text x={x} y={y + 12} textAnchor={textAnchor} fill={percentileColor(item?.pct)} fontSize={9} fontWeight={800} fontFamily="'DM Mono',monospace">{percentileLabel(item?.pct)}</text>
-                  </g>
-                );
-              }} />
-              <PolarRadiusAxis domain={[0, 100]} ticks={[50]} tick={{ fill:C.text4, fontSize:8, fontFamily:"'DM Mono',monospace" }} axisLine={false} />
-              <Radar isAnimationActive={false} dataKey="pct" stroke={teamAccent} fill={teamAccent} fillOpacity={0.2} strokeWidth={2} dot={{ r:3, fill:teamAccent }} />
-            </RadarChart>
-          </ResponsiveContainer>
+          <div className={`skip-percentile-radar-frame ${expanded ? 'is-expanded' : ''}`}>
+            <ResponsiveContainer width="100%" height={expanded ? 430 : 250}>
+              <RadarChart data={axes} cx="50%" cy="50%" outerRadius={expanded ? '68%' : '62%'} margin={{ top:28, right:58, bottom:28, left:58 }}>
+                <PolarGrid stroke={C.border} radialLines={true} />
+                <PolarAngleAxis dataKey="axis" tick={({ payload, x, y, textAnchor }) => {
+                  const item = axes.find(entry => entry.axis === payload.value);
+                  const anchor = textAnchor || 'middle';
+                  return (
+                    <g className="skip-percentile-axis-label">
+                      <text x={x} y={y} dy={anchor === 'middle' ? -2 : 0} textAnchor={anchor} fill={C.text2} fontSize={9} fontWeight={700} fontFamily="'Plus Jakarta Sans',sans-serif">{payload.value}</text>
+                      <text x={x} y={y} dy={anchor === 'middle' ? 11 : 13} textAnchor={anchor} fill={percentileColor(item?.pct)} fontSize={9} fontWeight={800} fontFamily="'DM Mono',monospace">{percentileLabel(item?.pct)}</text>
+                    </g>
+                  );
+                }} />
+                <PolarRadiusAxis domain={[0, 100]} ticks={[25, 50, 75, 100]} tick={{ fill:C.text4, fontSize:7, fontFamily:"'DM Mono',monospace" }} axisLine={false} />
+                <Radar isAnimationActive={false} dataKey="pct" stroke={teamAccent} fill={teamAccent} fillOpacity={0.22} strokeWidth={2.5} dot={{ r:3.5, fill:teamAccent, stroke:C.surface, strokeWidth:1 }} />
+                <Tooltip {...TT} formatter={(value, name, item) => [`${value} percentile · ${item?.payload?.rawLabel || 'raw unavailable'}`, item?.payload?.axis || 'Metric']} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:'5px 14px', borderTop:`0.5px solid ${C.borderLight}`, paddingTop:8 }}>
             {axes.map(item => (
               <div key={item.axis} style={{ display:'flex', justifyContent:'space-between', gap:8 }}>
