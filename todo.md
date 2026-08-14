@@ -11107,8 +11107,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 
 ## Data repair and UI optimization (No new features)
 
-- [ ] Audit team overview metrics and fallback states for team win-loss records, run differential, and win percentage in offline or slow-connection states.
-- [ ] Replace placeholder or fallback text on team overview and player cards with verified baseline statistics from MLB Stats API / Baseball Savant.
-- [ ] Refine Overview page loading skeletons and error boundaries to prevent layout shifts during data fetches.
-- [ ] Enhance contrast, touch targets, and visual hierarchy across secondary cards.
-- [ ] Run regression tests, verify responsive layout, preserve ROADMAP_REFERENCE_FEATURES.md, and save a final data-repair checkpoint.
+- [x] Audit team overview metrics and fallback states for team win-loss records, run differential, and win percentage in offline or slow-connection states.
+- [x] Replace placeholder or fallback text on team overview and player cards with verified baseline statistics from MLB Stats API / Baseball Savant.
+- [x] Refine Overview page loading skeletons and error boundaries to prevent layout shifts during data fetches.
+- [x] Enhance contrast, touch targets, and visual hierarchy across secondary cards.
+- [x] Run regression tests, verify responsive layout, preserve ROADMAP_REFERENCE_FEATURES.md, and save a final data-repair checkpoint.
