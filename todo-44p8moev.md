@@ -30,3 +30,11 @@
 - [x] Save and publish the completed playlist and embedded-player update.
 
 - [x] Add move-up and move-down controls for saved clips within the active playlist and test ordering persistence.
+
+- [x] Inventory every visible unavailable, pending, loading, dash, and placeholder data state across the app.
+- [x] Trace each state to its API, transformation, loading, or empty-data source.
+- [x] Repair safe data paths and replace unresolved states with specific, honest explanations and recovery actions.
+- [x] Add focused tests for repaired data states and verify affected views at desktop and mobile sizes.
+- [x] Save and publish the completed unavailable-data remediation update.
+
+- [x] Bound the Overview live-feed loading state with an explicit timeout/error message so a stalled upstream cannot leave the page connecting forever.

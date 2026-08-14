@@ -58,6 +58,50 @@ function formatTeamMetric(value, digits = 0) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   return Number(value).toFixed(digits);
 }
+
+function sumPlayerStat(rows = [], keys = []) {
+  const values = rows.map(row => {
+    for (const key of keys) {
+      const value = Number(row?.stat?.[key]);
+      if (Number.isFinite(value)) return value;
+    }
+    return null;
+  }).filter(value => value != null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+}
+
+export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
+  const hitters = Array.isArray(players.hitting) ? players.hitting : [];
+  const pitchers = Array.isArray(players.pitching) ? players.pitching : [];
+  const stolenBases = sumPlayerStat(hitters, ['stolenBases', 'sb']);
+  const caughtStealing = sumPlayerStat(hitters, ['caughtStealing', 'cs']);
+  const hits = sumPlayerStat(hitters, ['hits', 'h']);
+  const extraBaseHits = [
+    sumPlayerStat(hitters, ['doubles', '2B']),
+    sumPlayerStat(hitters, ['triples', '3B']),
+    sumPlayerStat(hitters, ['homeRuns', 'hr']),
+  ].every(value => value != null)
+    ? [sumPlayerStat(hitters, ['doubles', '2B']), sumPlayerStat(hitters, ['triples', '3B']), sumPlayerStat(hitters, ['homeRuns', 'hr'])].reduce((sum, value) => sum + value, 0)
+    : null;
+  const byPosition = new Map();
+  [...hitters, ...pitchers].forEach(row => {
+    const position = row?.position || '—';
+    const current = byPosition.get(position) || { position, players:0, pa:0, ip:0 };
+    current.players += 1;
+    current.pa += Number(row?.stat?.plateAppearances || row?.stat?.pa) || 0;
+    current.ip += Number(row?.stat?.inningsPitched || row?.stat?.ip) || 0;
+    byPosition.set(position, current);
+  });
+  return {
+    stolenBases,
+    caughtStealing,
+    stolenBaseAttempts: stolenBases != null && caughtStealing != null ? stolenBases + caughtStealing : null,
+    extraBaseHits,
+    extraBaseRate: extraBaseHits != null && hits ? extraBaseHits / hits : null,
+    activePlayers: hitters.length || pitchers.length ? hitters.length + pitchers.length : null,
+    positions: [...byPosition.values()].sort((a, b) => b.players - a.players || a.position.localeCompare(b.position)),
+  };
+}
 function rankAmong(teams, key, asc=false) {
   const vals=Object.values(teams).map(t=>t[key]).sort((a,b)=>asc?a-b:b-a);
   return v=>vals.indexOf(v)+1;
@@ -298,6 +342,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   // brown) would fail contrast as text against a themed background, but read
   // fine as a bar fill or a 3px accent strip.
   const teamAccent = team?.color || C.amber;
+  const teamRollups = useMemo(() => deriveTeamPlayerRollups(liveTeamPlayers), [liveTeamPlayers]);
   const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
@@ -356,6 +401,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     // must render independently of the slower per-player leaderboard calls,
     // otherwise one delayed pitching request leaves every visible team card on
     // an em dash even when the authoritative aggregate responses succeeded.
+    const feedTimeout = window.setTimeout(() => {
+      if (alive && !liveTeamData) setLiveTeamError(true);
+    }, 12000);
     Promise.allSettled([
       getStandings(),
       getAllTeamStats('hitting'),
@@ -385,8 +433,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           if (stat.teamId != null) byId[stat.teamId] = row;
         });
       }
+      window.clearTimeout(feedTimeout);
       if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
         setLiveTeamData({ byAbbr, byId });
+        setLiveTeamError(false);
       } else {
         setLiveTeamError(true);
       }
@@ -408,7 +458,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamPlayersLoading(false);
     });
 
-    return ()=>{ alive=false; };
+    return ()=>{ alive=false; window.clearTimeout(feedTimeout); };
   },[teamBase?.id]);
 
   useEffect(() => {
@@ -532,9 +582,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {lbl:'Offense', pct:offPct, color:C.amber},
       {lbl:'Pitching', pct:pitchingPct, color:C.rust},
       {lbl:'Defense', pct:null, color:C.teal},
-      {lbl:'Baserunning', pct:null, color:C.navy},
+      {lbl:'Baserunning', pct:speedPct, color:C.navy},
     ];
-    const available = [offPct, pitchingPct].filter(v => v != null);
+    const available = [offPct, pitchingPct, speedPct].filter(v => v != null);
     const overallPct = available.length ? Math.round(available.reduce((sum, value) => sum + value, 0) / available.length) : null;
     return {
       offenseData,strengthData,standings,leagueRanks,pctBars,divName,
@@ -556,7 +606,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }), [team, liveTeamPlayers]);
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
   const offRows=[['OPS',formatTeamMetric(team.ops,3)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',formatTeamMetric(team.avg,3)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
-  const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','—'],['OAA','—'],['BsR','—']];
+  const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','Source gap'],['OAA','Source gap'],['BsR',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases)] ];
 
   // Team-level OAA and per-batted-ball EV distributions require dedicated
   // Statcast team queries. The MLB aggregate endpoints above do not provide
@@ -586,7 +636,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </button>
           <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:liveTeamError?C.rustSoft:liveTeamData?C.tealSoft:C.amberSoft,border:`1px solid ${liveTeamError?C.rustMid:liveTeamData?C.tealMid:C.amberMid}`}}>
             <span style={{width:6,height:6,borderRadius:'50%',background:liveTeamError?C.rust:liveTeamData?C.teal:C.amber,animation:liveTeamData||liveTeamError?'none':'pulse 1.2s ease-in-out infinite'}} />
-            <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'DATA UNAVAILABLE':liveTeamData?'LIVE MLB DATA':'LOADING MLB DATA'}</span>
+            <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'LIVE FEED ERROR':liveTeamData?'LIVE MLB DATA':'CONNECTING TO MLB DATA'}</span>
           </div>
         </div>
       </div>
@@ -600,7 +650,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </select>
         </label>
         <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
-          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds','—'],['Team WAR','—']].map(([l,v],i)=>(
+          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds','Source gap'],['Team WAR','Source gap']].map(([l,v],i)=>(
             <div key={i} style={{textAlign:'center'}}>
               <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):i===5?C.teal:C.text})}>{v}</div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
@@ -617,7 +667,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         {val:formatTeamMetric(team.avg,3),lbl:'Batting Avg',sub:'Contact'},
         {val:formatTeamMetric(team.k),     lbl:'Strikeouts', sub:'K'},
         {val:formatTeamMetric(team.sb),    lbl:'Stolen Bases',sub:'Speed'},
-        {val:'—',lbl:'Team WAR',   sub:'Unavailable'},
+        {val:'Source gap',lbl:'Team WAR',   sub:'Statcast / model feed'},
       ]}/>
 
       <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
@@ -673,7 +723,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
-                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense','—',C.teal],['Baserunning','—',C.teal],['Depth','—',C.slate],['Future Value','—',C.purple]].map(([lbl,val,color])=>(
+                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense','Source gap',C.teal],['Baserunning',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases),C.teal],['Depth',teamRollups.activePlayers == null ? 'Source gap' : `${teamRollups.activePlayers} active`,C.slate],['Future Value','Source gap',C.purple]].map(([lbl,val,color])=>(
                   <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>
                     <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
                     <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
@@ -886,7 +936,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div style={px({fontSize:52,fontWeight:900,color:C.amber,lineHeight:1})}>{D.overall}</div>
               <div style={sans({fontSize:11,color:C.text2,marginTop:4,letterSpacing:'.04em'})}>Overall Team Rating</div>
               <div style={{marginTop:12,borderTop:`0.5px solid ${C.borderLight}`,paddingTop:10,display:'flex',flexDirection:'column',gap:4}}>
-                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,null],['Baserunning','—',null],['Depth','—',null],['Future Value','—',null]].map(([l,g,n])=>(
+                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,null],['Baserunning',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases),D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth',teamRollups.activePlayers == null ? 'Source gap' : `${teamRollups.activePlayers} active`,null],['Future Value','Source gap',null]].map(([l,g,n])=>(
                   <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px'}}>
                     <span style={sans({fontSize:11,color:C.text2})}>{l}</span>
                     <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -912,7 +962,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              panels) — fixing it now that a debug pass finally had room
              for it, since "lower priority" isn't the same as "not a real
              gap", and half this page turned out to share the pattern. */}
-        <Panel title="Batted Ball Profile" accent={C.amber} badge={bb ? 'Savant' : 'Unavailable'}>
+        <Panel title="Batted Ball Profile" accent={C.amber} badge={bb ? 'Savant' : 'Coverage gap'}>
           {bb ? (
           <div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
@@ -956,8 +1006,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           ) : (
             <div style={{padding:'28px 18px',textAlign:'center'}}>
               <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team batted-ball data unavailable</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Aggregate MLB team stats do not include Statcast spray coordinates or batted-ball distributions.</div>
+              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team batted-ball feed not connected</div>
+              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>The current team aggregate feed has no Statcast batted-ball rows. Player-level Statcast panels remain the authoritative view until a team query is connected.</div>
             </div>
           )}
         </Panel>
@@ -973,7 +1023,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 {l}
               </button>
             ))}
-          </div> : 'Unavailable'}>
+          </div> : 'Coverage gap'}>
           {arsenal ? (arsenalTab === 'usage' ? (
             <div style={{display:'flex',gap:0,alignItems:'stretch'}}>
               {/* Donut */}
@@ -1018,8 +1068,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           )) : (
             <div style={{padding:'28px 18px',textAlign:'center'}}>
               <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team pitch arsenal unavailable</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Pitch type usage and Stuff+ require a team-level Baseball Savant pitch query.</div>
+              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team pitch arsenal feed not connected</div>
+              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Pitch-type usage and Stuff+ are available on individual player profiles; the team-level Statcast query is not part of the current feed.</div>
             </div>
           )}
           <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
@@ -1029,21 +1079,23 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
         {/* Contact Quality Allowed + Position OAA */}
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <Panel title="Contact Quality Allowed" accent={C.slate} badge="Unavailable">
-            <div style={{padding:'28px 18px',textAlign:'center'}}>
+          <Panel title="Contact Quality Allowed" accent={C.slate} badge="Coverage gap">
+            <div style={{padding:'20px 18px',textAlign:'center'}}>
               <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team contact-quality data unavailable</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>xwOBA allowed, hard-hit rate, barrel rate, and average exit velocity require team-level Baseball Savant Statcast rows.</div>
+              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Opponent Statcast feed not connected</div>
+              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>xwOBA allowed, hard-hit rate, barrel rate, and average exit velocity require team-level Baseball Savant rows. No proxy values are substituted.</div>
             </div>
           </Panel>
 
-          {/* Position OAA Breakdown */}
-          <Panel title="Position Breakdown" accent={teamAccent} badge="Unavailable">
-            <div style={{padding:'28px 18px',textAlign:'center'}}>
-              <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-              <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team OAA by position unavailable</div>
-              <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Baseball Savant’s individual OAA rows are not available through the aggregate team request used by this overview.</div>
-            </div>
+          {/* Position depth is derived from the verified current-season player rows. */}
+          <Panel title="Position Breakdown" accent={teamAccent} badge="Live roster rows">
+            {teamRollups.positions.length ? teamRollups.positions.slice(0, 8).map((row, index) => (
+              <div key={row.position} style={{display:'flex',justifyContent:'space-between',padding:'7px 14px',borderBottom:index<Math.min(teamRollups.positions.length,8)-1?`0.5px solid ${C.borderLight}`:'none'}}>
+                <span style={sans({fontSize:11,color:C.text2})}>{row.position}</span>
+                <span style={px({fontSize:11,fontWeight:700,color:teamAccent})}>{row.players} player{row.players === 1 ? '' : 's'}</span>
+              </div>
+            )) : <div style={sans({padding:'20px 14px',fontSize:10,color:C.text3})}>Roster rows are still loading.</div>}
+            <div style={sans({padding:'8px 14px',fontSize:9,color:C.text4,lineHeight:1.4})}>Verified player-count depth from the current MLB season feed. OAA remains a separate Statcast coverage gap.</div>
           </Panel>
         </div>
       </div>
@@ -1055,9 +1107,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <Panel title="Baserunning" accent={C.teal} badge="MLB Stats API">
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0,borderBottom:`0.5px solid ${C.border}`}}>
             {[
-              ['SB', team.sb, C.teal],
-              ['BsR', '—', C.text4],
-              ['Extra Bases %', '—', C.text4],
+              ['SB', teamRollups.stolenBases ?? team.sb, C.teal],
+              ['Attempts', teamRollups.stolenBaseAttempts ?? 'Source gap', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
+              ['XB Hits', teamRollups.extraBaseHits ?? 'Source gap', teamRollups.extraBaseHits == null ? C.text4 : C.teal],
             ].map(([l,v,c],i)=>(
               <div key={l} style={{padding:'12px 10px',textAlign:'center',borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={px({fontSize:22,fontWeight:800,color:c,lineHeight:1})}>{v}</div>
@@ -1067,11 +1119,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:6}}>
             {[
-              ['Sprint Speed','—', C.text4],
-              ['Stolen Base Attempts','—', C.text4],
-              ['Caught Stealing', '—', C.text4],
-              ['MLB Rank (BsR)',  '—', C.text4],
-              ['Extra Bases Taken', '—', C.text4],
+              ['Sprint Speed','Source gap', C.text4],
+              ['Stolen Base Attempts',teamRollups.stolenBaseAttempts ?? 'Source gap', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
+              ['Caught Stealing', teamRollups.caughtStealing ?? 'Source gap', teamRollups.caughtStealing == null ? C.text4 : C.teal],
+              ['MLB Rank (BsR)',  'Source gap', C.text4],
+              ['Extra Base Rate', teamRollups.extraBaseRate == null ? 'Source gap' : `${(teamRollups.extraBaseRate * 100).toFixed(1)}%`, teamRollups.extraBaseRate == null ? C.text4 : C.teal],
             ].map(([l,v,c],i,arr)=>(
               <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0', borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <span style={sans({fontSize:11,color:C.text2})}>{l}</span>
@@ -1079,24 +1131,24 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
             ))}
             <div style={sans({fontSize:9,color:C.text4,paddingTop:2,lineHeight:1.4})}>
-              Only stolen bases are available in the current MLB aggregate team response. Sprint speed, BsR, attempts, and extra-base-taking require dedicated Statcast or play-by-play feeds.
+              Stolen bases, attempts, caught stealing, and extra-base hits are rolled up from verified player rows. Sprint speed, BsR, and league rank still require dedicated Statcast or play-by-play feeds.
             </div>
           </div>
         </Panel>
 
-        <Panel title="Exit Velocity Distribution" accent={teamAccent} badge="Unavailable">
+        <Panel title="Exit Velocity Distribution" accent={teamAccent} badge="Coverage gap">
           <div style={{padding:'28px 18px',textAlign:'center'}}>
             <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-            <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team exit-velocity distribution unavailable</div>
-            <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Baseball Savant batted-ball distributions are not included in the current aggregate team endpoint.</div>
+            <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team exit-velocity feed not connected</div>
+            <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>The current aggregate endpoint does not expose team batted-ball distributions. Individual player exit-velocity panels remain available.</div>
           </div>
         </Panel>
 
-        <Panel title="Spray Chart" accent={C.rust} badge="Unavailable">
+        <Panel title="Spray Chart" accent={C.rust} badge="Coverage gap">
           <div style={{padding:'28px 18px',textAlign:'center'}}>
             <div style={px({fontSize:24,color:C.text4,marginBottom:8})}>—</div>
-            <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team spray chart unavailable</div>
-            <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Team spray charts require individual Baseball Savant Statcast batted-ball coordinates; no seeded dots are shown.</div>
+            <div style={sans({fontSize:11,color:C.text2,fontWeight:700})}>Team spray feed not connected</div>
+            <div style={sans({fontSize:10,color:C.text4,lineHeight:1.5,marginTop:5})}>Team spray charts require individual Baseball Savant batted-ball coordinates. No estimated dots are shown.</div>
           </div>
         </Panel>
       </div>
