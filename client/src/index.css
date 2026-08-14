@@ -284,7 +284,14 @@
 
 /* Focused player-profile polish: compact rhythm, richer image framing, and
    obvious but quiet interaction states that stay inside the profile page. */
-.skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); }
+.skip-overview-page { gap:12px !important; }
+.skip-overview-page .overview-command-header { padding-bottom:0 !important; }
+.skip-overview-page .overview-team-context { gap:16px !important; }
+.skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); gap:10px !important; }
+.skip-player-page .skip-profile-source-strip { margin-top:0; padding:7px 12px; }
+.skip-player-page .skip-profile-tab-rail { margin-top:0; }
+.skip-player-page .skip-profile-tab-summary { gap:10px; }
+.skip-player-page .skip-profile-tab-grid { gap:10px; padding:10px; }
 .skip-profile-photo-frame {
   position: relative; width: 112px; height: 140px; flex: 0 0 112px;
   display: grid; place-items: end center; isolation: isolate;
@@ -328,7 +335,7 @@
 @media (max-width: 1100px) {
   .skip-player-hero { flex-wrap: wrap; overflow-x: visible !important; }
   .skip-profile-identity { flex: 1 1 100%; border-right: 0 !important; border-bottom: 0.5px solid rgba(255,255,255,.1); }
-  .skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; }
+  .skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; gap:10px !important; }
 }
 @media (max-width: 720px) {
   .skip-player-page { gap: 10px !important; }
@@ -498,11 +505,11 @@
    wide terminals, then stack it cleanly below the decision cards at narrower
    widths so labels and chart axes remain readable. */
 @media (max-width: 1100px) {
-  .overview-decision-row { grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr) !important; }
+  .overview-decision-row { grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr) !important; gap:12px !important; }
   .overview-decision-row > :last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {
-  .overview-decision-row { grid-template-columns: 1fr !important; }
+  .overview-decision-row { grid-template-columns: 1fr !important; gap:10px !important; }
   .overview-decision-row > :last-child { grid-column: auto; }
 }
 

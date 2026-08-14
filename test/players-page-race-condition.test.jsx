@@ -76,7 +76,7 @@ describe('PlayersPage — player comparison and race conditions', () => {
   it('keeps the profile layout breathable and collapses it at responsive breakpoints', () => {
     const css = readFileSync(join(process.cwd(), 'client/src/index.css'), 'utf8');
     expect(css).toContain('.skip-player-page { --profile-ease:');
-    expect(css).toContain('.skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; }');
+    expect(css).toContain('.skip-player-main-grid { grid-template-columns: minmax(170px, 210px) minmax(0, 1fr) !important; gap:10px !important; }');
     expect(css).toContain('.skip-player-main-grid { grid-template-columns: 1fr !important; gap: 10px !important; }');
     expect(css).toContain('.skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important;');
   });

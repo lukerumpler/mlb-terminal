@@ -55,6 +55,11 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(indexSource).toContain('.skip-prospect-workspace-grid .skip-long-table { display:none !important; }');
     expect(indexSource).not.toContain('  .skip-long-table { display:none !important; }');
     expect(overviewSource).toContain("import TeamLogo from '../components/TeamLogo.jsx';");
+    expect(overviewSource).toContain('skip-overview-page');
+    expect(overviewSource).toContain('overview-command-header');
+    expect(overviewSource).toContain('overview-team-context');
+    expect(indexSource).toContain('.skip-overview-page { gap:12px !important; }');
+    expect(indexSource).toContain('.skip-player-page .skip-profile-tab-grid { gap:10px; padding:10px; }');
     expect(playersSource).toContain("import TeamLogo from '../components/TeamLogo.jsx';");
     expect(teamLogoSource).toContain('team-logos/${team.id}.svg');
   });

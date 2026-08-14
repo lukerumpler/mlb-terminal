@@ -680,12 +680,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const evBins = [];
 
   return (
-    <div ref={overviewRef} className="page-enter" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
+    <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
 
       <Breadcrumbs items={[{ label:'Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
 
       {/* ── Selector + headline ── */}
-      <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
+      <div className="overview-command-header" style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
           <div>
           <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}>
             <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={30} />
@@ -707,7 +707,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </div>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
+      <div className="overview-team-context" style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
           <span className="sr-only">Select team</span>
