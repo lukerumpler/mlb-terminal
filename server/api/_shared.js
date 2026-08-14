@@ -44,17 +44,18 @@ export function applyCors(req, res) {
 // with a shared store (Vercel KV, Upstash Redis) keyed the same way. This
 // version costs nothing extra to run and stops the common case: a single
 // script hammering one endpoint.
-const hits = new Map(); // ip -> timestamps[]
+const hits = new Map(); // `${bucket}:${ip}` -> timestamps[]
 const WINDOW_MS = 10_000;
 const MAX_PER_WINDOW = 30;
 
-export function isRateLimited(req) {
+export function isRateLimited(req, bucket = 'shared') {
   const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
     .split(',')[0].trim();
+  const key = `${bucket}:${ip}`;
   const now = Date.now();
-  const recent = (hits.get(ip) || []).filter(t => now - t < WINDOW_MS);
+  const recent = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);
   recent.push(now);
-  hits.set(ip, recent);
+  hits.set(key, recent);
   if (hits.size > 5000) hits.clear(); // cheap guard against unbounded growth
   return recent.length > MAX_PER_WINDOW;
 }

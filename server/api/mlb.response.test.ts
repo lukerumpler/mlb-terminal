@@ -38,10 +38,10 @@ function createResponse(): MockResponse {
   return response;
 }
 
-function createRequest() {
+function createRequest(url = "/api/mlb?path=/schedule&sportId=1") {
   return {
     method: "GET",
-    url: "/api/mlb?path=/schedule&sportId=1",
+    url,
     headers: {},
     socket: { remoteAddress: "127.0.0.1" },
   };
@@ -80,6 +80,25 @@ describe("MLB proxy upstream response handling", () => {
     expect(response.body).toMatchObject({
       error: "MLB API returned an empty response",
     });
+  });
+
+  it("serves repeated successful reads from the warm response cache", async () => {
+    const upstream = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ dates: [], totalItems: 0 }),
+    });
+    vi.stubGlobal("fetch", upstream);
+
+    const first = createResponse();
+    const second = createResponse();
+    const url = "/api/mlb?path=/schedule&sportId=1&date=2098-08-01";
+    await handler(createRequest(url), first);
+    await handler(createRequest(url), second);
+
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(second.headers["X-Proxy-Cache"]).toBe("HIT");
   });
 });
 

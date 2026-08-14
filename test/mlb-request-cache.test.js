@@ -8,11 +8,15 @@ const {
   getAllTeamStats,
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
+  mlb,
+  __resetMlbClientStateForTests,
+  fetchTeamFinancials,
 } = await import('../client/src/api/mlb.js');
 
 describe('MLB request cache optimization', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    __resetMlbClientStateForTests();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ records: [], teams: [] }),
@@ -21,6 +25,8 @@ describe('MLB request cache optimization', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    __resetMlbClientStateForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -59,5 +65,59 @@ describe('MLB request cache optimization', () => {
     await getMinorLeagueTeamSchedule(9996, 11, 2098, 14);
     await getMinorLeagueTeamSchedule(9996, 11, 2098, 14);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('pauses queued requests after a proxy 429 instead of sending a burst', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: { get: () => '1' },
+        text: async () => '{"error":"rate limited"}',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ teams: [{ id: 238 }] }),
+        text: async () => '',
+      });
+
+    await expect(mlb('/teams/238', { hydrate: 'venue' })).rejects.toMatchObject({ status: 429 });
+    const queued = mlb('/teams/238/stats', { stats: 'season', group: 'pitching', season: 2098 });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(queued).resolves.toEqual({ teams: [{ id: 238 }] });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('allows Spotrac data to retry after a transient rate limit', async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: false, status: 429 })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ found: true, teamAbbr: 'ZZZ', season: 2098 }) });
+
+    await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toBeNull();
+    await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toMatchObject({ found: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a verified stale response when a refresh is rate-limited', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const verified = { teams: [{ id: 238, name: 'Los Angeles Dodgers' }] };
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => verified, text: async () => '' })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: { get: () => '1' },
+        text: async () => '',
+      });
+
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    await vi.advanceTimersByTimeAsync(1_001);
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith('[mlb] proxy rate limit; using verified cached response', '/teams/238');
   });
 });

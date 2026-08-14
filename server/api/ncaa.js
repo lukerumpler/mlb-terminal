@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req)) return rateLimitResponse(res);
+  if (isRateLimited(req, 'ncaa')) return rateLimitResponse(res);
 
   const urlObj = new URL(req.url, 'https://placeholder.invalid');
   const path   = urlObj.searchParams.get('path');

@@ -11119,3 +11119,13 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Include detailed breakdown tooltips explaining the confidence rating without fabricating unverified metrics.
 - [x] Add regression tests for confidence calculation and tooltip rendering.
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## MLB 429 Rate-Limit Mitigation
+- [ ] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
+- [ ] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
+- [ ] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
+- [ ] Add regression tests for rate-limit handling and verified cache fallback.
+- [ ] Run release gates and save checkpoint.
+
+## Current MLB Rate-Limit Fix
+- [ ] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.

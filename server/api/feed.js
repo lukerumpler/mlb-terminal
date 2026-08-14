@@ -91,7 +91,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req)) return rateLimitResponse(res);
+  if (isRateLimited(req, 'feed')) return rateLimitResponse(res);
 
   const { handle, n = '10' } = req.query ?? {};
   if (!handle || !/^[A-Za-z0-9_]{1,50}$/.test(handle)) {

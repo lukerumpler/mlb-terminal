@@ -114,7 +114,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req)) return rateLimitResponse(res);
+  if (isRateLimited(req, 'fangraphs')) return rateLimitResponse(res);
   const url = new URL(req.url, 'https://placeholder.invalid');
   const teamAbbr = String(url.searchParams.get('team') || '').trim().toUpperCase();
   const seasonValue = Number(url.searchParams.get('season') || DEFAULT_SEASON);

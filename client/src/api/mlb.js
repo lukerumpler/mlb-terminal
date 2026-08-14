@@ -43,23 +43,112 @@ export const MILB_LEVELS = {
   singleA: 14, lowA: 15, rookie: 16, winter: 17,
 };
 
-// ─── Request cache / in-flight de-dupe ─────────────────────────────────────
+// ─── Request cache / in-flight de-dupe / rate-limit guard ───────────────────
 // Several pages (App's live ticker, OverviewPage, LeaguePage) independently
-// call the same endpoints — e.g. getTodaysGames() — within milliseconds of
-// each other on mount, and tab-switching re-triggers the same fetches again
-// shortly after. A tiny TTL cache with in-flight de-duping collapses those
-// into a single network request without any page needing to know about it.
-// Not a correctness concern: MLB Stats API data doesn't change faster than
-// this TTL matters for a scouting dashboard.
+// call the same endpoints within milliseconds of each other. A short cache
+// and in-flight de-dupe collapse identical work, while the small client-side
+// queue keeps a page transition from bursting past the proxy's per-IP limit.
+// The queue is deliberately below the server limit because other SKIP feeds
+// share the same browser session and the proxy is best-effort across warm
+// instances.
 const CACHE_TTL_MS = 20_000;
-const cache    = new Map(); // key -> { data, expires }
+const STALE_CACHE_TTL_MS = 10 * 60_000;
+const CLIENT_WINDOW_MS = 10_000;
+const CLIENT_MAX_REQUESTS_PER_WINDOW = 18;
+const CLIENT_MAX_CONCURRENT = 4;
+const cache    = new Map(); // key -> { data, expires, staleExpires }
 const inFlight = new Map(); // key -> Promise
+const requestQueue = [];
+const requestStarts = [];
+let activeRequests = 0;
+let queueTimer = null;
+let proxyCooldownUntil = 0;
 
 function cacheGet(key) {
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return hit.data;
-  if (hit) cache.delete(key);
   return undefined;
+}
+
+function staleCacheGet(key) {
+  const hit = cache.get(key);
+  if (hit && hit.staleExpires > Date.now()) return hit.data;
+  if (hit && hit.staleExpires <= Date.now()) cache.delete(key);
+  return undefined;
+}
+
+function parseRetryAfterMs(response) {
+  const value = response?.headers?.get?.('Retry-After');
+  if (!value) return 10_000;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(1_000, Math.min(60_000, seconds * 1_000));
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(1_000, Math.min(60_000, date - Date.now())) : 10_000;
+}
+
+function pumpRequestQueue() {
+  if (queueTimer != null) return;
+  const now = Date.now();
+  while (requestStarts.length && now - requestStarts[0] >= CLIENT_WINDOW_MS) requestStarts.shift();
+  const nextAllowedAt = Math.max(
+    proxyCooldownUntil,
+    requestStarts.length >= CLIENT_MAX_REQUESTS_PER_WINDOW ? requestStarts[0] + CLIENT_WINDOW_MS + 25 : now,
+  );
+  if (!requestQueue.length || activeRequests >= CLIENT_MAX_CONCURRENT) return;
+  if (nextAllowedAt > now) {
+    queueTimer = globalThis.setTimeout(() => {
+      queueTimer = null;
+      pumpRequestQueue();
+    }, Math.max(25, nextAllowedAt - now));
+    return;
+  }
+
+  const job = requestQueue.shift();
+  activeRequests += 1;
+  requestStarts.push(now);
+  fetch(job.url, { signal: AbortSignal.timeout(job.timeoutMs) })
+    .then(response => {
+      if (response.status === 429) {
+        proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + parseRetryAfterMs(response));
+      }
+      job.resolve(response);
+    }, job.reject)
+    .finally(() => {
+      activeRequests -= 1;
+      pumpRequestQueue();
+    })
+    .catch(() => {});
+  pumpRequestQueue();
+}
+
+function scheduledFetch(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ url, timeoutMs, resolve, reject });
+    pumpRequestQueue();
+  });
+}
+
+export function __resetMlbClientStateForTests() {
+  cache.clear();
+  inFlight.clear();
+  requestQueue.splice(0, requestQueue.length);
+  requestStarts.splice(0, requestStarts.length);
+  activeRequests = 0;
+  proxyCooldownUntil = 0;
+  if (queueTimer != null) {
+    globalThis.clearTimeout(queueTimer);
+    queueTimer = null;
+  }
+}
+
+class MlbProxyError extends Error {
+  constructor(status, path, retryAfterMs = 0) {
+    super(`MLB API ${status} — ${path}`);
+    this.name = 'MlbProxyError';
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+    this.rateLimited = status === 429;
+  }
 }
 
 // ─── Core fetcher ─────────────────────────────────────────────────────────
@@ -78,11 +167,29 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
   }
 
   const request = (async () => {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    let res;
+    try {
+      res = await scheduledFetch(url, 10_000);
+    } catch (error) {
+      const stale = useCache ? staleCacheGet(url) : undefined;
+      if (stale !== undefined) return stale;
+      throw error;
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error('[mlb] proxy error', res.status, url, body.slice(0, 200));
-      throw new Error(`MLB API ${res.status} — ${path}`);
+      const retryAfterMs = res.status === 429 ? parseRetryAfterMs(res) : 0;
+      if (res.status === 429) {
+        proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + retryAfterMs);
+        const stale = useCache ? staleCacheGet(url) : undefined;
+        if (stale !== undefined) {
+          console.warn('[mlb] proxy rate limit; using verified cached response', path);
+          return stale;
+        }
+        console.warn('[mlb] proxy rate limit; pausing MLB requests', path);
+      } else {
+        console.error('[mlb] proxy error', res.status, url, body.slice(0, 200));
+      }
+      throw new MlbProxyError(res.status, path, retryAfterMs);
     }
     // A 200 with a non-JSON body (misconfigured proxy, a dev-only routing
     // quirk, an unexpected upstream change) used to throw a raw SyntaxError
@@ -99,7 +206,10 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
     } catch {
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
-    if (useCache) cache.set(url, { data, expires: Date.now() + ttl });
+    if (useCache) {
+      const expires = Date.now() + ttl;
+      cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
+    }
     recordFeedSuccess(inferMlbFeedKey(path));
     return data;
   })();
@@ -133,8 +243,20 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
   if (pending) return pending;
 
   const request = (async () => {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) return null;
+    let res;
+    try {
+      res = await scheduledFetch(url, timeoutMs);
+    } catch {
+      return staleCacheGet(url) ?? null;
+    }
+    if (!res.ok) {
+      if (res.status === 429) {
+        proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + parseRetryAfterMs(res));
+        console.warn('[mlb] Savant rate limit; using verified cached rows when available');
+        return staleCacheGet(url) ?? null;
+      }
+      return null;
+    }
     // Same defensive fix as mlb() above, same reason — most callers of
     // fetchLeaderboard() already wrap the whole promise in .catch(() =>
     // null), so a thrown SyntaxError here was already being swallowed
@@ -147,7 +269,8 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
     } catch {
       return null;
     }
-    cache.set(url, { data, expires: Date.now() + LEADERBOARD_TTL_MS });
+    const expires = Date.now() + LEADERBOARD_TTL_MS;
+    cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
     recordFeedSuccess('savant');
     return data;
   })();
@@ -283,7 +406,12 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
       if (data?.found) recordFeedSuccess('spotrac');
       return data?.found ? data : null;
     } catch { return null; }
-  })();
+  })().then(result => {
+    // Do not turn a transient 429, timeout, or source gap into a permanent
+    // in-memory miss. A later retry should be allowed to recover the feed.
+    if (result == null) teamFinancialsCache.delete(cacheKey);
+    return result;
+  });
   teamFinancialsCache.set(cacheKey, promise);
   return promise;
 }

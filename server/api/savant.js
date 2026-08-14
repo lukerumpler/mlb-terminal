@@ -321,7 +321,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req)) return rateLimitResponse(res);
+  if (isRateLimited(req, 'savant')) return rateLimitResponse(res);
 
   const { endpoint, year, playerId, team } = req.query ?? {};
   const y = String(year || '2026');
