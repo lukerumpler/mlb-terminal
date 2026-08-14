@@ -10,6 +10,7 @@ import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
+import { readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache } from '../lib/teamDataCache.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -67,6 +68,20 @@ function freshnessLabel(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'timestamp unavailable';
   return `retrieved ${date.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}`;
+}
+
+export function formatDataAge(timestamp, now = Date.now()) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const age = Math.max(0, Number(now) - value);
+  if (age < 60_000) return 'just now';
+  if (age < 3_600_000) return `${Math.max(1, Math.floor(age / 60_000))}m ago`;
+  if (age < 86_400_000) return `${Math.max(1, Math.floor(age / 3_600_000))}h ago`;
+  return `${Math.max(1, Math.floor(age / 86_400_000))}d ago`;
+}
+
+function MetricValue({ value, loading, width = 42 }) {
+  return loading ? <SkeletonBlock width={width} height={18} radius={4} style={{ margin:'0 auto' }} /> : value;
 }
 
 function sumPlayerStat(rows = [], keys = []) {
@@ -318,8 +333,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [splitTab,setSplitTab]=useState('home');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
-  const [liveTeamData,setLiveTeamData]=useState(null);
-  const [liveTeamPlayers,setLiveTeamPlayers]=useState({ hitting:[], pitching:[] });
+  const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
+  const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
+  const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
+  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[] });
+  const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.updatedAt || null);
+  const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
   const [teamExitVelocityState, setTeamExitVelocityState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
@@ -485,8 +504,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
   useEffect(()=>{
     let alive=true;
-    setLiveTeamData(null);
-    setLiveTeamPlayers({ hitting:[], pitching:[] });
+    const cachedAggregate = readTeamAggregateCache(CURRENT_SEASON);
+    setLiveTeamData(cachedAggregate?.data || null);
+    setLiveTeamDataUpdatedAt(cachedAggregate?.updatedAt || null);
+    setLiveTeamDataMode(cachedAggregate ? 'cached' : 'loading');
+    const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
+    setLiveTeamPlayers(cachedPlayers?.data || { hitting:[], pitching:[] });
+    setTeamPlayersUpdatedAt(cachedPlayers?.updatedAt || null);
+    setTeamPlayersDataMode(cachedPlayers ? 'cached' : 'loading');
     setLiveTeamError(false);
     setTeamPlayersLoading(true);
     setTeamPlayersError(false);
@@ -530,10 +555,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       }
       window.clearTimeout(feedTimeout);
       if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
-        setLiveTeamData({ byAbbr, byId });
+        const snapshot = saveTeamAggregateCache({ byAbbr, byId }, CURRENT_SEASON);
+        setLiveTeamData(snapshot?.data || { byAbbr, byId });
+        setLiveTeamDataUpdatedAt(snapshot?.updatedAt || Date.now());
+        setLiveTeamDataMode('live');
         setLiveTeamError(false);
       } else {
-        setLiveTeamError(true);
+        const cached = readTeamAggregateCache(CURRENT_SEASON);
+        setLiveTeamDataMode(cached ? 'cached' : 'error');
+        setLiveTeamError(!cached);
       }
     });
 
@@ -544,12 +574,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       getTeamPlayerStats(teamBase.id, 'pitching'),
     ]).then(([teamHitters, teamPitchers]) => {
       if (!alive) return;
+      const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
       const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
-      setLiveTeamPlayers({
-        hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : [],
-        pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : [],
-      });
-      setTeamPlayersError(bothFailed);
+      const nextPlayers = {
+        hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []),
+        pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : (cachedPlayers?.data?.pitching || []),
+      };
+      const snapshot = teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled'
+        ? saveTeamPlayersCache(teamBase.id, CURRENT_SEASON, nextPlayers)
+        : cachedPlayers;
+      setLiveTeamPlayers(nextPlayers);
+      setTeamPlayersUpdatedAt(snapshot?.updatedAt || null);
+      setTeamPlayersDataMode(snapshot ? (teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled' ? 'live' : 'cached') : 'error');
+      setTeamPlayersError(bothFailed && !cachedPlayers);
       setTeamPlayersLoading(false);
     });
 
@@ -683,7 +720,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const overallPct = available.length ? Math.round(available.reduce((sum, value) => sum + value, 0) / available.length) : null;
     return {
       offenseData,strengthData,standings,leagueRanks,pctBars,divName,
-      og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:'—',
+      og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:'—',bg:pctToGrade(speedPct),
       overall:pctToGrade(overallPct),
     };
   },[selTeam, liveTeamData]);
@@ -702,11 +739,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const evBins = useMemo(() => buildExitVelocityBins(teamExitVelocityRows), [teamExitVelocityRows]);
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
   const offRows=[['OPS',formatTeamMetric(team.ops,3)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',formatTeamMetric(team.avg,3)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
-  const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','Source gap'],['OAA','Source gap'],['BsR',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases)] ];
+  const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','—'],['OAA','—'],['BsR','—'] ];
 
   // Team-level OAA still requires a dedicated Statcast query. Exit-velocity
   // bins are built above from the verified team-scoped Savant feed.
   const oaaPositions = [];
+  const aggregateAge = formatDataAge(liveTeamDataUpdatedAt);
+  const aggregateStatus = liveTeamDataMode === 'live' ? 'LIVE MLB DATA' : liveTeamDataMode === 'cached' ? `CACHED MLB DATA${aggregateAge ? ` · ${aggregateAge}` : ''}` : liveTeamDataMode === 'error' ? 'LIVE FEED ERROR' : 'CONNECTING TO MLB DATA';
+  const aggregateTone = liveTeamDataMode === 'live' ? C.teal : liveTeamDataMode === 'cached' ? C.amberDark : liveTeamDataMode === 'error' ? C.rust : C.amberDark;
+  const aggregateSurface = liveTeamDataMode === 'live' ? C.tealSoft : liveTeamDataMode === 'cached' ? C.amberSoft : liveTeamDataMode === 'error' ? C.rustSoft : C.amberSoft;
+  const aggregateBorder = liveTeamDataMode === 'live' ? C.tealMid : liveTeamDataMode === 'cached' ? C.amberMid : liveTeamDataMode === 'error' ? C.rustMid : C.amberMid;
+  const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'VERIFIED ROSTER ROWS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
 
   return (
     <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
@@ -729,13 +772,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             style={{height:30,padding:'0 10px',border:`1px solid ${C.amberMid}`,borderRadius:7,background:pdfExportState==='ready'?C.tealSoft:pdfExportState==='error'?C.rustSoft:C.amberSoft,color:pdfExportState==='ready'?C.teal:pdfExportState==='error'?C.rust:C.amberDark,cursor:pdfExportState==='loading'?'wait':'pointer',opacity:pdfExportState==='loading'?.7:1,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>
             {pdfExportState === 'loading' ? 'BUILDING PDF…' : pdfExportState === 'ready' ? 'PDF DOWNLOADED' : pdfExportState === 'error' ? 'PDF FAILED — RETRY' : 'DOWNLOAD PDF'}
           </button>
-          <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:liveTeamError?C.rustSoft:liveTeamData?C.tealSoft:C.amberSoft,border:`1px solid ${liveTeamError?C.rustMid:liveTeamData?C.tealMid:C.amberMid}`}}>
-            <span style={{width:6,height:6,borderRadius:'50%',background:liveTeamError?C.rust:liveTeamData?C.teal:C.amber,animation:liveTeamData||liveTeamError?'none':'pulse 1.2s ease-in-out infinite'}} />
-            <span style={px({fontSize:10,color:liveTeamError?C.rust:liveTeamData?C.teal:C.amberDark,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamError?'LIVE FEED ERROR':liveTeamData?'LIVE MLB DATA':'CONNECTING TO MLB DATA'}</span>
-            {liveTeamError && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamData(null);setFeedRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
+          <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:aggregateSurface,border:`1px solid ${aggregateBorder}`}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:aggregateTone,animation:liveTeamDataMode === 'loading' ? 'pulse 1.2s ease-in-out infinite' : 'none'}} />
+            <span style={px({fontSize:10,color:aggregateTone,fontWeight:700,letterSpacing:'.06em'})}>{aggregateStatus}</span>
+            {liveTeamError && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamDataMode('loading');setFeedRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
+          </div>
           </div>
         </div>
-      </div>
       <div className="overview-team-context" style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
@@ -752,8 +795,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </label>
         <div style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
-            <div key={i} style={{textAlign:'center'}}>
-              <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):i===5?C.teal:C.text})}>{v}</div>
+            <div key={i} title={v === 'Source gap' ? `${l} unavailable: no connected authoritative source feed` : undefined} style={{textAlign:'center'}}>
+              <div style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Source gap' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
@@ -769,14 +812,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>}
 
       <StatStrip items={[
-        {val:formatTeamMetric(team.ops,3),lbl:'Team OPS',   sub:'Offense'},
-        {val:formatTeamMetric(team.hr),    lbl:'Home Runs',  sub:'Power'},
-        {val:formatTeamMetric(team.era,2),lbl:'Team ERA',   sub:'Pitching'},
-        {val:formatTeamMetric(team.whip,3),lbl:'WHIP',      sub:'Command'},
-        {val:formatTeamMetric(team.avg,3),lbl:'Batting Avg',sub:'Contact'},
-        {val:formatTeamMetric(team.k),     lbl:'Strikeouts', sub:'K'},
-        {val:formatTeamMetric(team.sb),    lbl:'Stolen Bases',sub:'Speed'},
-        {val:teamWarValue,lbl:'Team WAR',   sub:`FanGraphs · ${modelFreshness}`},
+        {val:<MetricValue value={formatTeamMetric(team.ops,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense'},
+        {val:<MetricValue value={formatTeamMetric(team.hr)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Home Runs',  sub:'Power'},
+        {val:<MetricValue value={formatTeamMetric(team.era,2)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team ERA',   sub:'Pitching'},
+        {val:<MetricValue value={formatTeamMetric(team.whip,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'WHIP',      sub:'Command'},
+        {val:<MetricValue value={formatTeamMetric(team.avg,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
+        {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
+        {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
+        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR',   sub:`FanGraphs · ${modelFreshness}`, color:teamWarValue === 'Source gap' ? C.text4 : C.purple},
       ]}/>
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
@@ -784,7 +827,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>
 
       <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
-        <Panel title="Team Leaders" accent={C.rust}>
+        <Panel title="Team Leaders" accent={C.rust} badge={teamPlayersBadge}>
           <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
             <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
             {leaders.batting.map((row,i)=>(
@@ -836,7 +879,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
-                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense','Source gap',C.teal],['Baserunning',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases),C.teal],['Depth',teamRollups.activePlayers == null ? 'Source gap' : `${teamRollups.activePlayers} active`,C.slate],['Future Value','Source gap',C.purple]].map(([lbl,val,color])=>(
+                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth','—',C.slate],['Future Value','—',C.purple]].map(([lbl,val,color])=>(
                   <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>
                     <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
                     <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
@@ -1049,7 +1092,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div style={px({fontSize:52,fontWeight:900,color:C.amber,lineHeight:1})}>{D.overall}</div>
               <div style={sans({fontSize:11,color:C.text2,marginTop:4,letterSpacing:'.04em'})}>Overall Team Rating</div>
               <div style={{marginTop:12,borderTop:`0.5px solid ${C.borderLight}`,paddingTop:10,display:'flex',flexDirection:'column',gap:4}}>
-                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,null],['Baserunning',teamRollups.stolenBases == null ? 'Source gap' : formatTeamMetric(teamRollups.stolenBases),D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth',teamRollups.activePlayers == null ? 'Source gap' : `${teamRollups.activePlayers} active`,null],['Future Value','Source gap',null]].map(([l,g,n])=>(
+                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,null],['Baserunning',D.bg,D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth','—',null],['Future Value','—',null]].map(([l,g,n])=>(
                   <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px'}}>
                     <span style={sans({fontSize:11,color:C.text2})}>{l}</span>
                     <div style={{display:'flex',gap:8,alignItems:'center'}}>

@@ -256,7 +256,7 @@ const ENDPOINTS = {
   // Raw team-season batted-ball rows for a real exit-velocity distribution.
   // The client bins launch_speed locally; no proxy or seeded values are used.
   team_exit_velocity: (y, { team } = {}) =>
-    `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=&hfSit=&player_type=batter&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&batters_lookup%5B%5D=&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
+    `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfPT=&hfAB=&hfBBT=&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfGT=R%7CPO%7CS%7C=&hfSea=${y}%7C&hfSit=&player_type=batter&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=${y}-03-01&game_date_lt=${y}-11-30&batters_lookup%5B%5D=&team=${encodeURIComponent(team || '')}&position=&hfRO=&home_road=&hfFlag=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=h_launch_speed&sort_order=desc&min_abs=0&type=details&`,
 };
 
 // Robust CSV parser — handles quoted fields and embedded commas

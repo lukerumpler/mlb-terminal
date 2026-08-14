@@ -11104,3 +11104,11 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Improve player profile spacing rhythm, section separation, and primary/secondary/tertiary metric hierarchy without removing analytical depth.
 - [x] Add regression tests for recent history persistence, navigation, and profile hierarchy hooks.
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Data repair and UI optimization (No new features)
+
+- [x] Audit team overview metrics and fallback states for team win-loss records, run differential, and win percentage in offline or slow-connection states.
+- [x] Replace placeholder or fallback text on team overview and player cards with verified baseline statistics from MLB Stats API / Baseball Savant.
+- [x] Refine Overview page loading skeletons and error boundaries to prevent layout shifts during data fetches.
+- [x] Enhance contrast, touch targets, and visual hierarchy across secondary cards.
+- [x] Run regression tests, verify responsive layout, preserve ROADMAP_REFERENCE_FEATURES.md, and save a final data-repair checkpoint.
