@@ -14,18 +14,23 @@ describe("legacy API shared helpers", () => {
 
     applyCors(
       { headers: {}, socket: { remoteAddress: "cors-test" } } as never,
-      response as never,
+      response as never
     );
 
     expect(headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
-    expect(headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Accept");
+    expect(headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type, Accept"
+    );
     vi.unstubAllEnvs();
   });
 
   it("returns the configured CORS origin contract", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("ALLOWED_ORIGIN", "https://skip.example.com, https://www.skip.example.com");
+    vi.stubEnv(
+      "ALLOWED_ORIGIN",
+      "https://skip.example.com, https://www.skip.example.com"
+    );
     const headers = new Map<string, string>();
     const response = {
       setHeader(name: string, value: string) {
@@ -33,18 +38,28 @@ describe("legacy API shared helpers", () => {
       },
     };
     applyCors(
-      { headers: { origin: "https://skip.example.com" }, socket: { remoteAddress: "cors-test-allow" } } as never,
-      response as never,
+      {
+        headers: { origin: "https://skip.example.com" },
+        socket: { remoteAddress: "cors-test-allow" },
+      } as never,
+      response as never
     );
-    expect(headers.get("Access-Control-Allow-Origin")).toBe("https://skip.example.com");
+    expect(headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://skip.example.com"
+    );
     expect(headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
-    expect(headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Accept");
+    expect(headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type, Accept"
+    );
     vi.unstubAllEnvs();
   });
 
   it("uses ALLOWED_ORIGIN in production and omits CORS access for an untrusted origin", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("ALLOWED_ORIGIN", "https://skip.example.com, https://www.skip.example.com");
+    vi.stubEnv(
+      "ALLOWED_ORIGIN",
+      "https://skip.example.com, https://www.skip.example.com"
+    );
     const allowedHeaders = new Map<string, string>();
     const rejectedHeaders = new Map<string, string>();
     const responseFor = (headers: Map<string, string>) => ({
@@ -53,10 +68,18 @@ describe("legacy API shared helpers", () => {
       },
     });
 
-    applyCors({ headers: { origin: "https://skip.example.com" } } as never, responseFor(allowedHeaders) as never);
-    applyCors({ headers: { origin: "https://attacker.example" } } as never, responseFor(rejectedHeaders) as never);
+    applyCors(
+      { headers: { origin: "https://skip.example.com" } } as never,
+      responseFor(allowedHeaders) as never
+    );
+    applyCors(
+      { headers: { origin: "https://attacker.example" } } as never,
+      responseFor(rejectedHeaders) as never
+    );
 
-    expect(allowedHeaders.get("Access-Control-Allow-Origin")).toBe("https://skip.example.com");
+    expect(allowedHeaders.get("Access-Control-Allow-Origin")).toBe(
+      "https://skip.example.com"
+    );
     expect(rejectedHeaders.get("Access-Control-Allow-Origin")).toBeUndefined();
     vi.unstubAllEnvs();
   });
@@ -67,9 +90,15 @@ describe("legacy API shared helpers", () => {
     const headers = new Map<string, string>();
     applyCors(
       { headers: { origin: "https://www.lukerumpler.com" } } as never,
-      { setHeader(name: string, value: string) { headers.set(name, value); } } as never,
+      {
+        setHeader(name: string, value: string) {
+          headers.set(name, value);
+        },
+      } as never
     );
-    expect(headers.get("Access-Control-Allow-Origin")).toBe("https://www.lukerumpler.com");
+    expect(headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://www.lukerumpler.com"
+    );
     vi.unstubAllEnvs();
   });
 

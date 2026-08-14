@@ -11158,3 +11158,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add animated news skeleton component respecting reduced-motion and low-data modes.
 - [x] Integrate skeleton into FeedPage.jsx during loading states.
 - [x] Add test coverage and publish checkpoint.
+
+## Compact Farm-System Summary Score Card
+- [x] Trace existing prospect page ranking data and card structures.
+- [x] Implement farm-system summary score card with source-aware metrics and unavailable states.
+- [x] Add unit and rendering tests, verify desktop/mobile views, and publish checkpoint.

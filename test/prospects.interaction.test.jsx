@@ -22,6 +22,15 @@ async function goToProspects(user) {
 }
 
 describe('Prospects page — merged feature interactions', () => {
+  it('renders the compact Farm System Summary score card', async () => {
+    const user = userEvent.setup();
+    await goToProspects(user);
+    expect(screen.getByText('Farm System Summary')).toBeInTheDocument();
+    expect(screen.getByText(/Score model:/)).toBeInTheDocument();
+    expect(screen.getByText(/tracked prospects across/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+  }, 15000);
+
   it('opens a scouting card from the batter table and closes it', async () => {
     const user = userEvent.setup();
     await goToProspects(user);

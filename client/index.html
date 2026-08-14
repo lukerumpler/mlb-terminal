@@ -169,6 +169,12 @@
         }
       }
     </style>
+    <style>
+      @media (max-width: 720px) {
+        .skip-farm-summary-main { grid-template-columns: 1fr !important; gap: 10px !important; }
+        .skip-farm-summary-rankings { grid-template-columns: 1fr !important; }
+      }
+    </style>
     <script>
       // Apply saved/system theme before first paint to avoid a flash of the wrong theme.
       (function () {
