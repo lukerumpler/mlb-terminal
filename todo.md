@@ -11112,3 +11112,10 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Refine Overview page loading skeletons and error boundaries to prevent layout shifts during data fetches.
 - [x] Enhance contrast, touch targets, and visual hierarchy across secondary cards.
 - [x] Run regression tests, verify responsive layout, preserve ROADMAP_REFERENCE_FEATURES.md, and save a final data-repair checkpoint.
+
+## Player projection card data confidence score
+- [x] Implement a transparent data-confidence scoring utility that evaluates source completeness, freshness age, and live versus cached status.
+- [x] Add the confidence score indicator to player valuation and projection cards on player profile pages.
+- [x] Include detailed breakdown tooltips explaining the confidence rating without fabricating unverified metrics.
+- [x] Add regression tests for confidence calculation and tooltip rendering.
+- [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
