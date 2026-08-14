@@ -1,0 +1,30 @@
+# Player Profile Data Source Audit — 2026-08
+
+## Current gaps observed
+
+The current player profile already consumes MLB Stats API player identity, season statistics, career rows, handedness splits, and selected Baseball Savant inputs. The UI explicitly shows unavailable states for per-batted-ball exit-velocity distributions, contract data, some historical tax rows, and other fields when the adapter cannot verify a source. The profile also derives SKIP scores and projections locally; those are models rather than external source fields.
+
+## Recommended sources
+
+| Data need | Recommended source | Access and credential notes | Fit for this project |
+|---|---|---|---|
+| Player identity, biographical data, season stats, career stats, basic splits | MLB Stats API / `statsapi.mlb.com` | The public landing page currently routes to MLB Okta login and exposes API documentation at `https://docs.statsapi.mlb.com`; access should be treated as MLB-account/API access rather than assumed anonymous access. | Primary source for the existing player adapter. |
+| Statcast event rows, pitch-level fields, exit velocity, launch angle, pitch movement, handedness event filters | Baseball Savant Statcast Search CSV | Public documentation at `https://baseballsavant.mlb.com/csv-docs` defines fields including `batter`, `pitcher`, `events`, `stand`, `p_throws`, `launch_speed`, `launch_angle`, `release_speed`, and movement fields. The UI/download workflow is public, but production use should respect MLB/MLBAM terms, rate limits, and the project’s server-side proxy pattern. | Best source for missing batted-ball and pitch-level detail if the project can safely query and cache it. |
+| Commercial, supported MLB data feed with player profiles, seasonal splits, injuries, transactions, pitch metrics, and Statcast package | Sportradar MLB v8 | Official docs state authentication is required for all calls; the Statcast package is an extra product and uses tracking/trial-tracking feeds. Key acquisition is through Sportradar sales/developer access. | Enterprise alternative if public MLB/Savant access is insufficient. Requires user-supplied credentials and subscription. |
+| Commercial REST feed for scores, stats, projections, images, and broader historical coverage | SportsDataIO MLB API | Docs state all endpoints use HTTP GET and accept `Ocp-Apim-Subscription-Key: {key}` or a query key. Obtain a key through SportsDataIO’s developer portal/trial or paid plan. | Possible secondary source, but should not replace official MLB/Savant fields without source labels and reconciliation. |
+| Projections, WAR, valuation, advanced public sabermetrics | FanGraphs public site / paid products or licensed data | No stable general-purpose public API was verified in this audit. Do not scrape or invent an API contract; use licensed exports or a user-provided connector if required. | Use only after the user provides a supported access path. |
+
+## Credential recommendation
+
+No new key should be added yet. The highest-value missing fields can first be investigated through the existing MLB/Savant adapter and public/documented routes. If authenticated access is required, request only the specific credential after the user chooses a provider: an MLB Stats API account/token, a SportsDataIO API key, or Sportradar credentials. Never place keys in the browser bundle; store them server-side through the project secret workflow and proxy requests from the server.
+
+## Visual direction from supplied examples
+
+The supplied dashboard examples emphasize a dark intelligence-terminal surface, compact but breathable cards, amber/teal semantic accents, strong hero identity, concise uppercase labels, grouped metrics, and small chart modules with clear hierarchy. The current profile should continue improving through stronger source badges, compact “data confidence” context, tighter metric grouping, and deliberate unavailable states rather than filling gaps with synthetic values.
+
+## References
+
+1. [MLB Stats API](https://statsapi.mlb.com/) — current API portal and authentication landing page.
+2. [Baseball Savant Statcast Search CSV Documentation](https://baseballsavant.mlb.com/csv-docs) — field definitions for pitch and batted-ball event data.
+3. [SportsDataIO MLB API Documentation](https://sportsdata.io/developers/api-documentation/mlb) — API-key authentication and MLB feed access.
+4. [Sportradar MLB v8 Overview](https://developer.sportradar.com/baseball/reference/mlb-overview) — authenticated MLB feeds, seasonal splits, player profiles, and Statcast package details.

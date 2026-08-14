@@ -1885,6 +1885,12 @@ function PlayerProfile({ player, derived, onCompare }) {
   const verdictAccent = verd.includes('PRIORITY') || verd.includes('STRONG') ? C.teal
                       : verd.includes('MONITOR') ? C.amber
                       : verd.includes('HOLD')    ? C.slate : C.rust;
+  const profileSourceChecks = [
+    ['Identity', Boolean(p?.id), 'MLB'],
+    ['Season stats', Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), 'MLB'],
+    ['Statcast', Boolean(player.savant), 'Savant'],
+    ['Contract', Boolean(player.contractData?.salary || player.contractData?.aav || player.contractData?.total), 'Spotrac'],
+  ];
 
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
@@ -2111,9 +2117,13 @@ function PlayerProfile({ player, derived, onCompare }) {
           <div style={px({ fontSize:11, color:C.text3 })}>SKIP&rsquo;s score: <strong style={{ color:C.text }}>{score}</strong></div>
           <div style={px({ fontSize:9.5, color:C.text4 })}>{seasonLabel}</div>
         </div>
+            </div>
+      <div className="skip-profile-source-strip" aria-label="Player profile data sources">
+        <span className="skip-profile-source-title">DATA CONFIDENCE</span>
+        {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
       </div>
-
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
+
 
       {activeTab !== 'overview' && (
         <div className="skip-profile-tab-summary">
