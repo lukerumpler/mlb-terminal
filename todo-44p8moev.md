@@ -78,4 +78,4 @@
 - [x] Add more Baseball Savant data with source and freshness metadata.
 - [x] Persist recently viewed minor-league affiliates across sessions and expose quick-access controls.
 - [x] Add rendered tests for MiLB navigation/data, model/Savant freshness, and affiliate history persistence.
-- [ ] Verify MLB and MiLB flows on desktop/mobile and save a published checkpoint.
+- [x] Verify MLB and MiLB flows on desktop/mobile and save a published checkpoint.
