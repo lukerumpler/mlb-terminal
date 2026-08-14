@@ -16,3 +16,14 @@
 - Do not mark an item complete until it has been verified in this session.
 - [x] Replace the existing `lukerumpler/mlb-terminal` GitHub `main` branch with the current project by explicit force push, as approved by the user.
 - [x] Rerun type check, lint, tests, and production build on the exact pushed commit state before final checkpoint and delivery; the bounded rerun completed successfully.
+
+## Vercel API and production configuration
+
+- [ ] Inspect existing MLB, legacy API, and tRPC route registration and map them to a Vercel serverless handler.
+- [ ] Implement a Vercel-compatible serverless API entrypoint for MLB, legacy API, OAuth, storage proxy, and tRPC routes without breaking the managed Express runtime.
+- [ ] Add or update Vitest coverage for the Vercel handler and route dispatch behavior.
+- [ ] Identify required production environment variables and configure them in Vercel through the approved secrets workflow.
+- [ ] Verify public API responses and authenticated login/logout behavior on the Vercel deployment.
+- [ ] Enable Vercel Analytics for the production project.
+- [ ] Configure and verify the user-selected custom production domain.
+- [ ] Save a final checkpoint and record the completed Vercel configuration and test results.
