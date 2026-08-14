@@ -17,6 +17,7 @@ import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx
 import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
+import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
@@ -1870,6 +1871,8 @@ function PlayerProfile({ player, derived, onCompare }) {
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
+  const [provenanceOpen, setProvenanceOpen] = useState(false);
+  const provenanceTriggerRef = useRef(null);
   const [expandedChart, setExpandedChart] = useState(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
   const [noteText, setNoteText] = useState('');
@@ -1910,12 +1913,21 @@ function PlayerProfile({ player, derived, onCompare }) {
   const verdictAccent = verd.includes('PRIORITY') || verd.includes('STRONG') ? C.teal
                       : verd.includes('MONITOR') ? C.amber
                       : verd.includes('HOLD')    ? C.slate : C.rust;
+  const hasProfileContractMetadata = Boolean(player.contractData && Object.values(player.contractData).some(value => value != null && value !== ''));
   const profileSourceChecks = [
     ['Identity', Boolean(p?.id), 'MLB'],
     ['Season stats', Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), 'MLB'],
     ['Statcast', Boolean(player.savant), 'Savant'],
-    ['Contract', Boolean(player.contractData?.salary || player.contractData?.aav || player.contractData?.total), 'Spotrac'],
+    ['Contract', hasProfileContractMetadata, 'Spotrac'],
   ];
+  const profileProvenance = useMemo(() => [
+    { label:'Player identity', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
+    { label:'Season statistics', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
+    { label:'Statcast metrics', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
+    { label:'Tracking and pitch context', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
+    { label:'Contract and service time', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
+    { label:'SKIP decision metrics', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
+  ], [p, s, player]);
 
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
@@ -2164,8 +2176,10 @@ function PlayerProfile({ player, derived, onCompare }) {
           <div style={px({ fontSize:9.5, color:C.text4 })}>{seasonLabel}</div>
         </div>
             </div>
+      <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${p.fullName || player.fullName || 'Player'} · ${seasonLabel}`} entries={profileProvenance} />
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
+        <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
         {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
       </div>
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
