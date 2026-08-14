@@ -11035,3 +11035,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add a global header indicator showing when Low Data Mode is active, synchronized with the persisted preference.
 - [x] Add accessible severity color coding for CBT repeater-tier badges, table cells, and tooltip content.
 - [x] Add regression tests, verify responsive contrast, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Extension surcharge warnings and team financial CSV export
+- [x] Add source-backed luxury-tax surcharge impact warnings to individual player extension recommendation banners.
+- [x] Add a CSV export option for team payroll, CBT, repeater-tier, and multi-year luxury-tax projection data alongside PDF reports.
+- [x] Add regression tests, verify warning/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.

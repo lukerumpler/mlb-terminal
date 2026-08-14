@@ -21,8 +21,9 @@ import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
-import { buildMultiYearTaxProjection, getRepeaterTierExplanation } from '../../../shared/luxuryTax.js';
+import { buildMultiYearTaxProjection, getRepeaterTierExplanation, getSurchargeBand } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
+import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
@@ -1232,6 +1233,25 @@ export function getRepeaterTierSeverity(repeaterYears) {
   return { key:'severe', label:'SEVERE', color:C.rust, soft:C.rustSoft, border:C.rustMid };
 }
 
+export function getExtensionTaxWarning({ teamFinancials } = {}) {
+  const tax = teamFinancials?.tax || {};
+  const payroll = tax.taxPayroll == null || tax.taxPayroll === '' ? null : Number(tax.taxPayroll);
+  const threshold = tax.taxThreshold == null || tax.taxThreshold === '' ? null : Number(tax.taxThreshold);
+  if (!Number.isFinite(payroll) || !Number.isFinite(threshold)) return null;
+  const overage = Math.max(0, payroll - threshold);
+  if (overage <= 0) return { kind:'clear', overage:0, band:null, severity:getRepeaterTierSeverity(tax.repeaterYears), message:'No current CBT overage is verified for this team. Any new extension would still increase payroll relative to the threshold.' };
+  const band = getSurchargeBand(overage);
+  const severity = getRepeaterTierSeverity(tax.repeaterYears);
+  return {
+    kind:'warning',
+    overage,
+    band,
+    severity,
+    estimatedTaxBill: Number.isFinite(Number(tax.estimatedTaxBill)) ? Number(tax.estimatedTaxBill) : null,
+    message:`Current tax payroll is ${formatFinancialValue(overage)} above the CBT threshold. A new extension adds incremental payroll inside the ${band.label.toLowerCase()} band${tax.repeaterTier ? ` for a ${tax.repeaterTier.toLowerCase()}` : ''}.`,
+  };
+}
+
 function formatFinancialValue(value) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -1275,6 +1295,18 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
   });
   const hasTaxProjection = taxProjection.status === 'available';
   const [activeTierTooltip, setActiveTierTooltip] = useState(null);
+  const [csvExportState, setCsvExportState] = useState('idle');
+  const exportTeamFinancialCsv = () => {
+    try {
+      downloadTeamFinancialCsv({ teamName:p?.currentTeam?.name || p?.currentTeam?.abbreviation || 'Team', teamFinancials, taxProjection });
+      setCsvExportState('ready');
+      window.setTimeout(() => setCsvExportState('idle'), 2200);
+    } catch (error) {
+      console.error('[SKIP] team financial CSV export failed', error);
+      setCsvExportState('error');
+      window.setTimeout(() => setCsvExportState('idle'), 2500);
+    }
+  };
 
   return (
     <Panel title="Market & Contract Intelligence" accent={C.purple} badge="Financial Model">
@@ -1301,6 +1333,9 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
           <div style={sans({ fontSize:8.5, color:C.text4, lineHeight:1.35, marginTop:6 })}>
             {hasFinancials ? <>Source: <a href={teamFinancials?.sourceUrls?.tax || 'https://www.spotrac.com/mlb/tax'} target="_blank" rel="noreferrer noopener" style={{ color:C.teal }}>Spotrac MLB payroll and tax trackers</a>. Tax figures are payroll-based estimates.</> : 'No verified team payroll or tax response is available for this player’s current team.'}
           </div>
+          <button type="button" onClick={exportTeamFinancialCsv} aria-label="Download team financial and luxury tax CSV" style={{ marginTop:8, minHeight:28, padding:'5px 8px', border:`1px solid ${C.tealMid}`, borderRadius:6, background:csvExportState === 'ready' ? C.tealSoft : C.surface3, color:C.teal, cursor:'pointer', ...px({ fontSize:8.5, fontWeight:800, letterSpacing:'.04em' }) }}>
+            {csvExportState === 'ready' ? 'TEAM FINANCIAL CSV READY' : csvExportState === 'error' ? 'RETRY FINANCIAL CSV' : 'DOWNLOAD TEAM FINANCIAL CSV'}
+          </button>
         </div>
         <div style={{ marginBottom:10, padding:'9px 10px 8px', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:7 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
@@ -1884,6 +1919,7 @@ function PlayerProfile({ player, derived, onCompare }) {
     }
   };
 
+  const extensionTaxWarning = getExtensionTaxWarning({ teamFinancials:player.teamFinancials });
   const careerHeaders = player.isPitcher
     ? ['YR','G','GS','IP','W','L','ERA','K','BB','WHIP']
     : ['YR','G','AB','H','HR','RBI','AVG','OBP','SLG','OPS'];
@@ -2439,6 +2475,13 @@ function PlayerProfile({ player, derived, onCompare }) {
                 <div style={{ background:C.surface2, border:`0.5px solid ${C.border}`, borderLeft:`3px solid ${C.amber}`, borderRadius:'0 7px 7px 0', padding:'10px 12px' }}>
                   <div style={sans({ fontSize:9.5, fontWeight:700, color:C.amberDark, marginBottom:6 })}>→ Recommendation</div>
                   <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.6 })}>{rec}</div>
+                  {extensionTaxWarning?.kind === 'warning' && (
+                    <div role="note" style={{ marginTop:9, padding:'8px 9px', border:`1px solid ${extensionTaxWarning.severity.border}`, borderLeft:`3px solid ${extensionTaxWarning.severity.color}`, borderRadius:6, background:extensionTaxWarning.severity.soft }}>
+                      <div style={sans({ fontSize:9, fontWeight:800, color:extensionTaxWarning.severity.color, textTransform:'uppercase', letterSpacing:'.05em', marginBottom:3 })}>CBT surcharge impact · {extensionTaxWarning.severity.label}</div>
+                      <div style={sans({ fontSize:9.5, color:C.text2, lineHeight:1.45 })}>{extensionTaxWarning.message}</div>
+                      {extensionTaxWarning.estimatedTaxBill != null && <div style={px({ fontSize:8.5, color:extensionTaxWarning.severity.color, marginTop:4 })}>Current estimated tax bill: {formatFinancialValue(extensionTaxWarning.estimatedTaxBill)} · payroll-based estimate</div>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Context */}
