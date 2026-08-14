@@ -151,6 +151,16 @@ export default function App() {
       if (detail.id) recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
       setTab('players');
     };
+    const onOpenAffiliate = e => {
+      const detail = e.detail || {};
+      const parentAbbr = String(detail.parentAbbr || '').toUpperCase();
+      if (parentAbbr) {
+        const team = Object.values(TEAMS).find(item => item.abbr === parentAbbr);
+        recordRecentView({ type:'affiliate', affiliateId:detail.affiliateId, parentAbbr, levelId:detail.levelId, label:detail.label || 'Minor-league affiliate', secondary:detail.secondary || `${team?.name || parentAbbr} affiliate` });
+        setTab('overview');
+        window.dispatchEvent(new CustomEvent('skip-select-affiliate', { detail }));
+      }
+    };
     const onOpenTeam = e => {
       const teamAbbr = String(e.detail?.abbr || '').toUpperCase();
       const team = Object.values(TEAMS).find(item => item.abbr === teamAbbr);
@@ -165,10 +175,12 @@ export default function App() {
     window.addEventListener('skip-navigate', onNavigate);
     window.addEventListener('skip-open-player', onOpenPlayer);
     window.addEventListener('skip-open-team', onOpenTeam);
+    window.addEventListener('skip-select-affiliate', onOpenAffiliate);
     return () => {
       window.removeEventListener('skip-navigate', onNavigate);
       window.removeEventListener('skip-open-player', onOpenPlayer);
       window.removeEventListener('skip-open-team', onOpenTeam);
+      window.removeEventListener('skip-select-affiliate', onOpenAffiliate);
     };
   }, []);
 

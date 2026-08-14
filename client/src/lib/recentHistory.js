@@ -6,13 +6,16 @@ function storageAvailable() {
 }
 
 function normalizeEntry(entry) {
-  if (!entry || (entry.type !== 'player' && entry.type !== 'team')) return null;
-  const identity = entry.type === 'player' ? entry.id : String(entry.abbr || entry.id || '').toUpperCase();
+  if (!entry || !['player', 'team', 'affiliate'].includes(entry.type)) return null;
+  const identity = entry.type === 'player' ? entry.id : String(entry.abbr || entry.id || entry.affiliateId || '').toUpperCase();
   if (!identity || !entry.label) return null;
   return {
     type: entry.type,
     id: entry.type === 'player' ? Number(identity) || identity : undefined,
     abbr: entry.type === 'team' ? identity : undefined,
+    affiliateId: entry.type === 'affiliate' ? Number(entry.affiliateId || entry.id) || entry.affiliateId || entry.id : undefined,
+    parentAbbr: entry.type === 'affiliate' ? String(entry.parentAbbr || '').toUpperCase() : undefined,
+    levelId: entry.type === 'affiliate' ? Number(entry.levelId) || undefined : undefined,
     label: String(entry.label),
     secondary: entry.secondary ? String(entry.secondary) : '',
     viewedAt: Number(entry.viewedAt) || 0,
@@ -41,9 +44,9 @@ export function saveRecentHistory(entries) {
 export function recordRecentView(entry) {
   const next = normalizeEntry({ ...entry, viewedAt: Date.now() });
   if (!next) return readRecentHistory();
-  const key = next.type === 'player' ? `player:${next.id}` : `team:${next.abbr}`;
+  const key = next.type === 'player' ? `player:${next.id}` : next.type === 'affiliate' ? `affiliate:${next.affiliateId}` : `team:${next.abbr}`;
   const existing = readRecentHistory().filter(item => {
-    const itemKey = item.type === 'player' ? `player:${item.id}` : `team:${item.abbr}`;
+    const itemKey = item.type === 'player' ? `player:${item.id}` : item.type === 'affiliate' ? `affiliate:${item.affiliateId}` : `team:${item.abbr}`;
     return itemKey !== key;
   });
   return saveRecentHistory([next, ...existing]);

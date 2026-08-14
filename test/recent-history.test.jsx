@@ -27,6 +27,20 @@ describe('recent history persistence', () => {
     expect(history[0]).toMatchObject({ type:'team', abbr:`T${RECENT_HISTORY_LIMIT + 2}` });
   });
 
+  it('persists an affiliate entry and dispatches affiliate quick-access metadata', () => {
+    const listener = vi.fn();
+    window.addEventListener('skip-select-affiliate', listener);
+    recordRecentView({ type:'affiliate', affiliateId:6141, parentAbbr:'SF', levelId:11, label:'Sacramento River Cats', secondary:'Triple-A · San Francisco Giants' });
+    const saved = readRecentHistory();
+    expect(saved[0]).toMatchObject({ type:'affiliate', affiliateId:6141, parentAbbr:'SF', levelId:11, label:'Sacramento River Cats' });
+    render(<RecentHistoryDropdown items={saved} onClear={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name:/recently viewed/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name:/Sacramento River Cats/i }));
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.calls[0][0].detail).toMatchObject({ affiliateId:6141, parentAbbr:'SF', levelId:11 });
+    window.removeEventListener('skip-select-affiliate', listener);
+  });
+
   it('renders empty state, clears entries, and dispatches team navigation', () => {
     const listener = vi.fn();
     window.addEventListener('skip-open-team', listener);

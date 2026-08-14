@@ -1073,3 +1073,65 @@ export async function getMinorLeagueTeamOverview(teamId, levelId = 11, season = 
     return null;
   }
 }
+
+export async function getMinorLeagueTeamStandings(teamId, levelId = 11, season = SEASON) {
+  const leagueId = MILB_STANDINGS_LEAGUES[levelId];
+  if (!teamId || !leagueId) return { rows: [], retrievedAt: new Date().toISOString(), status: 'source-gap' };
+  try {
+    const data = await fetchStandings(leagueId, season);
+    const rows = Object.values(data).flat().map((row, index) => ({ ...row, rank: row.divRank || index + 1 }));
+    return { rows, retrievedAt: new Date().toISOString(), status: rows.length ? 'live' : 'source-gap' };
+  } catch {
+    return { rows: [], retrievedAt: new Date().toISOString(), status: 'upstream-unavailable' };
+  }
+}
+
+export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = SEASON, days = 14) {
+  if (!teamId || !MILB_STANDINGS_LEAGUES[levelId]) return { games: [], retrievedAt: new Date().toISOString(), status: 'source-gap' };
+  try {
+    const start = new Date();
+    const end = new Date(start.getTime() + Math.max(1, Number(days)) * 86400000);
+    const data = await mlb('/schedule', {
+      sportIds: String(levelId),
+      teamId,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: end.toISOString().slice(0, 10),
+      hydrate: 'linescore,team',
+      language: 'en',
+    });
+    const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
+    return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
+  } catch {
+    return { games: [], retrievedAt: new Date().toISOString(), status: 'upstream-unavailable' };
+  }
+}
+
+export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
+  try {
+    const rows = await getSavantData(year);
+    const target = String(teamAbbr || '').toUpperCase();
+    const teamRows = (Array.isArray(rows) ? rows : []).filter(row => {
+      const rowTeam = String(row.team_abbr || row.team || row.team_name || '').toUpperCase();
+      return rowTeam === target || rowTeam.includes(target);
+    });
+    const average = key => {
+      const values = teamRows.map(row => Number(row[key])).filter(Number.isFinite);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+    };
+    return {
+      status: teamRows.length ? 'live' : 'source-gap',
+      source: 'Baseball Savant',
+      retrievedAt: new Date().toISOString(),
+      sampleSize: teamRows.length,
+      expectedBA: average('est_ba'),
+      expectedSLG: average('est_slg'),
+      expectedWOBA: average('est woba') ?? average('est_woba'),
+      exitVelocity: average('exit_velocity_avg'),
+      hardHitPercent: average('hard_hit_percent'),
+      barrelPercent: average('brl_percent'),
+      launchAngle: average('launch_angle'),
+    };
+  } catch {
+    return { status: 'upstream-unavailable', source: 'Baseball Savant', retrievedAt: new Date().toISOString(), sampleSize: 0 };
+  }
+}
