@@ -70,3 +70,13 @@
 - [x] Add Vitest coverage for keyword search and combined filters
 - [x] Run typecheck, tests, and visual verification for the Notes search update
 - [x] Save a checkpoint containing the Notes search update
+- [x] Audit missing player-profile fields against current adapters and fallback states
+- [x] Research official or reputable sources and credential requirements for missing data
+- [x] Compare the current profile visual system with the supplied MLB dashboard examples
+- [x] Implement only verified data-source and player-profile visual improvements
+- [x] Add tests for any new data mapping or profile behavior
+- [x] Run typecheck, tests, and responsive visual verification
+- [x] Save a checkpoint containing the source-aware profile improvements
+- [x] Add focused Vitest coverage for the source-confidence strip and source-aware profile states
+- [x] Capture a loaded player profile preview showing the new data-confidence strip
+- [x] Save a new checkpoint after the source-aware profile update

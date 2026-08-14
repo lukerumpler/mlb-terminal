@@ -251,6 +251,8 @@ describe('PlayersPage — player comparison and race conditions', () => {
     await waitFor(() => expect(screen.getByText('Notes Player')).toBeInTheDocument());
     await user.click(screen.getByText('Notes Player'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Notes' })).toBeInTheDocument());
+    expect(screen.getByText('DATA CONFIDENCE')).toBeInTheDocument();
+    expect(screen.getAllByText('Statcast').length).toBeGreaterThanOrEqual(1);
     await user.click(screen.getByRole('button', { name: 'Notes' }));
 
     await user.type(screen.getByRole('textbox', { name: 'Observation' }), 'Keep the hands quiet in two-strike counts.');
@@ -371,7 +373,7 @@ describe('PlayersPage — player comparison and race conditions', () => {
 
     expect(await screen.findByText('Career Batting')).toBeInTheDocument();
     expect(document.querySelectorAll('.skip-long-table').length).toBeGreaterThan(0);
-    expect(screen.getByText('Identity')).toBeInTheDocument();
+    expect(screen.getAllByText('Identity').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Volume')).toBeInTheDocument();
     expect(screen.getByText('Rate & value')).toBeInTheDocument();
   });

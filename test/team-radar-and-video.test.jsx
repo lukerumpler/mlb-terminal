@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { buildTeamStrengthData } from '../client/src/pages/OverviewPage.jsx';
+import { buildTeamStrengthData, deriveTeamPlayerRollups } from '../client/src/pages/OverviewPage.jsx';
 import { buildPlayerVideoLinks, buildPlayerHighlightSearches, normalizeEmbeddableVideoUrl, loadPlayerPlaylists, savePlayerPlaylists } from '../client/src/pages/PlayersPage.jsx';
 
 describe('team strength radar data', () => {
+  it('derives verified baserunning and position-depth rollups from player rows', () => {
+    const rollups = deriveTeamPlayerRollups({
+      hitting: [
+        { position:'OF', stat:{ stolenBases:8, caughtStealing:2, hits:100, doubles:20, triples:2, homeRuns:10, plateAppearances:420 } },
+        { position:'SS', stat:{ stolenBases:4, caughtStealing:1, hits:90, doubles:14, triples:1, homeRuns:8, plateAppearances:380 } },
+      ],
+      pitching: [{ position:'SP', stat:{ inningsPitched:150 } }],
+    });
+    expect(rollups.stolenBases).toBe(12);
+    expect(rollups.caughtStealing).toBe(3);
+    expect(rollups.stolenBaseAttempts).toBe(15);
+    expect(rollups.extraBaseHits).toBe(55);
+    expect(rollups.positions.map(row => row.position)).toEqual(['OF', 'SP', 'SS']);
+  });
   it('keeps the overall and specific-strength axes in a stable order', () => {
     expect(buildTeamStrengthData({
       offense: 92,
