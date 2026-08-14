@@ -17,9 +17,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { Panel, SkeletonRows } from '../components/atoms.jsx';
+import { Panel, SkeletonBlock } from '../components/atoms.jsx';
 import { fetchFeeds } from '../api/feed.js';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { useLowDataMode } from '../lib/lowData.js';
 
 // ─── Account registry ─────────────────────────────────────────────────────
 // Each group is independently toggleable. Handles are case-insensitive for
@@ -163,6 +164,37 @@ const PostCard = memo(function PostCard({ item, highlight }) {
 });
 
 // ─── GroupPill ────────────────────────────────────────────────────────────
+function NewsFeedSkeleton({ lowDataMode }) {
+  const shimmerStyle = lowDataMode ? { animation:'none' } : {};
+  return (
+    <div
+      className={`skip-feed-skeleton${lowDataMode ? ' skip-feed-skeleton-low-data' : ''}`}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label="Loading Intel Feed headlines"
+      style={{ padding:'10px 14px' }}
+    >
+      <div style={sans({ fontSize:10, color:C.text3, margin:'0 0 4px' })}>Loading headlines and source status…</div>
+      {Array.from({ length:5 }, (_, index) => (
+        <div key={index} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 0', borderBottom:index < 4 ? `0.5px solid ${C.borderLight}` : 'none' }}>
+          <SkeletonBlock width={30} height={30} radius={50} style={shimmerStyle} />
+          <div style={{ minWidth:0, flex:1, display:'flex', flexDirection:'column', gap:7 }}>
+            <div style={{ display:'flex', gap:7, alignItems:'center' }}>
+              <SkeletonBlock width={`${24 + (index % 3) * 8}%`} height={10} style={shimmerStyle} />
+              <SkeletonBlock width={54} height={9} style={shimmerStyle} />
+              <div style={{ flex:1 }} />
+              <SkeletonBlock width={38} height={9} style={shimmerStyle} />
+            </div>
+            <SkeletonBlock width={`${84 - (index % 2) * 12}%`} height={10} style={shimmerStyle} />
+            <SkeletonBlock width={`${62 + (index % 3) * 9}%`} height={10} style={shimmerStyle} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GroupPill({ group, active, onClick }) {
   return (
     <button onClick={onClick}
@@ -188,6 +220,7 @@ export default memo(function FeedPage() {
   const [sourceStatuses, setSourceStatuses] = useState([]);
   const [lastFetch,   setLastFetch]   = useState(null);
   const [activeGroups,setActiveGroups]= useState(new Set(ALL_GROUPS));
+  const lowDataMode = useLowDataMode();
   const [search,      setSearch]      = useState('');
   const timerRef = useRef(null);
   const mountedRef = useRef(true);
@@ -341,7 +374,7 @@ export default memo(function FeedPage() {
         <Panel title="Timeline" accent={C.amber}
           badge={loading ? 'Loading…' : `${filtered.length} posts`}>
           {loading && items.length === 0 ? (
-            <div style={{ padding:'10px 14px' }}><SkeletonRows count={5} height={54} /></div>
+            <NewsFeedSkeleton lowDataMode={lowDataMode} />
           ) : filtered.length === 0 ? (
             <div style={{ padding:'32px 14px', textAlign:'center', ...sans({ fontSize:11, color:C.text3 }) }}>
               {search ? `No posts matching "${search}"` : 'No posts available right now.'}

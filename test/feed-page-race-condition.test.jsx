@@ -37,6 +37,31 @@ beforeEach(() => {
 });
 
 describe('FeedPage — load() race condition', () => {
+  it('shows an accessible skeleton while the initial feed request is pending', async () => {
+    const pending = deferred();
+    fetchFeeds.mockReturnValue(pending.promise);
+
+    render(<FeedPage />);
+
+    expect(screen.getByRole('status', { name: 'Loading Intel Feed headlines' })).toBeInTheDocument();
+    expect(screen.getByText('Loading headlines and source status…')).toBeInTheDocument();
+
+    pending.resolve(feedResult('Loaded headline'));
+    await waitFor(() => expect(screen.getByText('Loaded headline')).toBeInTheDocument());
+    expect(screen.queryByRole('status', { name: 'Loading Intel Feed headlines' })).not.toBeInTheDocument();
+  });
+
+  it('uses a static skeleton variant when Low Data Mode is enabled', () => {
+    window.localStorage.setItem('skip-low-data-mode', 'true');
+    const pending = deferred();
+    fetchFeeds.mockReturnValue(pending.promise);
+
+    render(<FeedPage />);
+
+    expect(screen.getByRole('status', { name: 'Loading Intel Feed headlines' })).toHaveClass('skip-feed-skeleton-low-data');
+    window.localStorage.removeItem('skip-low-data-mode');
+  });
+
   it('keeps the faster, newer group-selection response instead of an older, slower one clobbering it', async () => {
     const user = userEvent.setup();
     const initialLoad = deferred();

@@ -145,6 +145,9 @@
       @media (prefers-reduced-motion: reduce) { .skip-sidebar { transition:none !important; } }
     </style>
     <style>
+      @media (prefers-reduced-motion: reduce) {
+        .skip-feed-skeleton [style*="animation"] { animation: none !important; opacity: .72; }
+      }
       @media (max-width: 720px) {
         .skip-overview-page .skip-affiliate-overview-grid {
           display: flex !important;

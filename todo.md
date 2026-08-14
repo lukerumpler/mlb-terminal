@@ -11153,3 +11153,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Merge latest origin/main changes while keeping uncommitted news fallback, CORS, guide, venue, and Savant updates.
 - [x] Reapply and verify all 60 test files and build output.
 - [x] Save final checkpoint.
+
+## News Feed Loading Skeleton
+- [x] Add animated news skeleton component respecting reduced-motion and low-data modes.
+- [x] Integrate skeleton into FeedPage.jsx during loading states.
+- [x] Add test coverage and publish checkpoint.
