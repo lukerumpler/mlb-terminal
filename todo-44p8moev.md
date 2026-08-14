@@ -61,4 +61,6 @@
 - [x] Assert the affiliate loading badge in the rendered interaction test before the mocked minor-league overview resolves.
 - [x] Save the final selector and minor-league overview checkpoint after all validation is complete.
 
-- [ ] Save the final published checkpoint after the latest selector, affiliate overview, and loading-test changes.
+- [x] Save the final published checkpoint after the latest selector, affiliate overview, and loading-test changes.
+
+- [ ] Save a successful post-merge checkpoint for the latest selector, affiliate overview, and loading-state test changes.
