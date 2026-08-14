@@ -236,15 +236,10 @@ function PlayerVideoPanel({ player, profile, accent }) {
         ) : (
           <div style={{ padding:'10px', marginBottom:10, border:`0.5px dashed ${C.border}`, borderRadius:7, background:C.surface2, ...sans({ fontSize:9.5, color:C.text3, lineHeight:1.45 }) }}>Paste a verified YouTube clip URL below to watch it here and save it to a playlist.</div>
         )}
-<<<<<<< HEAD
-        <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>
-          Preview art is a lazy-loaded official MLB headshot and is skipped when browser data-saver mode is active. Search cards and highlight shortcuts remain lightweight external links; SKIP does not invent clip URLs or timestamps.
-=======
         <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) 130px auto', gap:5, alignItems:'center' }}>
           <input aria-label="Verified YouTube clip URL" value={clipUrl} onChange={e=>setClipUrl(e.target.value)} placeholder="Paste YouTube URL" style={{ minWidth:0, padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }} />
           <input aria-label="Clip title" value={clipTitle} onChange={e=>setClipTitle(e.target.value)} placeholder="Clip title" style={{ minWidth:0, padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }} />
           <button onClick={addClip} style={{ padding:'7px 9px', border:0, borderRadius:5, background:accent, color:'#fff', cursor:'pointer', fontSize:10, fontWeight:800 }}>Save clip</button>
->>>>>>> origin/main
         </div>
         {clipError && <div role="alert" style={sans({ fontSize:9.5, color:C.rust, marginTop:5 })}>{clipError}</div>}
         <div style={{ display:'flex', gap:5, alignItems:'center', marginTop:10, flexWrap:'wrap' }}>
