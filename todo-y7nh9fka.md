@@ -45,3 +45,12 @@
 - [x] Add rendered coverage for activating a roster preset and updating controls.
 - [x] Add automated coverage for the leader-card PA/IP threshold context label.
 - [x] Save the final preset and Settings checkpoint.
+- [x] Review the attached MLB dashboard visual examples for compact-sidebar and workspace layout guidance.
+- [x] Prepare a non-implemented design direction for condensing the sidebar without clipping labels or reducing accessibility.
+- [x] Await approval before implementing the layout changes.
+- [x] Inspect the latest shared shell implementation after other sessions' changes.
+- [x] Condense the desktop sidebar without clipping navigation labels.
+- [x] Optimize main workspace width and reduce shell gutters.
+- [x] Apply a shallower top header chrome while preserving readable controls.
+- [x] Verify responsive desktop/mobile behavior and update tests.
+- [x] Save a checkpoint for the approved shell update.

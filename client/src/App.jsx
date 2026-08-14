@@ -163,11 +163,11 @@ export default function App() {
     <div className="skip-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:C.bg, fontFamily:"'Plus Jakarta Sans', sans-serif", color:C.text }}>
 
       {/* ── SIDEBAR ── */}
-      <div className="skip-sidebar" style={{ width:232, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+      <div className="skip-sidebar" style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
 
         {/* Logo */}
-        <div style={{ padding:'18px 16px 15px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
-          <svg className="skip-sidebar-logo" viewBox="0 0 200 78" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', maxWidth:172, height:'auto', display:'block', marginBottom:10 }}>
+        <div style={{ padding:'12px 12px 10px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
+          <svg className="skip-sidebar-logo" viewBox="0 0 200 78" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', maxWidth:148, height:'auto', display:'block', marginBottom:7 }}>
             <path d="M 18 28 Q 95 -8 168 18" stroke={C.text4} strokeWidth="2" fill="none" strokeLinecap="round"/>
             <circle cx="168" cy="18" r="9" fill="none" stroke={C.text3} strokeWidth="1.5"/>
             <path d="M 162 14 Q 168 18 162 22" stroke="#CC2222" strokeWidth="1" fill="none"/>
@@ -186,23 +186,23 @@ export default function App() {
         </div>
 
         {/* Nav */}
-        <nav aria-label="SKIP workspace navigation" style={{ flex:1, padding:'8px 8px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
+        <nav aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
           {TABS.map((t, i) => (
             <React.Fragment key={t.key}>
             {(i === 0 || TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
             <button title={t.label} onClick={() => setTab(t.key)} aria-current={tab===t.key ? 'page' : undefined}
-              style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
+              style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
-              <span className="skip-nav-label" style={sans({ fontSize:12, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
+              <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
               {tab === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
           ))}
 
           <button onClick={() => setShowPalette(true)} title="Search everything"
-            style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
+            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
             <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>⌕</span>
             <span className="skip-nav-label" style={sans({ fontSize:12, fontWeight:600, flex:1 })}>Search</span>
             <span className="skip-nav-shortcut" style={px({ fontSize:9.5, color:C.text4, border:`0.5px solid ${C.border}`, borderRadius:4, padding:'1px 5px' })}>⌘K</span>
@@ -211,7 +211,7 @@ export default function App() {
           <div style={{ height:1, background:C.border, margin:'6px 2px' }} />
 
           <button onClick={() => setShowAlerts(s => !s)} title="View alerts" aria-expanded={showAlerts}
-            style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
+            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
             <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>Alerts</span>
             <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:C.rust, borderRadius:10, padding:'1px 7px' }}>
               {ALERTS.length}
@@ -219,13 +219,13 @@ export default function App() {
           </button>
 
           <button onClick={toggleTheme} title="Toggle light / dark theme"
-            style={{ width:'100%', padding:'8px 10px', display:'flex', alignItems:'center', gap:9, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
+            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
             <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{theme === 'dark' ? '☀' : '☾'}</span>
             <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
         </nav>
 
-        <div className="skip-sidebar-insight" style={{ padding:'10px 12px', borderTop:`1px solid ${C.border}` }}>
+        <div className="skip-sidebar-insight" style={{ padding:'8px 10px', borderTop:`1px solid ${C.border}` }}>
           <div style={{ marginBottom:5, fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700, color:C.amber, letterSpacing:'.08em' }}>SKIP INSIGHT</div>
           <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:10, color:C.text2, lineHeight:1.5, fontStyle:'italic' }}>
             &ldquo;{dailyInsight}&rdquo;
@@ -237,7 +237,7 @@ export default function App() {
       <div className="skip-workspace" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
 
         {/* Top bar */}
-        <div className="skip-topbar" style={{ height:56, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 24px', gap:16, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+        <div className="skip-topbar" style={{ height:46, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 18px', gap:12, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
           <div style={sans({ fontSize:14, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
@@ -247,7 +247,7 @@ export default function App() {
         </div>
 
         {/* Scrollable content */}
-        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'22px 24px 28px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
+        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
           {showAlerts && (
             <div style={{ marginBottom:16 }}>
@@ -337,7 +337,7 @@ export default function App() {
         button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
           outline:2px solid ${C.amber}; outline-offset:2px;
         }
-        .skip-nav-section { padding:10px 10px 4px; color:${C.text4}; font:700 9px/1.2 'DM Mono', monospace; letter-spacing:.14em; text-transform:uppercase; }
+        .skip-nav-section { padding:8px 8px 3px; color:${C.text4}; font:700 9px/1.2 'DM Mono', monospace; letter-spacing:.14em; text-transform:uppercase; }
         .skip-sidebar button:hover { transform: translateX(2px); }
         .skip-sidebar button[aria-current="page"]:hover { transform: translateX(1px); }
         .skip-topbar { transition: box-shadow .2s ease, background-color .2s ease; }
