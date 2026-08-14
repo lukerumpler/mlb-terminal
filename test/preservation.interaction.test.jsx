@@ -54,7 +54,11 @@ describe('SKIP preserved interactions and persistence', () => {
   it('opens the Command Palette with Ctrl+K and exposes the original tabs', async () => {
     render(<App />);
 
-    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    await waitFor(() => {
+      expect(screen.getByTitle('Overview')).toBeInTheDocument();
+      expect(document.documentElement.dataset.theme).toBe('light');
+    });
+    await userEvent.setup().keyboard('{Control>}k{/Control}');
 
     const palette = await screen.findByRole('dialog', { name: 'Command palette' });
     expect(palette).toBeInTheDocument();

@@ -11067,11 +11067,11 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 
 ## Division-rival financial trend overlay
 
-- [ ] Add source-backed division-rival financial trend rows using the existing selectable CBT history range.
-- [ ] Add a side-by-side overlay control and team-specific colors/logos to the Franchise CBT Trend panel.
-- [ ] Preserve missing source rows as unavailable and keep the overlay compatible with Low Data Mode and freshness tracking.
-- [ ] Add regression tests for division grouping, rival row normalization, and overlay selection behavior.
-- [ ] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+- [x] Add source-backed division-rival financial trend rows using the existing selectable CBT history range.
+- [x] Add a side-by-side overlay control and team-specific colors/logos to the Franchise CBT Trend panel.
+- [x] Preserve missing source rows as unavailable and keep the overlay compatible with Low Data Mode and freshness tracking.
+- [x] Add regression tests for division grouping, rival row normalization, and overlay selection behavior.
+- [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## Clickable player and team navigation (including MiLB)
 
@@ -11083,7 +11083,9 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 
 ## Breadcrumbs and team-specific color accents
 
-- [ ] Add reusable breadcrumb navigation to player profile views and team overview headers.
-- [ ] Apply accessible team-specific color accents to Overview page borders, badges, accent strips, and tab active states.
-- [ ] Add regression tests for breadcrumb rendering and team accent derivation.
-- [ ] Verify responsive layout, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+- [x] Add reusable breadcrumb navigation to player profile views and team overview headers.
+- [x] Apply accessible team-specific color accents to Overview page borders, badges, accent strips, and tab active states.
+- [x] Add regression tests for breadcrumb rendering and team accent derivation.
+- [x] Verify responsive layout, run release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+- [x] Stabilize the command-palette preservation regression under full-suite parallel load without changing its behavioral coverage.
