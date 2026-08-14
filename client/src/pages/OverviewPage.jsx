@@ -904,80 +904,93 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setTeamPlayersError(false);
     getTodaysGames().then(g=>{ if(alive) setTodayGames(g.slice(0,8)); }).catch(()=>{});
 
+    const aggregateFresh = Boolean(cachedAggregate?.data?.byAbbr && Date.now() - Number(cachedAggregate.updatedAt || 0) < 5 * 60 * 1000 && feedRetryToken === 0);
+    const playersFresh = Boolean(cachedPlayers?.data && Date.now() - Number(cachedPlayers.updatedAt || 0) < 5 * 60 * 1000 && feedRetryToken === 0);
+
     // Aggregate standings and team totals are the critical Overview path. They
     // must render independently of the slower per-player leaderboard calls,
     // otherwise one delayed pitching request leaves every visible team card on
     // an em dash even when the authoritative aggregate responses succeeded.
-    const feedTimeout = window.setTimeout(() => {
-      if (alive && !liveTeamData) setLiveTeamError(true);
-    }, 12000);
-    Promise.allSettled([
-      getStandings(),
-      getAllTeamStats('hitting'),
-      getAllTeamStats('pitching'),
-    ]).then(([std, hitting, pitching]) => {
-      if (!alive) return;
-      const byAbbr = {};
-      const byId = {};
-      if (std.status === 'fulfilled') {
-        Object.values(std.value).flat().forEach(row => {
-          const record = { standings: row };
-          if (row.abbr) byAbbr[row.abbr] = record;
-          if (row.id != null) byId[row.id] = record;
-        });
-      }
-      if (hitting.status === 'fulfilled') {
-        Object.values(hitting.value).forEach(stat => {
-          const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
-          row.hitting = stat;
-          if (stat.teamId != null) byId[stat.teamId] = row;
-        });
-      }
-      if (pitching.status === 'fulfilled') {
-        Object.values(pitching.value).forEach(stat => {
-          const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
-          row.pitching = stat;
-          if (stat.teamId != null) byId[stat.teamId] = row;
-        });
-      }
-      window.clearTimeout(feedTimeout);
-      if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
-        const snapshot = saveTeamAggregateCache({ byAbbr, byId }, CURRENT_SEASON);
-        setLiveTeamData(snapshot?.data || { byAbbr, byId });
-        setLiveTeamDataUpdatedAt(snapshot?.updatedAt || Date.now());
-        setLiveTeamDataMode('live');
-        setLiveTeamError(false);
-      } else {
-        const cached = readTeamAggregateCache(CURRENT_SEASON);
-        setLiveTeamDataMode(cached ? 'cached' : 'error');
-        setLiveTeamError(!cached);
-      }
-    });
+    let feedTimeout = null;
+    if (!aggregateFresh) {
+      feedTimeout = window.setTimeout(() => {
+        if (alive && !liveTeamData) setLiveTeamError(true);
+      }, 12000);
+      Promise.allSettled([
+        getStandings(),
+        getAllTeamStats('hitting'),
+        getAllTeamStats('pitching'),
+      ]).then(([std, hitting, pitching]) => {
+        if (!alive) return;
+        const byAbbr = {};
+        const byId = {};
+        if (std.status === 'fulfilled') {
+          Object.values(std.value).flat().forEach(row => {
+            const record = { standings: row };
+            if (row.abbr) byAbbr[row.abbr] = record;
+            if (row.id != null) byId[row.id] = record;
+          });
+        }
+        if (hitting.status === 'fulfilled') {
+          Object.values(hitting.value).forEach(stat => {
+            const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
+            row.hitting = stat;
+            if (stat.teamId != null) byId[stat.teamId] = row;
+          });
+        }
+        if (pitching.status === 'fulfilled') {
+          Object.values(pitching.value).forEach(stat => {
+            const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
+            row.pitching = stat;
+            if (stat.teamId != null) byId[stat.teamId] = row;
+          });
+        }
+        window.clearTimeout(feedTimeout);
+        if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
+          const snapshot = saveTeamAggregateCache({ byAbbr, byId }, CURRENT_SEASON);
+          setLiveTeamData(snapshot?.data || { byAbbr, byId });
+          setLiveTeamDataUpdatedAt(snapshot?.updatedAt || Date.now());
+          setLiveTeamDataMode('live');
+          setLiveTeamError(false);
+        } else {
+          const cached = readTeamAggregateCache(CURRENT_SEASON);
+          setLiveTeamDataMode(cached ? 'cached' : 'error');
+          setLiveTeamError(!cached);
+        }
+      });
+    } else {
+      setLiveTeamError(false);
+    }
 
     // Team leaders are useful but non-critical. A timeout or upstream failure
     // should only make the leader rows unavailable, not block the aggregates.
-    Promise.allSettled([
-      getTeamPlayerStats(teamBase.id, 'hitting'),
-      getTeamPlayerStats(teamBase.id, 'pitching'),
-    ]).then(([teamHitters, teamPitchers]) => {
-      if (!alive) return;
-      const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
-      const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
-      const nextPlayers = {
-        hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []),
-        pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : (cachedPlayers?.data?.pitching || []),
-      };
-      const snapshot = teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled'
-        ? saveTeamPlayersCache(teamBase.id, CURRENT_SEASON, nextPlayers)
-        : cachedPlayers;
-      setLiveTeamPlayers(nextPlayers);
-      setTeamPlayersUpdatedAt(snapshot?.updatedAt || null);
-      setTeamPlayersDataMode(snapshot ? (teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled' ? 'live' : 'cached') : 'error');
-      setTeamPlayersError(bothFailed && !cachedPlayers);
+    if (!playersFresh) {
+      Promise.allSettled([
+        getTeamPlayerStats(teamBase.id, 'hitting'),
+        getTeamPlayerStats(teamBase.id, 'pitching'),
+      ]).then(([teamHitters, teamPitchers]) => {
+        if (!alive) return;
+        const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
+        const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
+        const nextPlayers = {
+          hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []),
+          pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : (cachedPlayers?.data?.pitching || []),
+        };
+        const snapshot = teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled'
+          ? saveTeamPlayersCache(teamBase.id, CURRENT_SEASON, nextPlayers)
+          : cachedPlayers;
+        setLiveTeamPlayers(nextPlayers);
+        setTeamPlayersUpdatedAt(snapshot?.updatedAt || null);
+        setTeamPlayersDataMode(snapshot ? (teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled' ? 'live' : 'cached') : 'error');
+        setTeamPlayersError(bothFailed && !cachedPlayers);
+        setTeamPlayersLoading(false);
+      });
+    } else {
       setTeamPlayersLoading(false);
-    });
+      setTeamPlayersError(false);
+    }
 
-    return ()=>{ alive=false; window.clearTimeout(feedTimeout); };
+    return ()=>{ alive=false; if (feedTimeout) window.clearTimeout(feedTimeout); };
   },[teamBase?.id, feedRetryToken]);
 
   useEffect(() => {

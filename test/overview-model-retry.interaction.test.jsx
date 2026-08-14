@@ -31,11 +31,14 @@ vi.mock('../client/src/api/mlb.js', async () => {
   };
 });
 
-const { default: OverviewPage } = await import('../client/src/pages/OverviewPage.jsx');
+import OverviewPage from '../client/src/pages/OverviewPage.jsx';
+import * as mlbApi from '../client/src/api/mlb.js';
+import { saveTeamAggregateCache, saveTeamPlayersCache } from '../client/src/lib/teamDataCache.js';
 
 describe('Team Overview model source and retry interaction', () => {
   beforeEach(() => {
     cleanup();
+    vi.clearAllMocks();
     feedAttempt = 0;
     modelAttempt = 0;
     savantMode = 'pending';
@@ -55,6 +58,16 @@ describe('Team Overview model source and retry interaction', () => {
     expect(screen.queryByRole('button', { name:'Open source provenance' })).not.toBeInTheDocument();
     expect(screen.queryByText('SOURCES', { exact:true })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name:'Source provenance' })).not.toBeInTheDocument();
+  });
+
+  it('uses a fresh same-session team cache without repeating aggregate or roster requests', async () => {
+    saveTeamAggregateCache({ byAbbr:{ LAD:{ standings:{ id:119, abbr:'LAD', w:73, l:48, pct:.603, rs:606, ra:464, diff:142 }, hitting:{ teamId:119, teamAbbr:'LAD', ops:.802 }, pitching:{ teamId:119, teamAbbr:'LAD', era:2.98 } } }, byId:{} }, 2026);
+    saveTeamPlayersCache(119, 2026, { hitting:[{ id:1, name:'Cached hitter' }], pitching:[{ id:2, name:'Cached pitcher' }] });
+    render(<OverviewPage />);
+    await waitFor(() => expect(screen.getByText('Season overview', { exact:false })).toBeInTheDocument());
+    expect(mlbApi.getStandings).not.toHaveBeenCalled();
+    expect(mlbApi.getAllTeamStats).not.toHaveBeenCalled();
+    expect(mlbApi.getTeamPlayerStats).not.toHaveBeenCalled();
   });
 
   it('shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending', async () => {

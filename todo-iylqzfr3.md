@@ -150,3 +150,12 @@
 - [x] Add regression coverage for the diagnosed failures and optimizations
 - [x] Run typecheck, focused tests, full tests, and fresh visual verification
 - [x] Save a checkpoint containing the debugged and optimized update
+
+- [x] Audit team-selection data flow, cache helpers, and latest runtime request patterns
+- [x] Add a short-lived source-aware client cache for repeated team selections
+- [x] Prevent stale or unavailable cache entries from masking newer verified data
+- [x] Continue targeted debugging of redundant requests and timeout/error paths
+- [x] Preserve loading states, source metadata, mobile behavior, and team navigation
+- [x] Add regression coverage for cache hits, expiry, invalidation, and error fallback
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the team cache and optimization update
