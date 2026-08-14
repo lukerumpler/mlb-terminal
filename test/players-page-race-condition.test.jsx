@@ -33,8 +33,11 @@ function mockPlayer(id, fullName) {
     pitchArsenal: null, pitchArsenalPopulation: null, contactPoints: null, pitcherPitches: null,
     stats: {}, statSeason: 2026, isFallback: false, careerStats: null, splits: null, comps: [],
     handednessSplits: { season: 2026, rows: [
-      { side: 'LHP', stat: { avg: '.285', obp: '.360', slg: '.510', ops: '.870', homeRuns: 6, strikeoutRate: '21.4' } },
-      { side: 'RHP', stat: { avg: '.310', obp: '.395', slg: '.590', ops: '.985', homeRuns: 12, strikeoutRate: '18.2' } },
+      { side: 'LHP', stat: { hits: 57, atBats: 200, plateAppearances: 225, baseOnBalls: 20, hitByPitch: 2, sacFlies: 3, doubles: 10, triples: 1, homeRuns: 6, strikeOuts: 43 } },
+      { side: 'RHP', stat: { hits: 62, atBats: 200, plateAppearances: 234, baseOnBalls: 25, hitByPitch: 3, sacFlies: 4, doubles: 12, triples: 2, homeRuns: 12, strikeOuts: 42 } },
+    ], careerRows: [
+      { side: 'LHP', stat: { hits: 114, atBats: 400, plateAppearances: 450, baseOnBalls: 40, hitByPitch: 4, sacFlies: 6, doubles: 20, triples: 2, homeRuns: 12, strikeOuts: 86 } },
+      { side: 'RHP', stat: { hits: 124, atBats: 400, plateAppearances: 468, baseOnBalls: 50, hitByPitch: 6, sacFlies: 8, doubles: 24, triples: 4, homeRuns: 24, strikeOuts: 84 } },
     ] },
   };
 }
@@ -222,8 +225,16 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getByText('Pitcher Handedness Splits')).toBeInTheDocument();
     expect(screen.getAllByText('LHP').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('RHP').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('0.285')).toBeInTheDocument();
-    expect(screen.getByText('0.985')).toBeInTheDocument();
+    expect(screen.getAllByText('0.285').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('0.955').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('img', { name: /season comparison of LHP and RHP/i })).toBeInTheDocument();
+    expect(document.querySelector('.skip-split-value')?.getAttribute('data-tooltip')).toContain('57 H');
+
+    const careerToggle = screen.getByRole('button', { name: 'Career average' });
+    await user.click(careerToggle);
+    expect(careerToggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Aggregated across available career split seasons/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /career comparison of LHP and RHP/i })).toBeInTheDocument();
   });
 
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {

@@ -222,18 +222,18 @@ export function normalizeHandednessSplits(splits) {
 }
 
 export async function getHandednessSplits(id, season) {
-  const tryYear = async yr => {
+  const fetchRows = async (stats, yr) => {
     try {
-      const data = await mlb(`/people/${id}/stats`, { stats:'season', group:'hitting', season:yr, sitCodes:'vl,vr' });
+      const data = await mlb(`/people/${id}/stats`, { stats, group:'hitting', season:yr, sitCodes:'vl,vr' });
       const grp = findStatGroup(data.stats, 'hitting');
-      const rows = normalizeHandednessSplits(grp?.splits);
-      return rows.length ? { rows, season:yr, isFallback:false } : null;
-    } catch { return null; }
+      return normalizeHandednessSplits(grp?.splits);
+    } catch { return []; }
   };
-  const current = await tryYear(season);
-  if (current) return current;
-  const previous = await tryYear(season - 1);
-  return previous ? { ...previous, isFallback:true } : { rows:[], season, isFallback:false };
+  const currentRows = await fetchRows('season', season);
+  const usedSeason = currentRows.length ? season : season - 1;
+  const rows = currentRows.length ? currentRows : await fetchRows('season', usedSeason);
+  const careerRows = await fetchRows('yearByYear', season);
+  return { rows, careerRows, season:usedSeason, isFallback:usedSeason !== season };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

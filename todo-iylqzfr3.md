@@ -25,3 +25,11 @@
 - [x] Add Vitest coverage for split normalization and rendered comparison interaction
 - [x] Run typecheck, tests, and visual verification for the Splits tab update
 - [x] Save a checkpoint containing the handedness split comparison
+- [x] Inspect the current handedness split fields and career aggregate data
+- [x] Add raw hit/at-bat tooltips behind percentage split values
+- [x] Add a current season versus career averages toggle in Splits
+- [x] Add a visual LHP/RHP comparison bar chart
+- [x] Preserve unavailable-data handling and avoid invented split values
+- [x] Add Vitest coverage for tooltips, toggle state, and bar chart rendering
+- [x] Run typecheck, tests, and visual verification for the enhanced Splits tab
+- [x] Save a checkpoint containing the enhanced split comparison

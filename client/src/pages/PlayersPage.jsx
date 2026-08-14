@@ -340,13 +340,35 @@ function PlayersEmptyState({ onPick }) {
 // Coerce to a finite number, falling back to `def` only when the value is
 // genuinely missing/invalid — unlike `parseFloat(x||def)||def`, this does NOT
 // mistake a real value of 0 (e.g. 0 stolen bases, 0 K/9 in a tiny sample) for "missing".
-export function buildHandednessComparison(payload) {
-  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
-  const bySide = rows.reduce((acc, row) => {
-    if (row?.side === 'LHP' || row?.side === 'RHP') acc[row.side] = row.stat || {};
-    return acc;
-  }, {});
-  return ['LHP', 'RHP'].map(side => ({ side, stat: bySide[side] || null }));
+function sumNumeric(rows, key) {
+  return rows.reduce((total, row) => {
+    const value = Number(row?.stat?.[key]);
+    return Number.isFinite(value) ? total + value : total;
+  }, 0);
+}
+
+export function buildHandednessComparison(payload, mode = 'season') {
+  const sourceRows = mode === 'career' ? payload?.careerRows : payload?.rows;
+  const rows = Array.isArray(sourceRows) ? sourceRows : [];
+  return ['LHP', 'RHP'].map(side => {
+    const sideRows = rows.filter(row => row?.side === side);
+    if (!sideRows.length) return { side, stat: null };
+    const atBats = sumNumeric(sideRows, 'atBats');
+    const hits = sumNumeric(sideRows, 'hits');
+    const walks = sumNumeric(sideRows, 'baseOnBalls');
+    const hbp = sumNumeric(sideRows, 'hitByPitch');
+    const sacFlies = sumNumeric(sideRows, 'sacFlies');
+    const plateAppearances = sumNumeric(sideRows, 'plateAppearances') || atBats + walks + hbp + sacFlies;
+    const totalBases = hits + sumNumeric(sideRows, 'doubles') + (2 * sumNumeric(sideRows, 'triples')) + (3 * sumNumeric(sideRows, 'homeRuns'));
+    const avg = atBats ? hits / atBats : null;
+    const obp = (hits + walks + hbp) && plateAppearances ? (hits + walks + hbp) / plateAppearances : null;
+    const slg = atBats ? totalBases / atBats : null;
+    return { side, stat: {
+      atBats, hits, plateAppearances, homeRuns: sumNumeric(sideRows, 'homeRuns'),
+      avg, obp, slg, ops: avg == null || obp == null || slg == null ? null : obp + slg,
+      strikeoutRate: plateAppearances ? (sumNumeric(sideRows, 'strikeOuts') / plateAppearances) * 100 : null,
+    } };
+  });
 }
 
 function numOr(val, def) {
@@ -1594,32 +1616,42 @@ function PlayersPage() {
 }
 
 function HandednessSplitComparison({ splits }) {
+  const [mode, setMode] = useState('season');
   const columns = [
     ['AVG', stat => stat.avg, 3],
     ['OBP', stat => stat.obp, 3],
     ['SLG', stat => stat.slg, 3],
     ['OPS', stat => stat.ops, 3],
     ['HR', stat => stat.homeRuns, 0],
-    ['K%', stat => stat.strikeoutRate ?? stat.strikePercentage, 1],
+    ['K%', stat => stat.strikeoutRate, 1],
   ];
-  const comparison = buildHandednessComparison(splits);
+  const comparison = buildHandednessComparison(splits, mode);
   const available = comparison.some(row => row.stat);
+  const toggle = <div className="skip-split-mode-toggle" role="group" aria-label="Split sample period">
+    {['season', 'career'].map(option => <button key={option} type="button" aria-pressed={mode === option} onClick={() => setMode(option)}>{option === 'season' ? 'Current season' : 'Career average'}</button>)}
+  </div>;
   return (
-    <Panel title="Pitcher Handedness Splits" accent={C.teal} badge={splits?.isFallback ? `${splits.season} fallback` : 'Season'}>
+    <Panel title="Pitcher Handedness Splits" accent={C.teal} badge={toggle}>
+      <div className="skip-handedness-period">{mode === 'season' ? (splits?.isFallback ? `${splits.season} fallback season` : `${splits?.season || 'Current'} season`) : 'Aggregated across available career split seasons'}</div>
       {!available ? (
-        <div className="skip-profile-split-empty" role="status">No verified left/right pitcher split data is available for this player and season.</div>
+        <div className="skip-profile-split-empty" role="status">No verified left/right pitcher split data is available for this sample.</div>
       ) : (
         <div className="skip-handedness-comparison">
+          <div className="skip-handedness-bar-chart" role="img" aria-label={`${mode} comparison of LHP and RHP split metrics`}>
+            <div className="skip-handedness-chart-title">Relative split profile</div>
+            {columns.slice(0, 5).map(([label, getter, digits]) => {
+              const values = comparison.map(row => { const raw = Number(getter(row.stat || {})); return Number.isFinite(raw) ? raw : null; });
+              const max = Math.max(...values.filter(value => value != null), 0);
+              return <div className="skip-handedness-bar-row" key={label}><span>{label}</span><div className="skip-handedness-bars">{comparison.map((row, index) => <div className={`skip-handedness-bar-track ${index === 0 ? 'lhp' : 'rhp'}`} key={row.side}><div className="skip-handedness-bar-fill" style={{ width:max && values[index] != null ? `${Math.max(6, (values[index] / max) * 100)}%` : '0%' }} /><span>{values[index] == null ? '—' : values[index].toFixed(digits)}</span></div>)}</div></div>;
+            })}
+          </div>
           <div className="skip-handedness-header"><span>Metric</span><span className="skip-handedness-side lhp">LHP</span><span className="skip-handedness-side rhp">RHP</span></div>
           {columns.map(([label, getter, digits]) => {
-            const values = comparison.map(row => {
-              const raw = Number(getter(row.stat || {}));
-              return Number.isFinite(raw) ? raw : null;
-            });
+            const values = comparison.map(row => { const raw = Number(getter(row.stat || {})); return Number.isFinite(raw) ? raw : null; });
             const formatted = values.map(value => value == null ? '—' : value.toFixed(digits));
-            return <div className="skip-handedness-row" key={label}><span>{label}</span><strong className={values[0] != null && values[1] != null && values[0] > values[1] ? 'is-leading' : ''}>{formatted[0]}</strong><strong className={values[0] != null && values[1] != null && values[1] > values[0] ? 'is-leading' : ''}>{formatted[1]}</strong></div>;
+            return <div className="skip-handedness-row" key={label}><span>{label}</span>{comparison.map((row, index) => { const stat = row.stat || {}; const rawLabel = stat.hits != null || stat.atBats != null ? `${stat.hits ?? '—'} H · ${stat.atBats ?? '—'} AB · ${stat.plateAppearances ?? '—'} PA` : 'Raw count unavailable'; return <strong key={row.side} className={values[0] != null && values[1] != null && values[index] === Math.max(values[0], values[1]) ? 'is-leading' : ''}><span className="skip-split-value" title={rawLabel} data-tooltip={rawLabel}>{formatted[index]}</span></strong>; })}</div>;
           })}
-          <div className="skip-handedness-note">Higher values are not automatically better for every metric. Use the split line alongside role, sample size, and the player’s overall profile.</div>
+          <div className="skip-handedness-note">Hover a percentage or rate for its raw hit/at-bat context. Bars are scaled within each metric; higher is not automatically better for every metric.</div>
         </div>
       )}
     </Panel>
