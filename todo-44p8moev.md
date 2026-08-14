@@ -22,3 +22,11 @@
 - [x] Relabel the key-play area as source-safe highlight search shortcuts because verified timestamp metadata is not available from the current external search links.
 - [x] Add rendered player-video tests that verify the highlight shortcuts appear and are accessible/clickable in the Player Video panel.
 - [x] Perform desktop and mobile visual verification of the updated Player Video panel.
+
+- [x] Add custom highlight playlist creation and persistence for the current user/browser.
+- [x] Add save-to-playlist and remove/reorder organization controls for highlight clips.
+- [x] Add a compact in-page player for verified embeddable video URLs with safe fallback for search-only links.
+- [x] Add rendered interaction tests for playlist and playback flows, then verify desktop/mobile behavior.
+- [x] Save and publish the completed playlist and embedded-player update.
+
+- [x] Add move-up and move-down controls for saved clips within the active playlist and test ordering persistence.
