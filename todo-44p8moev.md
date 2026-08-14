@@ -39,11 +39,11 @@
 
 - [x] Bound the Overview live-feed loading state with an explicit timeout/error message so a stalled upstream cannot leave the page connecting forever.
 
-- [ ] Add source-backed playoff odds to Team Overview with source and last-updated freshness metadata.
-- [ ] Add source-backed team-WAR model data to Team Overview with source and last-updated freshness metadata.
-- [ ] Add a retry button and bounded retry state for stalled MLB aggregate/player feeds.
-- [ ] Add focused tests for odds, team-WAR, freshness, retry, and failure states; verify desktop/mobile presentation.
-- [ ] Save and publish the completed model-source and retry update.
+- [x] Add source-backed playoff odds to Team Overview with source and last-updated freshness metadata.
+- [x] Add source-backed team-WAR model data to Team Overview with source and last-updated freshness metadata.
+- [x] Add a retry button and bounded retry state for stalled MLB aggregate/player feeds.
+- [x] Add focused tests for odds, team-WAR, freshness, retry, and failure states; verify desktop/mobile presentation.
+- [x] Save and publish the completed model-source and retry update.
 
 - [x] Sort the Team Overview selector by league, then division, then alphabetical team name.
 - [x] Add regression coverage for deterministic selector ordering and preserve selected-team behavior.
@@ -63,4 +63,12 @@
 
 - [x] Save the final published checkpoint after the latest selector, affiliate overview, and loading-test changes.
 
-- [ ] Save a successful post-merge checkpoint for the latest selector, affiliate overview, and loading-state test changes.
+- [x] Save a successful post-merge checkpoint for the latest selector, affiliate overview, and loading-state test changes.
+
+- [x] Add a rendered Overview test that verifies model-source success/failure, playoff odds and team-WAR freshness text, source-gap messaging, and retry behavior end to end.
+- [x] Save a fresh checkpoint after the rendered model-source and retry test passes.
+
+- [x] Assert rendered model-source freshness text in both the source-gap and recovered-live states.
+- [x] Save a successful checkpoint after the freshness assertions pass.
+
+- [x] Save the final checkpoint after the current freshness assertions pass.
