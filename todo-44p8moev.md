@@ -82,4 +82,4 @@
 
 - [x] Improve mobile dashboard navigation with a compact, accessible navigation control while preserving the desktop sidebar.
 - [x] Add responsive interaction coverage and verify the mobile navigation at desktop and mobile sizes.
-- [ ] Save and publish the validated mobile navigation update.
+- [x] Save and publish the validated mobile navigation update.
