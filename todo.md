@@ -11030,3 +11030,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add a side-by-side two-player valuation PDF export using existing comparison data and clear source notes.
 - [x] Add accessible interactive tooltips explaining CBT repeater tiers and their financial implications.
 - [x] Add regression tests, verify responsive/settings/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
+
+## Global Low Data indicator and CBT severity colors
+- [x] Add a global header indicator showing when Low Data Mode is active, synchronized with the persisted preference.
+- [x] Add accessible severity color coding for CBT repeater-tier badges, table cells, and tooltip content.
+- [x] Add regression tests, verify responsive contrast, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.

@@ -1224,6 +1224,14 @@ function DefensiveIntel({ pos }) {
 }
 
 /* ─── Market & Contract Intelligence ────────────────────────────── */
+export function getRepeaterTierSeverity(repeaterYears) {
+  const years = Number(repeaterYears);
+  if (!Number.isFinite(years) || years < 1) return { key:'unknown', label:'UNAVAILABLE', color:C.text3, soft:C.surface3, border:C.border };
+  if (years === 1) return { key:'lower', label:'LOWER', color:C.teal, soft:C.tealSoft, border:C.tealMid };
+  if (years === 2) return { key:'watch', label:'WATCH', color:C.amberDark, soft:C.amberSoft, border:C.amberMid };
+  return { key:'severe', label:'SEVERE', color:C.rust, soft:C.rustSoft, border:C.rustMid };
+}
+
 function formatFinancialValue(value) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -1243,7 +1251,7 @@ export function getTeamFinancialRows(teamFinancials) {
     ['CBT Threshold', tax.taxThreshold, C.slate],
     ['Est. Tax Bill', tax.estimatedTaxBill, tax.estimatedTaxBill > 0 ? C.rust : C.teal],
     ['Tax Space', tax.taxSpace, tax.taxSpace != null && Number(tax.taxSpace) < 0 ? C.rust : C.teal],
-    ['Repeater Tier', tax.repeaterTier || 'History unavailable', tax.repeaterYears == null ? C.text4 : C.rust],
+    ['Repeater Tier', tax.repeaterTier || 'History unavailable', getRepeaterTierSeverity(tax.repeaterYears).color],
   ].map(([label, value, color]) => ({ label, value: typeof value === 'string' ? value : formatFinancialValue(value), color }));
 }
 
@@ -1299,6 +1307,9 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
             <span style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, letterSpacing:'.06em', textTransform:'uppercase' })}>Multi-Year CBT Projection</span>
             <span style={px({ fontSize:8.5, color:hasTaxProjection ? C.teal : C.text4 })}>{hasTaxProjection ? '5-YEAR MODEL' : 'UNAVAILABLE'}</span>
           </div>
+          <div aria-label="CBT repeater-tier severity legend" style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:7 }}>
+            {[['lower','Lower','1st year'],['watch','Watch','2nd year'],['severe','Severe','3rd+ year']].map(([key,label,detail]) => { const tone = getRepeaterTierSeverity(key === 'lower' ? 1 : key === 'watch' ? 2 : 3); return <span key={key} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 6px', border:`1px solid ${tone.border}`, borderRadius:999, background:tone.soft, color:tone.color, ...px({ fontSize:8, fontWeight:800 }) }}><span aria-hidden="true" style={{ width:5, height:5, borderRadius:'50%', background:tone.color }} />{label} · {detail}</span>; })}
+          </div>
           {hasTaxProjection ? (
             <div style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
@@ -1309,9 +1320,9 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
                   <td style={{ padding:'5px', textAlign:'right', color:row.overage > 0 ? C.rust : C.teal, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.overage)}</td>
                   <td style={{ padding:'5px', textAlign:'right', color:row.repeaterYears == null ? C.text4 : C.text2, fontSize:8.5 }}>
                     <div style={{ position:'relative', display:'inline-flex', alignItems:'center', justifyContent:'flex-end', gap:4 }} onMouseLeave={() => setActiveTierTooltip(null)}>
-                      <span>{row.repeaterTier}</span>
-                      <button type="button" className="skip-cbt-tier-info" aria-label={`Explain ${row.repeaterTier} for ${row.season}`} aria-describedby={`cbt-tier-tooltip-${row.season}`} onMouseEnter={() => setActiveTierTooltip(row.season)} onFocus={() => setActiveTierTooltip(row.season)} onBlur={() => setActiveTierTooltip(null)} style={{ width:16, height:16, padding:0, border:`1px solid ${row.repeaterYears == null ? C.border : C.amberMid}`, borderRadius:'50%', background:C.surface3, color:row.repeaterYears == null ? C.text3 : C.amber, cursor:'help', ...px({ fontSize:9, fontWeight:800, lineHeight:1 }) }}>i</button>
-                      {activeTierTooltip === row.season && (() => { const info = getRepeaterTierExplanation(row.repeaterYears); return <div id={`cbt-tier-tooltip-${row.season}`} role="tooltip" className="skip-cbt-tier-tooltip" style={{ position:'absolute', right:0, top:'calc(100% + 6px)', zIndex:20, width:220, padding:'9px 10px', border:`1px solid ${C.border}`, borderRadius:7, background:C.surface, boxShadow:'0 10px 24px rgba(0,0,0,.18)', textAlign:'left' }}><div style={sans({ fontSize:9.5, fontWeight:800, color:C.text, marginBottom:3 })}>{info.title}</div><div style={px({ fontSize:9, fontWeight:800, color:row.repeaterYears == null ? C.text3 : C.amber, marginBottom:4 })}>{info.rate}</div><div style={sans({ fontSize:9.5, color:C.text2, lineHeight:1.4 })}>{info.detail}</div></div>; })()}
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 5px', border:`1px solid ${getRepeaterTierSeverity(row.repeaterYears).border}`, borderRadius:999, background:getRepeaterTierSeverity(row.repeaterYears).soft, color:getRepeaterTierSeverity(row.repeaterYears).color, ...px({ fontSize:8, fontWeight:800 }) }}><span aria-hidden="true" style={{ width:5, height:5, borderRadius:'50%', background:getRepeaterTierSeverity(row.repeaterYears).color }} />{getRepeaterTierSeverity(row.repeaterYears).label}</span>
+                      <button type="button" className="skip-cbt-tier-info" aria-label={`Explain ${row.repeaterTier} for ${row.season}`} aria-describedby={`cbt-tier-tooltip-${row.season}`} onMouseEnter={() => setActiveTierTooltip(row.season)} onFocus={() => setActiveTierTooltip(row.season)} onBlur={() => setActiveTierTooltip(null)} style={{ width:16, height:16, padding:0, border:`1px solid ${getRepeaterTierSeverity(row.repeaterYears).border}`, borderRadius:'50%', background:getRepeaterTierSeverity(row.repeaterYears).soft, color:getRepeaterTierSeverity(row.repeaterYears).color, cursor:'help', ...px({ fontSize:9, fontWeight:800, lineHeight:1 }) }}>i</button>
+                      {activeTierTooltip === row.season && (() => { const info = getRepeaterTierExplanation(row.repeaterYears); const tone = getRepeaterTierSeverity(row.repeaterYears); return <div id={`cbt-tier-tooltip-${row.season}`} role="tooltip" className="skip-cbt-tier-tooltip" style={{ position:'absolute', right:0, top:'calc(100% + 6px)', zIndex:20, width:220, padding:'9px 10px', border:`1px solid ${tone.border}`, borderLeft:`3px solid ${tone.color}`, borderRadius:7, background:C.surface, boxShadow:'0 10px 24px rgba(0,0,0,.18)', textAlign:'left' }}><div style={sans({ fontSize:9.5, fontWeight:800, color:tone.color, marginBottom:3 })}>{info.title} · {tone.label}</div><div style={px({ fontSize:9, fontWeight:800, color:tone.color, marginBottom:4 })}>{info.rate}</div><div style={sans({ fontSize:9.5, color:C.text2, lineHeight:1.4 })}>{info.detail}</div></div>; })()}
                     </div>
                   </td>
                   <td style={{ padding:'5px', textAlign:'right', color:row.estimatedTax == null ? C.text4 : C.rust, fontFamily:"'DM Mono',monospace", fontSize:9 }}>{formatFinancialValue(row.estimatedTax)}</td>

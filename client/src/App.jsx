@@ -247,6 +247,13 @@ export default function App() {
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>
           <div style={{ flex:1 }} />
+          {lowDataMode && (
+            <button type="button" className="skip-low-data-indicator" onClick={() => setTab('settings')} aria-label="Low Data Mode is active. Open Settings to change it." title="Low Data Mode is active — open Settings to change it"
+              style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:26, padding:'4px 8px', border:`1px solid ${C.amberMid}`, borderRadius:999, background:C.amberSoft, color:C.amberDark, cursor:'pointer', ...px({ fontSize:9, fontWeight:800, letterSpacing:'.05em' }) }}>
+              <span aria-hidden="true" style={{ width:6, height:6, borderRadius:'50%', background:C.amber, boxShadow:`0 0 0 2px ${C.amberSoft}` }} />
+              <span className="skip-low-data-label">LOW DATA</span>
+            </button>
+          )}
           <div style={sans({ fontSize:11, color:C.text3, letterSpacing:'.02em' })}>Scouting Knowledge & Intelligence Platform</div>
           <div style={{ height:7, width:7, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
         </div>

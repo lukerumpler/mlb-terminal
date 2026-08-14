@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPlayerVideoLinks, shouldLoadPlayerVideoThumbnail } from '../client/src/pages/PlayersPage.jsx';
-import { getTeamFinancialRows } from '../client/src/pages/PlayersPage.jsx';
+import { getTeamFinancialRows, getRepeaterTierSeverity } from '../client/src/pages/PlayersPage.jsx';
 
 describe('player video descriptions', () => {
   it('provides concise source-specific descriptions for hover and keyboard tooltips', () => {
@@ -26,6 +26,14 @@ describe('team financial rows', () => {
       { label:'Tax Space', value:'−$186.3M', color:expect.any(String) },
       { label:'Repeater Tier', value:'History unavailable', color:expect.any(String) },
     ]);
+  });
+
+  it('uses increasing visual severity for first-, second-, and third-plus-year tiers', () => {
+    expect(getRepeaterTierSeverity(1).key).toBe('lower');
+    expect(getRepeaterTierSeverity(2).key).toBe('watch');
+    expect(getRepeaterTierSeverity(3).key).toBe('severe');
+    expect(getRepeaterTierSeverity(1).color).not.toBe(getRepeaterTierSeverity(3).color);
+    expect(getRepeaterTierSeverity(null).key).toBe('unknown');
   });
 
   it('shows unavailable strings or em dashes when the financial feed is unavailable', () => {

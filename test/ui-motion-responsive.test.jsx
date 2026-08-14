@@ -17,6 +17,9 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(appSource).toContain('width:196');
     expect(appSource).toContain('height:46');
     expect(appSource).toContain("padding:'16px 18px 24px'");
+    expect(appSource).toContain('className="skip-low-data-indicator"');
+    expect(appSource).toContain('Low Data Mode is active');
+    expect(appSource).toContain("onClick={() => setTab('settings')}");
   });
 
   it('keeps reduced-motion support and mobile rail rules in the document styles', () => {
@@ -41,5 +44,7 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(prospectsSource).toContain('skip-table-group-row');
     expect(appSource).toContain('.skip-long-table table thead th { position:sticky;');
     expect(appSource).toContain('.skip-panel:hover, .skip-stat-strip:hover { transform:none !important;');
+    expect(playersSource).toContain('getRepeaterTierSeverity');
+    expect(playersSource).toContain('aria-label="CBT repeater-tier severity legend"');
   });
 });
