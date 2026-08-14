@@ -2227,7 +2227,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
           {activeTab === 'defense' && (
             <div className="skip-profile-tab-grid">
-              <ScoutingGradesPreview />
+              <ScoutingGradesPreview player={player} seasonStats={s} />
               <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
               <Panel title="Development Timeline" accent={C.amber}><DevTimeline age={p?.currentAge} /></Panel>
             </div>
@@ -2448,7 +2448,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
         {/* ── COL 3: Scouting & trajectory — grades, dev, trend, career ── */}
         <div className="skip-profile-tertiary-column" style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <ScoutingGradesPreview />
+          <ScoutingGradesPreview player={player} seasonStats={s} />
 
           {/* Development timeline */}
           <Panel title="Development Timeline" accent={C.amber}>

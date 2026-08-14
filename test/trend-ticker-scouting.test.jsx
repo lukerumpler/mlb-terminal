@@ -2,9 +2,9 @@ import React from 'react';
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { captureVerifiedSnapshot, deriveVerifiedTrends, TREND_SNAPSHOT_STORAGE_KEY } from '../client/src/lib/trendSnapshots.js';
-import ScoutingGradesPreview, { SCOUTING_GRADE_PREVIEW_ROWS } from '../client/src/components/ScoutingGradesPreview.jsx';
+import ScoutingGradesPreview, { SCOUTING_GRADE_PREVIEW_ROWS, buildScoutingGradeRows } from '../client/src/components/ScoutingGradesPreview.jsx';
 import LiveScoreTicker from '../client/src/components/LiveScoreTicker.jsx';
 import { StatStrip } from '../client/src/components/atoms.jsx';
 
@@ -57,11 +57,22 @@ describe('ticker and scouting preview contracts', () => {
     expect(container.querySelector('[aria-label="Team OPS trend up"]')).toHaveTextContent('▲ +0.025');
   });
 
-  it('renders 20–80 grade structure as preview-only with unavailable values', () => {
-    render(<ScoutingGradesPreview />);
-    expect(screen.getByText('PREVIEW ONLY')).toBeInTheDocument();
-    expect(screen.getByText(/Verified scouting grades are not connected/)).toBeInTheDocument();
+  it('renders 20–80 grade structure with verified proxy population and honest unavailable values', () => {
+    const player = { isPitcher:false, savant:{ est_ba:0.320, est_slg:0.700 }, expectedStatisticsPopulation:[{ est_ba:0.240, est_slg:0.400 }, { est_ba:0.280, est_slg:0.500 }, { est_ba:0.320, est_slg:0.620 }, { est_ba:0.360, est_slg:0.700 }] };
+    const rows = buildScoutingGradeRows({ player });
+    expect(rows.find(row => row.key === 'hit')).toMatchObject({ status:'estimated', source:'Baseball Savant · expected statistics' });
+    expect(rows.find(row => row.key === 'power')).toMatchObject({ status:'estimated', source:'Baseball Savant · expected statistics' });
+    const { container } = render(<ScoutingGradesPreview player={player} />);
+    expect(screen.getByText('ESTIMATED PROXIES')).toBeInTheDocument();
+    expect(screen.getByText(/Estimated proxies use verified Baseball Savant/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filter scouting grade attributes'), { target:{ value:'available' } });
+    expect(screen.getByText('Hit')).toBeInTheDocument();
+    expect(screen.getByText('Power')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Sort scouting grade attributes'), { target:{ value:'current-desc' } });
+    const visibleAttributeLabels = [...container.querySelectorAll('strong')].map(node => node.textContent);
+    expect(visibleAttributeLabels.slice(0, 2)).toEqual(['Power', 'Hit']);
+    fireEvent.change(screen.getByLabelText('Sort scouting grade attributes'), { target:{ value:'attribute' } });
+    expect(screen.getByText(/2\/5 shown/)).toBeInTheDocument();
     expect(SCOUTING_GRADE_PREVIEW_ROWS).toHaveLength(5);
-    expect(screen.getAllByRole('img', { name:/scouting grade unavailable/i })).toHaveLength(10);
   });
 });

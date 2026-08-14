@@ -768,3 +768,12 @@
 .skip-ticker-skeleton i:nth-child(3){width:42px;animation-delay:.28s}
 @keyframes skip-ticker-pulse{0%,100%{opacity:.34}50%{opacity:.9}}
 @media (prefers-reduced-motion: reduce){.skip-ticker-skeleton i{animation:none;opacity:.6}}
+
+@media (min-width:721px){
+  .skip-sidebar .skip-nav-label,.skip-sidebar .skip-utility-label{min-width:0;white-space:nowrap;overflow:visible;text-overflow:clip;}
+  .skip-sidebar nav button{min-width:0;}
+}
+
+.skip-overview-empty-heading{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;}
+.skip-overview-empty-separator{color:var(--text4,#888);font:700 10px/1 'DM Mono',monospace;}
+@media (max-width:720px){.skip-overview-empty-heading{gap:4px;}}

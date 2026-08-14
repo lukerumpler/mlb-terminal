@@ -153,3 +153,20 @@
 - [x] Add rendered LiveScoreTicker tests for loading, empty, error, stale, retry, and updating states.
 - [x] Add a rendered StatStrip assertion proving verified trend arrows appear only when a baseline exists.
 - [x] Save a new checkpoint after the rendered coverage pass.
+- [ ] Inspect the current 20–80 grade preview and available verified player metrics for safe population.
+- [ ] Define explicit verified mappings and preserve unavailable states for unsupported scouting attributes.
+- [ ] Add grade attribute filtering and sorting controls with accessible labels and responsive behavior.
+- [ ] Populate only defensible grade values from existing verified player data; keep unsupported grades unavailable.
+- [ ] Add regression coverage for filtering, sorting, verified population, and unavailable-data honesty.
+- [ ] Run type checks, full tests, production build, responsive preview verification, and save a checkpoint.
+- [x] Audit the attached recommendations against the current Overview cards, provenance surfaces, and shell navigation.
+- [x] Fix concatenated missing-data copy and standardize zero-versus-unavailable display behavior.
+- [x] Correct pitch-arsenal Usage units and labels so values match their meaning.
+- [x] Standardize metric semantic colors, provenance badge states, card accent categories, and card-internal grid rhythm.
+- [x] Verify sidebar label readability and grouped navigation behavior at supported widths.
+- [x] Add regression coverage for the applied data-display, provenance, pitch-unit, color, and navigation changes.
+- [x] Run type checks, full tests, production build, responsive previews, and save a checkpoint.
+- [x] Add an explicit rendered Contact Quality Allowed unavailable-state copy separator and regression assertion.
+- [x] Define and apply explicit Overview accent categories for offense, pitching, defense/baserunning, and context cards.
+- [x] Add regression coverage proving the category accent mapping and empty-state copy rendering.
+- [x] Save a new checkpoint after resolving the remaining recommendation gaps.

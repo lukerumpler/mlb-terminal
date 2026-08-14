@@ -7,6 +7,7 @@ import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
 import { openTab } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
@@ -30,21 +31,35 @@ const OffenseRadar = lazy(() => import('../components/OverviewCharts.jsx').then(
 const StrengthRadar = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.StrengthRadar })));
 const RunDiffChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.RunDiffChart })));
 const ArsenalPie = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.ArsenalPie })));
+
+export const OVERVIEW_ACCENTS = Object.freeze({
+  offense: C.amber,
+  pitching: C.teal,
+  defense: C.slate,
+  context: C.purple,
+});
 const PositionOaaChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.PositionOaaChart })));
 const EvDistributionChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.EvDistributionChart })));
 const LuxuryTaxTrendChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.LuxuryTaxTrendChart })));
 
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
-function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
+export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
   return <div className="skip-overview-empty-state" role="status">
     <span className="skip-overview-empty-mark" aria-hidden="true">—</span>
     <div className="skip-overview-empty-copy">
-      <span className="skip-overview-empty-status">{status}</span>
-      <span className="skip-overview-empty-message">{message}</span>
+      <div className="skip-overview-empty-heading">
+        <span className="skip-overview-empty-status">{status}</span>
+        <span className="skip-overview-empty-separator" aria-hidden="true">·</span>
+        <span className="skip-overview-empty-message">{message}</span>
+      </div>
       {detail && <span className="skip-overview-empty-detail">{detail}</span>}
     </div>
   </div>;
+}
+
+function OverviewSourceBadge({ status }) {
+  return <StatusBadge status={status} compact />;
 }
 
 function ChartFallback({ height }) {
@@ -213,10 +228,14 @@ export function buildBattedBallProfile(rows = []) {
   if (!speeds.length) return null;
   const count = speeds.length;
   const pct = value => Number((value / count * 100).toFixed(1));
-  const bbTypes = rows.map(row => String(row?.bb_type || '').toLowerCase());
-  const barrels = rows.filter(row => Number(row?.launch_speed_angle) === 6).length;
+  const bbTypes = rows.map(row => String(row?.bb_type || '').toLowerCase()).filter(value => value && value !== 'null' && value !== 'undefined');
+  const classifiedBarrels = rows.filter(row => {
+    const raw = row?.launch_speed_angle;
+    return raw !== null && raw !== undefined && raw !== '' && Number.isFinite(Number(raw));
+  });
+  const barrels = classifiedBarrels.filter(row => Number(row.launch_speed_angle) === 6).length;
   return {
-    barrelPct: pct(barrels),
+    barrelPct: classifiedBarrels.length ? pct(barrels) : null,
     hardHitPct: pct(speeds.filter(value => value >= 95).length),
     sweetSpot: pct(angles.filter(value => value >= 8 && value <= 32).length),
     avgEV: (speeds.reduce((sum, value) => sum + value, 0) / count).toFixed(1),
@@ -225,9 +244,9 @@ export function buildBattedBallProfile(rows = []) {
     pullPct: null,
     centerPct: null,
     oppoPct: null,
-    gbPct: pct(bbTypes.filter(value => value === 'ground_ball').length),
-    fbPct: pct(bbTypes.filter(value => value === 'fly_ball' || value === 'popup').length),
-    ldPct: pct(bbTypes.filter(value => value === 'line_drive').length),
+    gbPct: bbTypes.length ? pct(bbTypes.filter(value => value === 'ground_ball').length) : null,
+    fbPct: bbTypes.length ? pct(bbTypes.filter(value => value === 'fly_ball' || value === 'popup').length) : null,
+    ldPct: bbTypes.length ? pct(bbTypes.filter(value => value === 'line_drive').length) : null,
     sampleSize: count,
   };
 }
@@ -1183,7 +1202,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>
 
       <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
-        <Panel title="Team Leaders" accent={C.rust} badge={teamPlayersBadge}>
+        <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
           <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
             <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
             {leaders.batting.map((row,i)=>(
@@ -1210,7 +1229,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </Panel>
 
-        <Panel title="Front Office Evaluation" accent={teamAccent} badge="Decision Lens">
+        <Panel title="Front Office Evaluation" accent={OVERVIEW_ACCENTS.context} badge="Decision Lens">
           <div style={{padding:'10px 14px 0'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <div>
@@ -1246,7 +1265,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </Panel>
 
-        <Panel title="Team Strength Radar" accent={teamAccent} badge="Percentiles">
+        <Panel title="Team Strength Radar" accent={OVERVIEW_ACCENTS.context} badge="Percentiles">
           <div style={{padding:'3px 8px 0'}}>
             <Suspense fallback={<ChartFallback height={196}/> }>
               <StrengthRadar data={D.strengthData} accent={teamAccent}/>
@@ -1446,7 +1465,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </tbody>
             </table>
           </Panel>
-          <Panel title="SKIP Grade" accent={C.purple}>
+          <Panel title="SKIP Grade" accent={OVERVIEW_ACCENTS.context}>
             <div style={{padding:'14px 14px 10px',textAlign:'center'}}>
               <div style={px({fontSize:52,fontWeight:900,color:C.amber,lineHeight:1})}>{D.overall}</div>
               <div style={sans({fontSize:11,color:C.text2,marginTop:4,letterSpacing:'.04em'})}>Overall Team Rating</div>
@@ -1477,19 +1496,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              panels) — fixing it now that a debug pass finally had room
              for it, since "lower priority" isn't the same as "not a real
              gap", and half this page turned out to share the pattern. */}
-        <Panel title="Batted Ball Profile" accent={C.amber} badge={bb ? (teamSavantState === 'ready' ? 'Savant' : 'Cached') : teamSavantState === 'loading' ? 'Loading' : 'Coverage gap'}>
+        <Panel title="Batted Ball Profile" accent={OVERVIEW_ACCENTS.offense} badge={bb ? <OverviewSourceBadge status={teamSavantSource?.includes('rollup') ? 'estimated' : 'verified'} /> : teamSavantState === 'loading' ? 'Loading' : <OverviewSourceBadge status="coverage-gap" />}>
           {bb ? (
           <div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:0}}>
             {[
-              ['Barrel %',     formatPanelMetric(bb.barrelPct, '%'),  parseFloat(bb.barrelPct) >= 9 ? C.teal : C.amber],
-              ['Hard Hit %',   formatPanelMetric(bb.hardHitPct, '%'), parseFloat(bb.hardHitPct) >= 42 ? C.teal : C.amber],
-              ['Sweet Spot %', formatPanelMetric(bb.sweetSpot, '%'),  parseFloat(bb.sweetSpot) >= 33 ? C.teal : C.amber],
-              ['Avg EV',       formatPanelMetric(bb.avgEV, ' mph'),   parseFloat(bb.avgEV) >= 89 ? C.teal : C.slate],
-              ['Max EV',       formatPanelMetric(bb.maxEV, ' mph'),   C.text],
-              ['Launch Angle', formatPanelMetric(bb.launchAngle, '°'),C.text],
+              ['Barrel %',     formatPanelMetric(bb.barrelPct, '%'), C.text],
+              ['Hard Hit %',   formatPanelMetric(bb.hardHitPct, '%'), C.text],
+              ['Sweet Spot %', formatPanelMetric(bb.sweetSpot, '%'), C.text],
+              ['Avg EV',       formatPanelMetric(bb.avgEV, ' mph'), C.text],
+              ['Max EV',       formatPanelMetric(bb.maxEV, ' mph'), C.text],
+              ['Launch Angle', formatPanelMetric(bb.launchAngle, '°'), C.text],
             ].map(([l,v,c],i,arr)=>(
-              <div key={l} style={{padding:'8px 14px',borderBottom:i<arr.length-2?`0.5px solid ${C.borderLight}`:'none',borderRight:i%2===0?`0.5px solid ${C.borderLight}`:'none'}}>
+              <div key={l} style={{padding:'8px 14px',borderBottom:i<3?`0.5px solid ${C.borderLight}`:'none',borderRight:i%3!==2?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2})}>{l}</div>
                 <div style={px({fontSize:16,fontWeight:800,color:c})}>{v}</div>
               </div>
@@ -1500,13 +1519,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{display:'flex',gap:10,marginBottom:8}}>
               {[['Pull %',formatPanelMetric(bb.pullPct, '%')],['Center %',formatPanelMetric(bb.centerPct, '%')],['Oppo %',formatPanelMetric(bb.oppoPct, '%')]].map(([l,v])=>(
                 <div key={l} style={{flex:1,textAlign:'center',background:C.surface2,borderRadius:6,padding:'6px 4px'}}>
-                  <div style={px({fontSize:14,fontWeight:800,color:C.navy})}>{v}</div>
+                  <div style={px({fontSize:14,fontWeight:800,color:C.text})}>{v}</div>
                   <div style={sans({fontSize:9,color:C.text3,marginTop:2})}>{l}</div>
                 </div>
               ))}
             </div>
             <div style={{display:'flex',gap:10}}>
-              {[['GB %',formatPanelMetric(bb.gbPct, '%'),C.teal],['FB %',formatPanelMetric(bb.fbPct, '%'),C.amber],['LD %',formatPanelMetric(bb.ldPct, '%'),C.rust]].map(([l,v,c])=>(
+              {[['GB %',formatPanelMetric(bb.gbPct, '%'),C.text],['FB %',formatPanelMetric(bb.fbPct, '%'),C.text],['LD %',formatPanelMetric(bb.ldPct, '%'),C.text]].map(([l,v,c])=>(
                 <div key={l} style={{flex:1,textAlign:'center',background:C.surface2,borderRadius:6,padding:'6px 4px'}}>
                   <div style={px({fontSize:14,fontWeight:800,color:c})}>{v}</div>
                   <div style={sans({fontSize:9,color:C.text3,marginTop:2})}>{l}</div>
@@ -1524,8 +1543,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </Panel>
 
         {/* Pitch Arsenal */}
-        <Panel title="Pitch Arsenal" accent={teamAccent}
+        <Panel title="Pitch Arsenal" accent={OVERVIEW_ACCENTS.pitching}
           badge={arsenal ? <div style={{display:'flex',gap:6}}>
+
             {[['Usage','usage'],['Grades','grades']].map(([l,k])=>(
               <button key={k} onClick={()=>setArsenalTab(k)} aria-pressed={arsenalTab===k}
                 style={{padding:'2px 8px',fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
@@ -1534,7 +1554,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 {l}
               </button>
             ))}
-          </div> : 'Coverage gap'}>
+          </div> : <OverviewSourceBadge status="coverage-gap" />}>
           {arsenal ? (arsenalTab === 'usage' ? (
             <div style={{display:'flex',gap:0,alignItems:'stretch'}}>
               {/* Donut */}
@@ -1549,7 +1569,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                   <div key={p.type} style={{display:'flex',alignItems:'center',gap:7}}>
                     <div style={{width:9,height:9,borderRadius:2,background:p.color,flexShrink:0}}/>
                     <span style={sans({fontSize:11,color:C.text2,flex:1})}>{p.type}</span>
-                    <span style={px({fontSize:12,fontWeight:700,color:p.color})}>{percentileLabel(p.pct)}</span>
+                    <span aria-label={`${p.type} usage ${p.pct == null ? 'unavailable' : `${p.pct.toFixed(1)} percent`}`} style={px({fontSize:12,fontWeight:700,color:p.color})}>{p.pct == null ? '—' : `${p.pct.toFixed(1)}%`}</span>
                   </div>
                 ))}
               </div>
@@ -1586,7 +1606,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
         {/* Contact Quality Allowed + Position OAA */}
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <Panel title="Contact Quality Allowed" accent={C.slate} badge={contactAllowed.sampleSize ? 'Savant' : 'Unavailable'}>
+          <Panel title="Contact Quality Allowed" accent={OVERVIEW_ACCENTS.pitching} badge={contactAllowed.sampleSize ? <OverviewSourceBadge status="verified" /> : <OverviewSourceBadge status="coverage-gap" />}>
             {contactAllowed.sampleSize ? (
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
                 {[['xwOBA', contactAllowed.xwoba == null ? '—' : contactAllowed.xwoba.toFixed(3)], ['Avg EV', contactAllowed.exitVelocity == null ? '—' : `${contactAllowed.exitVelocity.toFixed(1)} mph`], ['Hard-hit', contactAllowed.hardHitPct == null ? '—' : `${contactAllowed.hardHitPct.toFixed(1)}%`]].map(([label,value]) => <div key={label} style={{padding:'18px 10px',textAlign:'center',borderRight:`0.5px solid ${C.borderLight}`}}><div style={px({fontSize:17,fontWeight:800,color:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
@@ -1596,7 +1616,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </Panel>
 
           {/* Position depth is derived from the verified current-season player rows. */}
-          <Panel title="Position Breakdown" accent={teamAccent} badge="Live roster rows">
+          <Panel title="Position Breakdown" accent={OVERVIEW_ACCENTS.defense} badge={<OverviewSourceBadge status="verified" />}>
             {teamRollups.positions.length ? teamRollups.positions.slice(0, 8).map((row, index) => (
               <div key={row.position} style={{display:'flex',justifyContent:'space-between',padding:'7px 14px',borderBottom:index<Math.min(teamRollups.positions.length,8)-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <span style={sans({fontSize:11,color:C.text2})}>{row.position}</span>
@@ -1612,7 +1632,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       <div className="overview-responsive-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,alignItems:'start'}}>
 
         {/* Baserunning */}
-        <Panel title="Baserunning" accent={C.teal} badge="MLB Stats API">
+        <Panel title="Baserunning" accent={OVERVIEW_ACCENTS.defense} badge={<OverviewSourceBadge status="verified" />}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0,borderBottom:`0.5px solid ${C.border}`}}>
             {[
               ['SB', teamRollups.stolenBases ?? team.sb, C.teal],
@@ -1644,7 +1664,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </Panel>
 
-        <Panel title="Exit Velocity Distribution" accent={teamAccent} badge={teamExitVelocityState === 'ready' ? 'Savant' : 'Coverage gap'}>
+        <Panel title="Exit Velocity Distribution" accent={OVERVIEW_ACCENTS.offense} badge={teamExitVelocityState === 'ready' ? 'Savant' : 'Coverage gap'}>
           {teamExitVelocityState === 'ready' ? (
             <div>
               <Suspense fallback={<ChartFallback height={130} />}>
@@ -1659,7 +1679,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           )}
         </Panel>
 
-        <Panel title="Spray Chart" accent={C.rust} badge={sprayRows.length ? 'Savant' : 'Unavailable'}>
+        <Panel title="Spray Chart" accent={OVERVIEW_ACCENTS.offense} badge={sprayRows.length ? 'Savant' : 'Unavailable'}>
           {sprayRows.length ? <div style={{padding:'10px 14px 8px'}}><svg viewBox="0 0 260 150" role="img" aria-label="Verified Baseball Savant batted-ball spray coordinates" style={{width:'100%',height:150,background:'linear-gradient(180deg, rgba(21,112,112,.06), transparent)',borderRadius:6}}><path d="M130 142 L28 22 M130 142 L232 22" stroke={C.border} strokeWidth="1" fill="none"/><path d="M130 142 L130 18" stroke={C.border} strokeWidth="1" fill="none"/>{sprayRows.map((row,index) => { const x = Math.max(20, Math.min(240, 130 + ((Number(row.hc_x) - 125) * 0.85))); const y = Math.max(18, Math.min(138, 142 - ((Number(row.hc_y) - 30) * 0.55))); const color = row.bb_type === 'ground_ball' ? C.teal : row.bb_type === 'fly_ball' ? C.amber : row.bb_type === 'line_drive' ? C.rust : C.slate; return <circle key={`${row.hc_x}-${row.hc_y}-${index}`} cx={x} cy={y} r="2.2" fill={color} opacity=".72"/>; })}</svg><div style={sans({fontSize:9,color:C.text4,lineHeight:1.4,marginTop:5})}>Source: Baseball Savant · {sprayRows.length.toLocaleString()} verified batted-ball coordinates. Raw Savant coordinate view; points are not estimated.</div></div> : <OverviewEmptyState message="Team spray coordinates" detail="Baseball Savant did not return verified team batted-ball coordinates for this season." />}
         </Panel>
       </div>
