@@ -133,3 +133,12 @@
 - [x] Add regression coverage for snap-scroll CSS, sparkline normalization, and expanded rendering
 - [x] Run typecheck, tests, and responsive visual verification
 - [x] Save a checkpoint containing the mobile rail and sparkline enhancement
+
+- [x] Audit the visible Sources button and identify all related controls and tests
+- [x] Inspect browser/server logs and affected MLB/Savant fetch paths for current errors
+- [x] Remove the visible Sources button without removing source provenance from data cards
+- [x] Apply targeted loading and request optimizations to the affected dashboard/player paths
+- [x] Preserve explicit unavailable states, source metadata, mobile behavior, and profile interactions
+- [x] Add regression coverage for Sources removal and optimized error/loading behavior
+- [x] Run typecheck, focused tests, full tests, and responsive visual verification
+- [x] Save a checkpoint containing the debugged and optimized update

@@ -69,9 +69,9 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(overviewSource).toContain('overview-team-context');
     expect(indexSource).toContain('.skip-overview-page { gap:12px !important; }');
     expect(indexSource).toContain('.skip-player-page .skip-profile-tab-grid { gap:10px; padding:10px; }');
-    expect(overviewSource).toContain('ProvenanceButton ref={provenanceTriggerRef}');
-    expect(playersSource).toContain('ProvenanceButton ref={provenanceTriggerRef}');
-    expect(indexSource).toContain('.skip-profile-source-strip .skip-provenance-trigger{margin-left:auto}');
+    expect(overviewSource).not.toContain('ProvenanceButton');
+    expect(playersSource).not.toContain('ProvenanceButton');
+    expect(indexSource).toContain('.skip-profile-source-strip');
     expect(indexSource).toContain('.skip-provenance-drawer{width:100%;border-left:0}');
     expect(overviewSource).toContain('linear-gradient(to right, ${C.rust} 0%, ${C.amber} 50%, ${C.teal} 100%)');
     expect(playersSource).toContain('import MetricInfo from');

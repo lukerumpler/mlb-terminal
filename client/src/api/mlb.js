@@ -206,6 +206,7 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
     try {
       data = await res.json();
     } catch {
+      if (quietStatuses.includes(res.status)) console.warn('[mlb] expected unreadable upstream response', res.status, path);
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
     if (useCache) {
@@ -527,7 +528,7 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     const today = new Date();
     const startDate = `${season}-03-01`;
     const endDate = season === today.getUTCFullYear() ? today.toISOString().slice(0, 10) : `${season}-10-05`;
-    const schedule = await mlb('/schedule', { sportId: 1, teamId: clubId, startDate, endDate, gameType: 'R', hydrate: 'team' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
+    const schedule = await mlb('/schedule', { sportId: 1, teamId: clubId, startDate, endDate, gameType: 'R', hydrate: 'team' }, { ttl: 5 * 60_000, timeoutMs: 12_000, quietStatuses:[502, 503, 504] });
     const games = (schedule?.dates || []).flatMap(date => date.games || []).filter(game => String(game.status?.abstractGameState || '').toLowerCase() === 'final').sort((a, b) => String(b.gameDate || '').localeCompare(String(a.gameDate || ''))).slice(0, 30);
     if (!games.length) return unavailable('No completed regular-season games were returned for the current team and season.');
     const results = [];
@@ -1049,7 +1050,7 @@ function parseStandingsRecord(rec) {
 
 async function fetchStandings(leagueIds, season = SEASON) {
   const ids  = Array.isArray(leagueIds) ? leagueIds.join(',') : String(leagueIds);
-  const data = await mlb('/standings', { leagueId: ids, season, standingsTypes: 'regularSeason', hydrate: 'team,division,league' }, { ttl: 5 * 60_000 });
+  const data = await mlb('/standings', { leagueId: ids, season, standingsTypes: 'regularSeason', hydrate: 'team,division,league' }, { ttl: 5 * 60_000, quietStatuses:[502, 503, 504] });
   const out  = {};
   for (const rec of data.records || []) {
     const parsed = parseStandingsRecord(rec);

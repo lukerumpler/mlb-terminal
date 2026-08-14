@@ -50,14 +50,10 @@ describe('Team Overview model source and retry interaction', () => {
     expect(await screen.findByText('Season overview', { exact: false })).toBeInTheDocument();
   });
 
-  it('opens source provenance for the current team metrics', async () => {
-    const user = userEvent.setup();
+  it('removes the visible Sources control while preserving inline source context', async () => {
     render(<OverviewPage />);
-    await user.click(screen.getByRole('button', { name:'Open source provenance' }));
-    expect(screen.getByRole('dialog', { name:'Source provenance' })).toBeInTheDocument();
-    expect(screen.getAllByText('MLB Stats API').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Direct team standings and aggregate-stat fields/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name:'Close source provenance' }));
+    expect(screen.queryByRole('button', { name:'Open source provenance' })).not.toBeInTheDocument();
+    expect(screen.queryByText('SOURCES', { exact:true })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name:'Source provenance' })).not.toBeInTheDocument();
   });
 

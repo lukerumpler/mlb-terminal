@@ -17,7 +17,6 @@ import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx
 import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
-import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
@@ -1925,8 +1924,6 @@ function PlayerProfile({ player, derived, onCompare }) {
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
-  const [provenanceOpen, setProvenanceOpen] = useState(false);
-  const provenanceTriggerRef = useRef(null);
   const [expandedChart, setExpandedChart] = useState(null);
   const [expandedSummary, setExpandedSummary] = useState(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
@@ -1975,15 +1972,6 @@ function PlayerProfile({ player, derived, onCompare }) {
     ['Statcast', Boolean(player.savant), 'Savant'],
     ['Contract', hasProfileContractMetadata, 'Spotrac'],
   ];
-  const profileProvenance = useMemo(() => [
-    { label:'Player identity', status:p?.id ? 'verified' : 'unavailable', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
-    { label:'Season statistics', status:(s?.gamesPlayed || s?.atBats || s?.inningsPitched) ? 'verified' : 'unavailable', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
-    { label:'Statcast metrics', status:player.savant ? 'verified' : 'unavailable', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
-    { label:'Tracking and pitch context', status:(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length) ? 'verified' : 'unavailable', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
-    { label:'Contract and service time', status:hasProfileContractMetadata ? 'verified' : 'unavailable', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
-    { label:'SKIP decision metrics', status:'estimated', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
-  ], [p, s, player]);
-
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
   // default amber for anyone outside that set rather than showing nothing.
@@ -2279,10 +2267,8 @@ function PlayerProfile({ player, derived, onCompare }) {
         </div>
       </div>
 
-      <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${p.fullName || player.fullName || 'Player'} · ${seasonLabel}`} entries={profileProvenance} />
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
-        <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
         {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
       </div>
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
