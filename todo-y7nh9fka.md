@@ -107,6 +107,6 @@
 - [x] Validate loading behavior and save a new checkpoint.
 - [x] Add rendered or effect-level tests proving Overview uses a cached team Savant snapshot on cache hit and performs network rollups on cache miss.
 - [x] Add rendered regression tests for Batted Ball Profile and Pitch Arsenal loading and unavailable states.
-- [ ] Add rendered Overview tests for Batted Ball Profile loading and unavailable states.
-- [ ] Add rendered Overview tests for Pitch Arsenal loading and unavailable states.
-- [ ] Save a checkpoint after the verified team Savant cache and panel rollup changes pass validation.
+- [x] Add rendered Overview tests for Batted Ball Profile loading and unavailable states.
+- [x] Add rendered Overview tests for Pitch Arsenal loading and unavailable states.
+- [x] Save a checkpoint after the verified team Savant cache and panel rollup changes pass validation.
