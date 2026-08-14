@@ -36,6 +36,16 @@ describe('player boxscore split aggregation', () => {
     expect(result.pitching.find(row => row.label === 'Day')).toMatchObject({ inningsPitched: 2, earnedRuns: 1, era: 4.5, whip: 1.5 });
   });
 
+  it('returns a truthful unavailable state when the official schedule times out', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('The operation was aborted due to timeout'); }));
+    const result = await getPlayerBoxscoreSplits(123, 10, 2026);
+    expect(result.status).toBe('unavailable');
+    expect(result.source).toBe('MLB Stats API boxscores');
+    expect(result.reason).toMatch(/schedule|boxscore.*unavailable/i);
+    expect(result.batting).toEqual([]);
+    expect(result.pitching).toEqual([]);
+  });
+
   it('returns a truthful unavailable state when no current team identifier exists', async () => {
     const result = await getPlayerBoxscoreSplits(123, null, 2026);
     expect(result.status).toBe('unavailable');

@@ -7,7 +7,7 @@ import {
   normalizeSprayPoint,
 } from '../client/src/pages/PlayersPage.jsx';
 import { computeAMD } from '../client/src/engine/skip.js';
-import { selectSeasonSplit } from '../client/src/api/mlb.js';
+import { selectSeasonSplit, normalizeSeasonAdvancedStat } from '../client/src/api/mlb.js';
 import { percentileLabel } from '../client/src/lib/percentile.js';
 import { comparisonAxes, comparisonIdentity } from '../client/src/components/PlayerComparisonModal.jsx';
 
@@ -96,6 +96,11 @@ describe('player profile data accuracy guards', () => {
     const axes = comparisonAxes(player, () => [{ axis:'Power', pct:99, rawLabel:'99' }], false);
     expect(comparisonIdentity(player)).toEqual({ name:'Juan Soto', identity:'New York Mets · RF' });
     expect(axes[0]).toMatchObject({ axis:'Power', pct:99, label:'99th', color:expect.any(String) });
+  });
+
+  it('normalizes only explicit provider WAR and wRC+ fields', () => {
+    expect(normalizeSeasonAdvancedStat({ fWAR:3.4, wRCPlus:128 }, 2026)).toMatchObject({ war:3.4, wrcPlus:128, status:'live' });
+    expect(normalizeSeasonAdvancedStat({ ops:.842 }, 2026)).toMatchObject({ war:null, wrcPlus:null, status:'unavailable' });
   });
 
   it('prefers a current-sport aggregate split over an arbitrary team split', () => {

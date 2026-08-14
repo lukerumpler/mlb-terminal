@@ -78,6 +78,15 @@ describe('MLB request cache optimization', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('treats an unavailable live feed as an explicit weather gap without proxy error noise', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetch.mockResolvedValueOnce({ ok:false, status:404, headers:{ get:() => null }, text:async () => '{"error":"Not Found"}' });
+    await expect(getGameFeedMetadata(123458)).resolves.toMatchObject({ status:'unavailable', mediaUrl:'https://www.mlb.com/gameday/123458' });
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('[mlb] proxy error'), expect.anything(), expect.anything(), expect.anything());
+    expect(warn).toHaveBeenCalledWith('[mlb] expected upstream unavailable response', 404, '/game/123458/feed/live');
+  });
+
   it('extracts recorded MLB weather and constructs an official Gameday link', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ gameData: { weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } } }) });
     await expect(getGameFeedMetadata(123456)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, mediaUrl: 'https://www.mlb.com/gameday/123456' });

@@ -114,3 +114,13 @@
 - [x] Add regression coverage for Performance Summary values and mobile rail CSS
 - [x] Run typecheck, tests, and desktop/mobile visual verification
 - [x] Save a checkpoint containing the Performance Summary and mobile rail enhancement
+
+- [x] Diagnose and repair the six reported feed/provider errors with explicit unavailable-state handling
+- [x] Audit existing player WAR and wRC+ provider adapters and response shapes
+- [x] Confirm the official seasonAdvanced path only populates explicit WAR/wRC+ fields and keeps missing provider fields unavailable
+- [x] Add trend indicators or percentile context beneath each Performance Summary metric
+- [x] Add interactive summary-card detail expansion with metric definitions and data sources
+- [x] Preserve source provenance, loading states, mobile rail behavior, and existing profile interactions
+- [x] Add regression coverage for the six error paths, provider mappings, trends, and summary expansion
+- [x] Run typecheck, focused tests, full tests, and responsive loaded-player regression verification
+- [x] Save a checkpoint containing the repaired and enhanced Performance Summary

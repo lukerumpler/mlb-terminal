@@ -153,7 +153,7 @@ class MlbProxyError extends Error {
 
 // ─── Core fetcher ─────────────────────────────────────────────────────────
 // Keeps commas unencoded in hydrate strings so MLB receives them intact.
-export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS, timeoutMs = 10_000 } = {}) {
+export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS, timeoutMs = 10_000, quietStatuses = [] } = {}) {
   const extraQs = Object.entries(params)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
     .join('&');
@@ -186,6 +186,8 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
           return stale;
         }
         console.warn('[mlb] proxy rate limit; pausing MLB requests', path);
+      } else if (quietStatuses.includes(res.status)) {
+        console.warn('[mlb] expected upstream unavailable response', res.status, path);
       } else {
         console.error('[mlb] proxy error', res.status, url, body.slice(0, 200));
       }
@@ -332,6 +334,25 @@ async function getSeasonStatsSafe(id, group, season, sportId) {
   const prev = await tryYear(season - 1);
   if (prev)    return { stat: prev, season: season - 1, isFallback: true };
   return { stat: {}, season, isFallback: false };
+}
+
+// Optional advanced season fields. MLB does not guarantee WAR or wRC+ in every
+// Stats API response, so this adapter preserves only explicit provider fields.
+export function normalizeSeasonAdvancedStat(stat = {}, season, source = 'MLB Stats API seasonAdvanced') {
+  const war = stat.war ?? stat.fWAR ?? stat.bWAR ?? stat.rWAR ?? null;
+  const wrcPlus = stat.wrcPlus ?? stat.wRCPlus ?? stat.wrc_plus ?? null;
+  return { season, war, wrcPlus, source, status:(war != null || wrcPlus != null) ? 'live' : 'unavailable' };
+}
+
+export async function getSeasonAdvancedStatsSafe(id, season, sportId) {
+  try {
+    const data = await mlb(`/people/${id}/stats`, { stats:'seasonAdvanced', group:'hitting', season });
+    const group = findStatGroup(data.stats, 'hitting');
+    const split = selectSeasonSplit(group?.splits, sportId);
+    return normalizeSeasonAdvancedStat(split?.stat || {}, season);
+  } catch {
+    return { season, war:null, wrcPlus:null, source:'MLB Stats API seasonAdvanced', status:'unavailable' };
+  }
 }
 
 // Career year-by-year splits across ALL levels (includes MiLB years)
@@ -546,7 +567,7 @@ export async function loadFullPlayer(person, season = SEASON) {
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
   const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
-  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials] = await Promise.all([
+  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics] = await Promise.all([
     getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
     getSeasonStatsSafe(id, 'pitching', season, profileSportId),
     getCareerSplits(id, 'hitting'),
@@ -554,6 +575,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     fetchContractData(id, person.fullName),
     getHandednessSplits(id, season),
     fetchTeamFinancials(currentTeamAbbreviation, season),
+    getSeasonAdvancedStatsSafe(id, season, profileSportId),
   ]);
 
   // Savant & bat-tracking are optional — never block. Each tries current season then prior year
@@ -755,6 +777,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
+    advancedMetrics,
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
@@ -883,7 +906,7 @@ export async function getGameFeedMetadata(gameOrPk) {
   const finalGame = typeof gameOrPk === 'object' && String(gameOrPk?.status || '').toLowerCase() === 'final';
   if (finalGame) return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable', reason: 'Recorded weather was not included in the official schedule response.' };
   try {
-    const data = await mlb(`/game/${gamePk}/feed/live`, {}, { ttl: 10 * 60_000, timeoutMs: 10_000 });
+    const data = await mlb(`/game/${gamePk}/feed/live`, {}, { ttl: 10 * 60_000, timeoutMs: 10_000, quietStatuses:[404, 502, 503, 504] });
     return { weather: normalizeWeather(data?.gameData?.weather), mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), source: 'MLB live feed' };
   } catch {
     return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable' };
