@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPlayerVideoLinks } from '../client/src/pages/PlayersPage.jsx';
+import { buildPlayerVideoLinks, shouldLoadPlayerVideoThumbnail } from '../client/src/pages/PlayersPage.jsx';
 import { getTeamFinancialRows } from '../client/src/pages/PlayersPage.jsx';
 
 describe('player video descriptions', () => {
@@ -8,6 +8,8 @@ describe('player video descriptions', () => {
     expect(links[0].description).toContain('Official MLB video search');
     expect(links[1].description).toContain('YouTube search');
     expect(links.every(link => link.description.length < 150)).toBe(true);
+    expect(shouldLoadPlayerVideoThumbnail({ saveData:false, thumbnail:links[0].thumbnail })).toBe(true);
+    expect(shouldLoadPlayerVideoThumbnail({ saveData:true, thumbnail:links[0].thumbnail })).toBe(false);
   });
 });
 

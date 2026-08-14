@@ -95,6 +95,10 @@ export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation
   ];
 }
 
+export function shouldLoadPlayerVideoThumbnail({ saveData = false, thumbnail } = {}) {
+  return !saveData && Boolean(thumbnail);
+}
+
 export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviation } = {}) {
   const name = String(fullName || '').trim();
   if (!name) return [];
@@ -110,8 +114,14 @@ export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviat
 
 function PlayerVideoThumbnail({ item, playerName, accent }) {
   const [imageError, setImageError] = useState(false);
+  const [saveData, setSaveData] = useState(false);
   useEffect(() => { setImageError(false); }, [item.thumbnail]);
+  useEffect(() => {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection?.saveData) setSaveData(true);
+  }, []);
   const initials = playerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'MLB';
+  const canLoadThumbnail = shouldLoadPlayerVideoThumbnail({ saveData, thumbnail:item.thumbnail });
   const tooltipId = `video-tooltip-${item.id}`;
   return (
     <div className="skip-video-thumbnail-wrap" style={{ position:'relative', minWidth:0 }}>
@@ -123,8 +133,8 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
         style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none' }}>
 
       <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
-        {!imageError && item.thumbnail ? (
-          <img src={item.thumbnail} alt="" loading="lazy" onError={() => setImageError(true)}
+        {canLoadThumbnail && !imageError ? (
+          <img src={item.thumbnail} alt="" loading="lazy" decoding="async" fetchPriority="low" width="640" height="360" onError={() => setImageError(true)}
             style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', display:'block', filter:'saturate(.8)' }} />
         ) : (
           <div aria-hidden="true" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', ...px({ fontSize:26, fontWeight:800, color:accent }) }}>{initials}</div>
@@ -182,7 +192,7 @@ function PlayerVideoPanel({ player, profile, accent }) {
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.5 })}>Video search is unavailable until a verified player identity is loaded.</div>
         )}
         <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>
-          Preview art is the official MLB headshot. Search cards and highlight shortcuts open live source results; SKIP does not invent clip URLs or timestamps.
+          Preview art is a lazy-loaded official MLB headshot and is skipped when browser data-saver mode is active. Search cards and highlight shortcuts remain lightweight external links; SKIP does not invent clip URLs or timestamps.
         </div>
       </div>
     </Panel>
