@@ -19,6 +19,7 @@ import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
+import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
@@ -1275,6 +1276,32 @@ export function SurchargeRiskBadge({ warning, compact = false } = {}) {
   );
 }
 
+const CONFIDENCE_PALETTE = {
+  teal: { color:C.teal, soft:C.tealSoft, border:C.tealMid },
+  amber: { color:C.amberDark, soft:C.amberSoft, border:C.amberMid },
+  rust: { color:C.rust, soft:C.rustSoft, border:C.rustMid },
+  slate: { color:C.text3, soft:C.surface3, border:C.border },
+};
+
+export function PlayerDataConfidenceBadge({ confidence, compact = false } = {}) {
+  if (!confidence) return null;
+  const tone = CONFIDENCE_PALETTE[confidence.tone] || CONFIDENCE_PALETTE.slate;
+  const label = compact ? `CONFIDENCE · ${confidence.label.toUpperCase()}` : `DATA CONFIDENCE · ${confidence.score}/100`;
+  const detail = `${confidence.reasons.join('. ')}. This is a source-completeness indicator, not a probability that the projection is correct.`;
+  return (
+    <span
+      role="note"
+      data-testid="player-data-confidence"
+      title={detail}
+      aria-label={`${label}. ${detail}`}
+      style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:22, padding:'3px 7px', border:`1px solid ${tone.border}`, borderRadius:999, background:tone.soft, color:tone.color, ...px({ fontSize:8.5, fontWeight:800, letterSpacing:'.045em' }) }}
+    >
+      <span aria-hidden="true" style={{ width:5, height:5, borderRadius:'50%', background:tone.color, flexShrink:0 }} />
+      {label}
+    </span>
+  );
+}
+
 function formatFinancialValue(value) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -1298,7 +1325,7 @@ export function getTeamFinancialRows(teamFinancials) {
   ].map(([label, value, color]) => ({ label, value: typeof value === 'string' ? value : formatFinancialValue(value), color }));
 }
 
-function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
+function MarketIntelPanel({ kpis, ct, p, teamFinancials, confidence }) {
   const projWARperS  = ((kpis.TPVI||50) * 0.09 - 1.5).toFixed(1);
   const surplusM     = Math.round(((kpis.TPVI||50) - 50) * 3.8);
   const extProb      = Math.min(97, Math.max(12, Math.round(kpis.TPVI||50 + 18)));
@@ -1332,7 +1359,7 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials }) {
   };
 
   return (
-    <Panel title="Market & Contract Intelligence" accent={C.purple} badge="Financial Model">
+    <Panel title="Market & Contract Intelligence" accent={C.purple} badge={<PlayerDataConfidenceBadge confidence={confidence} compact />}>
       <div style={{ padding:'10px 14px 6px' }}>
         {/* Surplus value */}
         <div style={{ textAlign:'center', padding:'12px 0 10px', borderBottom:`0.5px solid ${C.borderLight}`, marginBottom:10 }}>
@@ -1972,6 +1999,16 @@ function PlayerProfile({ player, derived, onCompare }) {
   };
 
   const extensionTaxWarning = getExtensionTaxWarning({ teamFinancials:player.teamFinancials });
+  const dataConfidence = getPlayerDataConfidence({
+    identity: p?.id,
+    seasonStats: Object.keys(s || {}).length ? s : null,
+    savant: player.savant,
+    contract: player.contractData?.salary || player.contractData?.aav || player.contractData?.total,
+    teamFinancials: player.teamFinancials?.payroll || player.teamFinancials?.tax,
+    isFallback: player.isFallback,
+    dataMode: player.dataMode || player.sourceStatus?.mode || 'unknown',
+    freshnessAgeMs: player.freshnessAgeMs || player.sourceStatus?.ageMs,
+  });
   const careerHeaders = player.isPitcher
     ? ['YR','G','GS','IP','W','L','ERA','K','BB','WHIP']
     : ['YR','G','AB','H','HR','RBI','AVG','OBP','SLG','OPS'];
@@ -2088,6 +2125,7 @@ function PlayerProfile({ player, derived, onCompare }) {
               {p.height && p.weight && <Badge>{p.height} / {p.weight}</Badge>}
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
+              <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
               <button onClick={onCompare} style={{ marginTop:8, padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
                 Compare player
               </button>
@@ -2585,7 +2623,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
           <ContractPanel contractData={player.contractData} />
 
-          <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} />
+          <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} confidence={dataConfidence} />
 
           {/* ── Comparison Engine ── */}
           <Panel title="Comparison Engine" accent={C.purple} badge="Model Reference">
