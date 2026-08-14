@@ -60,7 +60,7 @@ describe('SKIP preserved interactions and persistence', () => {
       expect(screen.getByTitle('Overview')).toBeInTheDocument();
       expect(document.documentElement.dataset.theme).toBe('light');
     });
-    await user.click(screen.getByTitle('Search everything'));
+    fireEvent.click(screen.getByTitle('Search everything'));
 
     const palette = await screen.findByRole('dialog', { name: 'Command palette' });
     expect(palette).toBeInTheDocument();

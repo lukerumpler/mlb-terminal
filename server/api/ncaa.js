@@ -100,20 +100,20 @@ export default async function handler(req, res) {
   } catch (err) {
     const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
     console.error('[ncaa-proxy] fetch error:', err.message);
-    return res.status(isTimeout ? 504 : 502).json({
+    throw { status: isTimeout ? 504 : 502, payload: {
       error: isTimeout ? 'NCAA API timed out' : 'Failed to reach NCAA API',
       detail: err.message,
       url: ncaaUrl,
-    });
+    } };
   }
 
   if (!ncaaRes.ok) {
     const body = await ncaaRes.text().catch(() => '');
-    return res.status(ncaaRes.status).json({
+    throw { status: ncaaRes.status, payload: {
       error: `NCAA API responded with ${ncaaRes.status}`,
       url: ncaaUrl,
       body: body.slice(0, 500),
-    });
+    } };
   }
 
     let data;

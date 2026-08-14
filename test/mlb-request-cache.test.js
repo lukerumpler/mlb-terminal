@@ -66,6 +66,18 @@ describe('MLB request cache optimization', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('reuses normalized schedule weather for completed games without a feed/live request', async () => {
+    const game = { gamePk: 123456, status: 'Final', weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } };
+    await expect(getGameFeedMetadata(game)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, source: 'MLB schedule', mediaUrl: 'https://www.mlb.com/gameday/123456' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not retry feed/live for completed games without recorded weather', async () => {
+    const game = { gamePk: 123457, status: 'Final' };
+    await expect(getGameFeedMetadata(game)).resolves.toMatchObject({ status: 'unavailable', mediaUrl: 'https://www.mlb.com/gameday/123457' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('extracts recorded MLB weather and constructs an official Gameday link', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ gameData: { weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } } }) });
     await expect(getGameFeedMetadata(123456)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, mediaUrl: 'https://www.mlb.com/gameday/123456' });

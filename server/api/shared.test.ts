@@ -14,10 +14,29 @@ describe("legacy API shared helpers", () => {
 
     applyCors(
       { headers: {}, socket: { remoteAddress: "cors-test" } } as never,
-      response as never
+      response as never,
     );
 
     expect(headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+    expect(headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Accept");
+    vi.unstubAllEnvs();
+  });
+
+  it("returns the configured CORS origin contract", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ALLOWED_ORIGIN", "https://skip.example.com, https://www.skip.example.com");
+    const headers = new Map<string, string>();
+    const response = {
+      setHeader(name: string, value: string) {
+        headers.set(name, value);
+      },
+    };
+    applyCors(
+      { headers: { origin: "https://skip.example.com" }, socket: { remoteAddress: "cors-test-allow" } } as never,
+      response as never,
+    );
+    expect(headers.get("Access-Control-Allow-Origin")).toBe("https://skip.example.com");
     expect(headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
     expect(headers.get("Access-Control-Allow-Headers")).toBe("Content-Type, Accept");
     vi.unstubAllEnvs();
@@ -29,7 +48,9 @@ describe("legacy API shared helpers", () => {
     const allowedHeaders = new Map<string, string>();
     const rejectedHeaders = new Map<string, string>();
     const responseFor = (headers: Map<string, string>) => ({
-      setHeader(name: string, value: string) { headers.set(name, value); },
+      setHeader(name: string, value: string) {
+        headers.set(name, value);
+      },
     });
 
     applyCors({ headers: { origin: "https://skip.example.com" } } as never, responseFor(allowedHeaders) as never);

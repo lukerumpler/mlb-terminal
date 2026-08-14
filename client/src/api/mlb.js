@@ -809,6 +809,7 @@ function normalizeGame(g) {
       losses: g.teams?.home?.leagueRecord?.losses,
     },
     venue:     g.venue?.name || '',
+    weather:   g.weather || g.gameData?.weather || null,
     time:      g.gameDate,
     gameType:  g.gameType,
     levelName: g.teams?.home?.team?.sport?.name || 'MLB',
@@ -820,7 +821,7 @@ export async function getTodaysGames(date) {
   const d    = date || new Date().toISOString().slice(0, 10);
   const data = await mlb('/schedule', {
     sportId: 1, date: d,
-    hydrate: 'linescore(matchup,runners),team,flags,review',
+    hydrate: 'linescore(matchup,runners),team,flags,review,weather',
     language: 'en',
   }, { ttl: 60_000 });
   return (data.dates?.[0]?.games || []).map(normalizeGame);
@@ -873,15 +874,17 @@ export async function getOrgGames(date, mlbTeamId) {
   ];
 }
 
-export async function getGameFeedMetadata(gamePk) {
+export async function getGameFeedMetadata(gameOrPk) {
+  const gamePk = typeof gameOrPk === 'object' ? gameOrPk?.gamePk : gameOrPk;
   if (!gamePk) return null;
+  const scheduledWeather = typeof gameOrPk === 'object' ? gameOrPk?.weather : null;
+  const normalizeWeather = weather => weather ? { condition: weather.condition || null, temp: weather.temp || null, wind: weather.wind || null } : null;
+  if (scheduledWeather) return { weather: normalizeWeather(scheduledWeather), mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), source: 'MLB schedule' };
+  const finalGame = typeof gameOrPk === 'object' && String(gameOrPk?.status || '').toLowerCase() === 'final';
+  if (finalGame) return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable', reason: 'Recorded weather was not included in the official schedule response.' };
   try {
     const data = await mlb(`/game/${gamePk}/feed/live`, {}, { ttl: 10 * 60_000, timeoutMs: 10_000 });
-    return {
-      weather: data?.gameData?.weather ? { condition: data.gameData.weather.condition || null, temp: data.gameData.weather.temp || null, wind: data.gameData.weather.wind || null } : null,
-      mediaUrl: `https://www.mlb.com/gameday/${gamePk}`,
-      retrievedAt: new Date().toISOString(),
-    };
+    return { weather: normalizeWeather(data?.gameData?.weather), mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), source: 'MLB live feed' };
   } catch {
     return { weather: null, mediaUrl: `https://www.mlb.com/gameday/${gamePk}`, retrievedAt: new Date().toISOString(), status: 'unavailable' };
   }
@@ -1212,7 +1215,7 @@ export async function getAllTeams(sportId = 1) {
 }
 
 export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
-  const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season }, { ttl: 10 * 60_000 });
+  const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season }, { ttl: 10 * 60_000, timeoutMs: 8_000 });
   return (data.teams || []).map(t => ({
     id: t.id, name: t.name, abbr: t.abbreviation,
     level: t.sport?.name || '', levelId: t.sport?.id || 0, league: t.league?.name || '',
@@ -1280,17 +1283,17 @@ export async function getSavantData(year = SEASON) {
 
 export async function getTeamExitVelocity(teamAbbr, year = SEASON) {
   if (!teamAbbr) return null;
-  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_exit_velocity&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 20_000 });
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_exit_velocity&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 8_000 });
   return Array.isArray(arr) ? arr : null;
 }
 export async function getTeamBattedBalls(teamAbbr, year = SEASON) {
   if (!teamAbbr) return null;
-  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 30_000 });
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 12_000 });
   return Array.isArray(arr) ? arr : null;
 }
 export async function getTeamBattedBallsAgainst(teamAbbr, year = SEASON) {
   if (!teamAbbr) return null;
-  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls_against&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 30_000 });
+  const arr = await fetchLeaderboard(`/api/savant?endpoint=team_batted_balls_against&year=${year}&team=${encodeURIComponent(teamAbbr)}`, { timeoutMs: 12_000 });
   return Array.isArray(arr) ? arr : null;
 }
 
@@ -1504,9 +1507,9 @@ export async function getMinorLeagueTeamOverview(teamId, levelId = 11, season = 
   if (!teamId || !leagueId) return null;
   try {
     const [teamResult, hittingResult, pitchingResult] = await Promise.allSettled([
-      mlb(`/teams/${teamId}`, { hydrate: 'venue,league,division,sport' }),
-      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'hitting', season, sportIds: levelId }),
-      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'pitching', season, sportIds: levelId }),
+      mlb(`/teams/${teamId}`, { hydrate: 'venue,league,division,sport' }, { ttl: 10 * 60_000, timeoutMs: 6_000 }),
+      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'hitting', season, sportIds: levelId }, { ttl: 5 * 60_000, timeoutMs: 6_000 }),
+      mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'pitching', season, sportIds: levelId }, { ttl: 5 * 60_000, timeoutMs: 6_000 }),
     ]);
     const team = teamResult.status === 'fulfilled' ? teamResult.value?.teams?.[0] : null;
     const hitting = hittingResult.status === 'fulfilled' ? findStatGroup(hittingResult.value?.stats, 'hitting')?.splits?.[0]?.stat || {} : {};

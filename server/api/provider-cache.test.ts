@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fangraphsHandler from "./fangraphs-models.js";
 import savantHandler from "./savant.js";
+import ncaaHandler from "./ncaa.js";
 
 type MockResponse = {
   statusCode: number;
@@ -75,6 +76,16 @@ describe("FanGraphs provider cache", () => {
     expect(stale.headers["X-Provider-Cache"]).toBe("STALE");
     expect((stale.body as { freshness: string }).freshness).toBe("stale-cached");
     expect((stale.body as { playoffOdds: number }).playoffOdds).toBe(61);
+  });
+});
+
+describe("NCAA proxy error handling", () => {
+  it("returns the upstream status without serializing the response object", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("NOT_FOUND", { status: 404 })));
+    const result = response();
+    await ncaaHandler(req("/api/ncaa?path=/scores"), result);
+    expect(result.statusCode).toBe(404);
+    expect(result.body).toMatchObject({ error: "NCAA API responded with 404", url: "https://ncaa-api.henrygd.me/scores" });
   });
 });
 

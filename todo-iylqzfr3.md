@@ -106,3 +106,11 @@
 - [x] Add regression coverage for the reference-driven profile layout and responsive behavior
 - [x] Run typecheck, tests, and visual verification of the refined player profile
 - [x] Save a checkpoint containing the reference-driven player profile refinement
+
+- [x] Audit available WAR, OPS, wRC+, and Statcast metrics and the current hero insertion point
+- [x] Add a flush aligned Performance Summary card row below the player hero
+- [x] Add a compact horizontal mobile metric rail for the hero metrics
+- [x] Preserve existing metric selection, tabs, charts, source states, and responsive behavior
+- [x] Add regression coverage for Performance Summary values and mobile rail CSS
+- [x] Run typecheck, tests, and desktop/mobile visual verification
+- [x] Save a checkpoint containing the Performance Summary and mobile rail enhancement

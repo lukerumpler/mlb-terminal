@@ -82,7 +82,7 @@ describe('Team Overview minor-league affiliate interaction', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Select team' }), 'sf');
     const affiliateSelect = await screen.findByRole('combobox', { name: 'Select minor league affiliate' });
     await user.selectOptions(affiliateSelect, '6141');
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByText(/Live MLB identity · stats loading/)).toBeInTheDocument();
     resolveAffiliateOverview();
     expect(await screen.findByText('Sacramento River Cats')).toBeInTheDocument();
   });

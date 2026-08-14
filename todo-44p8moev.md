@@ -135,3 +135,18 @@
 - [x] Implement bounded MLB boxscore retrieval, aggregation, and player-profile split presentation without fabricated values.
 - [x] Add regression tests for batting/pitching split success, loading, unavailable, and source freshness states.
 - [x] Verify desktop/mobile player-profile layouts and publish the validated boxscore splits release.
+
+- [x] Audit dashboard, team, affiliate, player, boxscore, FanGraphs, Savant, NCAA, and MLB loading paths plus current server/browser/network logs.
+- [x] Reproduce and document any loading failures, timeouts, 404s, 429s, stale states, or frontend race conditions with their root causes.
+- [x] Repair verified loading failures while preserving honest unavailable states and provider-specific freshness metadata.
+- [x] Add regression coverage for repaired loading and recovery flows, then run the complete test suite and TypeScript check.
+- [x] Verify repaired data flows at desktop/mobile sizes and publish the validated data-loading repair.
+- [x] Stabilize the preservation command-palette regression under the full Vitest worker run without weakening its interaction coverage.
+- [x] Bound the Savant team batted-ball request so an upstream timeout resolves to an honest unavailable state instead of holding Overview loading.
+- [x] Confirm FanGraphs 502 responses resolve to explicit unavailable/fallback states without leaving model panels in Loading.
+- [x] Rerun the complete suite and TypeScript check after the final affiliate timeout change.
+- [x] Capture post-fix desktop/mobile verification showing the affiliate selector resolves or transitions to an explicit unavailable state.
+- [x] Add or rerun rendered Overview coverage proving a FanGraphs 502 leaves model panels in an explicit unavailable/fallback state rather than Loading.
+- [x] Verify whether the ERR_HTTP_HEADERS_SENT log recurs after current proxy repairs or document it as stale/non-blocking.
+- [x] Save and publish a fresh checkpoint for the final data-loading repair after the verified fixes.
+- [x] Preserve rendered regression evidence that affiliate lookup transitions from generic Loading to identity-ready or explicit unavailable status.
