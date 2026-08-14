@@ -96,6 +96,18 @@ function getBattedBall() { return null; }
 function getPitchArsenal() { return null; }
 
 // Front office evaluation (seeded per team)
+export function buildTeamStrengthData({ offense, power, speed, contact, pitching, command } = {}) {
+  return [
+    { axis:'Offense', val:offense },
+    { axis:'Power', val:power },
+    { axis:'Speed', val:speed },
+    { axis:'Contact', val:contact },
+    { axis:'Pitching', val:pitching },
+    { axis:'Command', val:command },
+  ].filter(row => row.val != null && Number.isFinite(Number(row.val)))
+    .map(row => ({ ...row, val:Number(row.val) }));
+}
+
 function getFrontOffice(t) {
   const has = key => t[key] != null && Number.isFinite(Number(t[key]));
   const strengths = [
@@ -374,10 +386,10 @@ function OverviewPage() {
       {axis:'OBP', val:rankValue(team.obp, hittingRecords, ['obp'])}, {axis:'HR', val:powerPct},
       {axis:'SB', val:speedPct}, {axis:'Run Diff', val:runDiffPct},
     ].filter(row => row.val != null);
-    const strengthData=[
-      {axis:'Hitting', val:offPct}, {axis:'Power', val:powerPct}, {axis:'Speed', val:speedPct},
-      {axis:'Contact', val:contactPct}, {axis:'Run Prevention', val:pitchingPct}, {axis:'Command', val:whipPct},
-    ].filter(row => row.val != null);
+    const strengthData=buildTeamStrengthData({
+      offense:offPct, power:powerPct, speed:speedPct, contact:contactPct,
+      pitching:pitchingPct, command:whipPct,
+    });
     const divName = team.div || 'League';
     const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
       const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
@@ -474,7 +486,7 @@ function OverviewPage() {
         {val:'—',lbl:'Team WAR',   sub:'Unavailable'},
       ]}/>
 
-      <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(280px,1fr) minmax(320px,1.25fr)',gap:14,alignItems:'start'}}>
+      <div className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
         <Panel title="Team Leaders" accent={C.rust}>
           <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
             <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
@@ -535,6 +547,17 @@ function OverviewPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </Panel>
+
+        <Panel title="Team Strength Radar" accent={teamAccent} badge="Percentiles">
+          <div style={{padding:'3px 8px 0'}}>
+            <Suspense fallback={<ChartFallback height={196}/> }>
+              <StrengthRadar data={D.strengthData} accent={teamAccent}/>
+            </Suspense>
+          </div>
+          <div style={{padding:'0 14px 10px',...sans({fontSize:9.5,color:C.text4,lineHeight:1.4})}}>
+            Live league-relative scores. Offense and Pitching mirror the rating tiles; the remaining axes show the specific strengths behind the evaluation.
           </div>
         </Panel>
       </div>

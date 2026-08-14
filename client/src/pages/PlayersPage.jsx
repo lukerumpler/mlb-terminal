@@ -60,6 +60,94 @@ function PlayerPhoto({ id, name, size = 96 }) {
   );
 }
 
+/* ─── Source-safe player video discovery ──────────────────────────── */
+// These are search destinations, not fabricated individual video records. Each
+// card opens a live result page owned by MLB or YouTube, while the official MLB
+// headshot supplies a stable visual preview without pretending it is a frame
+// from a particular clip.
+export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation } = {}) {
+  const name = String(fullName || '').trim();
+  if (!name) return [];
+  const teamContext = [teamAbbreviation, teamName].filter(Boolean).join(' ');
+  const youtubeQuery = `${name}${teamContext ? ` ${teamContext}` : ''} baseball MLB`;
+  const thumbnail = id
+    ? `https://img.mlbstatic.com/mlb-photos/image/upload/c_fill,w_640,h_360,g_face,q_auto:best/v1/people/${id}/headshot/67/current`
+    : null;
+  return [
+    {
+      id: 'mlb',
+      source: 'MLB',
+      label: 'MLB Video Search',
+      href: `https://www.mlb.com/video/search?query=${encodeURIComponent(name)}`,
+      thumbnail,
+      query: name,
+    },
+    {
+      id: 'youtube',
+      source: 'YouTube',
+      label: 'YouTube Search',
+      href: `https://www.youtube.com/results?search_query=${encodeURIComponent(youtubeQuery)}`,
+      thumbnail,
+      query: youtubeQuery,
+    },
+  ];
+}
+
+function PlayerVideoThumbnail({ item, playerName, accent }) {
+  const [imageError, setImageError] = useState(false);
+  useEffect(() => { setImageError(false); }, [item.thumbnail]);
+  const initials = playerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'MLB';
+  return (
+    <a href={item.href} target="_blank" rel="noreferrer noopener"
+      aria-label={`${item.label} for ${playerName}`}
+      style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none', transition:'transform 160ms ease, border-color 160ms ease' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = accent; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = C.border; }}>
+      <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
+        {!imageError && item.thumbnail ? (
+          <img src={item.thumbnail} alt="" loading="lazy" onError={() => setImageError(true)}
+            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', display:'block', filter:'saturate(.8)' }} />
+        ) : (
+          <div aria-hidden="true" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', ...px({ fontSize:26, fontWeight:800, color:accent }) }}>{initials}</div>
+        )}
+        <div aria-hidden="true" style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(15,23,42,.05), rgba(15,23,42,.72))' }} />
+        <div aria-hidden="true" style={{ position:'absolute', left:10, bottom:9, width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,.92)', color:accent, fontSize:14, paddingLeft:2, boxShadow:'0 2px 8px rgba(0,0,0,.18)' }}>▶</div>
+        <span style={{ position:'absolute', right:8, top:7, padding:'3px 6px', borderRadius:4, background:'rgba(15,23,42,.72)', ...px({ fontSize:8.5, fontWeight:800, color:'#fff', letterSpacing:'.05em', textTransform:'uppercase' }) }}>{item.source}</span>
+      </div>
+      <div style={{ padding:'8px 9px 9px' }}>
+        <div style={sans({ fontSize:10.5, fontWeight:800, color:C.text, lineHeight:1.25 })}>{item.label}</div>
+        <div style={sans({ fontSize:8.5, color:C.text4, marginTop:3, lineHeight:1.35 })}>Opens live search results · source-safe</div>
+      </div>
+    </a>
+  );
+}
+
+function PlayerVideoPanel({ player, profile, accent }) {
+  const playerName = profile?.fullName || `${profile?.useName || profile?.firstName || ''} ${profile?.useLastName || profile?.lastName || ''}`.trim();
+  const items = buildPlayerVideoLinks({
+    id: player?.id,
+    fullName: playerName,
+    teamName: profile?.currentTeam?.name,
+    teamAbbreviation: profile?.currentTeam?.abbreviation,
+  });
+  return (
+    <Panel title="Player Video" accent={accent} badge="External Sources">
+      <div style={{ padding:'10px 12px 11px' }}>
+        {items.length ? (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8 }}>
+            {items.map(item => <PlayerVideoThumbnail key={item.id} item={item} playerName={playerName} accent={accent} />)}
+          </div>
+        ) : (
+          <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.5 })}>Video search is unavailable until a verified player identity is loaded.</div>
+        )}
+        <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>
+          Preview art is the official MLB headshot. Cards open live MLB or YouTube search results; SKIP does not host or invent video records.
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 /* ─── Empty state ─────────────────────────────────────────────────── */
 const QUICK_PLAYERS = [
   { id:592450, fullName:'Aaron Judge',     team:'NYY', pos:'RF'  },
@@ -1868,6 +1956,8 @@ function PlayerProfile({ player, derived, onCompare }) {
               </div>
             </div>
           </Panel>
+
+          <PlayerVideoPanel player={player} profile={p} accent={teamAccent} />
 
           <ContractPanel contractData={player.contractData} />
 
