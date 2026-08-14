@@ -120,3 +120,10 @@
 - [x] Add regression coverage for the additional optimized MLB helpers: today’s games, MiLB schedule, aggregate team stats, and team player stats.
 - [x] Save a new checkpoint after final focused/full validation, production build, and preview inspection.
 - [x] Split the oversized shared entry bundle with conservative vendor chunks and verify build output remains stable.
+- [x] Audit current Team Overview and Player Profile loading states and shared skeleton patterns.
+- [x] Add responsive skeleton screens for Team Overview data regions.
+- [x] Add responsive skeleton screens for Player Profile data regions.
+- [x] Add regression coverage for skeleton visibility and preservation of unavailable/error states.
+- [x] Verify desktop/mobile loading screens and save a checkpoint.
+- [x] Capture direct desktop and mobile verification for the Player Profile skeleton loading screen.
+- [x] Save a new checkpoint for the Team Overview and Player Profile skeleton-loading update after final verification.

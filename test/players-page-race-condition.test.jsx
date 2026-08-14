@@ -81,6 +81,25 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(css).toContain('.skip-profile-photo-frame, .skip-profile-photo-frame img { width: 92px !important; height: 116px !important;');
   });
 
+  it('shows a page-shaped Player Profile skeleton while the selected player is loading', async () => {
+    const user = userEvent.setup();
+    const pending = deferred();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Loading Player' }]);
+    loadFullPlayer.mockReturnValue(pending.promise);
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Loading');
+    await waitFor(() => expect(screen.getByText('Loading Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Loading Player'));
+
+    expect(await screen.findByRole('status', { name: 'Loading player profile' })).toBeInTheDocument();
+    expect(screen.getByText(/Loading profile, season stats, career splits, and Statcast context/)).toBeInTheDocument();
+
+    pending.resolve(mockPlayer(1, 'Loading Player'));
+    expect(await screen.findByRole('button', { name:/TPVI True Value/i })).toBeInTheDocument();
+  });
+
   it('opens the side-by-side comparison modal and loads a second player through the live adapter', async () => {
     const user = userEvent.setup();
     const primary = { id: 1, fullName: 'Primary Player' };

@@ -3,6 +3,7 @@ import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamSavantMetrics } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
+import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab } from '../lib/navigation.js';
@@ -933,10 +934,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const aggregateSurface = liveTeamDataMode === 'live' ? C.tealSoft : liveTeamDataMode === 'cached' ? C.amberSoft : liveTeamDataMode === 'error' ? C.rustSoft : C.amberSoft;
   const aggregateBorder = liveTeamDataMode === 'live' ? C.tealMid : liveTeamDataMode === 'cached' ? C.amberMid : liveTeamDataMode === 'error' ? C.rustMid : C.amberMid;
   const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'VERIFIED ROSTER ROWS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
+  const showInitialSkeleton = liveTeamDataMode === 'loading' && !liveTeamData && !liveTeamError;
 
   return (
     <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
 
+      {showInitialSkeleton && <TeamOverviewSkeleton />}
       <Breadcrumbs items={[{ label:'Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
 
       {/* ── Selector + headline ── */}

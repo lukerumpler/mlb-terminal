@@ -35,6 +35,13 @@ describe('Team Overview model source and retry interaction', () => {
     savantMode = 'pending';
   });
 
+  it('shows a page-shaped Team Overview skeleton during the initial aggregate fetch', async () => {
+    localStorage.clear();
+    render(<OverviewPage />);
+    expect(screen.getByRole('status', { name: 'Loading team overview' })).toBeInTheDocument();
+    expect(await screen.findByText('Season overview', { exact: false })).toBeInTheDocument();
+  });
+
   it('shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending', async () => {
     render(<OverviewPage />);
     expect(await screen.findByText('Loading verified batted-ball rows')).toBeInTheDocument();

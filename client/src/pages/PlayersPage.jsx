@@ -13,7 +13,8 @@ import {
   computeKPIs, decisionScore, verdict, verdictColor,
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
 } from '../engine/skip.js';
-import { Badge, Panel, KVRow, GradeBar, PosBadge, SkeletonPlayerHero, SkeletonPanelGrid } from '../components/atoms.jsx';
+import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx';
+import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
@@ -1741,15 +1742,7 @@ function PlayersPage() {
         )}
       </div>
 
-      {loading && (
-        <div role="status" aria-live="polite">
-          <div style={{ textAlign:'center', ...sans({ fontSize:11, color:C.text3 }), marginBottom:4 }}>
-            Loading player from MLB Stats API — fetching profile · season stats · career splits · Statcast…
-          </div>
-          <SkeletonPlayerHero />
-          <SkeletonPanelGrid panels={3} rows={5} />
-        </div>
-      )}
+      {loading && <PlayerProfileSkeleton />}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,
