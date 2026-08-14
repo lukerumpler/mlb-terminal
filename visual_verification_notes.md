@@ -1,7 +1,7 @@
-# Visual verification notes
+# Data repair and UI optimization verification
 
-The desktop Overview shell now shows a compact `RECENT` pill in the top header beside the data freshness indicator. It preserves the existing Bloomberg-style density and does not displace the page title or freshness status. The selected team breadcrumb and blue identity accents remain intact.
+Desktop Overview verification shows the live aggregate status returning to `LIVE MLB DATA` when the MLB Stats API resolves. Team W-L, win percentage, runs scored, runs allowed, run differential, OPS, home runs, ERA, WHIP, batting average, strikeouts, stolen bases, leaders, front-office evaluation, and the strength radar render with source-backed values. The Team Leaders panel clearly identifies a cached roster snapshot with an age label rather than presenting stale values as live.
 
-At a 375px mobile viewport, the responsive header retains the Recent History control area without horizontal overflow. The main Overview content remains readable with the sidebar collapsed to icons, the team selector fits within the content column, and the live ticker remains docked at the bottom. The desktop-only freshness/platform labels collapse as intended, while the Recent History trigger remains available for backtracking.
+Unavailable model-dependent values such as Team WAR and playoff odds are now compact dashes with contextual labels/tooltips instead of repeated wrapped `Source gap` text. The overall rating cards use compact dashes for unavailable defense, depth, and future value while preserving the verified offense, pitching, and baserunning grades.
 
-The player profile hierarchy refinements add labeled primary, analytics, and scouting/trajectory column rhythm while preserving all existing profile panels and metrics. The hierarchy labels are small, muted, and accent-coded rather than replacing analytical content.
+At 375px, the Overview remains readable and vertically ordered. Team aggregate values fit without horizontal overflow, compact unavailable states do not wrap into noisy text blocks, the team selector and live-status badge remain reachable, and the bottom ticker stays visible. Initial loading now uses small skeleton placeholders for team aggregate metrics, while cached leader data remains visible when available.
