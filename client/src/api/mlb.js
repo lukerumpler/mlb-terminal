@@ -1296,6 +1296,23 @@ export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEA
 // split per team when no teamId is supplied; keeping this in one helper lets
 // every team-facing view use the same authoritative snapshot rather than the
 // older static examples in data.js.
+export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season = SEASON, days = 14) {
+  const endDate = new Date().toISOString().slice(0, 10);
+  const startDate = new Date(Date.now() - Number(days) * 86400000).toISOString().slice(0, 10);
+  const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'onBasePlusSlugging';
+  const data = await mlb('/stats', {
+    stats: 'byDateRange', group, season, sportIds: 1, teamId,
+    startDate, endDate, limit: 100, hydrate: 'person', order: 'desc', sortStat,
+  }, { ttl: 60_000 });
+  const grp = findStatGroup(data.stats, group);
+  return (grp?.splits || []).map(split => ({
+    id: split.player?.id ?? split.person?.id ?? null,
+    name: split.player?.fullName ?? split.person?.fullName ?? '',
+    stat: split.stat || {},
+    position: split.position?.abbreviation ?? split.player?.primaryPosition?.abbreviation ?? '',
+  })).filter(row => row.id && row.name);
+}
+
 export async function getAllTeamStats(group = 'hitting', season = SEASON) {
   const data = await mlb('/teams/stats', { stats: 'season', group, season, sportIds: 1 }, { ttl: 60_000 });
   const grp = findStatGroup(data.stats, group);

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getTeamVenueMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getTeamVenueMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -435,18 +435,31 @@ export const ROSTER_PRESETS = [
 
 const ROSTER_SORT_OPTIONS = [
   { key:'ops', label:'OPS', group:'hitting', digits:3, direction:'desc' },
+  { key:'recentOps', label:'Recent OPS', group:'hitting', digits:3, direction:'desc' },
   { key:'homeRuns', label:'Home Runs', group:'hitting', digits:0, direction:'desc' },
   { key:'avg', label:'AVG', group:'hitting', digits:3, direction:'desc' },
   { key:'rbi', label:'RBI', group:'hitting', digits:0, direction:'desc' },
+  { key:'fantasyPoints', label:'Fantasy Points', group:'hitting', digits:0, direction:'desc' },
   { key:'stolenBases', label:'Stolen Bases', group:'hitting', digits:0, direction:'desc' },
   { key:'era', label:'ERA', group:'pitching', digits:2, direction:'asc' },
   { key:'whip', label:'WHIP', group:'pitching', digits:3, direction:'asc' },
   { key:'strikeOuts', label:'Strikeouts', group:'pitching', digits:0, direction:'desc' },
 ];
 
+export function hitterFantasyPoints(row) {
+  const stat = row?.stat || {};
+  const values = ['hits','doubles','triples','homeRuns','rbi','runs','baseOnBalls','stolenBases','caughtStealing'].map(key => Number(stat[key]));
+  if (values.some(value => !Number.isFinite(value))) return null;
+  const [hits, doubles, triples, homeRuns, rbi, runs, walks, stolenBases, caughtStealing] = values;
+  const singles = hits - doubles - triples - homeRuns;
+  if (singles < 0) return null;
+  return singles + doubles * 2 + triples * 3 + homeRuns * 4 + rbi + runs + walks + stolenBases * 2 - caughtStealing;
+}
+
 export function rosterStatValue(row, key) {
   const stat = row?.stat || {};
-  const aliases = { avg:['avg','battingAverage'], homeRuns:['homeRuns','hr'], rbi:['rbi','runsBattedIn'], stolenBases:['stolenBases','sb'], strikeOuts:['strikeOuts','strikeouts','so'], pa:['plateAppearances','pa'], ip:['inningsPitched','ip'] };
+  if (key === 'fantasyPoints') return hitterFantasyPoints(row);
+  const aliases = { recentOps:['recentOps','last10Ops','lastTenGamesOps','last30Ops'], avg:['avg','battingAverage'], homeRuns:['homeRuns','hr'], rbi:['rbi','runsBattedIn'], stolenBases:['stolenBases','sb'], strikeOuts:['strikeOuts','strikeouts','so'], pa:['plateAppearances','pa'], ip:['inningsPitched','ip'] };
   for (const candidate of (aliases[key] || [key])) {
     const value = Number(stat[candidate]);
     if (Number.isFinite(value)) return value;
@@ -456,8 +469,18 @@ export function rosterStatValue(row, key) {
 
 function formatRosterStat(row, option) {
   const value = rosterStatValue(row, option.key);
-  return value == null ? '—' : value.toFixed(option.digits);
+  if (value == null) return option.key === 'fantasyPoints' ? 'Unavailable' : '—';
+  return value.toFixed(option.digits);
 }
+
+export const ROSTER_QUICK_FILTERS = [
+  { id:'all', label:'All players', positions:[], sort:'ops', minBattingPa:0, minPitchingIp:0 },
+  { id:'hitters', label:'Hitters', positions:[], sort:'fantasyPoints', minBattingPa:0, minPitchingIp:0 },
+  { id:'pitchers', label:'Pitchers', positions:[], sort:'era', minBattingPa:0, minPitchingIp:0 },
+  { id:'recent', label:'Recent performance', positions:[], sort:'recentOps', minBattingPa:0, minPitchingIp:0 },
+  { id:'top-ops', label:'Current offense', positions:[], sort:'ops', minBattingPa:50, minPitchingIp:0 },
+  { id:'top-fantasy', label:'Fantasy leaders', positions:[], sort:'fantasyPoints', minBattingPa:50, minPitchingIp:0 },
+];
 
 export function formatRosterSampleLabel(group, minimum) {
   const unit = group === 'hitting' ? 'PA' : 'IP';
@@ -550,6 +573,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [minBattingPa, setMinBattingPa] = useState(() => Number(rosterDefaults.battingPa) || 0);
   const [minPitchingIp, setMinPitchingIp] = useState(() => Number(rosterDefaults.pitchingIp) || 0);
   const [activeRosterPreset, setActiveRosterPreset] = useState(null);
+  const [rosterQuickFilter, setRosterQuickFilter] = useState('all');
   const [taxTrendRows, setTaxTrendRows] = useState([]);
   const [taxTrendState, setTaxTrendState] = useState('loading');
   const [taxHistoryRange, setTaxHistoryRange] = useState(() => readCbtHistoryRange());
@@ -882,11 +906,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const activeMinimum = rosterSortOption.group === 'hitting' ? minBattingPa : minPitchingIp;
   const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp]);
   const applyRosterPreset = preset => {
+    setRosterQuickFilter(null);
     setSelectedRosterPositions(preset.positions);
     setRosterSort(preset.sort);
     setMinBattingPa(preset.minBattingPa);
     setMinPitchingIp(preset.minPitchingIp);
     setActiveRosterPreset(preset.id);
+  };
+  const applyRosterQuickFilter = filter => {
+    setRosterQuickFilter(filter.id);
+    setActiveRosterPreset(null);
+    setSelectedRosterPositions(filter.positions);
+    setRosterSort(filter.sort);
+    setMinBattingPa(filter.minBattingPa);
+    setMinPitchingIp(filter.minPitchingIp);
   };
 
   useEffect(()=>{
@@ -968,12 +1001,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       Promise.allSettled([
         getTeamPlayerStats(teamBase.id, 'hitting'),
         getTeamPlayerStats(teamBase.id, 'pitching'),
-      ]).then(([teamHitters, teamPitchers]) => {
+        getTeamRecentPlayerStats(teamBase.id, 'hitting', CURRENT_SEASON, 14),
+      ]).then(([teamHitters, teamPitchers, recentHitters]) => {
         if (!alive) return;
         const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
         const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
+        const recentById = recentHitters.status === 'fulfilled'
+          ? Object.fromEntries(recentHitters.value.map(row => [row.id, row]))
+          : {};
+        const seasonHitters = teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []);
         const nextPlayers = {
-          hitting: teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []),
+          hitting: seasonHitters.map(row => {
+            const recent = recentById[row.id];
+            const recentOps = recent?.stat?.ops ?? recent?.stat?.onBasePlusSlugging ?? null;
+            return recentOps == null ? row : { ...row, stat: { ...row.stat, recentOps } };
+          }),
           pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : (cachedPlayers?.data?.pitching || []),
         };
         const snapshot = teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled'
@@ -1400,6 +1442,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <div style={{padding:'8px 14px 0',...sans({fontSize:10,color:C.text3,lineHeight:1.45})}}>
           Automated read of the selected team using current aggregate stats and roster leaders. It updates when the team or live feed changes.
         </div>
+        <div className="roster-insight-quick-filters" style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',padding:'10px 14px 0'}}>
+          <span style={sans({fontSize:9.5,color:C.text3,fontWeight:800,textTransform:'uppercase',letterSpacing:'.07em'})}>Quick filter</span>
+          {ROSTER_QUICK_FILTERS.map(filter => <button key={filter.id} type="button" aria-pressed={rosterQuickFilter === filter.id} onClick={()=>applyRosterQuickFilter(filter)} style={{height:28,padding:'0 9px',border:`1px solid ${rosterQuickFilter === filter.id ? C.teal : C.border}`,borderRadius:6,background:rosterQuickFilter === filter.id ? C.tealSoft : C.surface,color:rosterQuickFilter === filter.id ? C.teal : C.text2,fontSize:10,fontWeight:700,cursor:'pointer'}}>{filter.label}</button>)}
+        </div>
         <div className="roster-insight-presets" style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',padding:'10px 14px 0'}}>
           <span style={sans({fontSize:9.5,color:C.text3,fontWeight:800,textTransform:'uppercase',letterSpacing:'.07em'})}>Presets</span>
           {ROSTER_PRESETS.map(preset => <button key={preset.id} type="button" aria-pressed={activeRosterPreset === preset.id} onClick={()=>applyRosterPreset(preset)} style={{height:28,padding:'0 9px',border:`1px solid ${activeRosterPreset === preset.id ? C.teal : C.border}`,borderRadius:6,background:activeRosterPreset === preset.id ? C.tealSoft : C.surface,color:activeRosterPreset === preset.id ? C.teal : C.text2,fontSize:10,fontWeight:700,cursor:'pointer'}}>{preset.label}</button>)}
@@ -1408,11 +1454,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <fieldset style={{border:0,padding:0,margin:0,minWidth:190}}>
             <legend style={sans({fontSize:10,color:C.text2,fontWeight:700,marginBottom:5})}>Positions</legend>
             <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-              <button type="button" aria-label="Show all roster positions" onClick={()=>{setSelectedRosterPositions([]);setActiveRosterPreset(null)}} style={{height:28,padding:'0 8px',border:`1px solid ${selectedRosterPositions.length===0?C.amber:C.border}`,borderRadius:6,background:selectedRosterPositions.length===0?C.amberSoft:C.surface,color:selectedRosterPositions.length===0?C.amberDark:C.text2,fontSize:10,cursor:'pointer'}}>All</button>
+              <button type="button" aria-label="Show all roster positions" onClick={()=>{setSelectedRosterPositions([]);setActiveRosterPreset(null);setRosterQuickFilter('all')}} style={{height:28,padding:'0 8px',border:`1px solid ${selectedRosterPositions.length===0?C.amber:C.border}`,borderRadius:6,background:selectedRosterPositions.length===0?C.amberSoft:C.surface,color:selectedRosterPositions.length===0?C.amberDark:C.text2,fontSize:10,cursor:'pointer'}}>All</button>
               {rosterPositions.map(position => {
                 const checked = selectedRosterPositions.includes(position);
                 return <label key={position} style={{display:'inline-flex',alignItems:'center',gap:4,height:28,padding:'0 7px',border:`1px solid ${checked?C.amber:C.border}`,borderRadius:6,background:checked?C.amberSoft:C.surface,cursor:'pointer',...sans({fontSize:10,color:checked?C.amberDark:C.text2,fontWeight:700})}}>
-                  <input type="checkbox" aria-label={`Filter roster insights by ${position}`} checked={checked} onChange={e=>{setActiveRosterPreset(null);setSelectedRosterPositions(prev=>e.target.checked?[...prev,position]:prev.filter(item=>item!==position))}} style={{accentColor:C.amber}} />
+                  <input type="checkbox" aria-label={`Filter roster insights by ${position}`} checked={checked} onChange={e=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setSelectedRosterPositions(prev=>e.target.checked?[...prev,position]:prev.filter(item=>item!==position))}} style={{accentColor:C.amber}} />
                   {position}
                 </label>;
               })}
@@ -1421,13 +1467,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </fieldset>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Sort by</span>
-            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>{setActiveRosterPreset(null);setRosterSort(e.target.value)}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterSort(e.target.value)}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {ROSTER_SORT_OPTIONS.map(option => <option key={option.key} value={option.key}>{option.label}{option.direction === 'asc' ? ' ↑' : ' ↓'}</option>)}
             </select>
           </label>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Min {rosterSortOption.group === 'hitting' ? 'PA' : 'IP'}</span>
-            <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>{setActiveRosterPreset(null);rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+            <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>{setActiveRosterPreset(null);setRosterQuickFilter(null);rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {(rosterSortOption.group === 'hitting' ? [[0,'Any PA'],[50,'50+ PA'],[150,'150+ PA'],[300,'300+ PA']] : [[0,'Any IP'],[10,'10+ IP'],[30,'30+ IP'],[60,'60+ IP']]).map(([value,label])=><option key={value} value={value}>{label}</option>)}
             </select>
           </label>

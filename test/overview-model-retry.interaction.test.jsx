@@ -16,6 +16,7 @@ vi.mock('../client/src/api/mlb.js', async () => {
     getStandings: vi.fn(async () => feedAttempt > 0 ? { LAD: [{ id: 119, abbr: 'LAD', w: 73, l: 48, pct: .603, rs: 606, ra: 464, diff: 142 }] } : Promise.reject(new Error('MLB feed stalled'))),
     getAllTeamStats: vi.fn(async group => feedAttempt > 0 ? { 119: { teamId: 119, teamAbbr: 'LAD', teamName: 'Los Angeles Dodgers', ops: .802, homeRuns: 98, era: 2.98, whip: 1.06, strikeOuts: 628, stolenBases: 54 } } : Promise.reject(new Error(`MLB ${group} feed stalled`))),
     getTeamPlayerStats: vi.fn().mockResolvedValue([]),
+    getTeamRecentPlayerStats: vi.fn().mockResolvedValue([]),
     getTeamExitVelocity: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve([])),
     getTeamBattedBalls: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve(savantMode === 'empty' ? [] : [{ hc_x: 125, hc_y: 210, bb_type: 'fly_ball', launch_speed: 101.4, xwoba: 0.512 }])),
     getTeamBattedBallsAgainst: vi.fn(() => savantMode === 'pending' ? new Promise(() => {}) : Promise.resolve(savantMode === 'empty' ? [] : [{ hc_x: 118, hc_y: 205, bb_type: 'line_drive', launch_speed: 96.2, xwoba: 0.365 }])),
@@ -68,6 +69,17 @@ describe('Team Overview model source and retry interaction', () => {
     expect(mlbApi.getStandings).not.toHaveBeenCalled();
     expect(mlbApi.getAllTeamStats).not.toHaveBeenCalled();
     expect(mlbApi.getTeamPlayerStats).not.toHaveBeenCalled();
+  });
+
+  it('updates the roster sort when quick filters are clicked', async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    const sortSelect = screen.getByRole('combobox', { name:'Sort roster insights by player statistic' });
+    await user.click(screen.getByRole('button', { name:'Fantasy leaders' }));
+    expect(screen.getByRole('button', { name:'Fantasy leaders' })).toHaveAttribute('aria-pressed', 'true');
+    expect(sortSelect).toHaveValue('fantasyPoints');
+    await user.click(screen.getByRole('button', { name:'Recent performance' }));
+    expect(sortSelect).toHaveValue('recentOps');
   });
 
   it('shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRosterRows, rosterStatValue, ROSTER_PRESETS, formatRosterSampleLabel } from '../client/src/pages/OverviewPage.jsx';
+import { buildRosterRows, rosterStatValue, hitterFantasyPoints, ROSTER_PRESETS, ROSTER_QUICK_FILTERS, formatRosterSampleLabel } from '../client/src/pages/OverviewPage.jsx';
 
 const players = {
   hitting: [
@@ -13,6 +13,11 @@ const players = {
 };
 
 describe('roster insights filters', () => {
+  it('provides quick filters for positions and current-performance views', () => {
+    expect(ROSTER_QUICK_FILTERS.map(filter => filter.label)).toEqual(['All players', 'Hitters', 'Pitchers', 'Recent performance', 'Current offense', 'Fantasy leaders']);
+    expect(ROSTER_QUICK_FILTERS.find(filter => filter.id === 'top-fantasy')).toMatchObject({ sort:'fantasyPoints', minBattingPa:50 });
+  });
+
   it('provides the requested quick-access presets', () => {
     expect(ROSTER_PRESETS.map(preset => preset.label)).toEqual(['Qualified hitters', 'Rotation candidates', 'High-leverage arms']);
     expect(ROSTER_PRESETS.find(preset => preset.id === 'qualified-hitters')).toMatchObject({ sort:'ops', minBattingPa:150 });
@@ -23,6 +28,13 @@ describe('roster insights filters', () => {
     expect(formatRosterSampleLabel('pitching', 30)).toBe('30 IP+');
     expect(formatRosterSampleLabel('hitting', 0)).toBe('Any PA');
   });
+  it('calculates transparent hitter Fantasy Points from verified season fields', () => {
+    const row = { stat: { hits:100, doubles:20, triples:3, homeRuns:25, rbi:80, runs:75, baseOnBalls:45, stolenBases:12, caughtStealing:3 } };
+    expect(hitterFantasyPoints(row)).toBe(100 - 20 - 3 - 25 + 20 * 2 + 3 * 3 + 25 * 4 + 80 + 75 + 45 + 12 * 2 - 3);
+    expect(rosterStatValue(row, 'fantasyPoints')).toBe(422);
+    expect(hitterFantasyPoints({ stat: { hits:100, homeRuns:25 } })).toBeNull();
+  });
+
   it('filters by position and sorts hitters by a selected stat descending', () => {
     const rows = buildRosterRows(players, 'all', 'homeRuns');
     expect(rows.map(row => row.name)).toEqual(['Slugger', 'Runner']);
