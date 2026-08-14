@@ -2007,7 +2007,7 @@ function PlayerProfile({ player, derived, onCompare }) {
             <div className="skip-profile-tab-grid splits-grid">
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
-              <div style={{ overflowX:'auto' }}><table className="skip-profile-splits-table"><thead><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
+              <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
               </Panel>
             </div>
           )}
@@ -2317,9 +2317,12 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
 
           <Panel title={player.isPitcher ? 'Career Pitching' : 'Career Batting'} accent={teamAccent}>
-            <div style={{ overflowX:'auto' }}>
+            <div className="skip-long-table">
               <table style={{ width:'100%', borderCollapse:'collapse', minWidth:480 }}>
                 <thead>
+                  <tr className="skip-table-group-row">
+                    <th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th>
+                  </tr>
                   <tr style={{ background:C.surface2 }}>
                     {careerHeaders.map(h => (
                       <th key={h} style={{ padding:'6px 8px', fontSize:9.5, fontWeight:700, textTransform:'uppercase',

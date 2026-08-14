@@ -193,3 +193,17 @@ describe('Command palette', () => {
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
+
+  it('renders sticky grouped headers for batter and pitcher ranking tables', async () => {
+    const user = userEvent.setup();
+    await goToProspects(user);
+
+    expect(document.querySelectorAll('.skip-long-table').length).toBeGreaterThan(0);
+    expect(screen.getByText('Identity')).toBeInTheDocument();
+    expect(screen.getByText('Hitting production')).toBeInTheDocument();
+
+    const pitchersToggle = screen.getAllByRole('button', { name: /^Pitchers$/ })[0];
+    await user.click(pitchersToggle);
+    expect(await screen.findByText('Pitching performance')).toBeInTheDocument();
+    expect(document.querySelectorAll('.skip-long-table').length).toBeGreaterThan(0);
+  });

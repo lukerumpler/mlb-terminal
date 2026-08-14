@@ -719,9 +719,12 @@ function ProspectsPage() {
 
             {batPit === 'bat' ? (
               <Panel title="Top Prospect Batters" accent={C.amber} badge={`${sortedBatters.length} prospects · Live MLB.com`}>
-                <div style={{ overflowX:'auto' }}>
+                <div className="skip-long-table">
                   <table style={{ width:'100%',borderCollapse:'collapse',minWidth:1060 }}>
                     <thead>
+                      <tr className="skip-table-group-row">
+                        <th colSpan={5}>Identity</th><th colSpan={3}>Projection</th><th colSpan={10}>Hitting production</th>
+                      </tr>
                       <tr style={{ background:C.surface2 }}>
                         <SortTh label="Rk"  k="rank" right={false} sortKey={sortKey} sortAsc={sortAsc} toggleSort={toggleSort}/>
                         <th style={{ padding:'7px 8px',fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:C.text2,textAlign:'left',borderBottom:`0.5px solid ${C.border}`,whiteSpace:'nowrap' }}>Player</th>
@@ -827,9 +830,12 @@ function ProspectsPage() {
               </Panel>
             ) : (
               <Panel title="Top Prospect Pitchers" accent={C.rust} badge={`${sortedPitchers.length} prospects · Live MLB.com`}>
-                <div style={{ overflowX:'auto' }}>
+                <div className="skip-long-table">
                   <table style={{ width:'100%',borderCollapse:'collapse',minWidth:920 }}>
                     <thead>
+                      <tr className="skip-table-group-row">
+                        <th colSpan={5}>Identity</th><th colSpan={3}>Projection</th><th colSpan={10}>Pitching performance</th>
+                      </tr>
                       <tr style={{ background:C.surface2 }}>
                         <SortTh label="Rk"   k="rank" right={false} sortKey={sortKey} sortAsc={sortAsc} toggleSort={toggleSort}/>
                         <th style={{ padding:'7px 8px',fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:C.text2,textAlign:'left',borderBottom:`0.5px solid ${C.border}`,whiteSpace:'nowrap' }}>Player</th>

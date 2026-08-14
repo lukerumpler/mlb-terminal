@@ -321,3 +321,21 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.queryByText(/Could not load/)).not.toBeInTheDocument();
   });
 });
+
+  it('renders a sticky grouped career table after selecting a player', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Table Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Table Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Table');
+    await waitFor(() => expect(screen.getByText('Table Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Table Player'));
+
+    expect(await screen.findByText('Career Batting')).toBeInTheDocument();
+    expect(document.querySelectorAll('.skip-long-table').length).toBeGreaterThan(0);
+    expect(screen.getByText('Identity')).toBeInTheDocument();
+    expect(screen.getByText('Volume')).toBeInTheDocument();
+    expect(screen.getByText('Rate & value')).toBeInTheDocument();
+  });

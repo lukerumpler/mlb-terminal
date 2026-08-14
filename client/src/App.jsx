@@ -346,15 +346,23 @@ export default function App() {
         .skip-sidebar button:hover { transform: translateX(2px); }
         .skip-sidebar button[aria-current="page"]:hover { transform: translateX(1px); }
         .skip-topbar { transition: box-shadow .2s ease, background-color .2s ease; }
-        .skip-panel { transition: box-shadow .2s cubic-bezier(.23,1,.32,1), transform .2s cubic-bezier(.23,1,.32,1), border-color .2s ease; }
-        .skip-panel:hover { transform: translateY(-2px); border-color: color-mix(in srgb, ${C.amber} 32%, ${C.border}) !important; box-shadow:0 12px 28px color-mix(in srgb, ${C.navy} 10%, transparent) !important; }
-        .skip-stat-strip { transition: box-shadow .2s ease, transform .2s ease; }
-        .skip-stat-strip:hover { transform: translateY(-1px); box-shadow:0 12px 28px color-mix(in srgb, ${C.navy} 10%, transparent) !important; }
+        .skip-panel { transition: border-color .2s ease; }
+        .skip-stat-strip { transition: border-color .2s ease; }
+        /* Data cards stay visually stable; only controls and table rows respond to hover. */
+        .skip-panel:hover, .skip-stat-strip:hover { transform:none !important; box-shadow:none !important; }
         tbody tr:hover { background: color-mix(in srgb, ${C.amber} 9%, transparent) !important; }
         /* Tables use their own density system; dashboard cards keep their existing breathing room. */
         .skip-content table th, .skip-content table td { padding-top:5px !important; padding-bottom:5px !important; }
+        .skip-long-table { max-height:min(68vh, 760px); overflow:auto; }
+        .skip-long-table table thead th { position:sticky; top:0; z-index:5; background:${C.surface2}; box-shadow:0 1px 0 ${C.border}; }
+        .skip-long-table table thead .skip-table-group-row th { top:0; z-index:6; padding:5px 8px !important; background:${C.surface3}; color:${C.text3}; font:700 9px/1.2 'DM Mono', monospace; letter-spacing:.08em; text-transform:uppercase; text-align:left; border-bottom:1px solid ${C.border}; }
+        .skip-long-table table thead .skip-table-group-row + tr th { top:25px; }
+        .skip-long-table table tbody tr:focus-visible { outline:2px solid ${C.amber}; outline-offset:-2px; }
         @media (max-width:720px) {
           .skip-content table th, .skip-content table td { padding-top:6px !important; padding-bottom:6px !important; }
+          .skip-long-table { max-height:62vh; }
+          .skip-long-table table thead .skip-table-group-row th { padding:5px 6px !important; font-size:8px; }
+          .skip-long-table table thead .skip-table-group-row + tr th { top:24px; }
         }
 
         @keyframes scrollx { from { transform:translateX(0) } to { transform:translateX(-50%) } }

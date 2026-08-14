@@ -36,5 +36,10 @@ describe('SKIP motion and responsive UI hooks', () => {
     expect(prospectsSource).toContain('skip-prospect-workspace-grid');
     expect(documentSource).toContain('.skip-player-main-grid { grid-template-columns:1fr !important;');
     expect(documentSource).toContain('.skip-prospect-workspace-grid { grid-template-columns:1fr !important;');
+    expect(playersSource).toContain('className="skip-long-table"');
+    expect(prospectsSource).toContain('className="skip-long-table"');
+    expect(prospectsSource).toContain('skip-table-group-row');
+    expect(appSource).toContain('.skip-long-table table thead th { position:sticky;');
+    expect(appSource).toContain('.skip-panel:hover, .skip-stat-strip:hover { transform:none !important;');
   });
 });

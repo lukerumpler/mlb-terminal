@@ -58,3 +58,14 @@
 - [x] Add table-specific dense row-height rules without changing card spacing.
 - [x] Verify dense tables remain readable and responsive.
 - [x] Save a checkpoint for the table-density update.
+- [x] Inspect current Players and Prospects table markup and shared card hover behavior.
+- [x] Add sticky headers for long Players and Prospects data tables.
+- [x] Add clearer grouped table-header styling for player and prospect data.
+- [x] Remove hover motion from data cards while preserving focus and click feedback.
+- [x] Add tests and verify desktop/mobile table readability.
+- [x] Save a checkpoint for the table usability update.
+- [x] Add grouped header styling or equivalent column grouping to the long Players tables.
+- [x] Directly verify Players and Prospects tables at desktop and mobile widths, including sticky-header behavior through rendered page coverage and desktop/mobile preview inspection.
+- [x] Save a new checkpoint for the completed table usability update.
+- [x] Complete final direct Players and Prospects verification using rendered page coverage and current responsive preview checks.
+- [x] Save a new checkpoint for the resumed sticky-table update after the latest shared fast-forward.
