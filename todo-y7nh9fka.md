@@ -36,3 +36,12 @@
 - [x] Preserve loading, unavailable, no-match, and sorting behavior with the expanded filters.
 - [x] Add automated transformation and rendered interaction coverage.
 - [x] Verify the expanded controls responsively and save a checkpoint.
+- [x] Inspect the latest roster-insights controls and Settings page implementation.
+- [x] Add quick-access saved presets for Qualified hitters and Rotation candidates.
+- [x] Display the active PA/IP threshold on each roster leader card.
+- [x] Add team-level batting and pitching sample-size defaults to Settings.
+- [x] Add automated coverage for presets, threshold context, and settings behavior.
+- [x] Verify the workflow responsively and save a checkpoint.
+- [x] Add rendered coverage for activating a roster preset and updating controls.
+- [x] Add automated coverage for the leader-card PA/IP threshold context label.
+- [x] Save the final preset and Settings checkpoint.

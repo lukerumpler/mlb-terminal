@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRosterRows, rosterStatValue } from '../client/src/pages/OverviewPage.jsx';
+import { buildRosterRows, rosterStatValue, ROSTER_PRESETS, formatRosterSampleLabel } from '../client/src/pages/OverviewPage.jsx';
 
 const players = {
   hitting: [
@@ -13,6 +13,16 @@ const players = {
 };
 
 describe('roster insights filters', () => {
+  it('provides the requested quick-access presets', () => {
+    expect(ROSTER_PRESETS.map(preset => preset.label)).toEqual(['Qualified hitters', 'Rotation candidates', 'High-leverage arms']);
+    expect(ROSTER_PRESETS.find(preset => preset.id === 'qualified-hitters')).toMatchObject({ sort:'ops', minBattingPa:150 });
+    expect(ROSTER_PRESETS.find(preset => preset.id === 'rotation-candidates')).toMatchObject({ sort:'era', minPitchingIp:30 });
+  });
+  it('formats the active sample context for hitter and pitcher leader cards', () => {
+    expect(formatRosterSampleLabel('hitting', 150)).toBe('150 PA+');
+    expect(formatRosterSampleLabel('pitching', 30)).toBe('30 IP+');
+    expect(formatRosterSampleLabel('hitting', 0)).toBe('Any PA');
+  });
   it('filters by position and sorts hitters by a selected stat descending', () => {
     const rows = buildRosterRows(players, 'all', 'homeRuns');
     expect(rows.map(row => row.name)).toEqual(['Slugger', 'Runner']);

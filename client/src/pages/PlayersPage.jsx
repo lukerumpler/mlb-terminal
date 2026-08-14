@@ -95,6 +95,19 @@ export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation
   ];
 }
 
+export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviation } = {}) {
+  const name = String(fullName || '').trim();
+  if (!name) return [];
+  const context = [teamAbbreviation, teamName].filter(Boolean).join(' ');
+  const base = `${name}${context ? ` ${context}` : ''} baseball MLB`;
+  return [
+    { id:'power', label:'Home run & extra-base plays', query:`${base} home run highlights` },
+    { id:'contact', label:'Contact & hard-hit plays', query:`${base} batting highlights hard hit` },
+    { id:'defense', label:'Defensive highlights', query:`${base} defensive highlights` },
+    { id:'pitching', label:'Strikeout & pitch-sequencing plays', query:`${base} strikeout pitching highlights` },
+  ].map(item => ({ ...item, href:`https://www.youtube.com/results?search_query=${encodeURIComponent(item.query)}` }));
+}
+
 function PlayerVideoThumbnail({ item, playerName, accent }) {
   const [imageError, setImageError] = useState(false);
   useEffect(() => { setImageError(false); }, [item.thumbnail]);
@@ -107,9 +120,8 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
         aria-describedby={tooltipId}
         title={item.description}
         className="skip-video-thumbnail"
-        style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none', transition:'transform 160ms ease, border-color 160ms ease' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = accent; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = C.border; }}>
+        style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none' }}>
+
       <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
         {!imageError && item.thumbnail ? (
           <img src={item.thumbnail} alt="" loading="lazy" onError={() => setImageError(true)}
@@ -133,6 +145,11 @@ function PlayerVideoThumbnail({ item, playerName, accent }) {
 
 function PlayerVideoPanel({ player, profile, accent }) {
   const playerName = profile?.fullName || `${profile?.useName || profile?.firstName || ''} ${profile?.useLastName || profile?.lastName || ''}`.trim();
+  const highlightSearches = buildPlayerHighlightSearches({
+    fullName: playerName,
+    teamName: profile?.currentTeam?.name,
+    teamAbbreviation: profile?.currentTeam?.abbreviation,
+  });
   const items = buildPlayerVideoLinks({
     id: player?.id,
     fullName: playerName,
@@ -143,14 +160,29 @@ function PlayerVideoPanel({ player, profile, accent }) {
     <Panel title="Player Video" accent={accent} badge="External Sources">
       <div style={{ padding:'10px 12px 11px' }}>
         {items.length ? (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8 }}>
-            {items.map(item => <PlayerVideoThumbnail key={item.id} item={item} playerName={playerName} accent={accent} />)}
-          </div>
+          <>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8 }}>
+              {items.map(item => <PlayerVideoThumbnail key={item.id} item={item} playerName={playerName} accent={accent} />)}
+            </div>
+            <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.borderLight}` }}>
+              <div style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 })}>Highlight search shortcuts</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:5 }}>
+                {highlightSearches.map(item => (
+                  <a key={item.id} href={item.href} target="_blank" rel="noreferrer noopener"
+                    aria-label={`Search ${item.label} for ${playerName}`}
+                    style={{ display:'block', padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:6, background:C.surface2, color:C.text2, textDecoration:'none' }}>
+                    <span style={px({ fontSize:9, fontWeight:800, color:accent, marginRight:5 })}>↗</span>
+                    <span style={sans({ fontSize:9.5, fontWeight:700 })}>{item.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </>
         ) : (
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.5 })}>Video search is unavailable until a verified player identity is loaded.</div>
         )}
         <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>
-          Preview art is the official MLB headshot. Cards open live MLB or YouTube search results; SKIP does not host or invent video records.
+          Preview art is the official MLB headshot. Search cards and highlight shortcuts open live source results; SKIP does not invent clip URLs or timestamps.
         </div>
       </div>
     </Panel>
@@ -281,7 +313,49 @@ function computeGeometryAxes(kpis, isPitcher) {
       ];
 }
 
-function GeometryRadar({ kpis, isPitcher, focusMetric = 'TPVI' }) {
+function ChartExpandButton({ label, onClick }) {
+  return (
+    <button className="skip-profile-expand-button" type="button" onClick={onClick} aria-label={`Expand ${label}`} title={`Expand ${label}`}>
+      ⛶ <span>{label}</span>
+    </button>
+  );
+}
+
+function ChartDialog({ title, children, onClose }) {
+  useEffect(() => {
+    const onKeyDown = event => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+  return (
+    <div className="skip-chart-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="skip-chart-dialog" role="dialog" aria-modal="true" aria-labelledby="skip-chart-dialog-title">
+        <div className="skip-chart-dialog-header">
+          <div>
+            <div id="skip-chart-dialog-title" className="skip-chart-dialog-title">{title}</div>
+            <div className="skip-chart-dialog-subtitle">Expanded player profile view</div>
+          </div>
+          <button type="button" className="skip-chart-dialog-close" onClick={onClose} aria-label="Close expanded chart">×</button>
+        </div>
+        <div className="skip-chart-dialog-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileTabRail({ activeTab, onChange }) {
+  const tabs = ['Overview', 'Offense', 'Defense', 'Splits', 'Notes'];
+  return (
+    <nav className="skip-profile-tab-rail" aria-label="Player profile sections">
+      {tabs.map(tab => {
+        const active = activeTab === tab.toLowerCase();
+        return <button key={tab} type="button" onClick={() => onChange(tab.toLowerCase())} aria-current={active ? 'page' : undefined} aria-pressed={active}>{tab}</button>;
+      })}
+    </nav>
+  );
+}
+
+function GeometryRadar({ kpis, isPitcher, focusMetric = 'TPVI', height = 200 }) {
   // kpis is a stable reference from the parent's useMemo, so this only
   // recomputes when the underlying player/stat line actually changes —
   // otherwise recharts treats a fresh array as new data and redoes its
@@ -295,7 +369,7 @@ function GeometryRadar({ kpis, isPitcher, focusMetric = 'TPVI' }) {
       <div className="skip-radar-focus-label" style={sans({ fontSize:9.5, color:C.amber, textTransform:'uppercase', letterSpacing:'.08em', textAlign:'center', marginBottom:-8 })}>
         Focus: {selectedAxis}
       </div>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={height}>
       <RadarChart data={chartData} margin={{ top:16, right:24, bottom:16, left:24 }}>
         <PolarGrid stroke={C.border} />
         <PolarAngleAxis dataKey="axis"
@@ -727,13 +801,13 @@ export function buildSavantPercentileAxes(player, isPitcher = Boolean(player?.is
   return (isPitcher ? pitcherAxes : hitterAxes).filter(item => item.pct != null);
 }
 
-function SavantPercentileProfile({ player, isPitcher, teamAccent }) {
+function SavantPercentileProfile({ player, isPitcher, teamAccent, onExpand, expanded = false }) {
   const axes = buildSavantPercentileAxes(player, isPitcher);
   const hasProfile = axes.length >= 3;
   const season = player.isFallback ? `${player.statSeason} fallback` : String(player.statSeason || SEASON);
 
   return (
-    <Panel title="Percentile Profile" accent={teamAccent} badge={hasProfile ? `Baseball Savant · ${season}` : 'Unavailable'}>
+    <Panel title="Percentile Profile" accent={teamAccent} badge={onExpand && hasProfile ? <ChartExpandButton label="Expand" onClick={onExpand} /> : (hasProfile ? `Baseball Savant · ${season}` : 'Unavailable')}>
       {!hasProfile ? (
         <div style={sans({ fontSize:11, color:C.text3, padding:'28px 18px', textAlign:'center', lineHeight:1.5 })}>
           Baseball Savant percentile data is not available for this player in {season}. No raw-value proxy chart is shown.
@@ -747,7 +821,7 @@ function SavantPercentileProfile({ player, isPitcher, teamAccent }) {
             </div>
             <div style={px({ fontSize:9, color:C.text4 })}>0–100 rank</div>
           </div>
-          <ResponsiveContainer width="100%" height={238}>
+          <ResponsiveContainer width="100%" height={expanded ? 420 : 238}>
             <RadarChart data={axes} margin={{ top:18, right:38, bottom:14, left:38 }}>
               <PolarGrid stroke={C.border} />
               <PolarAngleAxis dataKey="axis" tick={({ payload, x, y, textAnchor }) => {
@@ -1499,6 +1573,8 @@ function PlayerProfile({ player, derived, onCompare }) {
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [expandedChart, setExpandedChart] = useState(null);
 
   // computeGeometryAxes() is a pure function but still returns a fresh
   // array reference on every call — GeometryRadar's own internal useMemo
@@ -1645,6 +1721,45 @@ function PlayerProfile({ player, derived, onCompare }) {
         </div>
       </div>
 
+      <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
+
+      {activeTab !== 'overview' && (
+        <div className="skip-profile-tab-summary">
+          {activeTab === 'offense' && (
+            <Panel title="Offense Focus" accent={C.amber} badge="Profile view">
+              <div className="skip-profile-tab-grid">
+                <AnalyticsLayers kpis={kpis} s={s} isPitcher={player.isPitcher} savant={player.savant} batTracking={player.batTracking} expectedStatisticsPopulation={player.expectedStatisticsPopulation} batTrackingPopulation={player.batTrackingPopulation} statcastPopulation={player.statcastPopulation} />
+                {!player.isPitcher && <PlateDisciplinePercentiles savant={player.savant} population={player.statcastPopulation} />}
+                <EVDistribution season={player.statSeason} />
+              </div>
+            </Panel>
+          )}
+          {activeTab === 'defense' && (
+            <div className="skip-profile-tab-grid">
+              <Panel title="Scouting Grades" accent={C.teal} badge="20–80 Scale">
+                <div style={{ padding:'8px 14px 12px' }}>{gradeRows.map(g => <GradeBar key={g.lbl} lbl={g.lbl} val={g.val} desc={g.desc} />)}</div>
+              </Panel>
+              <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
+              <Panel title="Development Timeline" accent={C.amber}><DevTimeline age={p?.currentAge} /></Panel>
+            </div>
+          )}
+          {activeTab === 'splits' && (
+            <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
+              <div style={{ overflowX:'auto' }}><table className="skip-profile-splits-table"><thead><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
+            </Panel>
+          )}
+          {activeTab === 'notes' && (
+            <div className="skip-profile-tab-grid">
+              <Panel title="SKIP Read" accent={verdictAccent}><div style={sans({ padding:'14px', color:C.text2, lineHeight:1.6, fontSize:12 })}>{quote}</div></Panel>
+              <Panel title="Strengths & Risks" accent={C.purple}><div style={{ padding:'12px 14px' }}><div style={sans({ fontSize:10, color:C.teal, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Strengths</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5, marginBottom:12 })}>{strengths.join(' · ') || 'No strengths available'}</div><div style={sans({ fontSize:10, color:C.rust, fontWeight:800, textTransform:'uppercase', marginBottom:4 })}>Risks</div><div style={sans({ fontSize:11, color:C.text2, lineHeight:1.5 })}>{risks.join(' · ') || 'No risks available'}</div></div></Panel>
+              <Panel title="Recommendation" accent={C.amber}><div style={sans({ padding:'14px', color:C.text2, lineHeight:1.6, fontSize:12 })}>{rec}</div></Panel>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'overview' && (
+      <>
       {/* ── Selected metric readout ── */}
       <div className="skip-profile-selection" role="status" aria-live="polite" style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8 }}>
         <span style={{ width:7, height:7, borderRadius:'50%', background:teamAccent, boxShadow:`0 0 0 4px color-mix(in srgb, ${teamAccent} 12%, transparent)`, flexShrink:0 }} />
@@ -1653,7 +1768,7 @@ function PlayerProfile({ player, derived, onCompare }) {
       </div>
 
       {/* ── Savant-style percentile profile ── */}
-      <SavantPercentileProfile player={player} isPitcher={player.isPitcher} teamAccent={teamAccent} />
+      <SavantPercentileProfile player={player} isPitcher={player.isPitcher} teamAccent={teamAccent} onExpand={() => setExpandedChart('percentile')} />
 
       {/* ── SKIP quote ── */}
       <SkipQuoteBanner quote={quote} accent={verdictAccent} />
@@ -1724,7 +1839,7 @@ function PlayerProfile({ player, derived, onCompare }) {
              Engine above, not new analysis) — last on purpose, so a scan
              top-to-bottom hits "real" before "stylized/derived". ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <Panel title="Player Geometry Engine" accent={C.amber} badge="SKIP Model">
+          <Panel title="Player Geometry Engine" accent={C.amber} badge={<ChartExpandButton label="Expand" onClick={() => setExpandedChart('radar')} />}>
             <GeometryRadar kpis={kpis} isPitcher={player.isPitcher} focusMetric={selectedMetric} />
           </Panel>
 
@@ -1780,7 +1895,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
 
           {!player.isPitcher && (
-            <Panel title="Spray Chart" accent={C.teal} badge={Array.isArray(player.contactPoints) && player.contactPoints.length ? 'Live Savant' : 'Unavailable'}>
+            <Panel title="Spray Chart" accent={C.teal} badge={Array.isArray(player.contactPoints) && player.contactPoints.length ? <ChartExpandButton label="Expand" onClick={() => setExpandedChart('spray')} /> : 'Unavailable'}>
               <div style={{ padding:'8px 10px 4px' }}>
                 <SprayChart contactPoints={player.contactPoints} />
               </div>
@@ -2171,7 +2286,12 @@ function PlayerProfile({ player, derived, onCompare }) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
+      {expandedChart === 'radar' && <ChartDialog title="Player Geometry Engine" onClose={() => setExpandedChart(null)}><GeometryRadar kpis={kpis} isPitcher={player.isPitcher} focusMetric={selectedMetric} height={430} /></ChartDialog>}
+      {expandedChart === 'spray' && <ChartDialog title="Spray Chart" onClose={() => setExpandedChart(null)}><SprayChart contactPoints={player.contactPoints} /></ChartDialog>}
+      {expandedChart === 'percentile' && <ChartDialog title="Percentile Profile" onClose={() => setExpandedChart(null)}><SavantPercentileProfile player={player} isPitcher={player.isPitcher} teamAccent={teamAccent} expanded /></ChartDialog>}
     </>
   );
 }

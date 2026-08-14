@@ -100,6 +100,27 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
   });
 
+  it('renders accessible highlight search shortcuts in the Player Video panel', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Video Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Video Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Video');
+    await waitFor(() => expect(screen.getByText('Video Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Video Player'));
+
+    await waitFor(() => expect(screen.getByText('Player Video')).toBeInTheDocument());
+    expect(screen.getByText('Highlight search shortcuts')).toBeInTheDocument();
+    const shortcut = screen.getByRole('link', { name:/Search Home run & extra-base plays/i });
+    expect(shortcut).toHaveAttribute('target', '_blank');
+    expect(shortcut.getAttribute('href')).toContain('youtube.com/results?search_query=');
+    expect(shortcut.getAttribute('href')).not.toContain('#t=');
+    await user.click(shortcut);
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+  });
+
   it('updates the selected metric when a profile KPI is clicked', async () => {
     const user = userEvent.setup();
     searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Interactive Player' }]);
@@ -121,6 +142,30 @@ describe('PlayersPage — player comparison and race conditions', () => {
     expect(screen.getByRole('status')).toHaveTextContent('CAS');
     expect(screen.getByText(/Focus: Contact/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name:/TPVI True Value/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('switches profile tabs and opens an expanded chart dialog', async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: 'Tabbed Player' }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, 'Tabbed Player'));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, 'Tabbed');
+    await waitFor(() => expect(screen.getByText('Tabbed Player')).toBeInTheDocument());
+    await user.click(screen.getByText('Tabbed Player'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Offense' })).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Offense' }));
+    expect(screen.getByText('Offense Focus')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Notes' }));
+    expect(screen.getByText('SKIP Read')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Overview' }));
+    await user.click(screen.getAllByRole('button', { name: /Expand Expand/i })[1]);
+    expect(screen.getByRole('dialog', { name: /Player Geometry Engine/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Close expanded chart/i }));
+    expect(screen.queryByRole('dialog', { name: /Player Geometry Engine/i })).not.toBeInTheDocument();
   });
 
   it('keeps the faster, later-clicked player instead of an older, slower response clobbering it', async () => {

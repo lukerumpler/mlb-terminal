@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTeamStrengthData } from '../client/src/pages/OverviewPage.jsx';
-import { buildPlayerVideoLinks } from '../client/src/pages/PlayersPage.jsx';
+import { buildPlayerVideoLinks, buildPlayerHighlightSearches } from '../client/src/pages/PlayersPage.jsx';
 
 describe('team strength radar data', () => {
   it('keeps the overall and specific-strength axes in a stable order', () => {
@@ -46,5 +46,17 @@ describe('source-safe player video cards', () => {
 
   it('returns no cards for an unverified player identity', () => {
     expect(buildPlayerVideoLinks()).toEqual([]);
+  });
+
+  it('creates interactive key-play searches without fabricating clip timestamps', () => {
+    const highlights = buildPlayerHighlightSearches({ fullName:'Shohei Ohtani', teamName:'Los Angeles Dodgers', teamAbbreviation:'LAD' });
+    expect(highlights).toHaveLength(4);
+    expect(highlights.map(item => item.id)).toEqual(['power','contact','defense','pitching']);
+    expect(highlights.every(item => item.href.startsWith('https://www.youtube.com/results?search_query='))).toBe(true);
+    expect(highlights.every(item => !item.href.includes('#t='))).toBe(true);
+  });
+
+  it('returns no key-play searches without a verified player name', () => {
+    expect(buildPlayerHighlightSearches()).toEqual([]);
   });
 });

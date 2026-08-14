@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts';
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
+import { DEFAULT_ROSTER_DEFAULTS } from '../constants/rosterFilters.js';
 import {
   DRAFT_BOARD, DRAFT_CLASS_2026, TEAMS, SEASON, NOTABLE_TRADES,
 } from '../constants/data.js';
@@ -1607,7 +1608,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme }) {
+function SettingsPage({ theme, toggleTheme, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1646,6 +1647,23 @@ function SettingsPage({ theme, toggleTheme }) {
               <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
             </button>
           )}
+        </div>
+      </Panel>
+      <Panel title="Roster Insight Defaults" accent={C.teal}>
+        <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>
+          <label style={{padding:'8px 14px 12px',borderRight:`0.5px solid ${C.borderLight}`,...sans({fontSize:11,color:C.text2,fontWeight:700})}}>
+            Batting minimum
+            <select aria-label="Default batting minimum plate appearances" value={rosterDefaults.battingPa} onChange={e=>updateRosterDefaults?.({...rosterDefaults, battingPa:Number(e.target.value)})} style={{display:'block',width:'100%',height:32,marginTop:6,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:11,cursor:'pointer'}}>
+              {[[0,'Any PA'],[50,'50+ PA'],[150,'150+ PA'],[300,'300+ PA']].map(([value,label])=><option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label style={{padding:'8px 14px 12px',...sans({fontSize:11,color:C.text2,fontWeight:700})}}>
+            Pitching minimum
+            <select aria-label="Default pitching minimum innings pitched" value={rosterDefaults.pitchingIp} onChange={e=>updateRosterDefaults?.({...rosterDefaults, pitchingIp:Number(e.target.value)})} style={{display:'block',width:'100%',height:32,marginTop:6,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:11,cursor:'pointer'}}>
+              {[[0,'Any IP'],[10,'10+ IP'],[30,'30+ IP'],[60,'60+ IP']].map(([value,label])=><option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
         </div>
       </Panel>
       <Panel title="System Information" accent={C.amber}>
