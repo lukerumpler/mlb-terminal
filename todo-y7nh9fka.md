@@ -110,3 +110,13 @@
 - [x] Add rendered Overview tests for Batted Ball Profile loading and unavailable states.
 - [x] Add rendered Overview tests for Pitch Arsenal loading and unavailable states.
 - [x] Save a checkpoint after the verified team Savant cache and panel rollup changes pass validation.
+- [x] Audit current runtime logs, type health, test stability, and high-cost data-loading paths.
+- [x] Fix concrete bugs and high-impact performance inefficiencies without weakening source transparency.
+- [x] Add regression coverage for each debugging or optimization fix.
+- [x] Run focused and full validation, inspect the preview, and save an optimized checkpoint.
+- [x] Stabilize the known Prospects scouting-card interaction timeout without changing user behavior.
+- [x] Run the production build separately after the full-suite test pass or documented timing exception.
+- [x] Fix the remaining Overview affiliate style warning by avoiding mixed border shorthand and borderBottom updates.
+- [x] Add regression coverage for the additional optimized MLB helpers: today’s games, MiLB schedule, aggregate team stats, and team player stats.
+- [x] Save a new checkpoint after final focused/full validation, production build, and preview inspection.
+- [x] Split the oversized shared entry bundle with conservative vendor chunks and verify build output remains stable.

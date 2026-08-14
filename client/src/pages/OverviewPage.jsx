@@ -1553,7 +1553,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={{display:'flex',borderBottom:`0.5px solid ${C.border}`}}>
             {[['home','Home / Away'],['hand','vs LHP / RHP'],['time','Day / Night']].map(([k,l])=>(
               <button key={k} onClick={()=>setSplitTab(k)} aria-pressed={splitTab===k}
-                style={{padding:'8px 16px',fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:splitTab===k?teamAccent:C.text3,borderBottom:splitTab===k?`2px solid ${teamAccent}`:'2px solid transparent',background:'transparent',border:'none',cursor:'pointer',transition:'all .12s',whiteSpace:'nowrap'}}>
+                style={{padding:'8px 16px',fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,color:splitTab===k?teamAccent:C.text3,borderBottom:splitTab===k?`2px solid ${teamAccent}`:'2px solid transparent',borderTop:'none',borderLeft:'none',borderRight:'none',background:'transparent',cursor:'pointer',transition:'all .12s',whiteSpace:'nowrap'}}>
                 {l}
               </button>
             ))}

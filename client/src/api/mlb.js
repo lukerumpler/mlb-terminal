@@ -584,14 +584,14 @@ export async function getTodaysGames(date) {
     sportId: 1, date: d,
     hydrate: 'linescore(matchup,runners),team,flags,review',
     language: 'en',
-  });
+  }, { ttl: 60_000 });
   return (data.dates?.[0]?.games || []).map(normalizeGame);
 }
 
 export async function getMiLBGames(date, levelIds = [11, 12, 13, 14]) {
   const d    = date || new Date().toISOString().slice(0, 10);
   const ids  = Array.isArray(levelIds) ? levelIds.join(',') : String(levelIds);
-  const data = await mlb('/schedule', { sportIds: ids, date: d, hydrate: 'linescore,team', language: 'en' });
+  const data = await mlb('/schedule', { sportIds: ids, date: d, hydrate: 'linescore,team', language: 'en' }, { ttl: 60_000 });
   const games = (data.dates?.[0]?.games || []).map(normalizeGame);
   const byLevel = {};
   for (const g of games) {
@@ -626,7 +626,7 @@ export async function getOrgGames(date, mlbTeamId) {
   ]);
   let affiliateIds = new Set([mlbTeamId]);
   try {
-    const aff = await mlb(`/teams/${mlbTeamId}/affiliates`, { season: SEASON });
+    const aff = await mlb(`/teams/${mlbTeamId}/affiliates`, { season: SEASON }, { ttl: 10 * 60_000 });
     for (const t of aff.teams || []) affiliateIds.add(t.id);
   } catch (_) { /* best effort */ }
   return [
@@ -708,7 +708,7 @@ function parseStandingsRecord(rec) {
 
 async function fetchStandings(leagueIds, season = SEASON) {
   const ids  = Array.isArray(leagueIds) ? leagueIds.join(',') : String(leagueIds);
-  const data = await mlb('/standings', { leagueId: ids, season, standingsTypes: 'regularSeason', hydrate: 'team,division,league' });
+  const data = await mlb('/standings', { leagueId: ids, season, standingsTypes: 'regularSeason', hydrate: 'team,division,league' }, { ttl: 5 * 60_000 });
   const out  = {};
   for (const rec of data.records || []) {
     const parsed = parseStandingsRecord(rec);
@@ -770,7 +770,7 @@ export const getMiLBLeaders = (categories, season = SEASON, levelId = 11, limit 
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function getAllTeams(sportId = 1) {
-  const data = await mlb('/teams', { sportId, activeStatus: 'Active' });
+  const data = await mlb('/teams', { sportId, activeStatus: 'Active' }, { ttl: 10 * 60_000 });
   return (data.teams || []).map(t => ({
     id: t.id, name: t.name, abbr: t.abbreviation, short: t.shortName,
     venue: t.venue?.name, league: t.league?.name, division: t.division?.name,
@@ -779,7 +779,7 @@ export async function getAllTeams(sportId = 1) {
 }
 
 export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
-  const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season });
+  const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season }, { ttl: 10 * 60_000 });
   return (data.teams || []).map(t => ({
     id: t.id, name: t.name, abbr: t.abbreviation,
     level: t.sport?.name || '', levelId: t.sport?.id || 0, league: t.league?.name || '',
@@ -787,7 +787,7 @@ export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
 }
 
 export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
-  const data   = await mlb(`/teams/${teamId}/stats`, { stats: 'season', group, season, sportIds: 1 });
+  const data   = await mlb(`/teams/${teamId}/stats`, { stats: 'season', group, season, sportIds: 1 }, { ttl: 60_000 });
   const grp    = findStatGroup(data.stats, group);
   return grp?.splits?.[0]?.stat || {};
 }
@@ -801,7 +801,7 @@ export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEA
   const data = await mlb('/stats', {
     stats: 'season', group, season, sportIds: 1, teamId,
     limit: 100, hydrate: 'person', order: 'desc', sortStat,
-  });
+  }, { ttl: 60_000 });
   const grp = findStatGroup(data.stats, group);
   return (grp?.splits || []).map(split => ({
     id: split.player?.id ?? split.person?.id ?? null,
@@ -816,7 +816,7 @@ export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEA
 // every team-facing view use the same authoritative snapshot rather than the
 // older static examples in data.js.
 export async function getAllTeamStats(group = 'hitting', season = SEASON) {
-  const data = await mlb('/teams/stats', { stats: 'season', group, season, sportIds: 1 });
+  const data = await mlb('/teams/stats', { stats: 'season', group, season, sportIds: 1 }, { ttl: 60_000 });
   const grp = findStatGroup(data.stats, group);
   return Object.fromEntries((grp?.splits || []).map(split => [
     split.team?.id,
@@ -1098,7 +1098,7 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
       endDate: end.toISOString().slice(0, 10),
       hydrate: 'linescore,team',
       language: 'en',
-    });
+    }, { ttl: 60_000 });
     const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
     return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
   } catch {

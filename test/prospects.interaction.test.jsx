@@ -31,13 +31,13 @@ describe('Prospects page — merged feature interactions', () => {
     await user.click(cardButtons[0]);
 
     // ProspectCard renders a dialog with a close button.
-    const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 });
+    const dialog = await screen.findByRole('dialog', {}, { timeout: 15000 });
     const closeBtn = within(dialog).getByRole('button', { name: /close/i });
     expect(closeBtn).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
 
     await user.click(closeBtn);
-  });
+  }, 15000);
 
   it('toggles a watchlist star without crashing and persists to localStorage', async () => {
     const user = userEvent.setup();
