@@ -11188,3 +11188,6 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Implement AI-powered natural language search component and query routing for players, teams, and intel.
 - [x] Add interactive tooltips with offensive and defensive WAR breakdown for the Divisional WAR comparison.
 - [x] Verify test suite and build output with new features.
+- [x] Implement local search-query analytics store with privacy-safe normalization and frequency aggregation.
+- [x] Add common query summary and shortcut prioritization view in the command palette / search interface.
+- [x] Add unit and integration tests for query analytics and shortcut recommendations.

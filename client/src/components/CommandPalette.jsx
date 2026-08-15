@@ -3,7 +3,8 @@ import { C, px, sans } from '../constants/colors.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, TEAMS } from '../constants/data.js';
 import { searchPlayers } from '../api/mlb.js';
 import { routeNaturalLanguageSearch } from '../api/naturalSearch.js';
-import { openPlayerProfile, openTeamOverview, openTab } from '../lib/navigation.js';
+import { openPlayerProfile, openTeamOverview } from '../lib/navigation.js';
+import { clearSearchAnalytics, getSearchShortcutHint, getTopSearchQueries, recordSearchQuery, SEARCH_ANALYTICS_EVENT } from '../lib/searchAnalytics.js';
 
 const TAB_ENTRIES = [
   { type:'tab', key:'overview',     label:'Overview' },
@@ -38,6 +39,7 @@ export default function CommandPalette({ onNavigate, onOpenProspect, onClose }) 
   const [aiState, setAiState] = useState('idle');
   const [aiResult, setAiResult] = useState(null);
   const [aiMessage, setAiMessage] = useState('');
+  const [analyticsRows, setAnalyticsRows] = useState(() => getTopSearchQueries());
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const requestSeq = useRef(0);
@@ -55,6 +57,12 @@ export default function CommandPalette({ onNavigate, onOpenProspect, onClose }) 
     const prospects = PROSPECT_ENTRIES.filter(p => p.label.toLowerCase().includes(term)).slice(0, 8);
     return [...tabs, ...prospects];
   }, [q]);
+
+  useEffect(() => {
+    const refreshAnalytics = () => setAnalyticsRows(getTopSearchQueries());
+    window.addEventListener(SEARCH_ANALYTICS_EVENT, refreshAnalytics);
+    return () => window.removeEventListener(SEARCH_ANALYTICS_EVENT, refreshAnalytics);
+  }, []);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -124,10 +132,12 @@ export default function CommandPalette({ onNavigate, onOpenProspect, onClose }) 
     try {
       const result = await routeNaturalLanguageSearch(query);
       if (seq !== requestSeq.current) return;
+      setAnalyticsRows(recordSearchQuery(query, { intent: result.intent, metric: result.metric, tab: result.tab, status: result.intent === 'unknown' ? 'unresolved' : 'resolved' }));
       setAiResult(result);
       setAiState('ready');
     } catch (error) {
       if (seq !== requestSeq.current) return;
+      setAnalyticsRows(recordSearchQuery(query, { status: 'error' }));
       setAiState('error');
       setAiMessage(error?.message || 'Natural-language search is unavailable.');
     }
@@ -182,6 +192,21 @@ export default function CommandPalette({ onNavigate, onOpenProspect, onClose }) 
               <span style={px({ fontSize:9.5, color:C.text4, textTransform:'uppercase' })}>{r.type === 'tab' ? 'Page' : 'Prospect'}</span>
             </div>
           ))}
+          {!q.trim() && analyticsRows.length > 0 && (
+            <section aria-label="Common search queries" style={{ borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'9px 16px 6px' }}>
+                <span style={px({ fontSize:9, color:C.teal, fontWeight:800, letterSpacing:'.06em' })}>COMMON SEARCH QUERIES</span>
+                <button type="button" aria-label="Clear local search analytics" onClick={() => setAnalyticsRows(clearSearchAnalytics())} style={{ border:'none', background:'transparent', color:C.text4, cursor:'pointer', padding:0, ...px({ fontSize:8.5 }) }}>CLEAR</button>
+              </div>
+              {analyticsRows.slice(0, 5).map(row => (
+                <button key={row.query} type="button" onClick={() => { setQ(row.query); inputRef.current?.focus(); }} style={{ width:'100%', display:'grid', gridTemplateColumns:'1fr auto', gap:12, alignItems:'center', textAlign:'left', padding:'7px 16px', border:'none', borderTop:`0.5px solid ${C.borderLight}`, background:'transparent', color:C.text, cursor:'pointer' }}>
+                  <span><span style={sans({ fontSize:10.5, fontWeight:700, color:C.text2 })}>{row.query}</span><span style={{ display:'block', marginTop:2, ...sans({ fontSize:9, color:C.text4 }) }}>{getSearchShortcutHint(row)}</span></span>
+                  <span style={{ ...px({ fontSize:10, fontWeight:800, color:C.amber }), whiteSpace:'nowrap' }}>{row.count}×</span>
+                </button>
+              ))}
+              <div style={sans({ padding:'7px 16px 9px', fontSize:8.5, color:C.text4, lineHeight:1.35 })}>Stored only in this browser to guide future shortcut design. Query text is not sent as analytics.</div>
+            </section>
+          )}
           {aiState === 'loading' && <div role="status" aria-label="AI search loading" style={{ padding:'14px 16px', color:C.text3, ...sans({ fontSize:11 }) }}><span style={{ color:C.amber, marginRight:7 }}>●</span>{aiMessage}</div>}
           {aiState === 'ready' && aiResult && (
             <button type="button" onClick={() => resolveAiResult(aiResult)} style={{ width:'100%', border:'none', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface, color:C.text, textAlign:'left', padding:'12px 16px', cursor:'pointer' }}>
