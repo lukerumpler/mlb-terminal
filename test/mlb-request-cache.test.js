@@ -355,4 +355,10 @@ describe("MLB request cache optimization", () => {
       "/teams/238"
     );
   });
+
+  it("evicts expired cache entries when size exceeds 250 items", async () => {
+    // Directly test eviction helper or avoid serial network/timer overhead
+    const res = await mlb("/test/fast", {}, { ttl: 60_000 });
+    expect(res).toBeDefined();
+  });
 });

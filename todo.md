@@ -11230,3 +11230,7 @@
 - [x] Run independent debugging pass with webdev_debug to detect subtle race conditions or memory leaks.
 - [x] Implement targeted refinements for data resilience and UI responsiveness based on debugging findings.
 - [x] Run full test suite, verify build and publish new checkpoint.
+- [ ] Profile bundle chunks and eliminate redundant re-renders across Overview and Players pages.
+- [ ] Optimize client API request de-duplication and memory cache cleanup.
+- [ ] Add performance regression test coverage and verify build outputs.
+- [ ] Run release validation and publish the optimized release.

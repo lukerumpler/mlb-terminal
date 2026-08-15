@@ -64,7 +64,17 @@ let activeRequests = 0;
 let queueTimer = null;
 let proxyCooldownUntil = 0;
 
+function evictExpiredCache() {
+  const now = Date.now();
+  if (cache.size > 250) {
+    for (const [k, v] of cache.entries()) {
+      if (v.staleExpires <= now) cache.delete(k);
+    }
+  }
+}
+
 function cacheGet(key) {
+  evictExpiredCache();
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return hit.data;
   return undefined;
