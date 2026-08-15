@@ -11176,3 +11176,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Integrate verified FanGraphs WAR and Baseball Savant source-health badges into affected metric and overview cards.
 - [x] Add unit and rendering regression tests for touch navigation and badge rendering.
 - [x] Run full release gates, verify desktop/mobile viewports, and publish the verified checkpoint.
+
+## Savant Refetch & Source-Health Repair
+- [x] Stabilize Savant roster rollup effect dependency with stable rosterSavantKey to prevent repeated loading loops on poll ticks.
+- [x] Add proper spacing and separation between provider names and source-health badge pills to eliminate visual text collision.
+- [x] Run full release gates, verify all 338 tests pass successfully, and save the publishable checkpoint.

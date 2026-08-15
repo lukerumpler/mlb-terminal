@@ -60,8 +60,8 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
 function OverviewSourceBadge({ status, provider, title }) {
   const badge = <StatusBadge status={status} compact />;
   if (!provider) return badge;
-  return <span className="skip-overview-source-badge" title={title || `${provider} source health`}>
-    <span className="skip-overview-source-name">{provider}</span>
+  return <span className="skip-overview-source-badge" title={title || `${provider} source health`} style={{gap:5}}>
+    <span className="skip-overview-source-name" style={{marginRight:2}}>{provider}</span>
     {badge}
   </span>;
 }
@@ -774,6 +774,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => { if (alive) setTeamSplitRows(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setTeamSplitRows([]); });
     return () => { alive = false; };
   }, [teamBase?.id, feedRetryToken]);
+  const rosterSavantKey = useMemo(() => {
+    const hitterIds = (liveTeamPlayers.hitting || [])
+      .slice()
+      .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
+      .slice(0, 12)
+      .map(p => p?.id)
+      .filter(Boolean);
+    const pitcherIds = (liveTeamPlayers.pitching || [])
+      .slice()
+      .sort((a, b) => (Number(b?.stat?.inningsPitched || b?.stat?.ip) || 0) - (Number(a?.stat?.inningsPitched || a?.stat?.ip) || 0))
+      .slice(0, 12)
+      .map(p => p?.id)
+      .filter(Boolean);
+    return [...hitterIds, ...pitcherIds].join(',');
+  }, [liveTeamPlayers]);
   useEffect(() => {
     let alive = true;
     const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
@@ -825,7 +840,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
-    }, [teamBase?.abbr, feedRetryToken, liveTeamPlayers]);
+    }, [teamBase?.abbr, feedRetryToken, rosterSavantKey]);
   useEffect(() => {
     let alive = true;
     setTeamBattedBallAgainstRows([]);
