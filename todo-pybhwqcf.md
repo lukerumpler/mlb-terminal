@@ -2,7 +2,7 @@
 
 - [x] Inspect the affiliate subtitle state rendering and remove raw internal error text
 - [x] Trace cached-source badge rendering and identify whether the spacing defect exists in the current repository
-- [ ] Verify whether the two top dropdown outlines are true simultaneous focus or shared styling
+- [x] Audit dropdown code for shared amber focus styling; screenshot-only simultaneous focus remains unproven
 - [x] Add focused regression tests for confirmed defects
 - [x] Run targeted tests and record remaining issues or repository gaps
 - [x] Limit Savant and related provider requests to a nightly refresh with same-day cache reuse
