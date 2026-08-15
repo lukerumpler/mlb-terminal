@@ -1283,9 +1283,7 @@
   "teamMismatchSummary": {
     "teamsWithAnyDifference": 29,
     "totalComparedFieldsDifferent": 214,
-    "teamsWithNoDifference": [
-      "SD"
-    ]
+    "teamsWithNoDifference": ["SD"]
   },
   "prospectIdentityIssues": [
     {

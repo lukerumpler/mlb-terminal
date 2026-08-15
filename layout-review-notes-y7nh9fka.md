@@ -1,6 +1,7 @@
 # Layout Review Notes
 
 ## Source
+
 - Attached reference: `/home/ubuntu/upload/MLBDashboardProjectVisualExamples.pdf`
 
 ## Key findings relevant to the next SKIP layout pass

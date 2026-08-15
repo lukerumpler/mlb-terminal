@@ -4,7 +4,8 @@ export const CBT_THRESHOLDS = Object.freeze({
   2026: 244_000_000,
 });
 
-export const CBT_SOURCE_URL = 'https://www.mlb.com/glossary/transactions/competitive-balance-tax';
+export const CBT_SOURCE_URL =
+  "https://www.mlb.com/glossary/transactions/competitive-balance-tax";
 
 function numeric(value) {
   const number = Number(value);
@@ -17,27 +18,73 @@ export function getCbtThreshold(season) {
 
 export function getRepeaterTier(consecutiveYears) {
   const years = numeric(consecutiveYears);
-  if (years == null || years < 1) return { key: 'unknown', label: 'History unavailable', baseRate: null };
-  if (years === 1) return { key: 'first-year', label: 'First-year CBT payer', baseRate: 0.20 };
-  if (years === 2) return { key: 'second-year', label: 'Second consecutive year', baseRate: 0.30 };
-  return { key: 'third-plus-year', label: 'Third consecutive year or more', baseRate: 0.50 };
+  if (years == null || years < 1)
+    return { key: "unknown", label: "History unavailable", baseRate: null };
+  if (years === 1)
+    return { key: "first-year", label: "First-year CBT payer", baseRate: 0.2 };
+  if (years === 2)
+    return {
+      key: "second-year",
+      label: "Second consecutive year",
+      baseRate: 0.3,
+    };
+  return {
+    key: "third-plus-year",
+    label: "Third consecutive year or more",
+    baseRate: 0.5,
+  };
 }
 
 export function getRepeaterTierExplanation(consecutiveYears) {
   const tier = getRepeaterTier(consecutiveYears);
-  if (tier.key === 'first-year') return { title:tier.label, rate:'20% base rate', detail:'Modeled as a first-year CBT payer. A season below the threshold resets the consecutive-year count.' };
-  if (tier.key === 'second-year') return { title:tier.label, rate:'30% base rate', detail:'The second consecutive year carries a higher base rate. Overages from $20M to $40M add a 12-point surcharge.' };
-  if (tier.key === 'third-plus-year') return { title:tier.label, rate:'50% base rate', detail:'The third-or-more consecutive year carries the highest base rate. Larger overage bands can add substantial surcharges.' };
-  return { title:'History unavailable', rate:'Tax rate not assigned', detail:'The current public financial feed does not provide verified consecutive-year CBT history, so SKIP does not assume a repeater rate or tax bill.' };
+  if (tier.key === "first-year")
+    return {
+      title: tier.label,
+      rate: "20% base rate",
+      detail:
+        "Modeled as a first-year CBT payer. A season below the threshold resets the consecutive-year count.",
+    };
+  if (tier.key === "second-year")
+    return {
+      title: tier.label,
+      rate: "30% base rate",
+      detail:
+        "The second consecutive year carries a higher base rate. Overages from $20M to $40M add a 12-point surcharge.",
+    };
+  if (tier.key === "third-plus-year")
+    return {
+      title: tier.label,
+      rate: "50% base rate",
+      detail:
+        "The third-or-more consecutive year carries the highest base rate. Larger overage bands can add substantial surcharges.",
+    };
+  return {
+    title: "History unavailable",
+    rate: "Tax rate not assigned",
+    detail:
+      "The current public financial feed does not provide verified consecutive-year CBT history, so SKIP does not assume a repeater rate or tax bill.",
+  };
 }
 
 export function getSurchargeBand(overage) {
   const amount = numeric(overage);
-  if (amount == null || amount < 0) return { key: 'unknown', label: 'Unavailable', rate: null };
-  if (amount < 20_000_000) return { key: 'base', label: 'Base threshold to +$20M', rate: 0 };
-  if (amount < 40_000_000) return { key: 'twenty-to-forty', label: '+$20M to +$40M surcharge', rate: 0.12 };
-  if (amount < 60_000_000) return { key: 'forty-to-sixty', label: '+$40M to +$60M surcharge', rate: null };
-  return { key: 'sixty-plus', label: '+$60M or more surcharge', rate: 0.60 };
+  if (amount == null || amount < 0)
+    return { key: "unknown", label: "Unavailable", rate: null };
+  if (amount < 20_000_000)
+    return { key: "base", label: "Base threshold to +$20M", rate: 0 };
+  if (amount < 40_000_000)
+    return {
+      key: "twenty-to-forty",
+      label: "+$20M to +$40M surcharge",
+      rate: 0.12,
+    };
+  if (amount < 60_000_000)
+    return {
+      key: "forty-to-sixty",
+      label: "+$40M to +$60M surcharge",
+      rate: null,
+    };
+  return { key: "sixty-plus", label: "+$60M or more surcharge", rate: 0.6 };
 }
 
 export function calculateCbtTax(overage, consecutiveYears) {
@@ -52,7 +99,7 @@ export function calculateCbtTax(overage, consecutiveYears) {
     { width: 20_000_000, rate: tier.baseRate },
     { width: 20_000_000, rate: tier.baseRate + 0.12 },
     { width: 20_000_000, rate: tier.baseRate + (years === 1 ? 0.425 : 0.45) },
-    { width: Infinity, rate: tier.baseRate + 0.60 },
+    { width: Infinity, rate: tier.baseRate + 0.6 },
   ];
   for (const band of bands) {
     if (remaining <= 0) break;
@@ -97,10 +144,20 @@ export function buildMultiYearTaxProjection({
   for (let i = 0; i < count; i += 1) {
     const season = Number(currentSeason) + i;
     const threshold = getCbtThreshold(season);
-    const projectedAav = aav == null ? null : Math.round(aav * ((1 + salaryGrowth) ** i));
-    const projectedPayroll = payroll == null ? null : Math.round(payroll * ((1 + payrollGrowth) ** i) + (projectedAav ?? 0) - playerAav);
-    const overage = projectedPayroll != null && threshold != null ? Math.max(0, projectedPayroll - threshold) : null;
-    const seasonRepeaterYears = repeaterYears == null ? null : Number(repeaterYears) + i;
+    const projectedAav =
+      aav == null ? null : Math.round(aav * (1 + salaryGrowth) ** i);
+    const projectedPayroll =
+      payroll == null
+        ? null
+        : Math.round(
+            payroll * (1 + payrollGrowth) ** i + (projectedAav ?? 0) - playerAav
+          );
+    const overage =
+      projectedPayroll != null && threshold != null
+        ? Math.max(0, projectedPayroll - threshold)
+        : null;
+    const seasonRepeaterYears =
+      repeaterYears == null ? null : Number(repeaterYears) + i;
     const tier = getRepeaterTier(seasonRepeaterYears);
     rows.push({
       season,
@@ -116,8 +173,13 @@ export function buildMultiYearTaxProjection({
   }
   return {
     source: CBT_SOURCE_URL,
-    assumptions: { salaryGrowth, payrollGrowth, currentPlayerAav: playerAav, years: count },
-    status: aav != null && payroll != null ? 'available' : 'unavailable',
+    assumptions: {
+      salaryGrowth,
+      payrollGrowth,
+      currentPlayerAav: playerAav,
+      years: count,
+    },
+    status: aav != null && payroll != null ? "available" : "unavailable",
     rows,
   };
 }
