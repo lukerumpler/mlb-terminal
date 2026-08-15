@@ -11219,7 +11219,10 @@
 - [x] Implement local search-query analytics store with privacy-safe normalization and frequency aggregation.
 - [x] Add common query summary and shortcut prioritization view in the command palette / search interface.
 - [x] Add unit and integration tests for query analytics and shortcut recommendations.
-- [ ] Conduct end-to-end audit of server proxies (mlb.js, savant.js, fangraphs-models.js, news.js, feed.js, ncaa.js, contract.js, team-financials.js).
-- [ ] Optimize response caching, rate-limit backoffs, and stale-if-error resilience across all data sources.
-- [ ] Ensure strict data provenance badges and zero synthetic/fabricated stat fallbacks across player and team views.
-- [ ] Run full test suite and build verification for the optimized API and data architecture.
+- [x] Conduct end-to-end audit of server proxies (mlb.js, savant.js, fangraphs-models.js, news.js, feed.js, ncaa.js, contract.js, team-financials.js).
+- [x] Optimize response caching, rate-limit backoffs, and stale-if-error resilience across all data sources.
+- [x] Ensure strict data provenance badges and zero synthetic/fabricated stat fallbacks across player and team views.
+- [x] Run full test suite and build verification for the optimized API and data architecture.
+- [x] Ensure MLB team identity and core stats load before affiliate requests on OverviewPage.
+- [x] Add explicit loading skeleton and retry status indicators for team identity fetching.
+- [x] Verify team loading sequence with unit tests and production build.

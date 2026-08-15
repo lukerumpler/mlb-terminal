@@ -631,6 +631,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const teamBase=TEAMS[selTeam];
   useEffect(() => {
     let alive = true;
+    if (liveTeamDataMode === 'loading' && !liveTeamData) {
+      setAffiliatesState('loading');
+      return () => { alive = false; };
+    }
     setAffiliatesState('loading');
     setAffiliates([]);
     setAffiliateId('');
@@ -1315,8 +1319,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </button>
           <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:aggregateSurface,border:`1px solid ${aggregateBorder}`}}>
             <span style={{width:6,height:6,borderRadius:'50%',background:aggregateTone,animation:liveTeamDataMode === 'loading' ? 'pulse 1.2s ease-in-out infinite' : 'none'}} />
-            <span style={px({fontSize:10,color:aggregateTone,fontWeight:700,letterSpacing:'.06em'})}>{aggregateStatus}</span>
-            {liveTeamError && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamDataMode('loading');setMlbRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
+            <span style={px({fontSize:10,color:aggregateTone,fontWeight:700,letterSpacing:'.06em'})}>{liveTeamDataMode === 'loading' ? 'LOADING MLB TEAM…' : aggregateStatus}</span>
+            {(liveTeamError || liveTeamDataMode === 'loading') && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamDataMode('loading');setMlbRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
           </div>
           </div>
         </div>
