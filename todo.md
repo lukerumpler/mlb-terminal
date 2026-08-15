@@ -11257,3 +11257,6 @@
 - [x] Fix OverviewPage team selector handling so MLB parent selection displays main MLB team overview instead of forcing affiliate stats.
 - [x] Add regression test for MLB parent versus affiliate selector routing.
 - [x] Run release validation, review preview, and publish release.
+- [x] Add 502 and non-JSON quiet status handling for affiliate schedule requests in client/src/api/mlb.js.
+- [x] Add regression test for affiliate schedule upstream errors.
+- [x] Run release validation and publish release.

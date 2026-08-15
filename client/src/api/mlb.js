@@ -222,7 +222,10 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
     try {
       data = await res.json();
     } catch {
-      if (quietStatuses.includes(res.status)) console.warn('[mlb] expected unreadable upstream response', res.status, path);
+      if (quietStatuses.includes(res.status) || res.status === 502 || res.status === 504) {
+        console.warn('[mlb] expected unreadable upstream response', res.status, path);
+        throw new MlbProxyError(res.status, path, 0);
+      }
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
     if (useCache) {
@@ -1703,7 +1706,7 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
       endDate: end.toISOString().slice(0, 10),
       hydrate: 'linescore,team',
       language: 'en',
-    }, { ttl: 60_000, timeoutMs: 15_000, quietStatuses: [404] });
+    }, { ttl: 60_000, timeoutMs: 15_000, quietStatuses: [404, 502, 503, 504] });
     const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
     return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
   } catch {
