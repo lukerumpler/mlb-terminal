@@ -11185,3 +11185,6 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Refine mobile touch scrolling, momentum, overscroll behavior, and drawer focus management for iOS and Android.
 - [x] Stabilize Savant roster-rollup refetch loop and provider badge formatting.
 - [x] Run full test suite (339 passing tests across 63 files) and production build.
+- [x] Implement AI-powered natural language search component and query routing for players, teams, and intel.
+- [x] Add interactive tooltips with offensive and defensive WAR breakdown for the Divisional WAR comparison.
+- [x] Verify test suite and build output with new features.

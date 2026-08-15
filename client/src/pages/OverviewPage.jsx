@@ -30,6 +30,7 @@ const OffenseRadar = lazy(() => import('../components/OverviewCharts.jsx').then(
 const StrengthRadar = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.StrengthRadar })));
 const RunDiffChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.RunDiffChart })));
 const ArsenalPie = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.ArsenalPie })));
+const DivisionalWarChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.DivisionalWarChart })));
 
 export const OVERVIEW_ACCENTS = Object.freeze({
   offense: C.amber,
@@ -924,6 +925,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       : 'Unavailable';
   const playoffOddsSource = teamModelData?.playoffOdds != null ? 'FanGraphs' : skipPlayoffEstimate?.estimate != null ? 'SKIP estimate' : 'Provider unavailable';
   const teamWarValue = teamModelData?.teamWar == null ? 'Unavailable' : Number(teamModelData.teamWar).toFixed(1);
+  const divisionWarData = useMemo(() => (Array.isArray(teamModelData?.divisionTeams) ? teamModelData.divisionTeams : [])
+    .filter(row => row?.team && row?.totalWAR != null)
+    .map(row => ({
+      team: Object.values(TEAMS).find(item => String(item.name).toLowerCase() === String(row.team).toLowerCase())?.abbr || String(row.team).slice(0, 4).toUpperCase(),
+      teamName: row.team,
+      totalWAR: Number(row.totalWAR),
+      offensiveWAR: row.offensiveWAR == null ? null : Number(row.offensiveWAR),
+      defensiveWAR: row.defensiveWAR == null ? null : Number(row.defensiveWAR),
+      pitchingWAR: row.pitchingWAR == null ? null : Number(row.pitchingWAR),
+    }))
+    .sort((a, b) => b.totalWAR - a.totalWAR), [teamModelData?.divisionTeams]);
   const fanGraphsHealthStatus = teamModelState === 'loading'
     ? 'loading'
     : teamModelData?.freshness === 'stale-cached'
@@ -1337,6 +1349,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource}{skipPlayoffEstimate?.estimate != null && teamModelData?.playoffOdds == null ? ` · ${skipPlayoffEstimate.simulationCount || 1200} simulations` : ''} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
       </div>
+      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges"><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
+        <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
+          <span style={sans({ fontSize:9.5, color:C.text3 })}>Verified total WAR by division · hover a bar for the exact component breakdown</span>
+          <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
+        </div>
+        <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
+          <DivisionalWarChart data={divisionWarData} />
+        </Suspense>
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>Offensive WAR and pitching WAR are shown only when returned by FanGraphs. Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
+      </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges"><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
           {[['Projected W',teamModelData?.advancedMetrics?.projectedWins,1,'FanGraphs',fanGraphsHealthStatus],['Projected L',teamModelData?.advancedMetrics?.projectedLosses,1,'FanGraphs',fanGraphsHealthStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</div><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div>)}

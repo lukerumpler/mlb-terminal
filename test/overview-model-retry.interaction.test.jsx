@@ -108,7 +108,7 @@ describe('Team Overview model source and retry interaction', () => {
     const { container } = render(<OverviewPage />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/));
     const providers = [...container.querySelectorAll('.skip-overview-source-name')].map(node => node.textContent);
-    expect(providers.filter(provider => provider === 'FanGraphs')).toHaveLength(6);
+    expect(providers.filter(provider => provider === 'FanGraphs')).toHaveLength(7);
     expect(providers.filter(provider => provider === 'Savant')).toHaveLength(4);
     expect(container.querySelector('.skip-status-unavailable')).toBeInTheDocument();
     expect(document.body.textContent).toContain('FanGraphs · not retrieved');

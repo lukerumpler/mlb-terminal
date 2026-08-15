@@ -1532,15 +1532,26 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     const teams = data?.teams || [];
     const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
     let divisionAverageWAR = null;
+    let divisionTeams = [];
     if (divisionTeamNames.length && teams.length) {
       const divRows = teams.filter(row => divisionTeamNames.some(name => String(name).toLowerCase() === String(row.team).toLowerCase()) && row.totalWAR != null);
+      divisionTeams = divRows.map(row => ({
+        team: row.team,
+        totalWAR: row.totalWAR ?? null,
+        offensiveWAR: row.battingWAR ?? row.offensiveWAR ?? row.offenseWAR ?? null,
+        defensiveWAR: row.defenseWAR ?? row.defensiveWAR ?? null,
+        pitchingWAR: row.pitchingWAR ?? null,
+      }));
       if (divRows.length) {
         divisionAverageWAR = Number((divRows.reduce((sum, r) => sum + Number(r.totalWAR), 0) / divRows.length).toFixed(1));
       }
     }
     return {
       teamWar: selected?.totalWAR ?? null,
+      offensiveWAR: selected?.battingWAR ?? selected?.offensiveWAR ?? selected?.offenseWAR ?? null,
+      defensiveWAR: selected?.defenseWAR ?? selected?.defensiveWAR ?? null,
       divisionAverageWAR,
+      divisionTeams,
       source: 'FanGraphs aggregate Team WAR',
       freshness: data.freshness || 'live',
       retrievedAt: data.retrievedAt || data.servedAt,

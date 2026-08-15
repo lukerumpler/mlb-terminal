@@ -11,6 +11,7 @@ describe("legacy API route registration", () => {
       "/api/news",
       "/api/contract",
       "/api/comparison-summary",
+      "/api/natural-search",
     ]);
   });
 });
