@@ -1522,15 +1522,30 @@ export async function getFirstRoundResults(year) {
   return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
 }
 
-export async function getTeamAggregateWar(teamName, season = SEASON) {
+export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
   const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
   try {
     const response = await fetch(`/api/fangraphs-models?${params.toString()}`, { signal: AbortSignal.timeout(15_000) });
     if (!response.ok) return null;
     const data = await response.json();
-    const selected = (data?.teams || []).find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
-    return selected?.totalWAR == null ? null : { teamWar: selected.totalWAR, source: 'FanGraphs aggregate Team WAR', freshness: data.freshness || 'live', retrievedAt: data.retrievedAt || data.servedAt, status: data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial' };
+    const teams = data?.teams || [];
+    const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
+    let divisionAverageWAR = null;
+    if (divisionTeamNames.length && teams.length) {
+      const divRows = teams.filter(row => divisionTeamNames.some(name => String(name).toLowerCase() === String(row.team).toLowerCase()) && row.totalWAR != null);
+      if (divRows.length) {
+        divisionAverageWAR = Number((divRows.reduce((sum, r) => sum + Number(r.totalWAR), 0) / divRows.length).toFixed(1));
+      }
+    }
+    return {
+      teamWar: selected?.totalWAR ?? null,
+      divisionAverageWAR,
+      source: 'FanGraphs aggregate Team WAR',
+      freshness: data.freshness || 'live',
+      retrievedAt: data.retrievedAt || data.servedAt,
+      status: data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial',
+    };
   } catch {
     return null;
   }

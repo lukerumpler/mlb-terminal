@@ -11181,3 +11181,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Stabilize Savant roster rollup effect dependency with stable rosterSavantKey to prevent repeated loading loops on poll ticks.
 - [x] Add proper spacing and separation between provider names and source-health badge pills to eliminate visual text collision.
 - [x] Run full release gates, verify all 338 tests pass successfully, and save the publishable checkpoint.
+- [x] Implement team-comparison metrics for FanGraphs WAR against divisional averages with robust fallback handling.
+- [x] Refine mobile touch scrolling, momentum, overscroll behavior, and drawer focus management for iOS and Android.
+- [x] Stabilize Savant roster-rollup refetch loop and provider badge formatting.
+- [x] Run full test suite (339 passing tests across 63 files) and production build.

@@ -117,6 +117,27 @@ describe('Team Overview model source and retry interaction', () => {
     expect(document.body.textContent).not.toMatch(/Team WAR:\s*Loading/);
   });
 
+  it('displays divisional average WAR comparison context under Team WAR when available from aggregate FanGraphs data', async () => {
+    vi.spyOn(mlbApi, 'getTeamModelSources').mockResolvedValueOnce({
+      found: true,
+      retrievedAt: '2026-08-14T02:02:00.000Z',
+      source: 'FanGraphs',
+      playoffOdds: 72.4,
+      teamWar: 31.4,
+      statuses: { playoffOdds: 'live', teamWar: 'live' },
+    });
+    vi.spyOn(mlbApi, 'getTeamAggregateWar').mockResolvedValueOnce({
+      teamWar: 31.4,
+      divisionAverageWAR: 23.9,
+      source: 'FanGraphs aggregate Team WAR',
+      freshness: 'live',
+      retrievedAt: '2026-08-14T02:02:00.000Z',
+      status: 'live',
+    });
+    render(<OverviewPage />);
+    expect(await screen.findByText(/div avg/)).toBeInTheDocument();
+  });
+
   it('shows explicit unavailable model states, exposes retry, and recovers model and MLB data after retry', async () => {
     const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
