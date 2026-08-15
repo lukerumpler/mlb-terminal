@@ -11238,3 +11238,6 @@
 - [x] Preserve live, cached, and loading provenance badges and loading states.
 - [x] Add layout regression tests and verify desktop/mobile rendering.
 - [x] Run full release validation, review preview, and publish release.
+- [x] Fix Savant metric rendering on OverviewPage to display actual numerical stats instead of source/cache status strings.
+- [x] Add explicit unit and rendering tests for Savant metrics and source badges.
+- [x] Run release validation, review preview, and publish release.
