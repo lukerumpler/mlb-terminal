@@ -16,6 +16,8 @@ import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_H
 import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
 import { DAILY_CACHE_TTL_MS, shouldRefreshDailyCache, readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache, readTeamSavantSummaryCache, saveTeamSavantSummaryCache, readTeamSavantAgainstCache, saveTeamSavantAgainstCache } from '../lib/teamDataCache.js';
 import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
+import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.js';
+import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -770,6 +772,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
+  const aiInsightsRequestKeyRef = useRef(null);
+  useEffect(() => {
+    setAiInsights(null);
+    setAiInsightsState('idle');
+    aiInsightsRequestKeyRef.current = null;
+  }, [teamBase?.abbr]);
   const [verifiedTrends, setVerifiedTrends] = useState({});
   const trendSnapshotScope = `${selTeam}:${CURRENT_SEASON}`;
   const verifiedTrendMetrics = useMemo(() => {
@@ -825,21 +833,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => { if (alive) setTeamSplitRows(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setTeamSplitRows([]); });
     return () => { alive = false; };
   }, [teamBase?.id, mlbRetryToken]);
-  const rosterSavantKey = useMemo(() => {
-    const hitterIds = (liveTeamPlayers.hitting || [])
-      .slice()
-      .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
-      .slice(0, 12)
-      .map(p => p?.id)
-      .filter(Boolean);
-    const pitcherIds = (liveTeamPlayers.pitching || [])
-      .slice()
-      .sort((a, b) => (Number(b?.stat?.inningsPitched || b?.stat?.ip) || 0) - (Number(a?.stat?.inningsPitched || a?.stat?.ip) || 0))
-      .slice(0, 12)
-      .map(p => p?.id)
-      .filter(Boolean);
-    return [...hitterIds, ...pitcherIds].join(',');
-  }, [liveTeamPlayers]);
+  const rosterSavantKey = useMemo(() => buildRosterSavantKey(liveTeamPlayers), [liveTeamPlayers]);
   useEffect(() => {
     let alive = true;
     const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
@@ -964,8 +958,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }), [team.name, team.abbr, team.w, team.l, team.pct, team.rs, team.ra, team.ops, team.hr, team.era, team.whip, team.k, team.sb, liveTeamPlayers]);
 
   useEffect(() => {
-    if (!liveTeamData || aiInsights) return;
+    const requestKey = `${teamBase?.abbr || ''}:${rosterInsightsRetryToken}`;
+    if (!shouldStartRosterInsightsRequest({
+      hasLiveData: Boolean(liveTeamData),
+      hasInsights: Boolean(aiInsights),
+      inFlightKey: aiInsightsRequestKeyRef.current,
+      requestKey,
+      hitterCount: liveTeamPlayers.hitting?.length || 0,
+      pitcherCount: liveTeamPlayers.pitching?.length || 0,
+    })) return;
     let alive = true;
+    aiInsightsRequestKeyRef.current = requestKey;
     const input = {
       team: {
         name: team.name, abbr: team.abbr, w: team.w, l: team.l, pct: team.pct,
@@ -987,7 +990,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(() => { if (alive) setAiInsightsState('error'); });
     return () => { alive = false; };
-  }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken]);
+  }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
   const playoffOddsValue = teamModelData?.playoffOdds != null
     ? `${Number(teamModelData.playoffOdds).toFixed(1)}%`

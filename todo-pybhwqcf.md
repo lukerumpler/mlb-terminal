@@ -65,3 +65,17 @@
 - [x] Add a regression assertion for development denial as well as production denial
 - [x] Save a new checkpoint after the staging-gate correction
 - [x] Save a new webdev checkpoint containing the explicit staging-only gate, updated tests, managed-secret configuration, and hook documentation
+- [x] Inspect current browser/server logs and request traces for runtime errors and slow or duplicate calls
+- [x] Measure the highest-impact data-loading bottlenecks and cache misses
+- [x] Apply targeted performance or reliability fixes without changing metric definitions
+- [x] Add or update regression coverage for request counts and corrected error paths
+- [x] Run focused tests, type-check, build, and final performance validation
+- [x] Read and summarize the attached api-and-ui-fixes.patch contents
+- [x] Compare each patch hunk with current API, cache, and Overview code
+- [x] Apply only compatible patch changes that improve measured reliability or performance
+- [x] Add regression coverage for accepted patch behavior and validate the full focused suite
+- [x] Explicitly reconcile the attached OverviewPage rosterSavantKey hunk with the current source and decide whether it is already present or needs application
+- [x] Add or verify regression coverage for the Savant-rollup effect identity guard
+- [x] Document accept/reject decisions for the attached index.css, OverviewPage, PlayersPage, and contract hunks
+- [x] Add a direct regression test for stable rosterSavantKey identity across liveTeamPlayers object churn
+- [x] Persist a short QA note documenting accept/reject decisions for every attached patch hunk

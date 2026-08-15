@@ -27,6 +27,18 @@ const CACHE_RULES = {
 // client cache remains the source of truth for verified local snapshots.
 const responseCache = new Map();
 const MLB_FAILURE_COOLDOWN_MS = 15_000;
+const UPSTREAM_TIMEOUT_MS = {
+  "/schedule": 20_000,
+  "/teams": 15_000,
+  default: 12_000,
+};
+
+export function getUpstreamTimeoutMs(path) {
+  for (const [prefix, timeoutMs] of Object.entries(UPSTREAM_TIMEOUT_MS)) {
+    if (prefix !== "default" && path.startsWith(prefix)) return timeoutMs;
+  }
+  return UPSTREAM_TIMEOUT_MS.default;
+}
 const upstreamFailureUntil = new Map();
 // Overview, ticker, and affiliate panels can request the same resource at
 // nearly the same time. Share one upstream promise during a cache miss so a
@@ -163,7 +175,7 @@ export default async function handler(req, res) {
           "User-Agent": "Mozilla/5.0 (compatible; MLBDashboard/1.0)",
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(getUpstreamTimeoutMs(path)),
       });
     } catch (err) {
       const isTimeout =

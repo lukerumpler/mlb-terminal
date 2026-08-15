@@ -42,8 +42,10 @@ const UA =
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-function normalizeName(s) {
+export function normalizeName(s) {
   return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/['\u2018\u2019`.,-]/g, "")
     .replace(/\s+/g, " ")
@@ -64,6 +66,13 @@ function levenshtein(a, b) {
     }
   }
   return dp[m][n];
+}
+
+export function isAcceptableMatch(target, candidate, dist) {
+  if (!target || !candidate) return false;
+  const maxLen = Math.max(target.length, candidate.length);
+  const cap = Math.min(3, Math.max(1, Math.floor(maxLen * 0.12)));
+  return dist <= cap;
 }
 
 function parseDollar(s) {
@@ -160,7 +169,7 @@ async function fetchHtml(url, timeoutMs = 10_000) {
 //   Rank | Player | Team | Pos | Years | Total | AAV | Expires
 // The <th> in each row holds the rank; <td>s hold the rest.
 
-function parseSpotracTable(html, playerName) {
+export function parseSpotracTable(html, playerName) {
   const normTarget = normalizeName(playerName);
 
   // Extract the #table section
@@ -200,10 +209,11 @@ function parseSpotracTable(html, playerName) {
     if (dist < bestDist) {
       bestDist = dist;
       best = tds;
+      bestCandidate = candidate;
     }
   }
 
-  if (!best || bestDist > 4) return null;
+  if (!best || !isAcceptableMatch(normTarget, bestCandidate, bestDist)) return null;
 
   // Map columns: Rank(0) Player(1) Team(2) Pos(3) Years(4) Total(5) AAV(6) Expires(7)
   const expiry = fmtExpiry(best[7]);
@@ -225,7 +235,7 @@ function parseSpotracTable(html, playerName) {
 // extract_baseball_reference_format() + extract_player_urls()
 // Uses data-stat attributes to locate each field robustly — no positional assumptions.
 
-function parseBRefTable(html, playerName) {
+export function parseBRefTable(html, playerName) {
   const normTarget = normalizeName(playerName);
 
   const tableMatch = html.match(
@@ -262,11 +272,11 @@ function parseBRefTable(html, playerName) {
     const dist = levenshtein(normTarget, normalizeName(playerCell));
     if (dist < bestDist) {
       bestDist = dist;
-      best = { rowHtml, name: playerCell };
+      best = { rowHtml, name: playerCell, normalizedName: normalizeName(playerCell) };
     }
   }
 
-  if (!best || bestDist > 4) return null;
+  if (!best || !isAcceptableMatch(normTarget, best.normalizedName, bestDist)) return null;
 
   const { rowHtml, name } = best;
 

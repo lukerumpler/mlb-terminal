@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import handler, { __resetMlbProxyStateForTests } from "./mlb.js";
+import handler, {
+  __resetMlbProxyStateForTests,
+  getUpstreamTimeoutMs,
+} from "./mlb.js";
 
 type MockResponse = {
   statusCode: number;
@@ -52,6 +55,11 @@ afterEach(() => {
 });
 
 describe("MLB proxy upstream protection", () => {
+  it("uses longer deadlines for known slow MLB resources", () => {
+    expect(getUpstreamTimeoutMs("/schedule")).toBe(20_000);
+    expect(getUpstreamTimeoutMs("/teams/119/affiliates")).toBe(15_000);
+    expect(getUpstreamTimeoutMs("/people/123")).toBe(12_000);
+  });
   it("coalesces identical concurrent cache misses into one upstream request", async () => {
     let resolveFetch!: (value: Response) => void;
     const upstream = new Promise<Response>(resolve => {
