@@ -40,3 +40,21 @@ describe('MLB-first team loading sequence', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Select minor league affiliate' })).toHaveValue(''));
   });
 });
+
+  it('does not restore a recent affiliate as the default MLB Overview selection', async () => {
+    localStorage.setItem('skip-recent-history', JSON.stringify([
+      { type: 'affiliate', affiliateId: 501, parentAbbr: 'LAD', levelId: 11, label: 'Oklahoma City Comets', secondary: 'Triple-A · Los Angeles Dodgers', viewedAt: Date.now() },
+    ]));
+    vi.stubGlobal('fetch', vi.fn(async url => {
+      if (String(url).includes('/teams/238/affiliates')) {
+        return { ok: true, status: 200, headers: { get: () => null }, json: async () => [{ id: 501, name: 'Oklahoma City Comets', level: 'Triple-A', levelId: 11, league: 'PCL' }], text: async () => '[]' };
+      }
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => '{}' };
+    }));
+    render(<OverviewPage />);
+    await waitFor(() => {
+      const selectors = screen.getAllByRole('combobox', { name: 'Select minor league affiliate' });
+      expect(selectors.every(select => select.value === '')).toBe(true);
+    });
+    expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
+  });

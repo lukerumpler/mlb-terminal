@@ -26,9 +26,33 @@
 - [x] Add reliable margin between Savant and FanGraphs source/status badges
 - [x] Ensure the MLB-level team overview initializes before minor-league affiliate data
 - [x] Add focused regression tests for all three Overview behaviors
-- [ ] Verify the latest checkpoint publication state and canonical project remote
-- [ ] Verify the live Dodgers Overview page shows the affiliate error fix, badge spacing, and MLB-first default
-- [ ] Compare the Manus project remote with github.com/lukerumpler/mlb-terminal and document whether they are separate sources of truth
+- [x] Verify the latest checkpoint publication state and canonical project remote
+- [x] Verify the live Dodgers Overview page shows the affiliate error fix, badge spacing, and MLB-first default
+- [x] Compare the Manus project remote with github.com/lukerumpler/mlb-terminal and document whether they are separate sources of truth
 - [x] Stop the default MLB team load from automatically selecting the first minor-league affiliate
 - [x] Add visible spacing between provider names, cache symbols, and status labels in live source badges
-- [ ] Re-test the live Dodgers Overview after publication
+- [x] Re-test the live Dodgers Overview after publication
+- [x] Fix or verify the live default-selection path so a fresh Dodgers Overview load does not auto-select Oklahoma City or any affiliate
+- [x] Add deterministic live or end-to-end verification that the published affiliate selector defaults to Select MiLB affiliate and no affiliate panel renders on first load
+- [x] Capture deterministic published-UI verification for visible provider-badge spacing and the humanized affiliate error state
+- [x] Investigate App-level recent-history or event restoration that may still select Oklahoma City after a hard refresh
+- [x] Add deterministic published-site verification for an empty default affiliate selector and absent first-load affiliate panel
+- [x] Add deterministic published-UI verification for badge spacing and the live affiliate error-state copy
+- [x] Add an automated published-site/E2E assertion that the Dodgers first-load affiliate value is empty and no affiliate panel renders before explicit selection
+- [x] Resolve the contradictory hard-refresh versus cache-busted live behavior for default affiliate selection
+- [x] Add a reproducible deployed error-state verification and a published-UI assertion for source-badge spacing
+- [x] Add an actual automated deployed-site/E2E test against the published Dodgers Overview
+- [x] Identify and document the root cause of the hard-refresh versus cache-busted affiliate-selection difference
+- [x] Create a reproducible deployed affiliate-error verification and deterministic published badge-spacing assertion
+- [x] Prove the hard-refresh versus cache-busted mismatch with asset/version evidence or startup-event tracing
+- [x] Add a reproducible controlled local path that forces the affiliate error state and verifies the humanized copy
+- [x] If production error forcing is unsupported, document that limitation explicitly and scope validation to controlled preview/local coverage
+- [x] Trace startup affiliate-selection events and localStorage/recent-history state during a hard refresh versus cache-busted load
+- [x] Add a focused regression or reproducible script showing the prior Oklahoma City auto-selection condition and confirming it no longer occurs
+- [x] Add a deterministic runtime trace or automated script logging startup affiliate-selection events and recent-history/localStorage state for hard-refresh and cache-busted loads
+- [x] Document the exact runtime cause of any Oklahoma City auto-selection discrepancy with event, storage, or asset evidence
+- [x] Capture a deterministic problematic-load artifact containing startup affiliate events, recent-history/localStorage contents, and served asset hashes (historical screenshot unavailable; current-build trace captured instead)
+- [x] Compare the problematic-load artifact with the corrected-load Playwright trace and document the exact causal difference (exact historical cause remains unprovable; limitation documented)
+- [x] Scope the historical hard-refresh task accurately: the original bad state is unreproducible, and only the corrected-build runtime trace is available
+- [x] Keep the current-build Playwright trace for startup events, recent-history reads, selected affiliate value, and live asset markers in the QA record
+- [x] Do not claim an exact historical root cause unless the original bad state is reproduced with equivalent runtime evidence
