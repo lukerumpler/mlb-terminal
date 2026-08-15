@@ -16,6 +16,7 @@ import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllT
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt } from '../lib/formatting.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
+import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
 
 // FIX: Global tooltip config — z-index 9999 prevents clip behind sibling panels
 const TT = {
@@ -68,7 +69,13 @@ function NcaaWatchPanel() {
   const [rankings, setRankings] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
-
+  const [retryToken, setRetryToken] = useState(0);
+  useEffect(() => {
+    const onProviderRetry = event => { if (event.detail?.provider === 'ncaa') setRetryToken(token => token + 1); };
+    window.addEventListener('skip-provider-retry', onProviderRetry);
+    return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
+  }, []);
+  
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -91,7 +98,7 @@ function NcaaWatchPanel() {
       if (alive) setLoading(false);
     })();
     return () => { alive = false; };
-  }, []);
+  }, [retryToken]);
 
   const liveOrRecent = useMemo(() => {
     const filtered = games.filter(g => g && (g.status === 'live' || g.status === 'final'));
@@ -1664,9 +1671,10 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
           )}
         </div>
       </Panel>
-      {feedFreshnessSettings && (
+      {feedFreshnessSettings && <>
+        <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
-      )}
+      </>}
       <Panel title="Roster Insight Defaults" accent={C.teal}>
         <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>

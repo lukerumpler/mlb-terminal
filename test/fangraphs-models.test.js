@@ -40,7 +40,7 @@ describe('Overview model freshness and retry contract', () => {
     expect(overviewSource).toContain('getTeamModelSources');
     expect(overviewSource).toContain('FanGraphs');
     expect(overviewSource).toContain('retrieved');
-    expect(overviewSource).toContain('setFeedRetryToken');
+    expect(overviewSource).toContain('setMlbRetryToken');
     expect(overviewSource).toContain('>RETRY</button>');
   });
 });

@@ -22,6 +22,7 @@ import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
+import { buildReconciliationRows, buildDataQualityPayload, downloadDataQualityExport } from '../lib/dataQuality.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
 import ScoutingGradesPreview from '../components/ScoutingGradesPreview.jsx';
@@ -1874,6 +1875,40 @@ function ProfileStatusState({ status = 'Unavailable', message, detail }) {
 function formatBoxscoreRate(value, digits = 3) {
   return value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits);
 }
+export function ReconciliationPanel({ player }) {
+  const isPitcher = Boolean(player?.isPitcher);
+  const boxscore = player?.boxscoreSplits;
+  const aggregate = player?.stats || {};
+  const boxscoreRows = isPitcher ? (boxscore?.pitching || []) : (boxscore?.batting || []);
+  const all = boxscoreRows.find(row => row.label === 'All');
+  const rows = buildReconciliationRows({ aggregate, boxscore: all, isPitcher });
+  const payload = buildDataQualityPayload({ player, rows, context: 'Player Profile reconciliation' });
+  const hasBoxscore = boxscore?.status === 'live' && Boolean(all);
+  const filenameBase = `skip-${String(player?.fullName || player?.name || 'player').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'player'}-reconciliation-${player?.statSeason || 'current'}`;
+  return (
+    <Panel title="Aggregate vs Boxscore Reconciliation" accent={C.purple} badge={hasBoxscore ? 'Verified comparison' : 'Unavailable'}>
+      <div className="skip-reconciliation-toolbar">
+        <div className="skip-reconciliation-copy">Compares MLB season aggregates with the most recent official boxscore window. Variances are shown, not silently corrected.</div>
+        <div className="skip-reconciliation-actions">
+          <button type="button" onClick={() => downloadDataQualityExport(payload, 'csv', filenameBase)} disabled={!rows.length}>CSV</button>
+          <button type="button" onClick={() => downloadDataQualityExport(payload, 'json', filenameBase)} disabled={!rows.length}>JSON</button>
+        </div>
+      </div>
+      {!hasBoxscore ? (
+        <div className="skip-reconciliation-empty" role="status">
+          <strong>Boxscore comparison unavailable</strong>
+          <span>{boxscore?.reason || 'No verified official boxscore window is available for this player.'}</span>
+        </div>
+      ) : (
+        <>
+          <div className="skip-long-table"><table className="skip-profile-splits-table skip-reconciliation-table"><thead><tr><th>Metric</th><th>Aggregate</th><th>Boxscore</th><th>Variance</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.metric}><td>{row.metric}</td><td>{row.aggregate == null ? '—' : row.aggregate}</td><td>{row.boxscore == null ? '—' : row.boxscore}</td><td>{row.variance == null ? '—' : row.variance > 0 ? `+${row.variance}` : row.variance}</td><td><span className={`skip-reconciliation-status is-${row.status}`}>{row.status === 'match' ? 'Match' : row.status === 'variance' ? 'Variance' : 'Incomplete'}</span></td></tr>)}</tbody></table></div>
+          <div className="skip-profile-source-strip">Aggregate: {payload.sources.aggregate.source} · retrieved {payload.sources.aggregate.retrievedAt ? new Date(payload.sources.aggregate.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'} · Boxscores: {payload.sources.boxscore.source} · retrieved {payload.sources.boxscore.retrievedAt ? new Date(payload.sources.boxscore.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 export function BoxscoreSplitPanel({ player }) {
   const data = player?.boxscoreSplits;
   const isPitcher = Boolean(player?.isPitcher);
@@ -2255,6 +2290,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
           {activeTab === 'splits' && (
             <div className="skip-profile-tab-grid splits-grid">
+              <ReconciliationPanel player={player} />
               <BoxscoreSplitPanel player={player} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>

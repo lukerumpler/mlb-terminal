@@ -764,6 +764,8 @@ export async function loadFullPlayer(person, season = SEASON) {
     contractData:  contractRaw,
     handednessSplits: handednessResult,
     teamFinancials,
+    aggregateSource: 'MLB Stats API season stats',
+    aggregateRetrievedAt: new Date().toISOString(),
     boxscoreSplits: await boxscoreSplitsPromise,
   };
 }

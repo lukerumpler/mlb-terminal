@@ -16,6 +16,7 @@ import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
 import { readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache } from '../lib/teamDataCache.js';
+import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -537,7 +538,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamSavantSource, setTeamSavantSource] = useState('');
   const [teamSavantState, setTeamSavantState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
-  const [feedRetryToken, setFeedRetryToken] = useState(0);
+  const [mlbRetryToken, setMlbRetryToken] = useState(0);
+  const [fangraphsRetryToken, setFangraphsRetryToken] = useState(0);
+  const [savantRetryToken, setSavantRetryToken] = useState(0);
+  const [rosterInsightsRetryToken, setRosterInsightsRetryToken] = useState(0);
+  useEffect(() => {
+    const onProviderRetry = event => {
+      const provider = event.detail?.provider;
+      if (provider === 'mlb') setMlbRetryToken(token => token + 1);
+      if (provider === 'fangraphs') setFangraphsRetryToken(token => token + 1);
+      if (provider === 'savant') setSavantRetryToken(token => token + 1);
+      if (provider === 'roster-insights') setRosterInsightsRetryToken(token => token + 1);
+    };
+    window.addEventListener('skip-provider-retry', onProviderRetry);
+    return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
+  }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
   const [skipPlayoffEstimate, setSkipPlayoffEstimate] = useState(null);
@@ -723,7 +738,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setTeamSplitRows([]);
     getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => { if (alive) setTeamSplitRows(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setTeamSplitRows([]); });
     return () => { alive = false; };
-  }, [teamBase?.id, feedRetryToken]);
+  }, [teamBase?.id, mlbRetryToken]);
   useEffect(() => {
     let alive = true;
     const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
@@ -775,7 +790,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
-    }, [teamBase?.abbr, feedRetryToken, liveTeamPlayers]);
+    }, [teamBase?.abbr, savantRetryToken, liveTeamPlayers]);
   useEffect(() => {
     let alive = true;
     setTeamBattedBallAgainstRows([]);
@@ -783,11 +798,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive) setTeamBattedBallAgainstRows(Array.isArray(rows) ? rows : []);
     }).catch(() => { if (alive) setTeamBattedBallAgainstRows([]); });
     return () => { alive = false; };
-  }, [teamBase?.abbr, feedRetryToken]);
+  }, [teamBase?.abbr, savantRetryToken]);
   useEffect(() => {
     let alive = true;
     setTeamModelState('loading');
-    setSkipPlayoffEstimate(null);
     getTeamModelSources(teamBase?.abbr, CURRENT_SEASON).then(async data => {
       if (!alive) return;
       if (data?.teamWar == null) {
@@ -800,13 +814,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamModelData(data);
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
     }).catch(() => { if (alive) setTeamModelState('error'); });
+    return () => { alive = false; };
+  }, [teamBase?.abbr, fangraphsRetryToken]);
+  useEffect(() => {
+    let alive = true;
+    setSkipPlayoffEstimate(null);
     getSkipPlayoffOddsEstimate(teamBase?.id, CURRENT_SEASON).then(estimate => {
       if (alive) setSkipPlayoffEstimate(estimate);
     }).catch(() => {
       if (alive) setSkipPlayoffEstimate({ status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() });
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr, teamBase?.id, feedRetryToken]);
+  }, [teamBase?.id, mlbRetryToken]);
 
   useEffect(() => {
     let alive = true;
@@ -838,7 +857,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(() => { if (alive) setAiInsightsState('error'); });
     return () => { alive = false; };
-  }, [liveTeamData, team, liveTeamPlayers]);
+  }, [liveTeamData, team, liveTeamPlayers, rosterInsightsRetryToken]);
   const displayedInsights = aiInsights || rosterInsights;
   const playoffOddsValue = teamModelData?.playoffOdds != null
     ? `${Number(teamModelData.playoffOdds).toFixed(1)}%`
@@ -952,7 +971,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     });
 
     return ()=>{ alive=false; window.clearTimeout(feedTimeout); };
-  },[teamBase?.id, feedRetryToken]);
+  },[teamBase?.id, mlbRetryToken]);
 
   useEffect(() => {
     let alive = true;
@@ -977,6 +996,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [teamBase?.abbr, taxHistorySeasons]);
 
+  const exportTeamDataQuality = format => {
+    const payload = buildTeamDataQualityPayload({ team, liveTeamData, teamModelData, teamSavantData, liveTeamDataUpdatedAt, teamPlayersUpdatedAt, teamBattedBallData });
+    const filename = `skip-${String(team?.name || teamBase?.name || 'team').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'team'}-data-quality-${CURRENT_SEASON}`;
+    downloadTeamDataQualityExport(payload, format, filename);
+  };
   const exportTeamOverviewPdf = async () => {
     if (!overviewRef.current || pdfExportState === 'loading') return;
     setPdfExportState('loading');
@@ -1142,6 +1166,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
+          <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('csv')} aria-label="Download current team data as CSV"
+            style={{height:30,padding:'0 9px',border:`1px solid ${C.tealMid}`,borderRadius:7,background:C.tealSoft,color:C.teal,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>CSV</button>
+          <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('json')} aria-label="Download current team data as JSON"
+            style={{height:30,padding:'0 9px',border:`1px solid ${C.tealMid}`,borderRadius:7,background:C.tealSoft,color:C.teal,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>JSON</button>
           <button type="button" data-export-ignore onClick={exportTeamOverviewPdf} disabled={pdfExportState === 'loading'}
             aria-label="Download the current team overview as a PDF"
             style={{height:30,padding:'0 10px',border:`1px solid ${C.amberMid}`,borderRadius:7,background:pdfExportState==='ready'?C.tealSoft:pdfExportState==='error'?C.rustSoft:C.amberSoft,color:pdfExportState==='ready'?C.teal:pdfExportState==='error'?C.rust:C.amberDark,cursor:pdfExportState==='loading'?'wait':'pointer',opacity:pdfExportState==='loading'?.7:1,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>
@@ -1150,7 +1178,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div role="status" aria-live="polite" style={{display:'flex',alignItems:'center',gap:7,padding:'6px 9px',borderRadius:7,background:aggregateSurface,border:`1px solid ${aggregateBorder}`}}>
             <span style={{width:6,height:6,borderRadius:'50%',background:aggregateTone,animation:liveTeamDataMode === 'loading' ? 'pulse 1.2s ease-in-out infinite' : 'none'}} />
             <span style={px({fontSize:10,color:aggregateTone,fontWeight:700,letterSpacing:'.06em'})}>{aggregateStatus}</span>
-            {liveTeamError && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamDataMode('loading');setFeedRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
+            {liveTeamError && <button type="button" onClick={()=>{setLiveTeamError(false);setLiveTeamDataMode('loading');setMlbRetryToken(token=>token+1);}} style={{border:0,background:'transparent',color:C.rust,fontSize:10,fontWeight:800,cursor:'pointer',padding:0}}>RETRY</button>}
           </div>
           </div>
         </div>
