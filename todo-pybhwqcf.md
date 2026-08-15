@@ -64,4 +64,4 @@
 - [x] Restrict the provider-failure hook to an explicit staging environment flag and reject it in development and production
 - [x] Add a regression assertion for development denial as well as production denial
 - [x] Save a new checkpoint after the staging-gate correction
-- [ ] Save a new webdev checkpoint containing the explicit staging-only gate, updated tests, managed-secret configuration, and hook documentation
+- [x] Save a new webdev checkpoint containing the explicit staging-only gate, updated tests, managed-secret configuration, and hook documentation
