@@ -16,6 +16,7 @@ import CommandPalette from '../client/src/components/CommandPalette.jsx';
 import { routeNaturalLanguageSearch } from '../client/src/api/naturalSearch.js';
 import { searchPlayers } from '../client/src/api/mlb.js';
 import { getTeamAggregateWar } from '../client/src/api/mlb.js';
+import { SEARCH_ANALYTICS_STORAGE_KEY } from '../client/src/lib/searchAnalytics.js';
 import { readFileSync } from 'node:fs';
 
 const chartSource = readFileSync('/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx', 'utf8');
@@ -24,6 +25,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe('natural-language search', () => {
@@ -78,6 +80,21 @@ describe('natural-language search', () => {
     await user.type(screen.getByRole('combobox', { name: 'Search pages, prospects, or ask SKIP' }), 'unknown baseball thing');
     await user.click(screen.getByRole('button', { name: 'ASK SKIP' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Natural-language search is unavailable.');
+  });
+
+  it('shows common queries and shortcut hints from local analytics, with a clear action', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SEARCH_ANALYTICS_STORAGE_KEY, JSON.stringify([{ query:'dodgers team war', count:3, lastUsedAt:Date.now(), intent:'team', metric:'WAR', tab:'overview', status:'resolved' }]));
+    render(<CommandPalette onNavigate={vi.fn()} onOpenProspect={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByRole('region', { name:'Common search queries' })).toBeInTheDocument();
+    expect(screen.getByText('Prioritize a WAR shortcut')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name:'Clear local search analytics' }));
+    expect(screen.queryByRole('region', { name:'Common search queries' })).not.toBeInTheDocument();
+    localStorage.setItem(SEARCH_ANALYTICS_STORAGE_KEY, JSON.stringify([{ query:'dodgers team war', count:3, lastUsedAt:Date.now(), intent:'team', metric:'WAR', tab:'overview', status:'resolved' }]));
+    window.dispatchEvent(new CustomEvent('skip-search-analytics-updated'));
+    expect(await screen.findByRole('region', { name:'Common search queries' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name:/dodgers team war/i }));
+    expect(screen.getByRole('combobox', { name:'Search pages, prospects, or ask SKIP' })).toHaveValue('dodgers team war');
   });
 });
 
