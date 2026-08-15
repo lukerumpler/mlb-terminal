@@ -1351,8 +1351,33 @@ export async function getTeamRoster(teamId, season = SEASON, rosterType = 'activ
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function getSavantData(year = SEASON) {
-  const arr = await fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${year}`);
-  return Array.isArray(arr) ? arr : null;
+  const [expectedArr, scArr] = await Promise.all([
+    fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${year}`),
+    fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${year}`),
+  ]);
+  const exp = Array.isArray(expectedArr) ? expectedArr : [];
+  const statcast = Array.isArray(scArr) ? scArr : [];
+  if (!exp.length && !statcast.length) return null;
+  // Merge by player_id / id
+  const map = new Map();
+  exp.forEach(row => {
+    const id = String(row.player_id ?? row.id ?? '');
+    if (id) map.set(id, { ...row });
+  });
+  statcast.forEach(row => {
+    const id = String(row.player_id ?? row.id ?? '');
+    if (id) {
+      const existing = map.get(id) || {};
+      map.set(id, { ...existing, ...row });
+    } else {
+      exp.push(row);
+    }
+  });
+  const merged = Array.from(map.values());
+  if (expectedArr?.__providerMeta) {
+    try { Object.defineProperty(merged, '__providerMeta', { value: expectedArr.__providerMeta, enumerable: false, configurable: true }); } catch {}
+  }
+  return merged.length ? merged : null;
 }
 
 export async function getTeamExitVelocity(teamAbbr, year = SEASON) {
@@ -1699,9 +1724,9 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
       expectedBA: average('est_ba'),
       expectedSLG: average('est_slg'),
       expectedWOBA: average('est woba') ?? average('est_woba'),
-      exitVelocity: average('exit_velocity_avg'),
-      hardHitPercent: average('hard_hit_percent'),
-      barrelPercent: average('brl_percent'),
+      exitVelocity: average('exit_velocity_avg') ?? average('launch_speed'),
+      hardHitPercent: average('hard_hit_percent') ?? average('hard_hit_pct'),
+      barrelPercent: average('brl_percent') ?? average('barrel_percent') ?? average('barrels_per_bbe_percent'),
       launchAngle: average('launch_angle'),
     };
   } catch {

@@ -11244,3 +11244,6 @@
 - [x] Fix affiliate metric mapping for OPS, HR, ERA, and K on OverviewPage to prevent mixed-up or mismatched stats.
 - [x] Add regression tests for affiliate stats and badge separation.
 - [x] Run release validation, review preview, and publish release.
+- [x] Fix Savant metric extraction in client/src/api/mlb.js for expectedBA, expectedSLG, hardHitPercent, and barrelPercent.
+- [x] Add regression tests for Savant metrics extraction.
+- [x] Run release validation, review preview, and publish release.
