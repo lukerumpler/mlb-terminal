@@ -955,3 +955,14 @@
   .skip-data-controls label:nth-child(3) { flex-basis:100%; }
   .skip-data-controls > button { align-self:flex-end; }
 }
+
+.skip-boxscore-presets { display:flex; align-items:center; flex-wrap:wrap; gap:6px; flex:1 1 100%; padding-top:2px; }
+.skip-boxscore-presets input, .skip-boxscore-presets select { height:28px; min-width:120px; padding:0 7px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:500 10px/1 'Plus Jakarta Sans',sans-serif; }
+.skip-boxscore-presets button, .skip-boxscore-pagination button { height:28px; padding:0 8px; border:1px solid var(--teal-mid); border-radius:6px; background:var(--teal-soft); color:var(--teal); font:800 8.5px/1 'DM Mono',monospace; cursor:pointer; }
+.skip-boxscore-presets button:disabled, .skip-boxscore-pagination button:disabled { opacity:.5; cursor:not-allowed; }
+.skip-boxscore-pagination { display:flex; align-items:center; justify-content:center; gap:10px; padding:8px 0 2px; color:var(--text-3); font:700 9px/1 'DM Mono',monospace; }
+@media (max-width:720px) {
+  .skip-boxscore-presets { align-items:stretch; }
+  .skip-boxscore-presets input, .skip-boxscore-presets select { flex:1 1 100%; min-width:0; }
+  .skip-boxscore-presets button { flex:1 1 auto; }
+}
