@@ -11234,3 +11234,7 @@
 - [x] Optimize client API request de-duplication and memory cache cleanup.
 - [x] Add performance regression test coverage and verify build outputs.
 - [x] Run release validation and publish the optimized release.
+- [x] Reorder Overview sections so unavailable and coverage-gap panels are positioned toward the bottom.
+- [x] Preserve live, cached, and loading provenance badges and loading states.
+- [x] Add layout regression tests and verify desktop/mobile rendering.
+- [x] Run full release validation, review preview, and publish release.
