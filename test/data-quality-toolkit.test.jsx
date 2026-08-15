@@ -4,6 +4,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { buildReconciliationRows, buildDataQualityPayload, buildDataQualityCsv, buildTeamDataQualityPayload, buildTeamDataQualityCsv } from '../client/src/lib/dataQuality.js';
 import DataSourceStatusCenter from '../client/src/components/DataSourceStatusCenter.jsx';
+import { filterAndSortNcaaGames } from '../client/src/pages/OtherPages.jsx';
+import { filterAndSortBoxscoreGames } from '../client/src/pages/PlayersPage.jsx';
 
 describe('data-quality reconciliation and export helpers', () => {
   it('classifies verified aggregate and boxscore metrics without inventing missing values', () => {
@@ -50,6 +52,26 @@ describe('data-quality reconciliation and export helpers', () => {
   });
 });
 
+describe('date/team navigation helpers', () => {
+  it('filters and sorts NCAA games by date and team', () => {
+    const games = [
+      { startDate: '2026-05-03', away: { name: 'Beta' }, home: { name: 'Alpha' } },
+      { startDate: '2026-05-01', away: { name: 'Gamma' }, home: { name: 'Delta' } },
+    ];
+    expect(filterAndSortNcaaGames(games, { date: '2026-05-03' })).toHaveLength(1);
+    expect(filterAndSortNcaaGames(games, { team: 'delta' })[0].away.name).toBe('Gamma');
+    expect(filterAndSortNcaaGames(games, { sort: 'date-asc' })[0].startDate).toBe('2026-05-01');
+  });
+  it('filters and sorts MLB boxscore games by date and opponent', () => {
+    const games = [
+      { date: '2026-05-03T00:00:00Z', opponent: 'Beta', batting: { ops: .810 } },
+      { date: '2026-05-01T00:00:00Z', opponent: 'Alpha', batting: { ops: .720 } },
+    ];
+    expect(filterAndSortBoxscoreGames(games, { date: '2026-05-01' })[0].opponent).toBe('Alpha');
+    expect(filterAndSortBoxscoreGames(games, { team: 'beta', sort: 'team-desc' })[0].batting.ops).toBe(.810);
+  });
+});
+
 describe('data-source status center', () => {
   it('shows independent providers and dispatches only the selected retry event', async () => {
     const user = userEvent.setup();
@@ -61,8 +83,11 @@ describe('data-source status center', () => {
     expect(screen.getByText('NCAA feed')).toBeInTheDocument();
     expect(screen.getByText('FanGraphs')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry FanGraphs' }));
+    expect(screen.getByText('Waiting for provider response…')).toBeInTheDocument();
     expect(retry).toHaveBeenCalledTimes(1);
     expect(retry.mock.calls[0][0].detail.provider).toBe('fangraphs');
+    window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'fangraphs', message: 'FanGraphs is temporarily unavailable.' } }));
+    expect(await screen.findByText(/FanGraphs is temporarily unavailable/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry NCAA feed' }));
     expect(retry.mock.calls[1][0].detail.provider).toBe('ncaa');
     await user.click(screen.getByRole('button', { name: 'Retry MLB boxscore feed' }));

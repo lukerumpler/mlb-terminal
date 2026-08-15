@@ -176,3 +176,10 @@
 - [x] Refactor MLB, FanGraphs, Savant, boxscore, and roster-insights retries into provider-specific tokens/effects rather than one shared Overview refresh token.
 - [x] Wire the NCAA retry control to the actual NcaaWatchPanel consumer and prove each provider retry refreshes only its targeted source panel.
 - [x] Add regression coverage for team exports and isolated provider retry behavior, then rerun full validation and responsive verification.
+
+- [x] Add date and team filtering for NCAA data navigation.
+- [x] Add date and team filtering for MLB boxscore data navigation.
+- [x] Add sorting controls for NCAA and MLB boxscore records by date and team.
+- [x] Add loading animations and clear error messages for provider status and retry controls.
+- [x] Add regression tests for filters, sorting, loading, retry success, and retry error states.
+- [x] Verify desktop/mobile presentation and publish the validated update.

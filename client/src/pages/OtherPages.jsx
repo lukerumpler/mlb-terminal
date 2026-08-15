@@ -64,12 +64,33 @@ function TradeSortableTh({ label, k, align = 'right', activeKey, ascending, onSo
 }
 
 /* ─── NCAA Watch — live D1 college baseball panel ──────────────────── */
+export function filterAndSortNcaaGames(games, { date = '', team = '', sort = 'date-desc' } = {}) {
+  const normalizedTeam = String(team || '').trim().toLowerCase();
+  return (Array.isArray(games) ? games : [])
+    .filter(game => {
+      const gameDate = String(game?.startDate || game?.startTime || '').slice(0, 10);
+      const teams = [game?.away?.name, game?.away?.short, game?.home?.name, game?.home?.short].filter(Boolean).join(' ').toLowerCase();
+      return (!date || gameDate === date) && (!normalizedTeam || teams.includes(normalizedTeam));
+    })
+    .sort((a, b) => {
+      const dateA = String(a?.startDate || a?.startTime || '');
+      const dateB = String(b?.startDate || b?.startTime || '');
+      const teamA = String(a?.away?.name || a?.away?.short || '').toLowerCase();
+      const teamB = String(b?.away?.name || b?.away?.short || '').toLowerCase();
+      if (sort === 'team-asc') return teamA.localeCompare(teamB);
+      if (sort === 'team-desc') return teamB.localeCompare(teamA);
+      return sort === 'date-asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    });
+}
 function NcaaWatchPanel() {
   const [games,    setGames]    = useState([]);
   const [rankings, setRankings] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [dateFilter, setDateFilter] = useState('');
+  const [teamFilter, setTeamFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('date-desc');
   useEffect(() => {
     const onProviderRetry = event => { if (event.detail?.provider === 'ncaa') setRetryToken(token => token + 1); };
     window.addEventListener('skip-provider-retry', onProviderRetry);
@@ -88,9 +109,12 @@ function NcaaWatchPanel() {
         ]);
         if (!alive) return;
         setGames(gamesRes.status === 'fulfilled' ? (gamesRes.value || []) : []);
+        window.dispatchEvent(new CustomEvent(gamesRes.status === 'fulfilled' ? 'skip-provider-retry-success' : 'skip-provider-retry-error', { detail: { provider: 'ncaa', message: gamesRes.status === 'fulfilled' ? 'NCAA data refreshed.' : 'NCAA scoreboard could not be refreshed.' } }));
         setRankings(ranksRes.status === 'fulfilled' ? (ranksRes.value || []).slice(0, 5) : []);
         if (gamesRes.status === 'rejected' && ranksRes.status === 'rejected') {
-          setError('Could not reach the NCAA API right now.');
+          const message = 'Could not reach the NCAA API right now.';
+          setError(message);
+          window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'ncaa', message } }));
         }
       } catch (err) {
         if (alive) setError(err.message || 'Could not load college baseball data.');
@@ -100,11 +124,7 @@ function NcaaWatchPanel() {
     return () => { alive = false; };
   }, [retryToken]);
 
-  const liveOrRecent = useMemo(() => {
-    const filtered = games.filter(g => g && (g.status === 'live' || g.status === 'final'));
-    // Live games first, then most recent finals
-    return filtered.sort((a, b) => (a.status === 'live' ? -1 : 0) - (b.status === 'live' ? -1 : 0)).slice(0, 5);
-  }, [games]);
+  const liveOrRecent = useMemo(() => filterAndSortNcaaGames(games, { date: dateFilter, team: teamFilter, sort: sortOrder }).filter(g => g && (g.status === 'live' || g.status === 'final')).slice(0, 12), [games, dateFilter, teamFilter, sortOrder]);
 
   return (
     <Panel title="NCAA Watch" accent={C.teal} badge="D1 Baseball">
@@ -123,6 +143,12 @@ function NcaaWatchPanel() {
       {!loading && !error && (
         <>
           {/* Live / recent scores */}
+          <div className="skip-data-controls" aria-label="NCAA score filters">
+            <label>Date<input type="date" value={dateFilter} onChange={event => setDateFilter(event.target.value)} /></label>
+            <label>Team<input type="search" value={teamFilter} onChange={event => setTeamFilter(event.target.value)} placeholder="Search team" /></label>
+            <label>Sort<select value={sortOrder} onChange={event => setSortOrder(event.target.value)}><option value="date-desc">Newest date</option><option value="date-asc">Oldest date</option><option value="team-asc">Team A–Z</option><option value="team-desc">Team Z–A</option></select></label>
+            {(dateFilter || teamFilter) && <button type="button" onClick={() => { setDateFilter(''); setTeamFilter(''); }}>Clear</button>}
+          </div>
           <div style={{ padding:'8px 14px 4px' }}>
             <div style={sans({ fontSize:9.5, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:C.text3 })}>
               Scores

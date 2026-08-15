@@ -939,3 +939,19 @@
     padding-right:4px !important;
   }
 }
+
+/* NCAA and MLB boxscore navigation controls */
+.skip-data-controls { display:flex; align-items:flex-end; flex-wrap:wrap; gap:8px; padding:8px 14px; border-bottom:0.5px solid var(--border-light); background:var(--surface-2); }
+.skip-data-controls label { display:flex; flex-direction:column; gap:4px; min-width:120px; color:var(--text-3); font:700 8.5px/1 'DM Mono',monospace; letter-spacing:.05em; text-transform:uppercase; }
+.skip-data-controls input, .skip-data-controls select { min-width:0; height:30px; padding:0 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:500 10px/1 'Plus Jakarta Sans',sans-serif; }
+.skip-data-controls input:focus, .skip-data-controls select:focus { outline:2px solid color-mix(in srgb, var(--teal) 35%, transparent); outline-offset:1px; border-color:var(--teal); }
+.skip-data-controls > button { height:30px; padding:0 9px; border:1px solid var(--teal-mid); border-radius:6px; background:var(--teal-soft); color:var(--teal); cursor:pointer; font:800 9px/1 'DM Mono',monospace; }
+.skip-status-retry-spinner { display:inline-block; width:9px; height:9px; margin-right:3px; border:1.5px solid currentColor; border-right-color:transparent; border-radius:50%; vertical-align:-1px; animation:skip-status-spin .7s linear infinite; }
+@keyframes skip-status-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .skip-status-retry-spinner { animation:none; } }
+@media (max-width:720px) {
+  .skip-data-controls { align-items:stretch; }
+  .skip-data-controls label { flex:1 1 calc(50% - 8px); min-width:0; }
+  .skip-data-controls label:nth-child(3) { flex-basis:100%; }
+  .skip-data-controls > button { align-self:flex-end; }
+}

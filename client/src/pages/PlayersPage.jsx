@@ -1632,9 +1632,14 @@ function PlayersPage() {
     let alive = true;
     getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
       .then(boxscoreSplits => {
-        if (alive) setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+        if (alive) {
+          setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+          window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider: 'boxscore', message: 'MLB boxscore data refreshed.' } }));
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'boxscore', message: 'MLB boxscore data could not be refreshed. The previous verified state remains visible.' } }));
+      });
     return () => { alive = false; };
   }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
@@ -1926,10 +1931,33 @@ export function ReconciliationPanel({ player }) {
   );
 }
 
+export function filterAndSortBoxscoreGames(games, { date = '', team = '', sort = 'date-desc' } = {}) {
+  const normalizedTeam = String(team || '').trim().toLowerCase();
+  return (Array.isArray(games) ? games : [])
+    .filter(game => {
+      const gameDate = String(game?.date || '').slice(0, 10);
+      const opponent = String(game?.opponent || '').toLowerCase();
+      return (!date || gameDate === date) && (!normalizedTeam || opponent.includes(normalizedTeam));
+    })
+    .sort((a, b) => {
+      const dateA = String(a?.date || '');
+      const dateB = String(b?.date || '');
+      const teamA = String(a?.opponent || '').toLowerCase();
+      const teamB = String(b?.opponent || '').toLowerCase();
+      if (sort === 'team-asc') return teamA.localeCompare(teamB);
+      if (sort === 'team-desc') return teamB.localeCompare(teamA);
+      return sort === 'date-asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    });
+}
+
 export function BoxscoreSplitPanel({ player }) {
   const data = player?.boxscoreSplits;
   const isPitcher = Boolean(player?.isPitcher);
   const rows = isPitcher ? (data?.pitching || []) : (data?.batting || []);
+  const [dateFilter, setDateFilter] = useState('');
+  const [teamFilter, setTeamFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('date-desc');
+  const recentGames = useMemo(() => filterAndSortBoxscoreGames(data?.recentGames, { date: dateFilter, team: teamFilter, sort: sortOrder }), [data?.recentGames, dateFilter, teamFilter, sortOrder]);
   const title = isPitcher ? 'Boxscore ERA Splits' : 'Boxscore OPS Splits';
   const detail = isPitcher
     ? 'Earned runs and innings are aggregated from official MLB game boxscores in the recent sample.'
@@ -1942,7 +1970,17 @@ export function BoxscoreSplitPanel({ player }) {
   }
   return <Panel title={title} accent={C.teal} badge={`${data.games} games`}>
     <div className="skip-profile-source-strip">{data.source} · {data.windowLabel || 'Recent completed games'} · retrieved {data.retrievedAt ? new Date(data.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
+    <div className="skip-data-controls" aria-label="MLB boxscore game filters">
+      <label>Date<input type="date" value={dateFilter} onChange={event => setDateFilter(event.target.value)} /></label>
+      <label>Team<input type="search" value={teamFilter} onChange={event => setTeamFilter(event.target.value)} placeholder="Search opponent" /></label>
+      <label>Sort<select value={sortOrder} onChange={event => setSortOrder(event.target.value)}><option value="date-desc">Newest date</option><option value="date-asc">Oldest date</option><option value="team-asc">Team A–Z</option><option value="team-desc">Team Z–A</option></select></label>
+      {(dateFilter || teamFilter) && <button type="button" onClick={() => { setDateFilter(''); setTeamFilter(''); }}>Clear</button>}
+    </div>
     <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th>Split</th><th>G</th>{isPitcher ? <><th>GS</th><th>IP</th><th>ER</th><th>K</th><th>BB</th><th>ERA</th><th>WHIP</th></> : <><th>PA</th><th>AB</th><th>H</th><th>HR</th><th>BB</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th></>}</tr></thead><tbody>{rows.map(row => <tr key={row.label}><td>{row.label}</td><td>{row.games}</td>{isPitcher ? <><td>{row.gamesStarted || '—'}</td><td>{row.inningsPitched ? row.inningsPitched.toFixed(1) : '—'}</td><td>{row.earnedRuns || '—'}</td><td>{row.strikeOuts || '—'}</td><td>{row.walksAllowed || '—'}</td><td>{formatBoxscoreRate(row.era, 2)}</td><td>{formatBoxscoreRate(row.whip, 3)}</td></> : <><td>{row.plateAppearances || '—'}</td><td>{row.atBats || '—'}</td><td>{row.hits || '—'}</td><td>{row.homeRuns || '—'}</td><td>{row.walks || '—'}</td><td>{formatBoxscoreRate(row.avg)}</td><td>{formatBoxscoreRate(row.obp)}</td><td>{formatBoxscoreRate(row.slg)}</td><td>{formatBoxscoreRate(row.ops)}</td></>}</tr>)}</tbody></table></div>
+    {recentGames.length > 0 && <div className="skip-recent-boxscore-games" aria-label="Recent MLB boxscore games">
+      <div className="skip-profile-panel-note">Filtered recent games: {recentGames.length}</div>
+      <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr><th>Date</th><th>Opponent</th><th>{isPitcher ? 'ERA' : 'OPS'}</th></tr></thead><tbody>{recentGames.map(game => <tr key={game.gamePk || `${game.date}-${game.opponent}`}><td>{game.date ? new Date(game.date).toLocaleDateString() : '—'}</td><td>{game.opponent || 'Team unavailable'}</td><td>{formatBoxscoreRate(isPitcher ? game.pitching?.era : game.batting?.ops, isPitcher ? 2 : 3)}</td></tr>)}</tbody></table></div>
+    </div>}
     <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
   </Panel>;
 }
