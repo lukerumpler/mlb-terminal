@@ -35,5 +35,7 @@ describe('MLB-first team loading sequence', () => {
 
     render(<OverviewPage />);
     expect(screen.getByText(/LOADING MLB TEAM/i)).toBeInTheDocument();
+    expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('lad');
   });
 });

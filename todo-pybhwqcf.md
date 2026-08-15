@@ -22,3 +22,7 @@
 - [x] Do not overwrite or merge divergent branch changes until the canonical source of truth is identified
 - [x] Add a retry integration test that directly mocks or spies on getTeamSavantMetrics and related Savant helpers
 - [x] Move nightly-savant-refresh from 03:00 UTC to 09:00 UTC to reduce the risk of caching incomplete late West Coast game data
+- [x] Replace the raw affiliate `· error` subtitle state with humanized user-facing text
+- [x] Add reliable margin between Savant and FanGraphs source/status badges
+- [x] Ensure the MLB-level team overview initializes before minor-league affiliate data
+- [x] Add focused regression tests for all three Overview behaviors

@@ -58,5 +58,8 @@ describe('Savant metric display and source badge separation', () => {
     
     const xwobaLabel = await screen.findByText(/xwOBA/i);
     expect(xwobaLabel).toBeInTheDocument();
+    const badgeGroup = document.querySelector('.skip-overview-source-badges');
+    expect(badgeGroup).toBeInTheDocument();
+    expect(getComputedStyle(badgeGroup).gap).toBe('10px');
   });
 });
