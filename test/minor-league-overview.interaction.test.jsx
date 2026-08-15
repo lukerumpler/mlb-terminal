@@ -56,6 +56,7 @@ describe('Team Overview minor-league affiliate interaction', () => {
     resolveAffiliateOverview = null;
     getTeamAffiliates.mockClear();
     getMinorLeagueTeamOverview.mockClear();
+    getTeamSavantMetrics.mockClear();
   });
 
   it('selects the Giants and displays the Sacramento River Cats affiliate overview while keeping MLB context visible', async () => {
@@ -73,6 +74,7 @@ describe('Team Overview minor-league affiliate interaction', () => {
     expect(screen.getByText(/Affiliated with San Francisco Giants/)).toBeInTheDocument();
     expect(screen.getByText('0.742')).toBeInTheDocument();
     expect(screen.getByText('4.12')).toBeInTheDocument();
+    expect(getTeamSavantMetrics).toHaveBeenCalledWith('SAC', 2026);
   });
 
   it('shows the affiliate loading state before the live overview resolves', async () => {

@@ -4,7 +4,8 @@ import { getFeedFreshnessRows } from '../lib/feedFreshness.js';
 import { Panel } from './atoms.jsx';
 
 const PROVIDERS = [
-  { key: 'mlb', label: 'MLB Stats API', source: 'Official MLB schedule, standings, player, team, and boxscore feeds' },
+  { key: 'mlb', label: 'MLB Stats API', source: 'Official MLB schedule, standings, player, and team feeds' },
+  { key: 'boxscore', label: 'MLB boxscore feed', source: 'Official completed-game boxscores used for player OPS and ERA splits' },
   { key: 'fangraphs', label: 'FanGraphs', source: 'Team model and projection provider' },
   { key: 'savant', label: 'Baseball Savant', source: 'Statcast and batted-ball provider' },
   { key: 'ncaa', label: 'NCAA feed', source: 'College baseball scoreboard and rankings proxy' },

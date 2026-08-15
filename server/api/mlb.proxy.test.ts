@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import handler from "./mlb.js";
+import handler, { __resetMlbProxyStateForTests } from "./mlb.js";
 
 type MockResponse = {
   statusCode: number;
@@ -33,7 +33,10 @@ function request(query: string) {
   };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  __resetMlbProxyStateForTests();
+});
 
 describe("MLB proxy upstream protection", () => {
   it("coalesces identical concurrent cache misses into one upstream request", async () => {
@@ -54,6 +57,19 @@ describe("MLB proxy upstream protection", () => {
     expect(firstResponse.statusCode).toBe(200);
     expect(secondResponse.statusCode).toBe(200);
     expect(secondResponse.headers["X-Proxy-Cache"]).toBe("COALESCED");
+  });
+
+  it("avoids repeating an identical upstream failure during the short cooldown", async () => {
+    const fetchMock = vi.fn(async () => { throw Object.assign(new Error("upstream timeout"), { name: "TimeoutError" }); });
+    vi.stubGlobal("fetch", fetchMock);
+    const first = response();
+    await handler(request("/schedule?cooldown=one"), first);
+    const second = response();
+    await handler(request("/schedule?cooldown=one"), second);
+    expect(first.statusCode).toBe(504);
+    expect(second.statusCode).toBe(503);
+    expect(second.headers["Retry-After"]).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("passes through upstream Retry-After for throttled responses", async () => {

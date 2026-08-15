@@ -8,7 +8,7 @@ import {
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import { SEASON, TEAMS } from '../constants/data.js';
 import { SKIP_QUOTES } from '../constants/alerts.js';
-import { searchPlayers, loadFullPlayer } from '../api/mlb.js';
+import { searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
 import {
   computeKPIs, decisionScore, verdict, verdictColor,
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
@@ -17,7 +17,6 @@ import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx
 import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
-import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
@@ -1558,6 +1557,7 @@ function PlayersPage() {
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
+  const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
@@ -1620,6 +1620,23 @@ function PlayersPage() {
     if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const onProviderRetry = event => {
+      if (event.detail?.provider === 'boxscore') setBoxscoreRetryToken(token => token + 1);
+    };
+    window.addEventListener('skip-provider-retry', onProviderRetry);
+    return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
+  }, []);
+  useEffect(() => {
+    if (!player || boxscoreRetryToken === 0) return undefined;
+    let alive = true;
+    getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
+      .then(boxscoreSplits => {
+        if (alive) setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
     const onOpenExternalPlayer = e => {
       const detail = e.detail;
@@ -1929,15 +1946,39 @@ export function BoxscoreSplitPanel({ player }) {
     <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
   </Panel>;
 }
+export function buildRecentGameSeries(boxscoreSplits, metric = 'ops', limit = 10) {
+  const games = Array.isArray(boxscoreSplits?.recentGames) ? boxscoreSplits.recentGames : [];
+  return games.slice(0, limit).map(game => {
+    const raw = game?.batting?.[metric];
+    return raw == null || raw === '' ? null : Number(raw);
+  }).filter(Number.isFinite).reverse();
+}
+
+export function MetricSparkline({ values, tone }) {
+  const numeric = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
+  if (numeric.length < 2) return <div className="skip-summary-sparkline-unavailable">Last 10 games unavailable</div>;
+  const min = Math.min(...numeric);
+  const max = Math.max(...numeric);
+  const span = max - min || 1;
+  const points = numeric.map((value, index) => `${(index / (numeric.length - 1)) * 100},${28 - ((value - min) / span) * 22}`).join(' ');
+  return (
+    <div className="skip-summary-sparkline-wrap" aria-label={`Last ${numeric.length} games trend`}>
+      <svg className="skip-summary-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-hidden="true">
+        <polyline points={points} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span>Last {numeric.length} games</span>
+    </div>
+  );
+}
+
 function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
-  const [provenanceOpen, setProvenanceOpen] = useState(false);
-  const provenanceTriggerRef = useRef(null);
   const [expandedChart, setExpandedChart] = useState(null);
+  const [expandedSummary, setExpandedSummary] = useState(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
   const [noteText, setNoteText] = useState('');
   const [noteCategory, setNoteCategory] = useState('Scouting');
@@ -1984,15 +2025,6 @@ function PlayerProfile({ player, derived, onCompare }) {
     ['Statcast', Boolean(player.savant), 'Savant'],
     ['Contract', hasProfileContractMetadata, 'Spotrac'],
   ];
-  const profileProvenance = useMemo(() => [
-    { label:'Player identity', status:p?.id ? 'verified' : 'unavailable', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
-    { label:'Season statistics', status:(s?.gamesPlayed || s?.atBats || s?.inningsPitched) ? 'verified' : 'unavailable', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
-    { label:'Statcast metrics', status:player.savant ? 'verified' : 'unavailable', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
-    { label:'Tracking and pitch context', status:(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length) ? 'verified' : 'unavailable', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
-    { label:'Contract and service time', status:hasProfileContractMetadata ? 'verified' : 'unavailable', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
-    { label:'SKIP decision metrics', status:'estimated', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
-  ], [p, s, player]);
-
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
   // default amber for anyone outside that set rather than showing nothing.
@@ -2017,11 +2049,25 @@ function PlayerProfile({ player, derived, onCompare }) {
   const quickStats = player.isPitcher
     ? [['ERA',s.era?(+s.era).toFixed(2):'—'],['K',dashIfMissing(s.strikeOuts)],['W',dashIfMissing(s.wins)],['WHIP',s.whip?(+s.whip).toFixed(3):'—']]
     : [['AVG',fmt(s.avg)],['HR',dashIfMissing(s.homeRuns)],['RBI',dashIfMissing(s.rbi)],['OPS',fmt(s.ops)]];
+  const percentileOf = (value, population) => {
+    const numeric = Number(value);
+    const values = (Array.isArray(population) ? population : []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!Number.isFinite(numeric) || !values.length) return null;
+    return Math.round((values.filter(candidate => candidate <= numeric).length / values.length) * 100);
+  };
+  const currentOps = Number(s.ops);
+  const priorOps = careerRows.slice(1).map(row => Number(row.stat?.ops)).find(Number.isFinite);
+  const opsDelta = Number.isFinite(currentOps) && Number.isFinite(priorOps) ? currentOps - priorOps : null;
+  const statcastValue = player.savant?.est_woba ?? player.savant?.avg_hit_speed ?? null;
+  const recentOpsSeries = buildRecentGameSeries(player.boxscoreSplits, 'ops', 10);
+  const statcastPopulation = player.savant?.est_woba != null
+    ? (player.statcastPopulation || []).map(row => row?.est_woba)
+    : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
   const performanceSummary = [
-    { label:'WAR', value:dashIfMissing(player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', source:(player.war ?? s.war ?? player.fangraphs?.war) != null ? 'Verified provider' : 'Unavailable', tone:C.purple },
-    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', tone:C.amber },
-    { label:'wRC+', value:dashIfMissing(s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', source:(s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus) != null ? 'Verified provider' : 'Unavailable', tone:C.teal },
-    { label:'Statcast', value:player.savant?.est_woba != null ? fmt(player.savant.est_woba, 3) : (player.savant?.avg_hit_speed != null ? fmt(player.savant.avg_hit_speed, 1) : '—'), detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', source:player.savant ? 'Baseball Savant' : 'Unavailable', tone:C.navy },
+    { label:'WAR', value:dashIfMissing(player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:player.advancedMetrics?.war != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.purple },
+    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber },
+    { label:'wRC+', value:dashIfMissing(player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:player.advancedMetrics?.wrcPlus != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.teal },
+    { label:'Statcast', value:statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : '—', detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:player.savant ? 'Baseball Savant' : 'Unavailable', trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy },
   ];
 
   const runPdfExport = async kind => {
@@ -2250,21 +2296,32 @@ function PlayerProfile({ player, derived, onCompare }) {
       <div className="skip-performance-summary" role="region" aria-label="Performance Summary">
         <div className="skip-performance-summary-heading">Performance Summary <span>Current season · verified inputs only</span></div>
         <div className="skip-performance-summary-grid">
-          {performanceSummary.map(metric => (
-            <div className="skip-performance-summary-card" key={metric.label}>
-              <div className="skip-performance-summary-card-label">{metric.label}</div>
-              <div className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</div>
-              <div className="skip-performance-summary-card-detail">{metric.detail}</div>
-              <div className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</div>
-            </div>
-          ))}
+          {performanceSummary.map(metric => {
+            const isExpanded = expandedSummary === metric.label;
+            return (
+              <div className={`skip-performance-summary-card ${isExpanded ? 'is-expanded' : ''}`} key={metric.label}>
+                <button type="button" className="skip-performance-summary-card-button" aria-expanded={isExpanded} aria-controls={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`} onClick={() => setExpandedSummary(isExpanded ? null : metric.label)}>
+                  <span className="skip-performance-summary-card-label">{metric.label}</span>
+                  <span className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</span>
+                  <span className="skip-performance-summary-card-detail">{metric.detail}</span>
+                  <span className={`skip-performance-summary-card-trend ${metric.trend.startsWith('▼') ? 'is-down' : metric.trend.startsWith('▲') ? 'is-up' : ''}`}>{metric.trend}</span>
+                  <span className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</span>
+                  <span className="skip-performance-summary-card-expand">{isExpanded ? 'Hide details' : 'Details'}</span>
+                </button>
+                {isExpanded && <div className="skip-performance-summary-card-expanded" id={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`}>
+                  <div>{metric.definition}</div>
+                  <MetricSparkline values={metric.series} tone={metric.tone} />
+                  <strong>Provider:</strong> {metric.source}<br />
+                  <strong>Context:</strong> {metric.trend}
+                </div>}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${p.fullName || player.fullName || 'Player'} · ${seasonLabel}`} entries={profileProvenance} />
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
-        <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
         {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
       </div>
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />

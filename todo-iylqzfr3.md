@@ -114,3 +114,57 @@
 - [x] Add regression coverage for Performance Summary values and mobile rail CSS
 - [x] Run typecheck, tests, and desktop/mobile visual verification
 - [x] Save a checkpoint containing the Performance Summary and mobile rail enhancement
+
+- [x] Diagnose and repair the six reported feed/provider errors with explicit unavailable-state handling
+- [x] Audit existing player WAR and wRC+ provider adapters and response shapes
+- [x] Confirm the official seasonAdvanced path only populates explicit WAR/wRC+ fields and keeps missing provider fields unavailable
+- [x] Add trend indicators or percentile context beneath each Performance Summary metric
+- [x] Add interactive summary-card detail expansion with metric definitions and data sources
+- [x] Preserve source provenance, loading states, mobile rail behavior, and existing profile interactions
+- [x] Add regression coverage for the six error paths, provider mappings, trends, and summary expansion
+- [x] Run typecheck, focused tests, full tests, and responsive loaded-player regression verification
+- [x] Save a checkpoint containing the repaired and enhanced Performance Summary
+
+- [x] Audit available recent-game data and current mobile Performance Summary rail behavior
+- [x] Add touch-friendly smooth snap-to-card scrolling for the mobile metric rail
+- [x] Add verified last-10-games sparkline data to expanded metric cards
+- [x] Show explicit unavailable states when a metric lacks a verified last-10-games series
+- [x] Preserve expanded definitions, provenance, mobile layout, and existing profile interactions
+- [x] Add regression coverage for snap-scroll CSS, sparkline normalization, and expanded rendering
+- [x] Run typecheck, tests, and responsive visual verification
+- [x] Save a checkpoint containing the mobile rail and sparkline enhancement
+
+- [x] Audit the visible Sources button and identify all related controls and tests
+- [x] Inspect browser/server logs and affected MLB/Savant fetch paths for current errors
+- [x] Remove the visible Sources button without removing source provenance from data cards
+- [x] Apply targeted loading and request optimizations to the affected dashboard/player paths
+- [x] Preserve explicit unavailable states, source metadata, mobile behavior, and profile interactions
+- [x] Add regression coverage for Sources removal and optimized error/loading behavior
+- [x] Run typecheck, focused tests, full tests, and responsive visual verification
+- [x] Save a checkpoint containing the debugged and optimized update
+
+- [x] Inspect the latest browser, server, and network logs for the highest-impact runtime failures
+- [x] Identify redundant requests, slow fetch paths, and avoidable render work
+- [x] Apply targeted error handling and performance optimizations
+- [x] Preserve source-backed unavailable states, caching, mobile behavior, and profile interactions
+- [x] Add regression coverage for the diagnosed failures and optimizations
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the debugged and optimized update
+
+- [x] Audit team-selection data flow, cache helpers, and latest runtime request patterns
+- [x] Add a short-lived source-aware client cache for repeated team selections
+- [x] Prevent stale or unavailable cache entries from masking newer verified data
+- [x] Continue targeted debugging of redundant requests and timeout/error paths
+- [x] Preserve loading states, source metadata, mobile behavior, and team navigation
+- [x] Add regression coverage for cache hits, expiry, invalidation, and error fallback
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the team cache and optimization update
+
+- [x] Audit roster row fields, existing position/performance filters, and verified hitter inputs
+- [x] Add a true recent-performance quick filter using verified recent-window fields when available
+- [x] Add source-backed Fantasy Points normalization for hitter rows
+- [x] Show an explicit Fantasy Points unavailable label when required source fields are missing
+- [x] Preserve existing roster sorting, minimum thresholds, caching, mobile layout, and source metadata
+- [x] Add rendered interaction coverage for quick-filter changes plus Fantasy Points calculations
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the roster filter and Fantasy Points enhancement

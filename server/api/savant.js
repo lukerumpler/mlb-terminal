@@ -324,9 +324,18 @@ async function fetchWithRedirects(url, maxRedirects = 3) {
 const SAVANT_CACHE_TTL_MS = 60 * 60_000;
 const SAVANT_STALE_TTL_MS = 6 * 60 * 60_000;
 const SAVANT_COOLDOWN_MS = 30_000;
+const SAVANT_FAILURE_COOLDOWN_MS = 15_000;
 const savantCache = new Map();
 const savantInFlight = new Map();
 let savantCooldownUntil = 0;
+let savantFailureCooldownUntil = 0;
+
+export function __resetSavantStateForTests() {
+  savantCache.clear();
+  savantInFlight.clear();
+  savantCooldownUntil = 0;
+  savantFailureCooldownUntil = 0;
+}
 
 function savantCacheKey(url) { return url; }
 function parseSavantRetryAfterMs(response) {
@@ -337,6 +346,14 @@ function parseSavantRetryAfterMs(response) {
 }
 function staleSavant(entry) {
   return entry && entry.staleExpiresAt > Date.now() ? entry : null;
+}
+
+function serveStaleSavant(res, stale) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  res.setHeader('X-Provider-Cache', 'STALE');
+  res.setHeader('X-Provider-Freshness', 'stale-cached');
+  return res.status(200).json(stale.data);
 }
 
 export default async function handler(req, res) {
@@ -376,6 +393,7 @@ export default async function handler(req, res) {
     res.setHeader('X-Provider-Freshness', 'cached');
     return res.status(200).json(cached.data);
   }
+  const stale = staleSavant(cached);
   const existing = savantInFlight.get(key);
   if (existing) {
     try {
@@ -386,22 +404,22 @@ export default async function handler(req, res) {
       res.setHeader('X-Provider-Freshness', 'live');
       return res.status(200).json(data);
     } catch (error) {
+      if (stale) return serveStaleSavant(res, stale);
       if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
       return res.status(error?.status || 502).json(error?.payload || { error: 'Savant request failed' });
     }
   }
-  const stale = staleSavant(cached);
   if (savantCooldownUntil > Date.now()) {
-    if (stale) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      res.setHeader('X-Provider-Cache', 'STALE');
-      res.setHeader('X-Provider-Freshness', 'stale-cached');
-      return res.status(200).json(stale.data);
-    }
+    if (stale) return serveStaleSavant(res, stale);
     const retryAfter = Math.ceil((savantCooldownUntil - Date.now()) / 1000);
     res.setHeader('Retry-After', String(retryAfter));
     return res.status(429).json({ error: 'Baseball Savant rate limit cooldown active', retryAfter, url });
+  }
+  if (savantFailureCooldownUntil > Date.now()) {
+    if (stale) return serveStaleSavant(res, stale);
+    const retryAfter = Math.ceil((savantFailureCooldownUntil - Date.now()) / 1000);
+    res.setHeader('Retry-After', String(retryAfter));
+    return res.status(503).json({ error: 'Baseball Savant temporary upstream cooldown active', retryAfter, url });
   }
   if (isRateLimited(req, 'savant')) return rateLimitResponse(res);
 
@@ -439,6 +457,8 @@ export default async function handler(req, res) {
           hc_y: Number(r.hc_y),
           bb_type: r.bb_type || null,
           launch_speed: r.launch_speed == null ? null : Number(r.launch_speed),
+          launch_angle: r.launch_angle == null ? null : Number(r.launch_angle),
+          launch_speed_angle: r.launch_speed_angle == null ? null : Number(r.launch_speed_angle),
           xwoba: r.estimated_woba_using_speedangle == null ? null : Number(r.estimated_woba_using_speedangle),
           events: r.events || null,
         }))
@@ -453,6 +473,7 @@ export default async function handler(req, res) {
   savantInFlight.set(key, upstreamRequest);
   try {
     const data = await upstreamRequest;
+    savantFailureCooldownUntil = 0;
     savantCache.set(key, { data, expiresAt: Date.now() + SAVANT_CACHE_TTL_MS, staleExpiresAt: Date.now() + SAVANT_CACHE_TTL_MS + SAVANT_STALE_TTL_MS });
     if (savantCache.size > 300) savantCache.delete(savantCache.keys().next().value);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -461,13 +482,9 @@ export default async function handler(req, res) {
     res.setHeader('X-Provider-Freshness', 'live');
     return res.status(200).json(data);
   } catch (error) {
-    if (stale) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      res.setHeader('X-Provider-Cache', 'STALE');
-      res.setHeader('X-Provider-Freshness', 'stale-cached');
-      return res.status(200).json(stale.data);
-    }
+    const status = error?.status || 502;
+    if (status >= 500) savantFailureCooldownUntil = Math.max(savantFailureCooldownUntil, Date.now() + SAVANT_FAILURE_COOLDOWN_MS);
+    if (stale) return serveStaleSavant(res, stale);
     if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
     console.error('[savant-proxy] error:', error?.payload?.error || error?.message || error);
     return res.status(error?.status || 502).json(error?.payload || { error: 'Savant request failed', url });

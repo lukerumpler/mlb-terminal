@@ -6,6 +6,10 @@ import { invokeLLM } from "./_core/llm";
 import { z } from "zod";
 
 let aiFallbackUntil = 0;
+const AI_ROSTER_INSIGHTS_CACHE_TTL_MS = 30_000;
+const aiRosterInsightsCache = new Map<string, { data: unknown; expiresAt: number }>();
+const aiRosterInsightsInFlight = new Map<string, Promise<unknown>>();
+
 function buildRosterInsightsFallback(input: { team?: Record<string, unknown>; roster?: { hitting?: Array<Record<string, unknown>>; pitching?: Array<Record<string, unknown>> } }) {
   const team = input.team || {};
   const strengths: Array<{ title: string; detail: string; evidence: string }> = [];
@@ -54,41 +58,59 @@ export const appRouter = router({
         }),
       }))
       .mutation(async ({ input }) => {
-        if (Date.now() < aiFallbackUntil) return buildRosterInsightsFallback(input);
-        try {
-        const response = await invokeLLM({
-          model: 'gpt-5-mini',
-          messages: [
-            { role: 'system', content: 'You are a baseball front-office analyst. Use only the supplied team and roster data. Never invent missing metrics. Return concise, evidence-based strengths and weaknesses for a scouting dashboard.' },
-            { role: 'user', content: JSON.stringify(input) },
-          ],
-          maxTokens: 700,
-          responseFormat: {
-            type: 'json_schema',
-            json_schema: {
-              name: 'roster_insights',
-              strict: true,
-              schema: {
-                type: 'object',
-                properties: {
-                  strengths: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, evidence: { type: 'string' } }, required: ['title', 'detail', 'evidence'], additionalProperties: false } },
-                  weaknesses: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, evidence: { type: 'string' } }, required: ['title', 'detail', 'evidence'], additionalProperties: false } },
-                  source: { type: 'string' },
+        const key = JSON.stringify(input);
+        const cached = aiRosterInsightsCache.get(key);
+        if (cached && cached.expiresAt > Date.now()) return cached.data;
+        if (cached) aiRosterInsightsCache.delete(key);
+        const existing = aiRosterInsightsInFlight.get(key);
+        if (existing) return existing;
+
+        const request = (async () => {
+          if (Date.now() < aiFallbackUntil) return buildRosterInsightsFallback(input);
+          try {
+            const response = await invokeLLM({
+              model: 'gpt-5-mini',
+              messages: [
+                { role: 'system', content: 'You are a baseball front-office analyst. Use only the supplied team and roster data. Never invent missing metrics. Return concise, evidence-based strengths and weaknesses for a scouting dashboard.' },
+                { role: 'user', content: JSON.stringify(input) },
+              ],
+              maxTokens: 700,
+              responseFormat: {
+                type: 'json_schema',
+                json_schema: {
+                  name: 'roster_insights',
+                  strict: true,
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      strengths: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, evidence: { type: 'string' } }, required: ['title', 'detail', 'evidence'], additionalProperties: false } },
+                      weaknesses: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, evidence: { type: 'string' } }, required: ['title', 'detail', 'evidence'], additionalProperties: false } },
+                      source: { type: 'string' },
+                    },
+                    required: ['strengths', 'weaknesses', 'source'],
+                    additionalProperties: false,
+                  },
                 },
-                required: ['strengths', 'weaknesses', 'source'],
-                additionalProperties: false,
               },
-            },
-          },
-        });
-        const content = response.choices[0]?.message?.content;
-        if (typeof content !== 'string') throw new Error('AI insights response was empty');
-        return JSON.parse(content);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (/usage exhausted|412 precondition/i.test(message)) aiFallbackUntil = Date.now() + 10 * 60_000;
-          console.warn('[ai.rosterInsights] AI provider unavailable; returning verified local fallback', message);
-          return buildRosterInsightsFallback(input);
+            });
+            const content = response.choices[0]?.message?.content;
+            if (typeof content !== 'string') throw new Error('AI insights response was empty');
+            return JSON.parse(content);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (/usage exhausted|412 precondition/i.test(message)) aiFallbackUntil = Date.now() + 10 * 60_000;
+            console.warn('[ai.rosterInsights] AI provider unavailable; returning verified local fallback', message);
+            return buildRosterInsightsFallback(input);
+          }
+        })();
+        aiRosterInsightsInFlight.set(key, request);
+        try {
+          const result = await request;
+          aiRosterInsightsCache.set(key, { data: result, expiresAt: Date.now() + AI_ROSTER_INSIGHTS_CACHE_TTL_MS });
+          if (aiRosterInsightsCache.size > 100) aiRosterInsightsCache.delete(aiRosterInsightsCache.keys().next().value!);
+          return result;
+        } finally {
+          if (aiRosterInsightsInFlight.get(key) === request) aiRosterInsightsInFlight.delete(key);
         }
       }),
   }),

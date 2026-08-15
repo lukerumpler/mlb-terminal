@@ -1,63 +1,144 @@
 /**
- * src/api/feed.js  —  Client: fetch posts from /api/feed (nitter RSS proxy)
+ * Client news helper for SKIP's three-tier /api/news route.
  *
- * Each call is client-side cached for CACHE_TTL_MS so repeated tab switches
- * don't hammer the serverless function. The server also has its own CDN cache,
- * so in practice most requests resolve from Vercel's edge within ~30 ms.
+ * The server decides which provider wins. The client preserves that decision
+ * and exposes sourceStatuses so the UI can show Tier 1, Tier 2, Tier 3,
+ * cached-fallback, or unavailable without guessing.
  */
-
-const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
 
 import { compareValues } from '../lib/sorting.js';
 import { recordFeedSuccess } from '../lib/feedFreshness.js';
-// { key → { data, ts } }
+
+const CACHE_TTL_MS = 5 * 60 * 1_000;
+const STALE_TTL_MS = 30 * 60 * 1_000;
 const _cache = new Map();
+const _inFlight = new Map();
 
 function cacheGet(key) {
   const hit = _cache.get(key);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.data;
+  if (!hit) return null;
+  const now = Date.now();
+  if (hit.expiresAt > now || hit.staleUntil > now) return hit;
+  _cache.delete(key);
   return null;
 }
+
 function cacheSet(key, data) {
-  _cache.set(key, { data, ts: Date.now() });
-  return data;
+  const now = Date.now();
+  const entry = { data, retrievedAt: now, expiresAt: now + CACHE_TTL_MS, staleUntil: now + STALE_TTL_MS };
+  _cache.set(key, entry);
+  return entry;
+}
+
+function kindForHandles(handles = []) {
+  return handles.some(handle => /ncaa|college/i.test(String(handle))) ? 'college' : 'mlb';
+}
+
+function requestedKinds(handles = []) {
+  const values = new Set(handles.map(handle => String(handle).toLowerCase()));
+  const wantsCollege = handles.length === 0 || [...values].some(value => /ncaa|college/.test(value));
+  const wantsMlb = handles.length === 0 || [...values].some(value => /mlb|espn|fox|official|team/.test(value));
+  return [
+    ...(wantsMlb ? ['mlb'] : []),
+    ...(wantsCollege ? ['college'] : []),
+  ];
+}
+
+async function fetchNews(kind, n, handle = null) {
+  const key = `${handle ? `handle:${handle}` : kind}:${n}`;
+  const cached = cacheGet(key);
+  if (cached) {
+    return { ...cached.data, status: cached.expiresAt > Date.now() ? 'cached' : 'cached-fallback', ageSeconds: Math.round((Date.now() - cached.retrievedAt) / 1000) };
+  }
+
+  const pending = _inFlight.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    try {
+      const query = handle
+        ? `handle=${encodeURIComponent(handle)}&n=${n}`
+        : `kind=${encodeURIComponent(kind)}&n=${n}`;
+      const response = await fetch(`/api/news?${query}`, {
+        signal: AbortSignal.timeout(14_000),
+      });
+      const data = await response.json();
+      if (!response.ok && !data?.items?.length) {
+        return { handle: handle || kind, items: [], sourceStatuses: data?.sourceStatuses ?? [], sources: data?.sources ?? [], status: 'unavailable', error: data?.error || `HTTP ${response.status}` };
+      }
+      const entry = cacheSet(key, data);
+      if (data?.status !== 'unavailable' && data?.items?.length) recordFeedSuccess('intel-feed');
+      return { ...data, ageSeconds: Math.round((Date.now() - entry.retrievedAt) / 1000) };
+    } catch (error) {
+      const stale = cacheGet(key);
+      if (stale) {
+        return { ...stale.data, status: 'cached-fallback', freshness: 'stale-cached', ageSeconds: Math.round((Date.now() - stale.retrievedAt) / 1000), reason: error?.message || 'network-error' };
+      }
+      return { handle: handle || kind, items: [], sourceStatuses: [], sources: [], status: 'unavailable', error: error?.message || 'News request failed' };
+    }
+  })();
+
+  _inFlight.set(key, request);
+  request.finally(() => _inFlight.delete(key)).catch(() => {});
+  return request;
 }
 
 /**
- * fetchFeed(handle, n=10)
- * Returns { handle, items, fetchedAt, error? }
- * Never throws — network/parse errors come back as { items:[], error }.
+ * Legacy-compatible single feed call. Handles containing NCAA/college select
+ * the NCAA tier chain; all other handles use the MLB news chain.
  */
 export async function fetchFeed(handle, n = 10) {
-  const key = `${handle}:${n}`;
-  const hit = cacheGet(key);
-  if (hit) return hit;
-
-  try {
-    const res  = await fetch(`/api/feed?handle=${encodeURIComponent(handle)}&n=${n}`, {
-      signal: AbortSignal.timeout(12_000),
-    });
-    const data = await res.json();
-    if (!data?.error) recordFeedSuccess('intel-feed');
-    return cacheSet(key, data);
-  } catch (e) {
-    return { handle, items: [], fetchedAt: new Date().toISOString(), error: e.message };
-  }
+  const result = await fetchNews(kindForHandles([handle]), n, handle);
+  return { ...result, handle };
 }
 
 /**
- * fetchFeeds(handles, n=10)
- * Fetches multiple accounts in parallel. Returns a flat, time-sorted array
- * of items with a { handle, items, errors } summary object.
+ * Fetches the active MLB and/or college chains, merges and time-sorts items,
+ * and returns the complete source-state summary for the React page.
  */
-export async function fetchFeeds(handles, n = 10) {
-  const results = await Promise.all(handles.map(h => fetchFeed(h, n)));
-  const items   = results
-    .flatMap(r => r.items ?? [])
-    // Bug fix 2026-08-11: see src/lib/sorting.js's header comment — this
-    // used to be a tie-less `< ? -1 : 1` comparator, same bug class as
-    // ProspectsPage.jsx's sort had. Descending (newest first), so ascending=false.
+export async function fetchFeeds(handles = [], n = 10) {
+  const kinds = requestedKinds(handles);
+  const results = await Promise.all(kinds.map(kind => fetchNews(kind, n)));
+  const allowed = new Set(handles.map(handle => String(handle).toLowerCase()));
+  const items = results
+    .flatMap(result => result.items ?? [])
+    .filter(item => allowed.size === 0 || allowed.has(String(item.sourceKey || item.handle).toLowerCase()) || /official|espn|fox|mlb|ncaa|college/.test(String(item.sourceKey || item.handle).toLowerCase()))
     .sort((a, b) => compareValues(a.isoDate ?? '', b.isoDate ?? '', false));
-  const errors  = results.filter(r => r.error).map(r => ({ handle: r.handle, error: r.error }));
-  return { items, errors, fetchedAt: new Date().toISOString() };
+
+  const sourceStatuses = results.flatMap(result => result.sourceStatuses ?? []);
+  const sources = results.flatMap(result => result.sources ?? []);
+  const errors = sourceStatuses
+    .filter(status => !status.ok)
+    .map(status => ({ handle: status.key, error: status.reason || 'Source unavailable', tier: status.tier, source: status.label }));
+  const fallbackResult = results.find(result => result.status === 'cached-fallback')
+    || results.find(result => result.status === 'unavailable')
+    || results.find(result => result.status?.startsWith?.('tier-'));
+  const statuses = results.map(result => result.status).filter(Boolean);
+  const status = statuses.includes('cached-fallback')
+    ? 'cached-fallback'
+    : statuses.includes('unavailable') && !items.length
+      ? 'unavailable'
+      : statuses.find(value => value === 'tier-3')
+        || statuses.find(value => value === 'tier-2')
+        || statuses.find(value => value === 'tier-1')
+        || fallbackResult?.status
+        || 'unavailable';
+
+  return {
+    items,
+    errors,
+    sourceStatuses,
+    sources,
+    status,
+    freshness: results.every(result => result.freshness === 'cached') ? 'cached' : results.some(result => result.freshness === 'stale-cached') ? 'stale-cached' : 'live',
+    fetchedAt: new Date().toISOString(),
+    retrievedAt: results.map(result => result.retrievedAt).filter(Boolean).sort().at(-1) ?? null,
+    ageSeconds: Math.max(...results.map(result => Number(result.ageSeconds) || 0), 0),
+    reason: results.find(result => result.reason)?.reason || null,
+  };
+}
+
+export function __resetFeedClientStateForTests() {
+  _cache.clear();
+  _inFlight.clear();
 }

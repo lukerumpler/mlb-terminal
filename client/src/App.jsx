@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
@@ -84,6 +84,8 @@ export default function App() {
   const [tab, setTab]               = useState('overview');
   const [showAlerts, setShowAlerts] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileNavToggleRef = useRef(null);
+  const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
   // 'loading' | 'live' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
@@ -134,6 +136,29 @@ export default function App() {
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
 
   const [showPalette, setShowPalette] = useState(false);
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    const focusTimer = window.setTimeout(() => mobileNavFirstItemRef.current?.focus({ preventScroll: true }), 0);
+    const onDrawerKeyDown = e => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMobileNavOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onDrawerKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', onDrawerKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+      window.setTimeout(() => mobileNavToggleRef.current?.focus({ preventScroll: true }), 0);
+    };
+  }, [mobileNavOpen]);
+
   useEffect(() => {
     const onKey = e => {
       const mod = e.metaKey || e.ctrlKey;
@@ -227,7 +252,7 @@ export default function App() {
 
       {/* ── SIDEBAR ── */}
       {mobileNavOpen && <button type="button" className="skip-mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
-      <div className={`skip-sidebar${mobileNavOpen ? ' skip-mobile-nav-open' : ''}`} style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+      <div id="skip-mobile-nav" className={`skip-sidebar${mobileNavOpen ? ' skip-mobile-nav-open' : ''}`} data-mobile-open={mobileNavOpen ? 'true' : 'false'} style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
 
         {/* Logo */}
         <div style={{ padding:'12px 12px 10px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
@@ -250,13 +275,13 @@ export default function App() {
         </div>
 
         {/* Nav */}
-        <nav aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
+        <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
           {TABS.map((t, i) => (
             <React.Fragment key={t.key}>
             {(i === 0 || TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button title={t.label} onClick={() => { setTab(t.key); setMobileNavOpen(false); }} aria-current={tab===t.key ? 'page' : undefined}
+            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} onClick={() => { setTab(t.key); setMobileNavOpen(false); }} aria-current={tab===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
@@ -303,7 +328,7 @@ export default function App() {
 
         {/* Top bar */}
         <div className="skip-topbar" style={{ height:46, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 18px', gap:12, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
-          <button type="button" className="skip-mobile-nav-toggle" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(open => !open)} style={{ display:'none', alignItems:'center', justifyContent:'center', width:34, height:34, border:`1px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text, cursor:'pointer', fontSize:18, lineHeight:1 }}>☰</button>
+          <button type="button" ref={mobileNavToggleRef} className="skip-mobile-nav-toggle" aria-controls="skip-mobile-nav" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(open => !open)} style={{ display:'none', alignItems:'center', justifyContent:'center', width:34, height:34, border:`1px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text, cursor:'pointer', fontSize:18, lineHeight:1 }}>☰</button>
           <div style={sans({ fontSize:14, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
             {TABS.find(t => t.key === tab)?.label || 'SKIP'}
           </div>

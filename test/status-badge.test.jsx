@@ -14,8 +14,13 @@ describe('StatusBadge', () => {
   it.each([
     ['verified', 'Verified'],
     ['estimated', 'Estimated'],
+    ['tier-1', 'Tier 1 · Official'],
+    ['tier-2', 'Tier 2 · Backup'],
+    ['tier-3', 'Tier 3 · Secondary'],
+    ['cached-fallback', 'Stale Fallback'],
     ['unavailable', 'Unavailable'],
     ['coverage-gap', 'Coverage Gap'],
+    ['loading', 'Loading'],
   ])('renders the %s status as visible text', (status, label) => {
     render(<StatusBadge status={status} />);
     expect(screen.getByRole('status', { name:`Data status: ${label}` })).toHaveTextContent(label);

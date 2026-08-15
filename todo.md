@@ -11121,11 +11121,70 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## MLB 429 Rate-Limit Mitigation
-- [ ] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
-- [ ] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
-- [ ] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
-- [ ] Add regression tests for rate-limit handling and verified cache fallback.
-- [ ] Run release gates and save checkpoint.
+- [x] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
+- [x] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
+- [x] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
+- [x] Add regression tests for rate-limit handling and verified cache fallback.
+- [x] Run release gates and save checkpoint.
 
 ## Current MLB Rate-Limit Fix
-- [ ] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.
+- [x] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.
+
+## Three-Tier News Fallback
+- [x] Implement Tier 1–3 news fallback in api/news.js with stale-if-error cache metadata.
+- [x] Update React news components to display accessible Tier 1, Tier 2, Tier 3, cached, and unavailable badges.
+- [x] Complete RESILIENCE_GUIDE.md with configuration, feed provenance, and deployment steps.
+- [x] Add regression tests for fallback ordering, cache behavior, and badge rendering.
+- [x] Run release gates and save a published checkpoint.
+
+## Attached Data-Gaps Specification
+- [x] Review and reconcile the attached FanGraphs, Savant, splits, weather, metadata, and playoff-odds requirements.
+- [x] Preserve honest unavailable states where a source or endpoint is not verified.
+- [x] Implement only verified data-gap improvements without modifying ROADMAP_REFERENCE_FEATURES.md.
+- [x] Add regression coverage and verify desktop/mobile rendering for each changed panel.
+
+## ESPN RSS and Secure API Configuration
+- [x] Integrate the verified ESPN MLB RSS XML feed into the resilient news fallback route.
+- [x] Add environment-based Vercel CORS allowlisting and document required variables.
+- [x] Add simulated Nitter/ESPN failure-injection tests for fallback ordering and stale cache behavior.
+- [x] Preserve and continue the attached FanGraphs, Savant, splits, weather, and metadata gap work.
+
+## Shared Checkpoint Reconciliation and Reapplication
+- [x] Merge latest origin/main changes while keeping uncommitted news fallback, CORS, guide, venue, and Savant updates.
+- [x] Reapply and verify all 60 test files and build output.
+- [x] Save final checkpoint.
+
+## News Feed Loading Skeleton
+- [x] Add animated news skeleton component respecting reduced-motion and low-data modes.
+- [x] Integrate skeleton into FeedPage.jsx during loading states.
+- [x] Add test coverage and publish checkpoint.
+
+## Compact Farm-System Summary Score Card
+- [x] Trace existing prospect page ranking data and card structures.
+- [x] Implement farm-system summary score card with source-aware metrics and unavailable states.
+- [x] Add unit and rendering tests, verify desktop/mobile views, and publish checkpoint.
+
+## Broad Debugging and Optimization Pass
+- [x] Audit current shared code, runtime logs, request behavior, and production preview for actionable issues.
+- [x] Reduce verified client/server data-loading failures, timeout noise, and stale-state ambiguity without fabricating baseball data.
+- [x] Improve measurable frontend performance, low-data behavior, responsive layout, and accessibility where regressions are found.
+- [x] Add regression coverage for every optimization or bug fix and run focused validation.
+- [x] Run the complete release gate, review desktop/mobile previews, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
+
+## Mobile Experience & Source-Health Badges
+- [x] Refine touch scrolling momentum, gesture inertia, and menu drawer backdrop handling for iOS and Android.
+- [x] Integrate verified FanGraphs WAR and Baseball Savant source-health badges into affected metric and overview cards.
+- [x] Add unit and rendering regression tests for touch navigation and badge rendering.
+- [x] Run full release gates, verify desktop/mobile viewports, and publish the verified checkpoint.
+
+## Savant Refetch & Source-Health Repair
+- [x] Stabilize Savant roster rollup effect dependency with stable rosterSavantKey to prevent repeated loading loops on poll ticks.
+- [x] Add proper spacing and separation between provider names and source-health badge pills to eliminate visual text collision.
+- [x] Run full release gates, verify all 338 tests pass successfully, and save the publishable checkpoint.
+- [x] Implement team-comparison metrics for FanGraphs WAR against divisional averages with robust fallback handling.
+- [x] Refine mobile touch scrolling, momentum, overscroll behavior, and drawer focus management for iOS and Android.
+- [x] Stabilize Savant roster-rollup refetch loop and provider badge formatting.
+- [x] Run full test suite (339 passing tests across 63 files) and production build.
+- [x] Implement AI-powered natural language search component and query routing for players, teams, and intel.
+- [x] Add interactive tooltips with offensive and defensive WAR breakdown for the Divisional WAR comparison.
+- [x] Verify test suite and build output with new features.

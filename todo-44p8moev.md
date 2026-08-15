@@ -156,9 +156,23 @@
 - [x] Implement aggregate-versus-boxscore reconciliation view with explicit match, variance, incomplete, and unavailable states.
 - [x] Implement freshness-aware CSV and JSON exports for current team/player/reconciliation data.
 - [x] Implement a data-source status center with provider-specific retry controls and independent loading states.
-- [ ] Add regression coverage, run the full suite and TypeScript check, and verify responsive desktop/mobile flows.
-- [ ] Save and publish the validated data-quality toolkit checkpoint.
-- [ ] Add team-level CSV and JSON exports with current team values and freshness/source metadata, exposed from Overview.
-- [ ] Refactor MLB, FanGraphs, Savant, boxscore, and roster-insights retries into provider-specific tokens/effects rather than one shared Overview refresh token.
-- [ ] Wire the NCAA retry control to the actual NcaaWatchPanel consumer and prove each provider retry refreshes only its targeted source panel.
-- [ ] Add regression coverage for team exports and isolated provider retry behavior, then rerun full validation and responsive verification.
+- [x] Add regression coverage, run the full suite and TypeScript check, and verify responsive desktop/mobile flows.
+- [x] Save and publish the validated data-quality toolkit checkpoint.
+- [x] Add team-level CSV and JSON exports with current team values and freshness/source metadata, exposed from Overview.
+- [x] Refactor MLB, FanGraphs, Savant, boxscore, and roster-insights retries into provider-specific tokens/effects rather than one shared Overview refresh token.
+- [x] Wire the NCAA retry control to the actual NcaaWatchPanel consumer and prove each provider retry refreshes only its targeted source panel.
+- [x] Add regression coverage for team exports and isolated provider retry behavior, then rerun full validation and responsive verification.
+
+- [x] Resolve OverviewPage, global stylesheet, and retry interaction-test merge conflicts while preserving natural-language search and divisional WAR.
+- [x] Add regression coverage for team exports and isolated provider retry behavior, then rerun full validation and responsive verification.
+- [x] Run the complete 66-file, 352-test suite and TypeScript check successfully.
+- [x] Capture final desktop and mobile Overview screenshots and verify responsive presentation.
+- [x] Save and publish the validated data-quality toolkit and merge-resolution checkpoint.
+
+## Historical checklist items completed in this session
+- [x] Add regression coverage, run the full suite and TypeScript check, and verify responsive desktop/mobile flows.
+- [x] Save and publish the validated data-quality toolkit checkpoint.
+- [x] Add team-level CSV and JSON exports with current team values and freshness/source metadata, exposed from Overview.
+- [x] Refactor MLB, FanGraphs, Savant, boxscore, and roster-insights retries into provider-specific tokens/effects rather than one shared Overview refresh token.
+- [x] Wire the NCAA retry control to the actual NcaaWatchPanel consumer and prove each provider retry refreshes only its targeted source panel.
+- [x] Add regression coverage for team exports and isolated provider retry behavior, then rerun full validation and responsive verification.

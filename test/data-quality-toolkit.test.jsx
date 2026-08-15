@@ -57,10 +57,17 @@ describe('data-source status center', () => {
     window.addEventListener('skip-provider-retry', retry);
     render(<DataSourceStatusCenter settings={{ enabled: true, displayMode: 'relative' }} successes={{}} />);
     expect(screen.getByText('MLB Stats API')).toBeInTheDocument();
+    expect(screen.getByText('MLB boxscore feed')).toBeInTheDocument();
+    expect(screen.getByText('NCAA feed')).toBeInTheDocument();
     expect(screen.getByText('FanGraphs')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry FanGraphs' }));
     expect(retry).toHaveBeenCalledTimes(1);
     expect(retry.mock.calls[0][0].detail.provider).toBe('fangraphs');
+    await user.click(screen.getByRole('button', { name: 'Retry NCAA feed' }));
+    expect(retry.mock.calls[1][0].detail.provider).toBe('ncaa');
+    await user.click(screen.getByRole('button', { name: 'Retry MLB boxscore feed' }));
+    expect(retry.mock.calls[2][0].detail.provider).toBe('boxscore');
+    expect(retry).toHaveBeenCalledTimes(3);
     window.removeEventListener('skip-provider-retry', retry);
   });
 });

@@ -8,11 +8,14 @@ const {
   getAllTeamStats,
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
+  getTeamSavantMetrics,
   getTeamScheduleSplits,
   mlb,
   __resetMlbClientStateForTests,
   fetchTeamFinancials,
   getGameFeedMetadata,
+  getTeamVenueMetadata,
+  __resetTeamVenueMetadataCacheForTests,
 } = await import('../client/src/api/mlb.js');
 
 describe('MLB request cache optimization', () => {
@@ -29,6 +32,7 @@ describe('MLB request cache optimization', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     __resetMlbClientStateForTests();
+    __resetTeamVenueMetadataCacheForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -75,9 +79,27 @@ describe('MLB request cache optimization', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('treats an unavailable live feed as an explicit weather gap without proxy error noise', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetch.mockResolvedValueOnce({ ok:false, status:404, headers:{ get:() => null }, text:async () => '{"error":"Not Found"}' });
+    await expect(getGameFeedMetadata(123458)).resolves.toMatchObject({ status:'unavailable', mediaUrl:'https://www.mlb.com/gameday/123458' });
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('[mlb] proxy error'), expect.anything(), expect.anything(), expect.anything());
+    expect(warn).toHaveBeenCalledWith('[mlb] expected upstream unavailable response', 404, '/game/123458/feed/live');
+  });
+
   it('extracts recorded MLB weather and constructs an official Gameday link', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ gameData: { weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' } } }) });
     await expect(getGameFeedMetadata(123456)).resolves.toMatchObject({ weather: { condition: 'Clear', temp: '72° F', wind: '5 mph' }, mediaUrl: 'https://www.mlb.com/gameday/123456' });
+  });
+
+  it('loads official venue metadata and caches it for one day', async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ teams: [{ venue: { id: 1, name: 'Dodger Stadium' } }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ venues: [{ id: 1, name: 'Dodger Stadium', fieldInfo: { capacity: 56000, turfType: 'Grass', roofType: 'Open', leftLine: 330, leftCenter: 375, center: 395, rightCenter: 375, rightLine: 330 }, location: { latitude: 34.0739, longitude: -118.2400 } }] }) });
+    await expect(getTeamVenueMetadata(119)).resolves.toMatchObject({ status: 'live', venue: { name: 'Dodger Stadium', capacity: 56000, surface: 'Grass', roof: 'Open', latitude: 34.0739 } });
+    await expect(getTeamVenueMetadata(119)).resolves.toMatchObject({ freshness: 'cached', venue: { name: 'Dodger Stadium' } });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('aggregates schedule-derived Home/Away and Day/Night W–L rows and caches the result', async () => {
@@ -99,6 +121,15 @@ describe('MLB request cache optimization', () => {
     await getMinorLeagueTeamSchedule(9996, 11, 2098, 14);
     await getMinorLeagueTeamSchedule(9996, 11, 2098, 14);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves Savant provider freshness metadata after filtering expected-stat rows by team', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      headers: { get: name => name === 'X-Provider-Freshness' ? 'stale-cached' : 'STALE' },
+      json: async () => [{ team_abbr: 'LAD', est_ba: 0.280 }, { team_abbr: 'SF', est_ba: 0.250 }],
+    });
+    await expect(getTeamSavantMetrics('LAD', 2097)).resolves.toMatchObject({ status: 'cached', freshness: 'stale-cached', sampleSize: 1, expectedBA: 0.280 });
   });
 
   it('pauses queued requests after a proxy 429 instead of sending a burst', async () => {
@@ -134,6 +165,25 @@ describe('MLB request cache optimization', () => {
     await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toBeNull();
     await expect(fetchTeamFinancials('ZZZ', 2098)).resolves.toMatchObject({ found: true });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a verified stale response when a refresh returns a transient 504', async () => {
+    const verified = { teams: [{ id: 238, name: 'Los Angeles Dodgers' }] };
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => verified, text: async () => '' })
+      .mockResolvedValueOnce({ ok: false, status: 504, headers: { get: () => null }, text: async () => '{"error":"timeout"}' });
+
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    await vi.advanceTimersByTimeAsync(1_001);
+    await expect(mlb('/teams/238', {}, { ttl: 1_000 })).resolves.toEqual(verified);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds affiliate schedule requests to a fourteen-day provider window', async () => {
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    await getMinorLeagueTeamSchedule(9996, 11, 2098, 45);
+    const requestUrl = new URL(fetch.mock.calls[0][0], 'https://skipbasebal-mm6hz9ps.manus.space');
+    expect(requestUrl.searchParams.get('endDate')).toBe('2026-08-28');
   });
 
   it('returns a verified stale response when a refresh is rate-limited', async () => {
