@@ -33,15 +33,16 @@ const RunDiffChart = lazy(() => import('../components/OverviewCharts.jsx').then(
 const ArsenalPie = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.ArsenalPie })));
 const DivisionalWarChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.DivisionalWarChart })));
 
+const PositionOaaChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.PositionOaaChart })));
+const EvDistributionChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.EvDistributionChart })));
+const LuxuryTaxTrendChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.LuxuryTaxTrendChart })));
+
 export const OVERVIEW_ACCENTS = Object.freeze({
   offense: C.amber,
   pitching: C.teal,
   defense: C.slate,
   context: C.purple,
 });
-const PositionOaaChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.PositionOaaChart })));
-const EvDistributionChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.EvDistributionChart })));
-const LuxuryTaxTrendChart = lazy(() => import('../components/OverviewCharts.jsx').then(m => ({ default: m.LuxuryTaxTrendChart })));
 
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.

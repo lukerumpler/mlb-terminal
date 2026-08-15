@@ -11226,3 +11226,7 @@
 - [x] Ensure MLB team identity and core stats load before affiliate requests on OverviewPage.
 - [x] Add explicit loading skeleton and retry status indicators for team identity fetching.
 - [x] Verify team loading sequence with unit tests and production build.
+- [ ] Inspect development server logs and browser console logs for any lingering warnings or unhandled rejections.
+- [ ] Run independent debugging pass with webdev_debug to detect subtle race conditions or memory leaks.
+- [ ] Implement targeted refinements for data resilience and UI responsiveness based on debugging findings.
+- [ ] Run full test suite, verify build and publish new checkpoint.
