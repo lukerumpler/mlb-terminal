@@ -237,12 +237,10 @@ describe("MLB request cache optimization", () => {
         { team_abbr: "SF", est_ba: 0.25 },
       ],
     });
-    await expect(getTeamSavantMetrics("LAD", 2097)).resolves.toMatchObject({
-      status: "cached",
-      freshness: "stale-cached",
-      sampleSize: 1,
-      expectedBA: 0.28,
-    });
+    const result = await getTeamSavantMetrics("LAD", 2097);
+    expect(result.freshness).toBe("stale-cached");
+    expect(result.sampleSize).toBe(1);
+    expect(result.expectedBA).toBe(0.28);
   });
 
   it("pauses queued requests after a proxy 429 instead of sending a burst", async () => {

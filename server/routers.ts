@@ -28,7 +28,7 @@ function buildRosterInsightsFallback(input: {
   const pct = Number(team.pct);
   const runDiff = Number(team.diff ?? Number(team.rs) - Number(team.ra));
   const ops = Number(team.ops);
-  const era = Number(team.era);
+  const era = team.era != null && team.era !== '' && Number.isFinite(Number(team.era)) ? Number(team.era) : NaN;
   if (Number.isFinite(runDiff)) {
     (runDiff >= 0 ? strengths : weaknesses).push({
       title:

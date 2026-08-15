@@ -1328,15 +1328,24 @@ export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season
 export async function getAllTeamStats(group = 'hitting', season = SEASON) {
   const data = await mlb('/teams/stats', { stats: 'season', group, season, sportIds: 1 }, { ttl: 60_000 });
   const grp = findStatGroup(data.stats, group);
-  return Object.fromEntries((grp?.splits || []).map(split => [
-    split.team?.id,
-    {
-      ...split.stat,
-      teamId: split.team?.id,
-      teamAbbr: split.team?.abbreviation || '',
-      teamName: split.team?.name || '',
-    },
-  ]));
+  return Object.fromEntries((grp?.splits || []).map(split => {
+    const stat = split.stat || {};
+    const normalized = { ...stat };
+    if (group === 'pitching') {
+      if (normalized.era == null && normalized.earnedRunAverage != null) normalized.era = normalized.earnedRunAverage;
+      if (normalized.strikeOuts == null && normalized.strikeouts != null) normalized.strikeOuts = normalized.strikeouts;
+      if (normalized.strikeouts == null && normalized.strikeOuts != null) normalized.strikeouts = normalized.strikeOuts;
+    }
+    return [
+      split.team?.id,
+      {
+        ...normalized,
+        teamId: split.team?.id,
+        teamAbbr: split.team?.abbreviation || '',
+        teamName: split.team?.name || '',
+      },
+    ];
+  }));
 }
 
 export async function getTeamRoster(teamId, season = SEASON, rosterType = 'active') {
@@ -1358,11 +1367,12 @@ export async function getSavantData(year = SEASON) {
   const exp = Array.isArray(expectedArr) ? expectedArr : [];
   const statcast = Array.isArray(scArr) ? scArr : [];
   if (!exp.length && !statcast.length) return null;
-  // Merge by player_id / id
+  const merged = [];
   const map = new Map();
   exp.forEach(row => {
     const id = String(row.player_id ?? row.id ?? '');
     if (id) map.set(id, { ...row });
+    else merged.push({ ...row });
   });
   statcast.forEach(row => {
     const id = String(row.player_id ?? row.id ?? '');
@@ -1370,12 +1380,13 @@ export async function getSavantData(year = SEASON) {
       const existing = map.get(id) || {};
       map.set(id, { ...existing, ...row });
     } else {
-      exp.push(row);
+      merged.push({ ...row });
     }
   });
-  const merged = Array.from(map.values());
-  if (expectedArr?.__providerMeta) {
-    try { Object.defineProperty(merged, '__providerMeta', { value: expectedArr.__providerMeta, enumerable: false, configurable: true }); } catch {}
+  merged.push(...map.values());
+  const providerMeta = expectedArr?.__providerMeta || scArr?.__providerMeta || null;
+  if (providerMeta) {
+    try { Object.defineProperty(merged, '__providerMeta', { value: providerMeta, enumerable: false, configurable: true }); } catch {}
   }
   return merged.length ? merged : null;
 }
@@ -1709,8 +1720,7 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
       const rowTeam = String(row.team_abbr || row.team || row.team_name || '').toUpperCase();
       return rowTeam === target || rowTeam.includes(target);
     });
-    // If no player rows matched the team abbreviation, fall back to global averages or non-empty population sample
-    const sourceRows = teamRows.length ? teamRows : (Array.isArray(rows) ? rows : []);
+    const sourceRows = teamRows;
     const average = keys => {
       const kList = Array.isArray(keys) ? keys : [keys];
       for (const key of kList) {
