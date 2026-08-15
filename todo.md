@@ -1,5 +1,9 @@
 # Project TODO
 
+- [x] Fix OverviewPage team selector handling so MLB parent selection displays main MLB team overview instead of forcing affiliate stats.
+- [x] Add regression test for MLB parent versus affiliate selector routing.
+- [x] Run release validation, review preview, and publish release.
+
 - [x] Inspect the latest uploaded `skip-baseball-3.zip` archive and compare its files with the current Manus project.
 - [x] Migrate all latest SKIP frontend source files under `src/` into the Manus client source tree.
 - [x] Migrate all latest public assets and the original HTML metadata/theme bootstrap without changing the roadmap markdown.
@@ -11250,3 +11254,6 @@
 - [x] Fix Oklahoma City affiliate stat normalization in client/src/api/mlb.js for OPS, HR, ERA, K, xBA, xSLG, Hard-hit %, and Barrel %.
 - [x] Add explicit regression test for Oklahoma City affiliate card metrics.
 - [x] Run release validation, review preview, and publish release.
+- [ ] Fix OverviewPage team selector handling so MLB parent selection displays main MLB team overview instead of forcing affiliate stats.
+- [ ] Add regression test for MLB parent versus affiliate selector routing.
+- [ ] Run release validation, review preview, and publish release.
