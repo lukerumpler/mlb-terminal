@@ -664,11 +664,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     getTeamAffiliates(teamBase?.id).then(rows => {
       if (!alive) return;
       setAffiliates(rows);
-      const preferred = rows.find(row => pendingAffiliate?.id && String(row.id) === String(pendingAffiliate.id)) || rows.find(row => String(row.levelId) === affiliateLevel) || rows[0];
+      const preferred = pendingAffiliate?.id
+        ? rows.find(row => String(row.id) === String(pendingAffiliate.id))
+        : null;
       if (preferred) {
         setAffiliateLevel(String(preferred.levelId));
         setAffiliateId(String(preferred.id));
         setAffiliateTab('overview');
+      } else {
+        setAffiliateId('');
       }
       setPendingAffiliate(null);
       setAffiliatesState('ready');

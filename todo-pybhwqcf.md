@@ -26,3 +26,9 @@
 - [x] Add reliable margin between Savant and FanGraphs source/status badges
 - [x] Ensure the MLB-level team overview initializes before minor-league affiliate data
 - [x] Add focused regression tests for all three Overview behaviors
+- [ ] Verify the latest checkpoint publication state and canonical project remote
+- [ ] Verify the live Dodgers Overview page shows the affiliate error fix, badge spacing, and MLB-first default
+- [ ] Compare the Manus project remote with github.com/lukerumpler/mlb-terminal and document whether they are separate sources of truth
+- [x] Stop the default MLB team load from automatically selecting the first minor-league affiliate
+- [x] Add visible spacing between provider names, cache symbols, and status labels in live source badges
+- [ ] Re-test the live Dodgers Overview after publication
