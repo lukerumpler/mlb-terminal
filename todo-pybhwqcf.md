@@ -12,6 +12,13 @@
 - [x] Add a regression test proving manual retry does not refetch same-day Savant data
 - [x] Add explicit user-facing Savant cache-age text and a UI regression test
 - [x] Record the full-suite unhandled test-environment errors and the unresolved dropdown-focus question in a QA note
-- [ ] Create the production Heartbeat job for /api/scheduled/refresh-savant after deployment is confirmed
-- [ ] Add an effect-level test that changes the manual retry path and asserts same-day Savant helpers are not called again
-- [ ] Add a rendered Overview UI test proving the visible cache-age label appears in the DOM
+- [x] Create the production Heartbeat job for /api/scheduled/refresh-savant after deployment is confirmed
+- [x] Add an effect-level test that changes the manual retry path and asserts same-day Savant helpers are not called again
+- [x] Add a rendered Overview UI test proving the visible cache-age label appears in the DOM
+- [x] Add an OverviewPage integration test that triggers the manual retry path and spies on Savant helpers
+- [x] Add an OverviewPage DOM test that verifies the visible cached-age text in the actual panel
+- [x] Compare checkpoint 36aaf482 and the editable project against GitHub main commit aa73d31
+- [x] Confirm whether Savant badge-spacing and nightly-refresh code is visible in the canonical repository
+- [x] Do not overwrite or merge divergent branch changes until the canonical source of truth is identified
+- [x] Add a retry integration test that directly mocks or spies on getTeamSavantMetrics and related Savant helpers
+- [x] Move nightly-savant-refresh from 03:00 UTC to 09:00 UTC to reduce the risk of caching incomplete late West Coast game data

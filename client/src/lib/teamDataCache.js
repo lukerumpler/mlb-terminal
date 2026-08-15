@@ -13,6 +13,10 @@ export function isSameUtcDay(firstTimestamp, secondTimestamp = Date.now()) {
     && first.toISOString().slice(0, 10) === second.toISOString().slice(0, 10);
 }
 
+export function shouldRefreshDailyCache(cached, now = Date.now()) {
+  return !cached?.updatedAt || !isSameUtcDay(cached.updatedAt, now);
+}
+
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }

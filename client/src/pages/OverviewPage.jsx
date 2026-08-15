@@ -14,7 +14,7 @@ import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
-import { DAILY_CACHE_TTL_MS, isSameUtcDay, readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache, readTeamSavantSummaryCache, saveTeamSavantSummaryCache, readTeamSavantAgainstCache, saveTeamSavantAgainstCache } from '../lib/teamDataCache.js';
+import { DAILY_CACHE_TTL_MS, shouldRefreshDailyCache, readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache, readTeamSavantSummaryCache, saveTeamSavantSummaryCache, readTeamSavantAgainstCache, saveTeamSavantAgainstCache } from '../lib/teamDataCache.js';
 import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -136,6 +136,10 @@ export function savantFreshnessLabel(data) {
   return data.status === 'cached' || data.freshness === 'cached' || data.freshness === 'stale-cached'
     ? `cached ${age}`
     : `retrieved ${age}`;
+}
+
+export function SavantFreshnessText({ data }) {
+  return <span>{savantFreshnessLabel(data)}</span>;
 }
 
 export function humanizeAffiliateOverviewState(status) {
@@ -724,7 +728,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     } else {
       const cached = readTeamSavantSummaryCache(affiliateAbbr, CURRENT_SEASON);
       if (cached?.data) setAffiliateSavant(cached.data);
-      if (!cached || !isSameUtcDay(cached.updatedAt)) {
+      if (shouldRefreshDailyCache(cached)) {
         getTeamSavantMetrics(affiliateAbbr, CURRENT_SEASON).then(savant => {
           saveTeamSavantSummaryCache(affiliateAbbr, CURRENT_SEASON, savant);
           if (alive) setAffiliateSavant(savant);
@@ -848,7 +852,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamSavantSource(source);
       setTeamSavantState(exitRows.length || batted.length || pitches.length ? 'ready' : 'unavailable');
     };
-    if (cached && isSameUtcDay(cached.updatedAt)) {
+    if (cached && !shouldRefreshDailyCache(cached)) {
       applySnapshot(cached.data, 'Baseball Savant Statcast Search · cached verified roster rollup');
       return () => { alive = false; };
     }
@@ -889,7 +893,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const cached = readTeamSavantAgainstCache(teamBase?.abbr, CURRENT_SEASON);
     const cachedRows = Array.isArray(cached?.data) ? cached.data : [];
     setTeamBattedBallAgainstRows(cachedRows);
-    if (cached && isSameUtcDay(cached.updatedAt)) {
+    if (cached && !shouldRefreshDailyCache(cached)) {
       return () => { alive = false; };
     }
     getTeamBattedBallsAgainst(teamBase?.abbr, CURRENT_SEASON).then(rows => {
@@ -938,7 +942,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     let alive = true;
     const cached = readTeamSavantSummaryCache(teamBase?.abbr, CURRENT_SEASON);
     if (cached?.data) setTeamSavantData(cached.data);
-    if (cached && isSameUtcDay(cached.updatedAt)) {
+    if (cached && !shouldRefreshDailyCache(cached)) {
       return () => { alive = false; };
     }
     getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON).then(data => {
@@ -1400,7 +1404,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div className="skip-affiliate-savant-grid" style={{padding:'0 14px 12px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8}}>
             {[['xBA',affiliateSavant?.expectedBA,3],['xSLG',affiliateSavant?.expectedSLG,3],['Hard-hit %',affiliateSavant?.hardHitPercent,1],['Barrel %',affiliateSavant?.barrelPercent,1]].map(([label,value,digits])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}{value!=null && label.includes('%')?'%':''}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}><MetricInfo label={label} /></span><OverviewSourceBadge provider="Savant" status={affiliateSavantHealthStatus} title={`Baseball Savant affiliate source: ${humanizeFeedStatus(affiliateSavant?.status, 'Not retrieved')}`} /></div></div>)}
           </div>
-          <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · {savantFreshnessLabel(affiliateSavant)}</div>
+          <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · <SavantFreshnessText data={affiliateSavant} /></div>
           {affiliateOverviewState==='error' && <div style={{padding:'0 14px 12px',...sans({fontSize:10,color:C.rust})}}>The selected affiliate’s live overview is unavailable right now. The MLB parent overview remains available above.</div>}
         </>}
         {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Triple-A standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateStandings?.status, 'Loading')}</div>{affiliateStandings?.rows?.length ? affiliateStandings.rows.slice(0,12).map((row,index)=><div key={row.id || row.name} style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
@@ -1437,7 +1441,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
           {[['Projected W',teamModelData?.advancedMetrics?.projectedWins,1,'FanGraphs',fanGraphsHealthStatus],['Projected L',teamModelData?.advancedMetrics?.projectedLosses,1,'FanGraphs',fanGraphsHealthStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
         </div>
-        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>FanGraphs projections · {modelFreshness} · {teamSavantDisplayData?.source || 'Baseball Savant'} · {savantFreshnessLabel(teamSavantDisplayData)} <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
+        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>FanGraphs projections · {modelFreshness} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
       </Panel>
       <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
         {teamVenueMetadata?.venue ? <>

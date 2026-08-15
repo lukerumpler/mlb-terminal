@@ -1,6 +1,8 @@
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { humanizeAffiliateOverviewState, resolveTeamSavantSnapshot, savantFreshnessLabel } from '../client/src/pages/OverviewPage.jsx';
-import { isSameUtcDay } from '../client/src/lib/teamDataCache.js';
+import { render, screen } from '@testing-library/react';
+import { humanizeAffiliateOverviewState, resolveTeamSavantSnapshot, SavantFreshnessText, savantFreshnessLabel } from '../client/src/pages/OverviewPage.jsx';
+import { isSameUtcDay, shouldRefreshDailyCache } from '../client/src/lib/teamDataCache.js';
 
 describe('nightly Savant refresh policy', () => {
   it('uses a two-hour-old team snapshot without making provider requests', async () => {
@@ -29,11 +31,15 @@ describe('nightly Savant refresh policy', () => {
     const lateNight = Date.parse('2026-08-15T23:00:00.000Z');
     expect(isSameUtcDay(morning, lateNight)).toBe(true);
     expect(isSameUtcDay(morning, Date.parse('2026-08-16T00:00:00.000Z'))).toBe(false);
+    expect(shouldRefreshDailyCache({ updatedAt: morning }, lateNight)).toBe(false);
+    expect(shouldRefreshDailyCache({ updatedAt: morning }, Date.parse('2026-08-16T00:00:00.000Z'))).toBe(true);
   });
 
   it('shows an explicit cached age instead of only the fused provider badge', () => {
     const retrievedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     expect(savantFreshnessLabel({ status: 'cached', retrievedAt })).toMatch(/^cached 2h ago$/);
+    render(<SavantFreshnessText data={{ status: 'cached', retrievedAt }} />);
+    expect(screen.getByText('cached 2h ago')).toBeInTheDocument();
   });
 
   it('humanizes affiliate state-machine values instead of exposing raw states', () => {
