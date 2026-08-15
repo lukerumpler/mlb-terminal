@@ -183,3 +183,9 @@
 - [x] Add loading animations and clear error messages for provider status and retry controls.
 - [x] Add regression tests for filters, sorting, loading, retry success, and retry error states.
 - [x] Verify desktop/mobile presentation and publish the validated update.
+
+- [x] Add pagination controls for larger historical MLB boxscore tables.
+- [x] Add saved filter presets for favorite boxscore team/date/sort combinations.
+- [x] Persist presets safely per player/browser and support applying and deleting them.
+- [x] Add regression tests for pagination, preset persistence, apply/delete, and responsive controls.
+- [x] Verify desktop/mobile presentation and publish the validated update.

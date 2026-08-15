@@ -1,7 +1,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { BoxscoreSplitPanel } from '../client/src/pages/PlayersPage.jsx';
+import userEvent from '@testing-library/user-event';
+import { BoxscoreSplitPanel, readBoxscoreFilterPresets, saveBoxscoreFilterPresets, boxscorePresetStorageKey } from '../client/src/pages/PlayersPage.jsx';
 import { __resetMlbClientStateForTests, getPlayerBoxscoreSplits } from '../client/src/api/mlb.js';
 
 function jsonResponse(payload, status = 200) {
@@ -55,7 +56,29 @@ describe('player boxscore split aggregation', () => {
     expect(result.pitching).toEqual([]);
   });
 
-  it('renders loading, unavailable, and live source states for hitter and pitcher profiles', () => {
+  it('persists saved filter presets per player', () => {
+    saveBoxscoreFilterPresets(123, [{ id: 'p1', name: 'Night opponents', date: '2026-08-10', team: 'Giants', sort: 'date-desc' }]);
+    expect(localStorage.getItem(boxscorePresetStorageKey(123))).toContain('Night opponents');
+    expect(readBoxscoreFilterPresets(123)[0]).toMatchObject({ name: 'Night opponents', team: 'Giants' });
+  });
+
+  it('saves, applies, and deletes a boxscore filter preset through the UI', async () => {
+    const user = userEvent.setup();
+    render(<BoxscoreSplitPanel player={{ id: 456, isPitcher: false, boxscoreSplits: {
+      status: 'live', source: 'MLB Stats API boxscores', games: 1, batting: [{ label: 'All', games: 1, plateAppearances: 4, atBats: 3, hits: 1, ops: .750 }], pitching: [], recentGames: [{ gamePk: 77, date: '2026-08-10T18:00:00Z', opponent: 'Giants', batting: { ops: .750 }, pitching: {} }],
+    } }} />);
+    await user.type(screen.getByLabelText('Preset name'), 'Giants night');
+    await user.click(screen.getByRole('button', { name: 'SAVE PRESET' }));
+    const presetOption = screen.getByRole('option', { name: 'Giants night' });
+    expect(presetOption).toBeInTheDocument();
+    const presetSelect = screen.getByRole('combobox', { name: 'Apply saved preset' });
+    await user.selectOptions(presetSelect, presetOption.value);
+    expect(readBoxscoreFilterPresets(456)[0].name).toBe('Giants night');
+    await user.click(screen.getByRole('button', { name: 'DELETE PRESET' }));
+    expect(screen.queryByRole('option', { name: 'Giants night' })).not.toBeInTheDocument();
+  });
+
+  it('renders loading, unavailable, and live source states for hitter and pitcher profiles', async () => {
     render(<BoxscoreSplitPanel player={{ id: 123, isPitcher: false, boxscoreSplits: { status: 'loading' } }} />);
     expect(screen.getByText('Checking official boxscores')).toBeInTheDocument();
     cleanup();
@@ -72,5 +95,19 @@ describe('player boxscore split aggregation', () => {
     expect(screen.getByText('Boxscore OPS Splits')).toBeInTheDocument();
     expect(screen.getByText(/MLB Stats API boxscores · Most recent 2 completed/)).toBeInTheDocument();
     expect(screen.getByText('1.214')).toBeInTheDocument();
+    cleanup();
+
+    const recentGames = Array.from({ length: 6 }, (_, index) => ({
+      gamePk: index + 1, date: `2026-08-${String(10 - index).padStart(2, '0')}T18:00:00Z`, opponent: index % 2 ? 'Giants' : 'Mets', batting: { ops: .700 + index / 100 }, pitching: {},
+    }));
+    const user = userEvent.setup();
+    render(<BoxscoreSplitPanel player={{ id: 123, isPitcher: false, boxscoreSplits: {
+      status: 'live', source: 'MLB Stats API boxscores', games: 6, batting: [{ label: 'All', games: 6, plateAppearances: 20, atBats: 18, hits: 6, ops: .800 }], pitching: [], recentGames,
+    } }} />);
+    expect(screen.getByText('Page 1 / 2')).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(8);
+    await user.click(screen.getByRole('button', { name: 'NEXT' }));
+    expect(screen.getByText('Page 2 / 2')).toBeInTheDocument();
+    expect(screen.getByText('8/5/2026')).toBeInTheDocument();
   });
 });
