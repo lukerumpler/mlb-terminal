@@ -65,9 +65,9 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
 function OverviewSourceBadge({ status, provider, title }) {
   const badge = <StatusBadge status={status} compact />;
   if (!provider) return badge;
-  return <span className="skip-overview-source-badge" title={title || `${provider} source health`} style={{display:'inline-flex',alignItems:'center',gap:8,marginInlineStart:4}}>
+  return <span className="skip-overview-source-badge" title={title || `${provider} source health`} style={{display:'inline-flex',alignItems:'center',gap:10,marginInlineStart:6}}>
     <span className="skip-overview-source-name">{provider}</span>
-    <span style={{display:'inline-flex',alignItems:'center',marginInlineStart:2}}>{badge}</span>
+    <span style={{display:'inline-flex',alignItems:'center',marginInlineStart:4}}>{badge}</span>
   </span>;
 }
 

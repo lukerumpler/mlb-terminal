@@ -63,6 +63,27 @@ const requestStarts = [];
 let activeRequests = 0;
 let queueTimer = null;
 let proxyCooldownUntil = 0;
+const providerJsonCache = new Map();
+const providerJsonInFlight = new Map();
+const PROVIDER_JSON_TTL_MS = 10 * 60_000;
+
+async function fetchProviderJson(url, { timeoutMs = 15_000, ttlMs = PROVIDER_JSON_TTL_MS } = {}) {
+  const now = Date.now();
+  const cached = providerJsonCache.get(url);
+  if (cached?.expiresAt > now) return cached.data;
+  const pending = providerJsonInFlight.get(url);
+  if (pending) return pending;
+  const request = (async () => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) throw new Error(`Provider request failed (${response.status})`);
+    const data = await response.json();
+    providerJsonCache.set(url, { data, expiresAt: Date.now() + ttlMs });
+    return data;
+  })();
+  providerJsonInFlight.set(url, request);
+  request.finally(() => providerJsonInFlight.delete(url)).catch(() => {});
+  return request;
+}
 
 function evictExpiredCache() {
   const now = Date.now();
@@ -145,6 +166,8 @@ export function __resetMlbClientStateForTests() {
   requestStarts.splice(0, requestStarts.length);
   activeRequests = 0;
   proxyCooldownUntil = 0;
+  providerJsonCache.clear();
+  providerJsonInFlight.clear();
   if (queueTimer != null) {
     globalThis.clearTimeout(queueTimer);
     queueTimer = null;
@@ -1575,11 +1598,9 @@ export async function getFirstRoundResults(year) {
 
 export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
-  const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
+    const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
   try {
-    const response = await fetch(`/api/fangraphs-models?${params.toString()}`, { signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) return null;
-    const data = await response.json();
+    const data = await fetchProviderJson(`/api/fangraphs-models?${params.toString()}`, { timeoutMs: 15_000 });
     const teams = data?.teams || [];
     const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
     let divisionAverageWAR = null;
@@ -1615,9 +1636,7 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
 export async function getTeamModelSources(teamAbbr, season = SEASON) {
   const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
   try {
-    const response = await fetch(`/api/fangraphs-models?${params.toString()}`, { signal: AbortSignal.timeout(12_000) });
-    if (!response.ok) throw new Error(`Model source request failed (${response.status})`);
-    return await response.json();
+    return await fetchProviderJson(`/api/fangraphs-models?${params.toString()}`, { timeoutMs: 12_000 });
   } catch {
     return {
       found: false,

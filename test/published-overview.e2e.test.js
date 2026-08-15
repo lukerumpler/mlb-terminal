@@ -5,6 +5,25 @@ import { chromium } from 'playwright';
 const LIVE_URL = process.env.SKIP_LIVE_URL || 'https://skipbasebal-mm6hz9ps.manus.space/?e2e=overview-default';
 let browser;
 
+async function openLivePage(url, setup) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    try {
+      if (setup) await page.addInitScript(setup);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      return page;
+    } catch (error) {
+      lastError = error;
+      await page.close().catch(() => {});
+      const message = String(error?.message || error);
+      if (!/Page crashed|Target crashed|ERR_ABORTED/i.test(message) || attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+  throw lastError;
+}
+
 describe('published Dodgers Overview', () => {
   it('keeps the MLB team selected first and separates source badges', async () => {
     browser = await chromium.launch({
@@ -12,8 +31,7 @@ describe('published Dodgers Overview', () => {
       executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
       args: ['--no-sandbox'],
     });
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    await page.goto(LIVE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    const page = await openLivePage(LIVE_URL);
     const teamSelect = page.getByRole('combobox', { name: 'Select team' });
     const affiliateSelect = page.getByRole('combobox', { name: 'Select minor league affiliate' });
     await teamSelect.waitFor({ state: 'visible', timeout: 30_000 });
@@ -31,8 +49,7 @@ describe('published Dodgers Overview', () => {
 
   it('does not dispatch affiliate selection during either fresh-load mode', async () => {
     const traces = [];
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    await page.addInitScript(() => {
+    const setupTrace = () => {
       window.__skipStartupTrace = { affiliateEvents: [], recentHistoryReads: [] };
       const originalDispatch = window.dispatchEvent.bind(window);
       window.dispatchEvent = event => {
@@ -48,9 +65,9 @@ describe('published Dodgers Overview', () => {
         }
         return originalGetItem.call(this, key);
       };
-    });
+    };
     for (const url of [LIVE_URL.replace('?e2e=overview-default', '?e2e=overview-hard-refresh'), LIVE_URL.replace('?e2e=overview-default', '?e2e=overview-cache-busted-2')]) {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      const page = await openLivePage(url, setupTrace);
       const affiliateSelect = page.getByRole('combobox', { name: 'Select minor league affiliate' });
       await affiliateSelect.waitFor({ state: 'visible', timeout: 30_000 });
       traces.push({
@@ -58,11 +75,11 @@ describe('published Dodgers Overview', () => {
         value: await affiliateSelect.inputValue(),
         trace: await page.evaluate(() => window.__skipStartupTrace),
       });
+      await page.close();
     }
     assert.deepEqual(traces.map(item => item.value), ['', '']);
     assert.equal(traces.every(item => item.trace.affiliateEvents.length === 0), true);
     assert.equal(traces.every(item => Array.isArray(item.trace.recentHistoryReads)), true);
-    await page.close();
   }, 60_000);
 
   afterAll(async () => {

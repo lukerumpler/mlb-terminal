@@ -17,6 +17,30 @@ const SPOTRAC_TAX_URL = season =>
   `https://www.spotrac.com/mlb/tax/_/year/${season}`;
 const UA =
   "Mozilla/5.0 (compatible; SKIPBaseball/1.0; +https://skipbaseball.com)";
+const FRESH_TTL_MS = 30 * 60_000;
+const STALE_TTL_MS = 6 * 60 * 60_000;
+const financialCache = new Map();
+const financialInFlight = new Map();
+
+export function __resetTeamFinancialsStateForTests() {
+  financialCache.clear();
+  financialInFlight.clear();
+}
+
+function financialCacheKey(team, season) {
+  return `${team}:${season}`;
+}
+
+function setFinancialHeaders(res, freshness) {
+  res.setHeader(
+    "Cache-Control",
+    freshness === "stale-cached"
+      ? "public, s-maxage=60, stale-while-revalidate=300"
+      : "public, s-maxage=1800, stale-while-revalidate=3600"
+  );
+  res.setHeader("X-Provider-Cache", freshness === "live" ? "MISS" : "STALE");
+  res.setHeader("X-Provider-Freshness", freshness);
+}
 
 function stripTags(html) {
   return (html || "")
@@ -218,8 +242,6 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET")
     return res.status(405).json({ error: "Method not allowed" });
-  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
-
   const url = new URL(req.url, "https://placeholder.invalid");
   const team = String(url.searchParams.get("team") || "")
     .trim()
@@ -236,40 +258,70 @@ export default async function handler(req, res) {
       .status(400)
       .json({ error: "Missing or invalid team abbreviation" });
 
-  const [payrollResult, taxResult] = await Promise.allSettled([
-    fetchHtml(SPOTRAC_PAYROLL_URL(season)).then(html =>
-      parseTeamPayrollHtml(html, team, season)
-    ),
-    fetchHtml(SPOTRAC_TAX_URL(season)).then(html =>
-      parseTeamTaxHtml(html, team, season)
-    ),
-  ]);
-  const payroll =
-    payrollResult.status === "fulfilled" ? payrollResult.value : null;
-  const tax = taxResult.status === "fulfilled" ? taxResult.value : null;
-  if (!payroll && !tax) {
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=600, stale-while-revalidate=1800"
-    );
-    return res.status(200).json({ found: false, teamAbbr: team, season });
+  const key = financialCacheKey(team, season);
+  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+  const now = Date.now();
+  const cached = financialCache.get(key);
+  if (cached?.freshUntil > now) {
+    setFinancialHeaders(res, cached.freshness);
+    return res.status(200).json(cached.payload);
   }
-  res.setHeader(
-    "Cache-Control",
-    "public, s-maxage=1800, stale-while-revalidate=3600"
-  );
-  return res
-    .status(200)
-    .json({
-      found: true,
-      teamAbbr: team,
-      season,
-      payroll,
-      tax,
-      source: "Spotrac",
-      sourceUrls: {
-        payroll: SPOTRAC_PAYROLL_URL(season),
-        tax: SPOTRAC_TAX_URL(season),
-      },
+
+  const existing = financialInFlight.get(key);
+  if (existing) {
+    const payload = await existing;
+    setFinancialHeaders(res, payload.freshness || "live");
+    return res.status(200).json(payload);
+  }
+
+  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+
+  const request = (async () => {
+    const [payrollResult, taxResult] = await Promise.allSettled([
+      fetchHtml(SPOTRAC_PAYROLL_URL(season)).then(html =>
+        parseTeamPayrollHtml(html, team, season)
+      ),
+      fetchHtml(SPOTRAC_TAX_URL(season)).then(html =>
+        parseTeamTaxHtml(html, team, season)
+      ),
+    ]);
+    const payroll =
+      payrollResult.status === "fulfilled" ? payrollResult.value : null;
+    const tax = taxResult.status === "fulfilled" ? taxResult.value : null;
+    const stale = cached?.staleUntil > Date.now() ? cached : null;
+    if (!payroll && !tax && stale) {
+      return {
+        ...stale.payload,
+        freshness: "stale-cached",
+        staleReason: "Spotrac upstream unavailable",
+      };
+    }
+    const payload = payroll || tax
+      ? {
+          found: true,
+          teamAbbr: team,
+          season,
+          payroll,
+          tax,
+          source: "Spotrac",
+          sourceUrls: {
+            payroll: SPOTRAC_PAYROLL_URL(season),
+            tax: SPOTRAC_TAX_URL(season),
+          },
+          freshness: "live",
+        }
+      : { found: false, teamAbbr: team, season, freshness: "live" };
+    financialCache.set(key, {
+      payload,
+      freshness: payload.freshness,
+      freshUntil: Date.now() + FRESH_TTL_MS,
+      staleUntil: Date.now() + FRESH_TTL_MS + STALE_TTL_MS,
     });
+    return payload;
+  })();
+  financialInFlight.set(key, request);
+  request.finally(() => financialInFlight.delete(key)).catch(() => {});
+  const payload = await request;
+  setFinancialHeaders(res, payload.freshness || "live");
+  return res.status(200).json(payload);
 }

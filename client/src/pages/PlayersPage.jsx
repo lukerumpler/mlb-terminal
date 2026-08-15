@@ -37,6 +37,13 @@ import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
+export function humanizePlayerLoadError(error, playerName = 'this player') {
+  const status = Number(error?.status);
+  if (status === 429) return `Could not load ${playerName} right now because the data provider is limiting requests. Please retry shortly.`;
+  if (status >= 500 || error?.name === 'AbortError' || error?.name === 'TimeoutError') return `Could not load ${playerName} right now because the data provider did not respond in time.`;
+  return `Could not load ${playerName}. Please retry shortly.`;
+}
+
 function pctBar(pct, color) {
   return (
     <div style={{ flex:'0 0 80px', height:5, background:C.surface3, borderRadius:3, overflow:'hidden' }}>
@@ -1615,7 +1622,7 @@ function PlayersPage() {
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
     } catch (err) {
-      if (mountedRef.current && pickSeqRef.current === mySeq) setError(`Could not load ${person.fullName}. ${err.message}`);
+      if (mountedRef.current && pickSeqRef.current === mySeq) setError(humanizePlayerLoadError(err, person.fullName));
     }
     if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
   }, []);

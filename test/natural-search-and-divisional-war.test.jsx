@@ -15,7 +15,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
 import CommandPalette from "../client/src/components/CommandPalette.jsx";
 import { routeNaturalLanguageSearch } from "../client/src/api/naturalSearch.js";
 import { searchPlayers } from "../client/src/api/mlb.js";
-import { getTeamAggregateWar } from "../client/src/api/mlb.js";
+import {
+  getTeamAggregateWar,
+  __resetMlbClientStateForTests,
+} from "../client/src/api/mlb.js";
 import { SEARCH_ANALYTICS_STORAGE_KEY } from "../client/src/lib/searchAnalytics.js";
 import { readFileSync } from "node:fs";
 
@@ -28,6 +31,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  __resetMlbClientStateForTests();
   localStorage.clear();
 });
 

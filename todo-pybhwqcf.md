@@ -79,3 +79,18 @@
 - [x] Document accept/reject decisions for the attached index.css, OverviewPage, PlayersPage, and contract hunks
 - [x] Add a direct regression test for stable rosterSavantKey identity across liveTeamPlayers object churn
 - [x] Persist a short QA note documenting accept/reject decisions for every attached patch hunk
+- [x] Establish a whole-project baseline: tests, type-check, build, logs, request traces, and runtime health
+- [x] Audit all external provider calls, cache keys, TTLs, stale-if-error behavior, and in-flight request coalescing
+- [x] Audit frontend effects, query dependencies, loading races, duplicate requests, and raw error-state rendering
+- [x] Measure and fix the highest-impact reliability or performance bottlenecks without changing metric definitions
+- [x] Add regression tests for each accepted whole-project fix
+- [x] Run the full validation suite and visual/runtime checks before checkpointing
+- [x] Investigate and fix the natural-search/divisional-WAR full-suite regression exposed after provider-cache changes
+- [x] Re-run the full suite and production build after the regression fix
+- [x] Fix the remaining FanGraphs provider/status badge spacing visible in the verified dashboard screenshot
+- [x] Add team-financials handler tests for fresh cache hits, in-flight coalescing, and stale-cached fallback
+- [x] Re-run focused and full suites after team-financials cache coverage is added
+- [x] Investigate the two published Overview E2E failures after the latest whole-project cache changes
+- [x] Re-run published E2E, full suite, and production build after the live regression is resolved or correctly isolated
+- [x] Stabilize published Overview E2E against transient live browser/page crashes without weakening assertions
+- [x] Re-run the complete test suite, type-check, and build with a clean passing result
