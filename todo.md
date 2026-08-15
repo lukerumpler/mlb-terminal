@@ -11241,3 +11241,6 @@
 - [x] Fix Savant metric rendering on OverviewPage to display actual numerical stats instead of source/cache status strings.
 - [x] Add explicit unit and rendering tests for Savant metrics and source badges.
 - [x] Run release validation, review preview, and publish release.
+- [x] Fix affiliate metric mapping for OPS, HR, ERA, and K on OverviewPage to prevent mixed-up or mismatched stats.
+- [x] Add regression tests for affiliate stats and badge separation.
+- [x] Run release validation, review preview, and publish release.

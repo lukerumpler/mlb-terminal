@@ -1612,8 +1612,16 @@ export async function getMinorLeagueTeamOverview(teamId, levelId = 11, season = 
       mlb(`/teams/${teamId}/stats`, { stats: 'season', group: 'pitching', season, sportIds: levelId }, { ttl: 5 * 60_000, timeoutMs: 6_000 }),
     ]);
     const team = teamResult.status === 'fulfilled' ? teamResult.value?.teams?.[0] : null;
-    const hitting = hittingResult.status === 'fulfilled' ? findStatGroup(hittingResult.value?.stats, 'hitting')?.splits?.[0]?.stat || {} : {};
-    const pitching = pitchingResult.status === 'fulfilled' ? findStatGroup(pitchingResult.value?.stats, 'pitching')?.splits?.[0]?.stat || {} : {};
+    const rawHitting = hittingResult.status === 'fulfilled' ? findStatGroup(hittingResult.value?.stats, 'hitting')?.splits?.[0]?.stat || {} : {};
+    const rawPitching = pitchingResult.status === 'fulfilled' ? findStatGroup(pitchingResult.value?.stats, 'pitching')?.splits?.[0]?.stat || {} : {};
+    const hitting = {
+      ops: rawHitting.ops ?? rawHitting.onBasePlusSlugging ?? null,
+      homeRuns: rawHitting.homeRuns ?? rawHitting.hr ?? null,
+    };
+    const pitching = {
+      era: rawPitching.era ?? rawPitching.earnedRunAverage ?? null,
+      strikeOuts: rawPitching.strikeOuts ?? rawPitching.strikeouts ?? rawPitching.so ?? null,
+    };
     if (!team && !Object.keys(hitting).length && !Object.keys(pitching).length) return null;
     return {
       id: team?.id || teamId,
