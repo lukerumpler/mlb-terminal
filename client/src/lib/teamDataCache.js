@@ -1,6 +1,17 @@
 const AGGREGATE_KEY = 'skip-team-aggregate-cache-v1';
 const PLAYERS_KEY = 'skip-team-player-cache-v1';
 const SAVANT_KEY = 'skip-team-savant-cache-v1';
+const SAVANT_SUMMARY_KEY = 'skip-team-savant-summary-cache-v1';
+const SAVANT_AGAINST_KEY = 'skip-team-savant-against-cache-v1';
+
+export const DAILY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export function isSameUtcDay(firstTimestamp, secondTimestamp = Date.now()) {
+  const first = new Date(Number(firstTimestamp));
+  const second = new Date(Number(secondTimestamp));
+  return Number.isFinite(first.getTime()) && Number.isFinite(second.getTime())
+    && first.toISOString().slice(0, 10) === second.toISOString().slice(0, 10);
+}
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -19,6 +30,23 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   if (!canUseStorage()) return;
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* best effort */ }
+}
+
+function readTeamCache(key, teamAbbr, season) {
+  const all = readJson(key, {});
+  const normalized = String(teamAbbr || '').toUpperCase();
+  const cached = all?.[`${season}:${normalized}`];
+  return cached && cached.data ? cached : null;
+}
+
+function saveTeamCache(key, teamAbbr, season, data) {
+  const normalized = String(teamAbbr || '').toUpperCase();
+  if (!normalized || !Number.isFinite(Number(season)) || !data) return null;
+  const all = readJson(key, {});
+  const cacheKey = `${season}:${normalized}`;
+  const cached = { season:Number(season), teamAbbr:normalized, updatedAt:Date.now(), data };
+  writeJson(key, { ...all, [cacheKey]: cached });
+  return cached;
 }
 
 export function readTeamAggregateCache(season) {
@@ -50,19 +78,27 @@ export function saveTeamPlayersCache(teamId, season, data) {
 }
 
 export function readTeamSavantCache(teamAbbr, season) {
-  const all = readJson(SAVANT_KEY, {});
-  const cached = all?.[`${season}:${String(teamAbbr || '').toUpperCase()}`];
-  return cached && cached.data ? cached : null;
+  return readTeamCache(SAVANT_KEY, teamAbbr, season);
 }
 
 export function saveTeamSavantCache(teamAbbr, season, data) {
-  const abbr = String(teamAbbr || '').toUpperCase();
-  if (!abbr || !Number.isFinite(Number(season)) || !data) return null;
-  const all = readJson(SAVANT_KEY, {});
-  const key = `${season}:${abbr}`;
-  const cached = { season:Number(season), teamAbbr:abbr, updatedAt:Date.now(), data };
-  writeJson(SAVANT_KEY, { ...all, [key]: cached });
-  return cached;
+  return saveTeamCache(SAVANT_KEY, teamAbbr, season, data);
 }
 
-export const TEAM_DATA_CACHE_KEYS = { AGGREGATE_KEY, PLAYERS_KEY, SAVANT_KEY };
+export function readTeamSavantSummaryCache(teamAbbr, season) {
+  return readTeamCache(SAVANT_SUMMARY_KEY, teamAbbr, season);
+}
+
+export function saveTeamSavantSummaryCache(teamAbbr, season, data) {
+  return saveTeamCache(SAVANT_SUMMARY_KEY, teamAbbr, season, data);
+}
+
+export function readTeamSavantAgainstCache(teamAbbr, season) {
+  return readTeamCache(SAVANT_AGAINST_KEY, teamAbbr, season);
+}
+
+export function saveTeamSavantAgainstCache(teamAbbr, season, data) {
+  return saveTeamCache(SAVANT_AGAINST_KEY, teamAbbr, season, data);
+}
+
+export const TEAM_DATA_CACHE_KEYS = { AGGREGATE_KEY, PLAYERS_KEY, SAVANT_KEY, SAVANT_SUMMARY_KEY, SAVANT_AGAINST_KEY };

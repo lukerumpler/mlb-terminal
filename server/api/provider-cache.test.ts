@@ -241,7 +241,7 @@ describe("Baseball Savant provider cache", () => {
     const url = "/api/savant?endpoint=team_exit_velocity&year=2094&team=LAX";
     const first = response();
     await savantHandler(req(url), first);
-    vi.advanceTimersByTime(60 * 60_000 + 1);
+    vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
     const stale = response();
     await savantHandler(req(url), stale);
     expect(stale.statusCode).toBe(200);

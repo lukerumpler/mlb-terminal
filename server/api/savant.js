@@ -330,8 +330,16 @@ async function fetchWithRedirects(url, maxRedirects = 3) {
   throw new Error("Too many redirects");
 }
 
-const SAVANT_CACHE_TTL_MS = 60 * 60_000;
-const SAVANT_STALE_TTL_MS = 6 * 60 * 60_000;
+// Savant is an overnight dataset for this application. Keep a successful
+// response for one day and allow a week-old snapshot during upstream trouble.
+const SAVANT_CACHE_TTL_MS = 24 * 60 * 60_000;
+const SAVANT_STALE_TTL_MS = 7 * 24 * 60 * 60_000;
+
+function nextUtcMidnightMs(now = Date.now()) {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  return next.getTime();
+}
 const SAVANT_COOLDOWN_MS = 30_000;
 const SAVANT_FAILURE_COOLDOWN_MS = 15_000;
 const savantCache = new Map();
@@ -369,6 +377,19 @@ function serveStaleSavant(res, stale) {
   res.setHeader("X-Provider-Cache", "STALE");
   res.setHeader("X-Provider-Freshness", "stale-cached");
   return res.status(200).json(stale.data);
+}
+
+export async function warmSavantCache(year = '2026') {
+  const endpoints = ['expected_statistics', 'statcast_leaderboard'];
+  for (const endpoint of endpoints) {
+    const response = {
+      headers: {},
+      status() { return response; },
+      setHeader(name, value) { response.headers[name] = value; return response; },
+      json(value) { response.body = value; return response; },
+    };
+    await handler({ method: 'GET', query: { endpoint, year }, headers: {}, socket: { remoteAddress: 'nightly-refresh' } }, response);
+  }
 }
 
 export default async function handler(req, res) {
@@ -421,7 +442,7 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=3600, stale-while-revalidate=1800"
+      "public, s-maxage=86400, stale-while-revalidate=604800"
     );
     res.setHeader("X-Provider-Cache", "HIT");
     res.setHeader("X-Provider-Freshness", "cached");
@@ -435,7 +456,7 @@ export default async function handler(req, res) {
       res.setHeader("Content-Type", "application/json; charset=utf-8");
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=3600, stale-while-revalidate=1800"
+        "public, s-maxage=86400, stale-while-revalidate=604800"
       );
       res.setHeader("X-Provider-Cache", "COALESCED");
       res.setHeader("X-Provider-Freshness", "live");
@@ -569,15 +590,15 @@ export default async function handler(req, res) {
     savantFailureCooldownUntil = 0;
     savantCache.set(key, {
       data,
-      expiresAt: Date.now() + SAVANT_CACHE_TTL_MS,
-      staleExpiresAt: Date.now() + SAVANT_CACHE_TTL_MS + SAVANT_STALE_TTL_MS,
+      expiresAt: nextUtcMidnightMs(),
+      staleExpiresAt: nextUtcMidnightMs() + SAVANT_STALE_TTL_MS,
     });
     if (savantCache.size > 300)
       savantCache.delete(savantCache.keys().next().value);
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=3600, stale-while-revalidate=1800"
+      "public, s-maxage=86400, stale-while-revalidate=604800"
     );
     res.setHeader("X-Provider-Cache", "MISS");
     res.setHeader("X-Provider-Freshness", "live");
