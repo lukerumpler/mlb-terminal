@@ -56,3 +56,12 @@
 - [x] Scope the historical hard-refresh task accurately: the original bad state is unreproducible, and only the corrected-build runtime trace is available
 - [x] Keep the current-build Playwright trace for startup events, recent-history reads, selected affiliate value, and live asset markers in the QA record
 - [x] Do not claim an exact historical root cause unless the original bad state is reproduced with equivalent runtime evidence
+- [x] Export checkpoint c89f9939 to github.com/lukerumpler/mlb-terminal without overwriting unrelated commits
+- [x] Inspect provider routes and environment handling for a staging-only failure hook
+- [x] Implement a default-off intentional provider-failure hook for staging
+- [x] Add regression tests for enabled and disabled failure-hook behavior
+- [x] Run validation and save the updated project checkpoint
+- [x] Restrict the provider-failure hook to an explicit staging environment flag and reject it in development and production
+- [x] Add a regression assertion for development denial as well as production denial
+- [x] Save a new checkpoint after the staging-gate correction
+- [ ] Save a new webdev checkpoint containing the explicit staging-only gate, updated tests, managed-secret configuration, and hook documentation

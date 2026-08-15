@@ -209,6 +209,7 @@
 //                           inferred) — see the ENDPOINTS entry below and
 //                           PitchShapePanel.jsx's own header comment.
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { authorizeProviderFailureHook, failureInjectionResponse, isFailureInjectionRequested } from "./provider-failure-hook.js";
 
 const ENDPOINTS = {
   expected_statistics: y =>
@@ -433,6 +434,14 @@ export default async function handler(req, res) {
     return res
       .status(400)
       .json({ error: `${endpoint} requires an MLB team abbreviation` });
+  }
+
+  if (isFailureInjectionRequested(req)) {
+    const authorization = authorizeProviderFailureHook(req.headers);
+    if (!authorization.allowed) {
+      return res.status(403).json({ error: "Staging failure hook is not authorized" });
+    }
+    return failureInjectionResponse(res);
   }
 
   const url = ENDPOINTS[endpoint](y, { playerId, team });
