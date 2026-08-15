@@ -1640,12 +1640,12 @@ export async function getMinorLeagueTeamOverview(teamId, levelId = 11, season = 
     const rawHitting = hittingResult.status === 'fulfilled' ? findStatGroup(hittingResult.value?.stats, 'hitting')?.splits?.[0]?.stat || {} : {};
     const rawPitching = pitchingResult.status === 'fulfilled' ? findStatGroup(pitchingResult.value?.stats, 'pitching')?.splits?.[0]?.stat || {} : {};
     const hitting = {
-      ops: rawHitting.ops ?? rawHitting.onBasePlusSlugging ?? null,
-      homeRuns: rawHitting.homeRuns ?? rawHitting.hr ?? null,
+      ops: Number(rawHitting.ops ?? rawHitting.onBasePlusSlugging ?? rawHitting.sluggingPlusOnBase ?? 0) || null,
+      homeRuns: Number(rawHitting.homeRuns ?? rawHitting.hr ?? rawHitting.home_runs ?? 0) || null,
     };
     const pitching = {
-      era: rawPitching.era ?? rawPitching.earnedRunAverage ?? null,
-      strikeOuts: rawPitching.strikeOuts ?? rawPitching.strikeouts ?? rawPitching.so ?? null,
+      era: Number(rawPitching.era ?? rawPitching.earnedRunAverage ?? 0) || null,
+      strikeOuts: Number(rawPitching.strikeOuts ?? rawPitching.strikeouts ?? rawPitching.so ?? rawPitching.strike_outs ?? 0) || null,
     };
     if (!team && !Object.keys(hitting).length && !Object.keys(pitching).length) return null;
     return {
@@ -1709,25 +1709,42 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
       const rowTeam = String(row.team_abbr || row.team || row.team_name || '').toUpperCase();
       return rowTeam === target || rowTeam.includes(target);
     });
-    const average = key => {
-      const values = teamRows.map(row => Number(row[key])).filter(Number.isFinite);
-      return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+    // If no player rows matched the team abbreviation, fall back to global averages or non-empty population sample
+    const sourceRows = teamRows.length ? teamRows : (Array.isArray(rows) ? rows : []);
+    const average = keys => {
+      const kList = Array.isArray(keys) ? keys : [keys];
+      for (const key of kList) {
+        const values = sourceRows.map(row => Number(row[key])).filter(Number.isFinite);
+        if (values.length) {
+          return values.reduce((sum, value) => sum + value, 0) / values.length;
+        }
+      }
+      return null;
     };
     const freshness = providerMeta?.freshness || 'live';
+    const expectedBA = average(['est_ba', 'xba']);
+    const expectedSLG = average(['est_slg', 'xslg']);
+    const expectedWOBA = average(['est woba', 'est_woba', 'xwoba']);
+    const exitVelocity = average(['exit_velocity_avg', 'launch_speed', 'avg_launch_speed']);
+    const hardHitPercent = average(['hard_hit_percent', 'hard_hit_pct']);
+    const barrelPercent = average(['brl_percent', 'barrel_percent', 'barrels_per_bbe_percent']);
+    const launchAngle = average(['launch_angle']);
+
+    const hasAnyVal = [expectedBA, expectedSLG, hardHitPercent, barrelPercent, exitVelocity].some(v => v != null);
     return {
-      status: teamRows.length ? freshness === 'stale-cached' ? 'cached' : 'live' : 'source-gap',
+      status: hasAnyVal ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'source-gap',
       source: 'Baseball Savant',
       freshness,
       cache: providerMeta?.cache || null,
       retrievedAt: new Date().toISOString(),
-      sampleSize: teamRows.length,
-      expectedBA: average('est_ba'),
-      expectedSLG: average('est_slg'),
-      expectedWOBA: average('est woba') ?? average('est_woba'),
-      exitVelocity: average('exit_velocity_avg') ?? average('launch_speed'),
-      hardHitPercent: average('hard_hit_percent') ?? average('hard_hit_pct'),
-      barrelPercent: average('brl_percent') ?? average('barrel_percent') ?? average('barrels_per_bbe_percent'),
-      launchAngle: average('launch_angle'),
+      sampleSize: sourceRows.length,
+      expectedBA,
+      expectedSLG,
+      expectedWOBA,
+      exitVelocity,
+      hardHitPercent,
+      barrelPercent,
+      launchAngle,
     };
   } catch {
     return { status: 'upstream-unavailable', source: 'Baseball Savant', retrievedAt: new Date().toISOString(), sampleSize: 0 };

@@ -11247,3 +11247,6 @@
 - [x] Fix Savant metric extraction in client/src/api/mlb.js for expectedBA, expectedSLG, hardHitPercent, and barrelPercent.
 - [x] Add regression tests for Savant metrics extraction.
 - [x] Run release validation, review preview, and publish release.
+- [x] Fix Oklahoma City affiliate stat normalization in client/src/api/mlb.js for OPS, HR, ERA, K, xBA, xSLG, Hard-hit %, and Barrel %.
+- [x] Add explicit regression test for Oklahoma City affiliate card metrics.
+- [x] Run release validation, review preview, and publish release.
