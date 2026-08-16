@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatProfileMetric,
+  savantField,
   getLivePerformanceItems,
   metricPopulationPercentile,
   buildSavantPercentileAxes,
@@ -54,6 +55,20 @@ describe("player profile data accuracy guards", () => {
       "28.2%",
       "86.4%",
     ]);
+  });
+
+  it("reads renamed Savant aliases consistently without turning missing fields into estimates", () => {
+    expect(savantField({ anglesweetspotpercent: 31.2 }, ["sweet_spot_percent", "anglesweetspotpercent"])).toBe(31.2);
+    expect(savantField({ barrel_percent: 9.4 }, ["brl_percent", "barrel_percent", "barrels_per_bbe_percent"])).toBe(9.4);
+    expect(savantField({ ev95percent: 44.1 }, ["hard_hit_percent", "ev95percent", "hard_hit_pct"])).toBe(44.1);
+    expect(savantField({ sweet_spot_percent: 0 }, ["sweet_spot_percent", "anglesweetspotpercent"])).toBe(0);
+    expect(savantField({}, ["brl_percent", "barrel_percent"])).toBeUndefined();
+
+    expect(getLivePerformanceItems({
+      anglesweetspotpercent: 31.2,
+      barrel_percent: 9.4,
+      ev95percent: 44.1,
+    }).slice(2, 5).map(item => item.val)).toEqual(["31.2%", "9.4%", "44.1%"]);
   });
 
   it("normalizes Baseball Savant spray coordinates and preserves hover metrics", () => {

@@ -178,6 +178,32 @@
 - [ ] Compare current project intelligence-calculation and FanGraphs daily-gate files with GitHub origin/main
 - [ ] Verify the published checkpoint endpoint and provenance behavior against the current source
 - [ ] Document any divergence between GitHub, project checkpoint, and deployed behavior without claiming unsupported features
-- [ ] Inspect current GitHub main divergence and local uncommitted changes before export
-- [ ] Push the verified Manus project changes to a safe GitHub branch or commit without overwriting unrelated work
-- [ ] Verify the remote commit and provide the exact GitHub review URL
+- [x] Inspect current GitHub main divergence and local uncommitted changes before export
+- [x] Push the verified Manus project changes to a safe GitHub branch or commit without overwriting unrelated work
+- [x] Verify the remote commit and provide the exact GitHub review URL
+- [x] Read and classify the attached pasted content into actionable requests and unsupported claims
+- [x] Compare its requested changes against the current Manus project and GitHub export branch
+- [x] Confirmed compatible changes are already present; did not reapply redundant Savant or contract patches, and preserved source-of-truth documentation
+- [x] Validated the export and opened GitHub pull request #1 for review; Player Profile tab restructure remains separate
+- [x] Check out PR #1 head 73c5300d in an isolated worktree without modifying main
+- [x] Run the PR head’s full test suite, TypeScript check, and production build independently
+- [x] Report actual validation results before any merge decision
+- [x] Read and classify pr1-test-path-fix.patch
+- [x] Compare the patch against PR #1 head and apply only compatible test-path changes
+- [x] Rerun affected and full validation after any patch application
+- [x] Update PR #1 with the verified patch result without merging main
+- [x] Inspect Savant URL builders, headers, response parsing, and affected metric mappings
+- [x] Verified live Savant response content through the exact URL families; responses were CSV with data rows, not interactive HTML
+- [x] Confirmed the current proxy already rejects HTML before CSV parsing; no production parser repair was warranted
+- [x] Added HTML-response rejection coverage, documented the endpoint verification, and passed focused/full tests, type-check, and build
+- [x] Finish reading the supplied legacy UI, CSS, and implementation files
+- [x] Compare legacy endpoint and data-loading guidance with the current project
+- [x] Identify safe reusable fixes and reject hardcoded, fabricated, or obsolete legacy behavior
+- [x] Report which legacy files materially help the current debugging and optimization work
+- [ ] Verify both PlayersPage Savant field-usage sites and the documented column aliases
+- [ ] Normalize sweet-spot, hard-hit, and barrel fields consistently without estimates
+- [ ] Add regression coverage for alias handling and missing-field behavior
+- [ ] Run focused and full validation for the PlayersPage mapping fix
+- [ ] Run full validation and inspect runtime health for the PlayersPage Savant alias fix
+- [ ] Commit and push the Savant alias normalization to the existing PR review branch
+- [ ] Verify the updated PR head and report the review link
