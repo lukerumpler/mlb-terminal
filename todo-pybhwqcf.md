@@ -226,4 +226,4 @@
 - [x] Show Contract & Service Time as pending while supplemental player data is still loading, instead of implying verified data is absent
 - [x] Add a core-first Player Profile regression proving core data renders before supplemental data resolves
 - [x] Run full validation and review the final Player Profile data contract
-- [ ] Push the verified Player Profile loading changes to PR #1 review branch
+- [x] Push the verified Player Profile loading changes to PR #1 review branch
