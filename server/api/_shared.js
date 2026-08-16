@@ -12,28 +12,36 @@
 // Set ALLOWED_ORIGIN in your Vercel project's environment variables to a
 // comma-separated list of the domain(s) this app is actually served from,
 // e.g.  ALLOWED_ORIGIN=https://skip.yourdomain.com,https://www.yourdomain.com
-// Until that's set, this falls back to the previous permissive behavior
-// so nothing breaks — but it should be set before a public launch.
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGIN || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+// In local development and tests, keep the permissive behavior for convenience.
+// In production, an unset allowlist means no cross-origin browser access is
+// granted. Same-origin requests do not need a CORS header.
+function configuredCorsOrigins() {
+  return (process.env.ALLOWED_ORIGIN || "")
+    .split(",")
+    .map(s => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
 
 export function applyCors(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.length === 0) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
-  } else if (!origin) {
+  const allowedOrigins = configuredCorsOrigins();
+  const isProduction = process.env.NODE_ENV === "production";
+  const origin = String(req.headers.origin || "").replace(/\/$/, "");
+  if (allowedOrigins.length === 0 && !isProduction) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  } else if (!origin && allowedOrigins.length > 0) {
     // Same-origin navigation / server-to-server calls send no Origin header.
-    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS[0]);
+    // The first configured origin is safe for preflight-compatible clients.
+    res.setHeader("Access-Control-Allow-Origin", allowedOrigins[0]);
+  } else if (origin) {
+    // Origin present but not on the allowlist: omit the header so browsers
+    // block the response from being read by an unrelated site.
+    res.setHeader("Vary", "Origin");
   }
-  // else: Origin present but not on the allowlist — omit the header
-  // entirely so the browser blocks the response from being read.
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
 }
 
 // --- Rate limiting --------------------------------------------------------
@@ -48,9 +56,14 @@ const hits = new Map(); // `${bucket}:${ip}` -> timestamps[]
 const WINDOW_MS = 10_000;
 const MAX_PER_WINDOW = 30;
 
-export function isRateLimited(req, bucket = 'shared') {
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
-    .split(',')[0].trim();
+export function isRateLimited(req, bucket = "shared") {
+  const ip = (
+    req.headers["x-forwarded-for"] ||
+    req.socket?.remoteAddress ||
+    "unknown"
+  )
+    .split(",")[0]
+    .trim();
   const key = `${bucket}:${ip}`;
   const now = Date.now();
   const recent = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);
@@ -61,6 +74,10 @@ export function isRateLimited(req, bucket = 'shared') {
 }
 
 export function rateLimitResponse(res) {
-  res.setHeader('Retry-After', '10');
-  return res.status(429).json({ error: 'Too many requests — please slow down and try again shortly.' });
+  res.setHeader("Retry-After", "10");
+  return res
+    .status(429)
+    .json({
+      error: "Too many requests — please slow down and try again shortly.",
+    });
 }

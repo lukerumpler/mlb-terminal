@@ -11,6 +11,7 @@ import CompareModal from '../components/CompareModal.jsx';
 import ScatterBuilder from '../components/ScatterBuilder.jsx';
 import { useWatchlist } from '../lib/watchlist.js';
 import { compareValues } from '../lib/sorting.js';
+import { buildFarmSystemSummary } from '../lib/farmSystemScore.js';
 
 /* ── Live MiLB Scoreboard ─────────────────────────────────────── */
 const MILB_LEVEL_COLOR = {
@@ -274,8 +275,51 @@ function useFarmRankings() {
   }, []);
 }
 
-function FarmRankingsPanel() {
-  const rankings = useFarmRankings();
+function FarmSystemSummaryCard({ summary }) {
+  const scoreColor = summary.score == null ? C.text3 : summary.score >= 80 ? C.teal : summary.score >= 65 ? C.amber : summary.score >= 50 ? C.slate : C.rust;
+  const topRows = summary.rows.slice(0, 5);
+  return (
+    <Panel title="Farm System Summary" accent={C.purple} badge={summary.score == null ? 'Score unavailable' : `${summary.score} / 100`}>
+      <div className="skip-farm-summary-main" style={{ display:'grid', gridTemplateColumns:'minmax(150px, .8fr) minmax(0, 2fr)', gap:14, padding:'12px 14px 10px' }}>
+        <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', minWidth:0 }}>
+          <div style={px({ fontSize:34, fontWeight:900, lineHeight:1, color:scoreColor })}>{summary.score == null ? '—' : summary.score}</div>
+          <div style={sans({ fontSize:11, fontWeight:800, color:scoreColor, marginTop:5 })}>{summary.scoreBand}</div>
+          <div style={sans({ fontSize:9.5, color:C.text3, lineHeight:1.45, marginTop:7 })}>
+            Derived from {summary.trackedCount || 'no'} tracked prospects across {summary.representedOrgs || 'no'} represented organizations.
+          </div>
+        </div>
+        <div className="skip-farm-summary-rankings" style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
+          {topRows.length ? topRows.map((row, index) => {
+            const teamInfo = TEAMS[row.team.toLowerCase()];
+            const bar = row.metrics.score == null ? 0 : row.metrics.score;
+            return (
+              <div key={row.team} style={{ padding:'8px 9px', border:`1px solid ${C.borderLight}`, borderRadius:7, background:C.surface2, minWidth:0 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                  <span style={px({ fontSize:9, color:C.text4, width:14, flexShrink:0 })}>#{index + 1}</span>
+                  <TeamLogo abbr={row.team} size={16} />
+                  <span style={sans({ fontSize:10.5, fontWeight:800, color:C.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' })}>{teamInfo?.name ?? row.team}</span>
+                  <span style={{ marginLeft:'auto', ...px({ fontSize:11, fontWeight:900, color:scoreColor }) }}>{row.metrics.score == null ? '—' : row.metrics.score}</span>
+                </div>
+                <div style={{ height:5, marginTop:7, borderRadius:4, background:C.surface3, overflow:'hidden' }}>
+                  <div style={{ width:`${bar}%`, height:'100%', borderRadius:4, background:scoreColor, transition:'width 180ms cubic-bezier(.23,1,.32,1)' }} />
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:6, marginTop:5, ...px({ fontSize:8.5, color:C.text3 }) }}>
+                  <span>{row.count} tracked</span><span>Best #{row.bestRank}</span>
+                </div>
+              </div>
+            );
+          }) : <div style={{ gridColumn:'1 / -1', padding:'18px 10px', textAlign:'center', ...sans({ fontSize:10.5, color:C.text3 }) }}>No verified prospect rankings are available for this snapshot.</div>}
+        </div>
+      </div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:12, padding:'8px 14px', borderTop:`0.5px solid ${C.borderLight}`, ...sans({ fontSize:9.5, color:C.text3 }) }}>
+        <span><strong style={{ color:C.text2 }}>Score model:</strong> 40% depth · 40% average rank quality · 20% best rank quality</span>
+        <span><strong style={{ color:C.text2 }}>Pool:</strong> tracked Top {summary.poolSize || '—'} snapshot</span>
+      </div>
+    </Panel>
+  );
+}
+
+function FarmRankingsPanel({ rankings }) {
   return (
     <Panel title="Farm System Depth" accent={C.slate} badge={`${rankings.length} orgs represented`}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:0 }}>
@@ -388,6 +432,12 @@ function ProspectsPage() {
   const [cardId,  setCardId]  = useState(null);
   const [sortKey, setSortKey] = useState('rank');
   const [sortAsc, setSortAsc] = useState(true);
+  const farmRankings = useFarmRankings();
+  const farmSummary = useMemo(() => buildFarmSystemSummary({
+    rankings: farmRankings,
+    trackedCount: PROSPECT_BATTERS.length + PROSPECT_PITCHERS.length,
+    poolSize: Math.max(0, ...[...PROSPECT_BATTERS, ...PROSPECT_PITCHERS].map(player => Number(player.rank) || 0)),
+  }), [farmRankings]);
 
   const [liveStats, setLiveStats] = useState(null);
   const [liveLoading, setLiveLoading] = useState(true);
@@ -649,7 +699,9 @@ function ProspectsPage() {
 
       <MiLBScoreboardPanel />
 
-      <FarmRankingsPanel />
+      <FarmSystemSummaryCard summary={farmSummary} />
+
+      <FarmRankingsPanel rankings={farmRankings} />
 
       {/* ── View tabs ── */}
       <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>

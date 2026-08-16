@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { mlb } from '../client/src/api/mlb.js';
+import { describe, it, expect, afterEach } from "vitest";
+import { mlb } from "../client/src/api/mlb.js";
 
 // Regression coverage for a bug found in a debug pass: mlb() called
 // res.json() unconditionally after an ok status check, so a 200 response
@@ -11,24 +11,32 @@ import { mlb } from '../client/src/api/mlb.js';
 // load" fallback the rest of the app is supposed to show everywhere else.
 
 const realFetch = global.fetch;
-afterEach(() => { global.fetch = realFetch; });
+afterEach(() => {
+  global.fetch = realFetch;
+});
 
 function mockNonJsonResponse() {
-  global.fetch = () => Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.reject(new SyntaxError("Unexpected token '/', \"/**\" is not valid JSON")),
-    text: () => Promise.resolve('/** raw source, not JSON **/'),
-  });
+  global.fetch = () =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.reject(
+          new SyntaxError("Unexpected token '/', \"/**\" is not valid JSON")
+        ),
+      text: () => Promise.resolve("/** raw source, not JSON **/"),
+    });
 }
 
-describe('mlb() — non-JSON response handling', () => {
-  it('throws a clean, readable Error instead of a raw JSON SyntaxError', async () => {
+describe("mlb() — non-JSON response handling", () => {
+  it("throws a clean, readable Error instead of a raw JSON SyntaxError", async () => {
     mockNonJsonResponse();
-    await expect(mlb('/test/non-json-path', {}, { cache: false })).rejects.toThrow();
+    await expect(
+      mlb("/test/non-json-path", {}, { cache: false })
+    ).rejects.toThrow();
     try {
-      await mlb('/test/non-json-path-2', {}, { cache: false });
-      expect.unreachable('should have thrown');
+      await mlb("/test/non-json-path-2", {}, { cache: false });
+      expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(Error);
       expect(err.message).not.toMatch(/Unexpected token/);

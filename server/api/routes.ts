@@ -32,14 +32,21 @@ export async function registerLegacyApiRoutes(app: Express) {
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./feed.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./news.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./contract.js"),
     // Server-side structured AI comparison summary; credentials stay inside invokeLLM.
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./comparison-summary.js"),
+    // Natural-language search intent router; credentials stay inside invokeLLM.
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./natural-search.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./team-financials.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./fangraphs-models.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./intelligence-calculations.js"),
   ])) as ApiModule[];
 
   const paths = [
@@ -47,10 +54,13 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/ncaa",
     "/api/savant",
     "/api/feed",
+    "/api/news",
     "/api/contract",
     "/api/comparison-summary",
+    "/api/natural-search",
     "/api/team-financials",
     "/api/fangraphs-models",
+    "/api/intelligence-calculations",
   ] as const;
   paths.forEach((path, index) => {
     app.all(path, wrapLegacyHandler(modules[index].default));
@@ -79,8 +89,10 @@ export const legacyApiPaths = [
   "/api/ncaa",
   "/api/savant",
   "/api/feed",
+  "/api/news",
   "/api/contract",
   "/api/comparison-summary",
+  "/api/natural-search",
 ] as const;
 
 void legacyApiPaths;

@@ -40,6 +40,7 @@ duplicate them:
 ---
 
 ## 1. Pitch Shape panel for pitchers
+
 `[ ]` **Priority: High · Effort: L**
 
 **Source images:** Kyle Bradish card, Ramon Marquez / Henry Lalane TJStats-style
@@ -54,6 +55,7 @@ arm angle labeled), no usage split vs. LHH/RHH, no per-pitch grade table
 chase%, whiff%, xwOBAcon).
 
 **What to build:**
+
 - New Savant endpoint in `api/savant.js` (pitch-arsenal / pitch-movement
   leaderboard, `player_type=pitcher`)
 - New `PitchShapePanel` component: 3 sub-charts (velocity KDE per pitch,
@@ -68,6 +70,7 @@ with velocity, break, and usage-by-handedness, sourced from live Savant data
 ---
 
 ## 2. Modern plate-discipline percentiles
+
 `[~]` **Priority: High · Effort: M**
 
 **Source images:** TJStats mobile percentile screen, Ketel Marte / Pete
@@ -90,6 +93,7 @@ fabricated `50`) when there's no pool data to rank against — `ProspectCard`'s
 silent mid-track marker.
 
 **Still open — don't silently mark this `[x]`:**
+
 - **CSW% and SwStr% are not implemented.** No confirmed raw column for
   either on the batter-side `statcast_leaderboard` CSV this app pulls, and
   deriving them from other fields would be a guess wearing a percent sign.
@@ -120,14 +124,15 @@ blocked on Roadmap #1.
 ---
 
 ## 3. Contact-location heatmap
+
 `[ ]` **Priority: Medium · Effort: M**
 
 **Source image:** Ketel Marte card — "Contact / Intercept Point" heatmap,
 split Bats Right / Bats Left for switch hitters.
 
-**Current state:** `SprayChart` exists but shows *where batted balls land in
-the field*. This is a different thing — *where contact is made relative to
-the plate/zone*. Not currently built.
+**Current state:** `SprayChart` exists but shows _where batted balls land in
+the field_. This is a different thing — _where contact is made relative to
+the plate/zone_. Not currently built.
 
 **What to build:** New heatmap component keyed on contact-point x/y (needs a
 Savant field for this, or an approximation from swing/plate-discipline data
@@ -140,6 +145,7 @@ ball events; switch hitters get both a Bats Right and Bats Left panel.
 ---
 
 ## 4. Color-by-stat scatter (upgrade, not new)
+
 `[x]` **Priority: Low · Effort: S**
 
 **Source image:** "2026 MiLB Pitchers U20" scatter — WHIP vs. K-BB%, colored
@@ -182,6 +188,7 @@ one new test added on top of the prior 27).
 ---
 
 ## 5. Historical trade analytics
+
 `[ ]` **Priority: High · Effort: L**
 
 **Source images:** Freylitics "Team Success Rate on Trade Deadline Week
@@ -195,6 +202,7 @@ history. The README's own roadmap already flags "Trade Sim · Standalone WAR
 projection model" as planned (Phase 4b) — this item fulfills that.
 
 **What to build:**
+
 - A curated/static dataset of historical deadline-week trades (date,
   teams, players each way, rWAR or netWAR outcome) in `constants/data.js`,
   similar in spirit to the existing `DRAFT_BOARD`/`FARM_GRADES` static data
@@ -211,6 +219,7 @@ trades with computed outcomes, sortable, with a team-level success-rate chart.
 ---
 
 ## 6. Farm system board upgrade
+
 `[~]` **Priority: Medium · Effort: M**
 
 **Source image:** Full farm-system ranking sheet — FV, Position, B/T, Age,
@@ -275,6 +284,7 @@ both batters and pitchers. Acquired-via not met — see above.
 ---
 
 ## 7. Compact team-branded percentile radar cards
+
 `[ ]` **Priority: Low · Effort: S**
 
 **Source images:** Brewers-style small hexagon radar cards (Avg LA 95+, EV
@@ -296,6 +306,7 @@ their team's colors, with the 6 stats listed above.
 ---
 
 ## 8. Live pitch-charting tool
+
 `[ ]` **Priority: Low (large, different category) · Effort: XL**
 
 **Source image:** Interactive strike-zone charting UI — 9-zone (+expanded

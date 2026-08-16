@@ -1,14 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { buildExitVelocityBins } from '../client/src/pages/OverviewPage.jsx';
+import { describe, expect, it } from "vitest";
+import { buildExitVelocityBins } from "../client/src/pages/OverviewPage.jsx";
 
-describe('team exit-velocity distribution', () => {
-  it('bins verified launch speeds into 5 mph ranges with percentages', () => {
+describe("team exit-velocity distribution", () => {
+  it("bins verified launch speeds into 5 mph ranges with percentages", () => {
     const bins = buildExitVelocityBins([
       { launch_speed: 91.2 },
       { launch_speed: 92.8 },
       { launch_speed: 97.1 },
       { launch_speed: null },
-      { launch_speed: 'not-a-number' },
+      { launch_speed: "not-a-number" },
     ]);
 
     expect(bins).toEqual([
@@ -17,8 +17,10 @@ describe('team exit-velocity distribution', () => {
     ]);
   });
 
-  it('returns no chart bins when the source has no verified launch speeds', () => {
+  it("returns no chart bins when the source has no verified launch speeds", () => {
     expect(buildExitVelocityBins([])).toEqual([]);
-    expect(buildExitVelocityBins([{ launch_speed: null }, { launch_speed: '—' }])).toEqual([]);
+    expect(
+      buildExitVelocityBins([{ launch_speed: null }, { launch_speed: "—" }])
+    ).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SKIP · Scouting Knowledge & Intelligence Platform</title>
     <meta name="description" content="SKIP is a baseball intelligence terminal for scouting, prospect evaluation, and roster decisions — live MLB stats, MiLB prospect tracking, and SKIP's own decision-score models in one dashboard." />
     <meta name="theme-color" content="#FAF7F2" media="(prefers-color-scheme: light)" />
@@ -116,6 +116,9 @@
         .skip-content select { max-width:100%; }
         .overview-responsive-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
         .overview-responsive-grid > * { min-width:0; }
+        .overview-team-metrics { min-width:0; max-width:100%; gap:16px !important; }
+        .overview-team-metrics > div { flex:0 1 auto; min-width:58px !important; }
+        .overview-team-metric-value { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .skip-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         .skip-stat-strip > div { min-height:78px; }
         .skip-sidebar button:hover { transform:none !important; }
@@ -132,6 +135,8 @@
     </style>
     <style>
       @media (max-width: 720px) {
+        .overview-team-metrics { width:100%; flex-wrap:nowrap !important; overflow-x:auto; overscroll-behavior-x:contain; padding:2px 2px 6px; scrollbar-width:thin; }
+        .overview-team-metrics > div { flex:0 0 76px; }
         .skip-mobile-nav-toggle { display:inline-flex !important; }
         .skip-sidebar { position:fixed !important; inset:0 auto 0 0; z-index:80; width:min(286px, calc(100vw - 48px)) !important; transform:translateX(-105%); transition:transform 180ms cubic-bezier(.23,1,.32,1); box-shadow:none !important; }
         .skip-sidebar.skip-mobile-nav-open { transform:translateX(0); box-shadow:14px 0 34px rgba(20,31,48,.18) !important; }
@@ -143,6 +148,37 @@
         .skip-mobile-nav-backdrop { display:block; position:fixed; inset:0; z-index:70; border:0; background:rgba(15,24,38,.34); backdrop-filter:blur(2px); }
       }
       @media (prefers-reduced-motion: reduce) { .skip-sidebar { transition:none !important; } }
+    </style>
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        .skip-feed-skeleton [style*="animation"] { animation: none !important; opacity: .72; }
+      }
+      @media (max-width: 720px) {
+        .skip-overview-page .skip-affiliate-overview-grid {
+          display: flex !important;
+          flex-wrap: wrap !important;
+          align-items: flex-start !important;
+          gap: 8px !important;
+        }
+        .skip-overview-page .skip-affiliate-overview-grid > div:first-child {
+          flex: 1 1 100% !important;
+          width: 100% !important;
+          grid-column: auto !important;
+        }
+        .skip-overview-page .skip-affiliate-overview-grid > div:not(:first-child) {
+          flex: 1 1 0 !important;
+          min-width: 0 !important;
+          text-align: center !important;
+          padding-left: 4px !important;
+          padding-right: 4px !important;
+        }
+      }
+    </style>
+    <style>
+      @media (max-width: 720px) {
+        .skip-farm-summary-main { grid-template-columns: 1fr !important; gap: 10px !important; }
+        .skip-farm-summary-rankings { grid-template-columns: 1fr !important; }
+      }
     </style>
     <script>
       // Apply saved/system theme before first paint to avoid a flash of the wrong theme.

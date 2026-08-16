@@ -8,7 +8,7 @@ import {
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import { SEASON, TEAMS } from '../constants/data.js';
 import { SKIP_QUOTES } from '../constants/alerts.js';
-import { searchPlayers, loadFullPlayer } from '../api/mlb.js';
+import { searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
 import {
   computeKPIs, decisionScore, verdict, verdictColor,
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
@@ -17,11 +17,11 @@ import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx
 import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
-import SourceProvenanceDrawer, { ProvenanceButton } from '../components/SourceProvenanceDrawer.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
+import { buildReconciliationRows, buildDataQualityPayload, downloadDataQualityExport } from '../lib/dataQuality.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
 import ScoutingGradesPreview from '../components/ScoutingGradesPreview.jsx';
@@ -36,6 +36,13 @@ import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, down
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
+
+export function humanizePlayerLoadError(error, playerName = 'this player') {
+  const status = Number(error?.status);
+  if (status === 429) return `Could not load ${playerName} right now because the data provider is limiting requests. Please retry shortly.`;
+  if (status >= 500 || error?.name === 'AbortError' || error?.name === 'TimeoutError') return `Could not load ${playerName} right now because the data provider did not respond in time.`;
+  return `Could not load ${playerName}. Please retry shortly.`;
+}
 
 function pctBar(pct, color) {
   return (
@@ -404,6 +411,18 @@ export function profileMetricValue(value) {
 export function formatProfileMetric(value, digits = 1, suffix = '') {
   const n = profileMetricValue(value);
   return n == null ? '—' : `${n.toFixed(digits)}${suffix}`;
+}
+
+// Savant has renamed several CSV columns across leaderboard families. Read
+// verified aliases consistently and preserve missing values as unavailable.
+export function savantField(row, aliases) {
+  const source = row || {};
+  for (const key of aliases) {
+    if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+      return source[key];
+    }
+  }
+  return undefined;
 }
 
 // Pure — no hooks, no rendering — so it can be reused anywhere the same
@@ -846,9 +865,9 @@ function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStat
     { lbl:'xBA', val:formatProfileMetric(estBa, 3), raw:estBa, pct:savantPercentile(estBa, expectedPopulation, ['est_ba']) },
     { lbl:'xSLG', val:formatProfileMetric(estSlg, 3), raw:estSlg, pct:savantPercentile(estSlg, expectedPopulation, ['est_slg']) },
     { lbl:'Bat Speed', val:formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw:profileMetricValue(bt.avg_bat_speed), pct:savantPercentile(bt.avg_bat_speed, batTrackingRows, ['avg_bat_speed']) },
-    { lbl:'Sweet Spot %', val:formatProfileMetric(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, 1, '%'), raw:profileMetricValue(sv.sweet_spot_percent ?? sv.anglesweetspotpercent), pct:savantPercentile(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
-    { lbl:'Barrel %', val:formatProfileMetric(sv.brl_percent, 1, '%'), raw:profileMetricValue(sv.brl_percent), pct:savantPercentile(sv.brl_percent, statcastPopulationRows, ['brl_percent']) },
-    { lbl:'Hard Hit %', val:formatProfileMetric(sv.hard_hit_percent ?? sv.ev95percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent ?? sv.ev95percent), pct:savantPercentile(sv.hard_hit_percent ?? sv.ev95percent, statcastPopulationRows, ['hard_hit_percent','ev95percent']) },
+    { lbl:'Sweet Spot %', val:formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent'])), pct:savantPercentile(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
+    { lbl:'Barrel %', val:formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent'])), pct:savantPercentile(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), statcastPopulationRows, ['brl_percent','barrel_percent','barrels_per_bbe_percent']) },
+    { lbl:'Hard Hit %', val:formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%'), raw:profileMetricValue(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct'])), pct:savantPercentile(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), statcastPopulationRows, ['hard_hit_percent','ev95percent','hard_hit_pct']) },
     { lbl:'Expected ISO', val:formatProfileMetric(expectedIso, 3), raw:expectedIso, pct:expectedIsoPercentile(expectedIso) },
     { lbl:'Contact Quality', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
     { lbl:'Swing Decisions', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
@@ -1463,9 +1482,9 @@ export function getLivePerformanceItems(savant) {
   return [
     { lbl:'Exit Velocity', val: formatProfileMetric(sv.avg_hit_speed, 1, ' mph') },
     { lbl:'Launch Angle',  val: formatProfileMetric(sv.launch_angle_avg, 1, '°') },
-    { lbl:'Sweet Spot %',  val: formatProfileMetric(sv.sweet_spot_percent, 1, '%') },
-    { lbl:'Barrel %',      val: formatProfileMetric(sv.brl_percent, 1, '%') },
-    { lbl:'Hard Hit %',    val: formatProfileMetric(sv.hard_hit_percent, 1, '%') },
+    { lbl:'Sweet Spot %',  val: formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%') },
+    { lbl:'Barrel %',      val: formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%') },
+    { lbl:'Hard Hit %',    val: formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%') },
     { lbl:'Chase Rate',    val: formatProfileMetric(sv.oz_swing_percent, 1, '%') },
     { lbl:'Zone Contact',  val: formatProfileMetric(sv.z_contact_percent, 1, '%') },
   ];
@@ -1557,6 +1576,7 @@ function PlayersPage() {
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
+  const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
@@ -1609,16 +1629,42 @@ function PlayersPage() {
     setPlayer(null);
     setError(null);
     try {
-      const data = await loadFullPlayer(person, SEASON);
+      const data = await loadFullPlayer(person, SEASON, {
+        onCoreReady: core => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
+        },
+      });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
     } catch (err) {
-      if (mountedRef.current && pickSeqRef.current === mySeq) setError(`Could not load ${person.fullName}. ${err.message}`);
+      if (mountedRef.current && pickSeqRef.current === mySeq) setError(humanizePlayerLoadError(err, person.fullName));
     }
     if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const onProviderRetry = event => {
+      if (event.detail?.provider === 'boxscore') setBoxscoreRetryToken(token => token + 1);
+    };
+    window.addEventListener('skip-provider-retry', onProviderRetry);
+    return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
+  }, []);
+  useEffect(() => {
+    if (!player || boxscoreRetryToken === 0) return undefined;
+    let alive = true;
+    getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
+      .then(boxscoreSplits => {
+        if (alive) {
+          setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+          window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider: 'boxscore', message: 'MLB boxscore data refreshed.' } }));
+        }
+      })
+      .catch(() => {
+        if (alive) window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'boxscore', message: 'MLB boxscore data could not be refreshed. The previous verified state remains visible.' } }));
+      });
+    return () => { alive = false; };
+  }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
     const onOpenExternalPlayer = e => {
       const detail = e.detail;
@@ -1746,7 +1792,12 @@ function PlayersPage() {
         )}
       </div>
 
-      {loading && <PlayerProfileSkeleton />}
+      {loading && !player && <PlayerProfileSkeleton />}
+      {player?.extrasLoading && (
+        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
+          Core MLB profile loaded. Supplemental Savant, contract, financial, and boxscore data are still loading; unavailable values are not estimates.
+        </div>
+      )}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,
@@ -1817,7 +1868,7 @@ function HandednessSplitComparison({ splits }) {
 }
 
 /* ─── Contract panel (stable component — not IIFE) ─────────────────── */
-function ContractPanel({ contractData: ct }) {
+function ContractPanel({ contractData: ct, loading = false }) {
   const hasVerifiedContract = Boolean(ct?.contractAvailable);
   const statusColor = !ct || !hasVerifiedContract             ? C.text3
     : ct.status === 'Under Contract'                         ? C.teal
@@ -1843,13 +1894,17 @@ function ContractPanel({ contractData: ct }) {
           borderBottom:`0.5px solid ${C.borderLight}`, marginBottom:8 }}>
           <div style={{ width:8, height:8, borderRadius:'50%', background: ct ? statusColor : C.border, flexShrink:0 }} />
           <span style={sans({ fontSize:12, fontWeight:800, color: ct ? statusColor : C.text3 })}>
-            {ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
+            {loading && !ct ? 'Loading contract data' : ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
           </span>
         </div>
         {rows.map(([lbl, val], i) => (
           <KVRow key={lbl} label={lbl} value={val} last={i === rows.length - 1} />
         ))}
-        {ct && !hasVerifiedContract && (
+        {loading && !ct ? (
+          <div role="status" style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
+            Contract and service-time sources are still loading; no absence is being inferred.
+          </div>
+        ) : ct && !hasVerifiedContract && (
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
             Connected sources resolved the player identity, but no verified contract dollar fields were returned.
           </div>
@@ -1874,10 +1929,107 @@ function ProfileStatusState({ status = 'Unavailable', message, detail }) {
 function formatBoxscoreRate(value, digits = 3) {
   return value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits);
 }
+export function ReconciliationPanel({ player }) {
+  const isPitcher = Boolean(player?.isPitcher);
+  const boxscore = player?.boxscoreSplits;
+  const aggregate = player?.stats || {};
+  const boxscoreRows = isPitcher ? (boxscore?.pitching || []) : (boxscore?.batting || []);
+  const all = boxscoreRows.find(row => row.label === 'All');
+  const rows = buildReconciliationRows({ aggregate, boxscore: all, isPitcher });
+  const payload = buildDataQualityPayload({ player, rows, context: 'Player Profile reconciliation' });
+  const hasBoxscore = boxscore?.status === 'live' && Boolean(all);
+  const filenameBase = `skip-${String(player?.fullName || player?.name || 'player').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'player'}-reconciliation-${player?.statSeason || 'current'}`;
+  return (
+    <Panel title="Aggregate vs Boxscore Reconciliation" accent={C.purple} badge={hasBoxscore ? 'Verified comparison' : 'Unavailable'}>
+      <div className="skip-reconciliation-toolbar">
+        <div className="skip-reconciliation-copy">Compares MLB season aggregates with the most recent official boxscore window. Variances are shown, not silently corrected.</div>
+        <div className="skip-reconciliation-actions">
+          <button type="button" onClick={() => downloadDataQualityExport(payload, 'csv', filenameBase)} disabled={!rows.length}>CSV</button>
+          <button type="button" onClick={() => downloadDataQualityExport(payload, 'json', filenameBase)} disabled={!rows.length}>JSON</button>
+        </div>
+      </div>
+      {!hasBoxscore ? (
+        <div className="skip-reconciliation-empty" role="status">
+          <strong>Boxscore comparison unavailable</strong>
+          <span>{boxscore?.reason || 'No verified official boxscore window is available for this player.'}</span>
+        </div>
+      ) : (
+        <>
+          <div className="skip-long-table"><table className="skip-profile-splits-table skip-reconciliation-table"><thead><tr><th>Metric</th><th>Aggregate</th><th>Boxscore</th><th>Variance</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.metric}><td>{row.metric}</td><td>{row.aggregate == null ? '—' : row.aggregate}</td><td>{row.boxscore == null ? '—' : row.boxscore}</td><td>{row.variance == null ? '—' : row.variance > 0 ? `+${row.variance}` : row.variance}</td><td><span className={`skip-reconciliation-status is-${row.status}`}>{row.status === 'match' ? 'Match' : row.status === 'variance' ? 'Variance' : 'Incomplete'}</span></td></tr>)}</tbody></table></div>
+          <div className="skip-profile-source-strip">Aggregate: {payload.sources.aggregate.source} · retrieved {payload.sources.aggregate.retrievedAt ? new Date(payload.sources.aggregate.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'} · Boxscores: {payload.sources.boxscore.source} · retrieved {payload.sources.boxscore.retrievedAt ? new Date(payload.sources.boxscore.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+export function filterAndSortBoxscoreGames(games, { date = '', team = '', sort = 'date-desc' } = {}) {
+  const normalizedTeam = String(team || '').trim().toLowerCase();
+  return (Array.isArray(games) ? games : [])
+    .filter(game => {
+      const gameDate = String(game?.date || '').slice(0, 10);
+      const opponent = String(game?.opponent || '').toLowerCase();
+      return (!date || gameDate === date) && (!normalizedTeam || opponent.includes(normalizedTeam));
+    })
+    .sort((a, b) => {
+      const dateA = String(a?.date || '');
+      const dateB = String(b?.date || '');
+      const teamA = String(a?.opponent || '').toLowerCase();
+      const teamB = String(b?.opponent || '').toLowerCase();
+      if (sort === 'team-asc') return teamA.localeCompare(teamB);
+      if (sort === 'team-desc') return teamB.localeCompare(teamA);
+      return sort === 'date-asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+    });
+}
+
+export const BOXSCORE_PAGE_SIZE = 5;
+export function boxscorePresetStorageKey(playerId) { return `skip-boxscore-filter-presets:${playerId || 'unknown'}`; }
+export function readBoxscoreFilterPresets(playerId) {
+  if (!playerId || typeof localStorage === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(boxscorePresetStorageKey(playerId)) || '[]');
+    return Array.isArray(parsed) ? parsed.filter(preset => preset && preset.name) : [];
+  } catch { return []; }
+}
+export function saveBoxscoreFilterPresets(playerId, presets) {
+  if (!playerId || typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(boxscorePresetStorageKey(playerId), JSON.stringify(presets)); } catch { /* best effort */ }
+}
+
 export function BoxscoreSplitPanel({ player }) {
   const data = player?.boxscoreSplits;
   const isPitcher = Boolean(player?.isPitcher);
   const rows = isPitcher ? (data?.pitching || []) : (data?.batting || []);
+  const [dateFilter, setDateFilter] = useState('');
+  const [teamFilter, setTeamFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('date-desc');
+  const [page, setPage] = useState(0);
+  const [presetName, setPresetName] = useState('');
+  const [presets, setPresets] = useState([]);
+  const [activePresetId, setActivePresetId] = useState('');
+  const recentGames = useMemo(() => filterAndSortBoxscoreGames(data?.recentGames, { date: dateFilter, team: teamFilter, sort: sortOrder }), [data?.recentGames, dateFilter, teamFilter, sortOrder]);
+  const pageCount = Math.max(1, Math.ceil(recentGames.length / BOXSCORE_PAGE_SIZE));
+  const pagedGames = recentGames.slice(page * BOXSCORE_PAGE_SIZE, (page + 1) * BOXSCORE_PAGE_SIZE);
+  useEffect(() => {
+    setPresets(readBoxscoreFilterPresets(player?.id));
+    setActivePresetId('');
+    setPage(0);
+  }, [player?.id]);
+  useEffect(() => { setPage(0); }, [dateFilter, teamFilter, sortOrder]);
+  const savePreset = () => {
+    const name = presetName.trim();
+    if (!name || !player?.id) return;
+    const next = [...presets.filter(preset => preset.name.toLowerCase() !== name.toLowerCase()), { id: `preset-${Date.now()}`, name, date: dateFilter, team: teamFilter, sort: sortOrder }].slice(-12);
+    setPresets(next); saveBoxscoreFilterPresets(player.id, next); setPresetName('');
+  };
+  const applyPreset = preset => {
+    if (!preset) return;
+    setDateFilter(preset.date || ''); setTeamFilter(preset.team || ''); setSortOrder(preset.sort || 'date-desc'); setActivePresetId(preset.id || '');
+  };
+  const deletePreset = presetId => {
+    const next = presets.filter(preset => preset.id !== presetId);
+    setPresets(next); saveBoxscoreFilterPresets(player?.id, next); if (activePresetId === presetId) setActivePresetId('');
+  };
   const title = isPitcher ? 'Boxscore ERA Splits' : 'Boxscore OPS Splits';
   const detail = isPitcher
     ? 'Earned runs and innings are aggregated from official MLB game boxscores in the recent sample.'
@@ -1890,19 +2042,64 @@ export function BoxscoreSplitPanel({ player }) {
   }
   return <Panel title={title} accent={C.teal} badge={`${data.games} games`}>
     <div className="skip-profile-source-strip">{data.source} · {data.windowLabel || 'Recent completed games'} · retrieved {data.retrievedAt ? new Date(data.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
+    <div className="skip-data-controls" aria-label="MLB boxscore game filters">
+      <label>Date<input type="date" value={dateFilter} onChange={event => setDateFilter(event.target.value)} /></label>
+      <label>Team<input type="search" value={teamFilter} onChange={event => setTeamFilter(event.target.value)} placeholder="Search opponent" /></label>
+      <label>Sort<select value={sortOrder} onChange={event => setSortOrder(event.target.value)}><option value="date-desc">Newest date</option><option value="date-asc">Oldest date</option><option value="team-asc">Team A–Z</option><option value="team-desc">Team Z–A</option></select></label>
+      {(dateFilter || teamFilter) && <button type="button" onClick={() => { setDateFilter(''); setTeamFilter(''); setActivePresetId(''); }}>Clear</button>}
+      <div className="skip-boxscore-presets" aria-label="Saved boxscore filter presets">
+        <input aria-label="Preset name" value={presetName} onChange={event => setPresetName(event.target.value)} placeholder="Preset name" />
+        <button type="button" onClick={savePreset} disabled={!presetName.trim()}>SAVE PRESET</button>
+        {presets.length > 0 && <select aria-label="Apply saved preset" value={activePresetId} onChange={event => applyPreset(presets.find(preset => preset.id === event.target.value))}><option value="">Apply preset…</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>}
+        {activePresetId && <button type="button" onClick={() => deletePreset(activePresetId)}>DELETE PRESET</button>}
+      </div>
+    </div>
     <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th>Split</th><th>G</th>{isPitcher ? <><th>GS</th><th>IP</th><th>ER</th><th>K</th><th>BB</th><th>ERA</th><th>WHIP</th></> : <><th>PA</th><th>AB</th><th>H</th><th>HR</th><th>BB</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th></>}</tr></thead><tbody>{rows.map(row => <tr key={row.label}><td>{row.label}</td><td>{row.games}</td>{isPitcher ? <><td>{row.gamesStarted || '—'}</td><td>{row.inningsPitched ? row.inningsPitched.toFixed(1) : '—'}</td><td>{row.earnedRuns || '—'}</td><td>{row.strikeOuts || '—'}</td><td>{row.walksAllowed || '—'}</td><td>{formatBoxscoreRate(row.era, 2)}</td><td>{formatBoxscoreRate(row.whip, 3)}</td></> : <><td>{row.plateAppearances || '—'}</td><td>{row.atBats || '—'}</td><td>{row.hits || '—'}</td><td>{row.homeRuns || '—'}</td><td>{row.walks || '—'}</td><td>{formatBoxscoreRate(row.avg)}</td><td>{formatBoxscoreRate(row.obp)}</td><td>{formatBoxscoreRate(row.slg)}</td><td>{formatBoxscoreRate(row.ops)}</td></>}</tr>)}</tbody></table></div>
+    {recentGames.length > 0 && <div className="skip-recent-boxscore-games" aria-label="Recent MLB boxscore games">
+      <div className="skip-profile-panel-note">Filtered recent games: {recentGames.length} · Page {Math.min(page + 1, pageCount)} of {pageCount}</div>
+      <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr><th>Date</th><th>Opponent</th><th>{isPitcher ? 'ERA' : 'OPS'}</th></tr></thead><tbody>{pagedGames.map(game => <tr key={game.gamePk || `${game.date}-${game.opponent}`}><td>{game.date ? new Date(game.date).toLocaleDateString() : '—'}</td><td>{game.opponent || 'Team unavailable'}</td><td>{formatBoxscoreRate(isPitcher ? game.pitching?.era : game.batting?.ops, isPitcher ? 2 : 3)}</td></tr>)}</tbody></table></div>
+      <div className="skip-boxscore-pagination" aria-label="Boxscore table pagination">
+        <button type="button" onClick={() => setPage(current => Math.max(0, current - 1))} disabled={page === 0}>PREVIOUS</button>
+        <span>Page {Math.min(page + 1, pageCount)} / {pageCount}</span>
+        <button type="button" onClick={() => setPage(current => Math.min(pageCount - 1, current + 1))} disabled={page >= pageCount - 1}>NEXT</button>
+      </div>
+    </div>}
     <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
   </Panel>;
 }
+export function buildRecentGameSeries(boxscoreSplits, metric = 'ops', limit = 10) {
+  const games = Array.isArray(boxscoreSplits?.recentGames) ? boxscoreSplits.recentGames : [];
+  return games.slice(0, limit).map(game => {
+    const raw = game?.batting?.[metric];
+    return raw == null || raw === '' ? null : Number(raw);
+  }).filter(Number.isFinite).reverse();
+}
+
+export function MetricSparkline({ values, tone }) {
+  const numeric = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
+  if (numeric.length < 2) return <div className="skip-summary-sparkline-unavailable">Last 10 games unavailable</div>;
+  const min = Math.min(...numeric);
+  const max = Math.max(...numeric);
+  const span = max - min || 1;
+  const points = numeric.map((value, index) => `${(index / (numeric.length - 1)) * 100},${28 - ((value - min) / span) * 22}`).join(' ');
+  return (
+    <div className="skip-summary-sparkline-wrap" aria-label={`Last ${numeric.length} games trend`}>
+      <svg className="skip-summary-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-hidden="true">
+        <polyline points={points} fill="none" stroke={tone} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span>Last {numeric.length} games</span>
+    </div>
+  );
+}
+
 function PlayerProfile({ player, derived, onCompare }) {
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
-  const [provenanceOpen, setProvenanceOpen] = useState(false);
-  const provenanceTriggerRef = useRef(null);
   const [expandedChart, setExpandedChart] = useState(null);
+  const [expandedSummary, setExpandedSummary] = useState(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
   const [noteText, setNoteText] = useState('');
   const [noteCategory, setNoteCategory] = useState('Scouting');
@@ -1949,15 +2146,6 @@ function PlayerProfile({ player, derived, onCompare }) {
     ['Statcast', Boolean(player.savant), 'Savant'],
     ['Contract', hasProfileContractMetadata, 'Spotrac'],
   ];
-  const profileProvenance = useMemo(() => [
-    { label:'Player identity', status:p?.id ? 'verified' : 'unavailable', available:Boolean(p?.id), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:p?.id ? '1 player record' : null, method:'Direct identity and team-position metadata.' },
-    { label:'Season statistics', status:(s?.gamesPlayed || s?.atBats || s?.inningsPitched) ? 'verified' : 'unavailable', available:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), provider:'MLB Stats API', retrieved:'Timestamp not supplied', sampleSize:player.isPitcher ? `${s?.inningsPitched ?? '—'} IP` : `${s?.plateAppearances ?? '—'} PA`, method:'Direct season stat line; missing fields remain unavailable.' },
-    { label:'Statcast metrics', status:player.savant ? 'verified' : 'unavailable', available:Boolean(player.savant), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.statcastPopulation?.length ? `${player.statcastPopulation.length.toLocaleString()} comparison rows` : 'Player row only', method:'Direct player metrics; percentile ranks compare against the supplied current-season population.' },
-    { label:'Tracking and pitch context', status:(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length) ? 'verified' : 'unavailable', available:Boolean(player.batTracking || player.pitcherPitches?.length || player.pitchArsenal?.length), provider:'Baseball Savant', retrieved:'Timestamp not supplied', sampleSize:player.pitcherPitches?.length ? `${player.pitcherPitches.length.toLocaleString()} pitches` : player.batTrackingPopulation?.length ? `${player.batTrackingPopulation.length.toLocaleString()} tracking rows` : null, method:'Player-level tracking or pitch rows grouped into profile panels.' },
-    { label:'Contract and service time', status:hasProfileContractMetadata ? 'verified' : 'unavailable', available:hasProfileContractMetadata, provider:'Spotrac', retrieved:'Timestamp not supplied', sampleSize:hasProfileContractMetadata ? '1 player record' : null, method:'Direct contract/service metadata; unavailable dollar fields are not estimated.' },
-    { label:'SKIP decision metrics', status:'estimated', available:true, provider:'SKIP model', retrieved:'Computed from current player inputs', sampleSize:'Current supplied player record', method:'Deterministic transformations of verified MLB/Savant inputs; not an independent external source.' },
-  ], [p, s, player]);
-
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
   // default amber for anyone outside that set rather than showing nothing.
@@ -1982,6 +2170,26 @@ function PlayerProfile({ player, derived, onCompare }) {
   const quickStats = player.isPitcher
     ? [['ERA',s.era?(+s.era).toFixed(2):'—'],['K',dashIfMissing(s.strikeOuts)],['W',dashIfMissing(s.wins)],['WHIP',s.whip?(+s.whip).toFixed(3):'—']]
     : [['AVG',fmt(s.avg)],['HR',dashIfMissing(s.homeRuns)],['RBI',dashIfMissing(s.rbi)],['OPS',fmt(s.ops)]];
+  const percentileOf = (value, population) => {
+    const numeric = Number(value);
+    const values = (Array.isArray(population) ? population : []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!Number.isFinite(numeric) || !values.length) return null;
+    return Math.round((values.filter(candidate => candidate <= numeric).length / values.length) * 100);
+  };
+  const currentOps = Number(s.ops);
+  const priorOps = careerRows.slice(1).map(row => Number(row.stat?.ops)).find(Number.isFinite);
+  const opsDelta = Number.isFinite(currentOps) && Number.isFinite(priorOps) ? currentOps - priorOps : null;
+  const statcastValue = player.savant?.est_woba ?? player.savant?.avg_hit_speed ?? null;
+  const recentOpsSeries = buildRecentGameSeries(player.boxscoreSplits, 'ops', 10);
+  const statcastPopulation = player.savant?.est_woba != null
+    ? (player.statcastPopulation || []).map(row => row?.est_woba)
+    : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
+  const performanceSummary = [
+    { label:'WAR', value:dashIfMissing(player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:player.advancedMetrics?.war != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.purple },
+    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber },
+    { label:'wRC+', value:dashIfMissing(player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:player.advancedMetrics?.wrcPlus != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.teal },
+    { label:'Statcast', value:statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : '—', detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:player.savant ? 'Baseball Savant' : 'Unavailable', trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy },
+  ];
 
   const runPdfExport = async kind => {
     if (pdfExportState === 'loading') return;
@@ -2205,10 +2413,36 @@ function PlayerProfile({ player, derived, onCompare }) {
           <div style={px({ fontSize:9.5, color:C.text4 })}>{seasonLabel}</div>
         </div>
             </div>
-      <SourceProvenanceDrawer open={provenanceOpen} onClose={() => setProvenanceOpen(false)} returnFocusRef={provenanceTriggerRef} context={`${p.fullName || player.fullName || 'Player'} · ${seasonLabel}`} entries={profileProvenance} />
+
+      <div className="skip-performance-summary" role="region" aria-label="Performance Summary">
+        <div className="skip-performance-summary-heading">Performance Summary <span>Current season · verified inputs only</span></div>
+        <div className="skip-performance-summary-grid">
+          {performanceSummary.map(metric => {
+            const isExpanded = expandedSummary === metric.label;
+            return (
+              <div className={`skip-performance-summary-card ${isExpanded ? 'is-expanded' : ''}`} key={metric.label}>
+                <button type="button" className="skip-performance-summary-card-button" aria-expanded={isExpanded} aria-controls={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`} onClick={() => setExpandedSummary(isExpanded ? null : metric.label)}>
+                  <span className="skip-performance-summary-card-label">{metric.label}</span>
+                  <span className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</span>
+                  <span className="skip-performance-summary-card-detail">{metric.detail}</span>
+                  <span className={`skip-performance-summary-card-trend ${metric.trend.startsWith('▼') ? 'is-down' : metric.trend.startsWith('▲') ? 'is-up' : ''}`}>{metric.trend}</span>
+                  <span className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</span>
+                  <span className="skip-performance-summary-card-expand">{isExpanded ? 'Hide details' : 'Details'}</span>
+                </button>
+                {isExpanded && <div className="skip-performance-summary-card-expanded" id={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`}>
+                  <div>{metric.definition}</div>
+                  <MetricSparkline values={metric.series} tone={metric.tone} />
+                  <strong>Provider:</strong> {metric.source}<br />
+                  <strong>Context:</strong> {metric.trend}
+                </div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
-        <ProvenanceButton ref={provenanceTriggerRef} onClick={() => setProvenanceOpen(true)} label="SOURCES" />
         {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
       </div>
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
@@ -2234,6 +2468,7 @@ function PlayerProfile({ player, derived, onCompare }) {
           )}
           {activeTab === 'splits' && (
             <div className="skip-profile-tab-grid splits-grid">
+              <ReconciliationPanel player={player} />
               <BoxscoreSplitPanel player={player} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
@@ -2651,7 +2886,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
           <PlayerVideoPanel player={player} profile={p} accent={teamAccent} />
 
-          <ContractPanel contractData={player.contractData} />
+          <ContractPanel contractData={player.contractData} loading={player.extrasLoading} />
 
           <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} confidence={dataConfidence} />
 
