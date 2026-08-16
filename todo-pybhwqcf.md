@@ -296,4 +296,9 @@
 - [x] Eliminate confirmed Overview duplicate requests without suppressing independent verified provider coverage
 - [x] Refactor only confirmed long-line/ownership hazards with regression coverage
 - [x] Run focused tests, full suite, type-check, build, and visual checks after each accepted slice
-- [ ] Save final checkpoints and deliver the completed autonomous optimization summary
+- [x] Save final checkpoints and deliver the completed autonomous optimization summary
+
+- [x] Audit optional Player Profile boxscore request volume, cache reuse, and cancellation trade-offs
+- [x] Reduce verified optional boxscore fan-out without changing the displayed data’s source or provenance
+- [x] Add focused request-count, cache, and partial-availability regressions for Player Profile boxscore enrichment
+- [x] Run focused tests, full suite, type-check, production build, visual checks, and save the next checkpoint

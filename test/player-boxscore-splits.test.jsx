@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BoxscoreSplitPanel, readBoxscoreFilterPresets, saveBoxscoreFilterPresets, boxscorePresetStorageKey } from '../client/src/pages/PlayersPage.jsx';
-import { __resetMlbClientStateForTests, getPlayerBoxscoreSplits } from '../client/src/api/mlb.js';
+import { __getMlbRequestTraceForTests, __resetMlbClientStateForTests, getPlayerBoxscoreSplits } from '../client/src/api/mlb.js';
 
 function jsonResponse(payload, status = 200) {
   return {
@@ -78,6 +78,103 @@ describe('player boxscore split aggregation', () => {
     expect(allBatting.atBats).toBe(4);
     expect(allBatting.hits).toBe(2);
     expect(allBatting.homeRuns).toBe(1);
+  });
+
+  it('caps optional player boxscore work at ten games and reuses the verified five-minute snapshot', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async url => {
+        const urlStr = String(url);
+        if (urlStr.includes('schedule')) {
+          return jsonResponse({
+            dates: [{
+              games: Array.from({ length: 12 }, (_, index) => ({
+                gamePk: index + 1,
+                gameDate: `2026-08-${String(12 - index).padStart(2, '0')}T18:00:00Z`,
+                dayNight: 'night',
+                status: { abstractGameState: 'Final' },
+              })),
+            }],
+          });
+        }
+        if (urlStr.includes('boxscore')) {
+          return jsonResponse({
+            teams: {
+              home: {
+                players: {
+                  ID123: {
+                    person: { id: 123, fullName: 'Test Player' },
+                    stats: { batting: { atBats: 4, hits: 1, plateAppearances: 4 } },
+                  },
+                },
+              },
+            },
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    const [first, concurrent] = await Promise.all([
+      getPlayerBoxscoreSplits(123, 238, 2026),
+      getPlayerBoxscoreSplits(123, 238, 2026),
+    ]);
+    const second = await getPlayerBoxscoreSplits(123, 238, 2026);
+
+    expect(first).toMatchObject({ status: 'live', requestedGames: 10, games: 10 });
+    expect(first.windowLabel).toContain('Most recent 10 completed regular-season games');
+    expect(concurrent).toBe(first);
+    expect(second).toBe(first);
+    expect(fetch).toHaveBeenCalledTimes(11);
+    expect(__getMlbRequestTraceForTests().filter(event => event.event === 'queued')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ priority: 'optional', stage: 'optional', screen: 'player-profile', key: expect.stringContaining(encodeURIComponent('/schedule')) }),
+      expect.objectContaining({ priority: 'optional', stage: 'optional', screen: 'player-profile', key: expect.stringContaining(encodeURIComponent('/game/1/boxscore')) }),
+    ]));
+  });
+
+  it('retains verified available rows when individual optional boxscores are unavailable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async url => {
+        const urlStr = String(url);
+        if (urlStr.includes('schedule')) {
+          return jsonResponse({
+            dates: [{
+              games: [1, 2, 3].map(gamePk => ({
+                gamePk,
+                gameDate: `2026-08-0${gamePk}T18:00:00Z`,
+                dayNight: 'day',
+                status: { abstractGameState: 'Final' },
+              })),
+            }],
+          });
+        }
+        if (urlStr.includes(encodeURIComponent('/game/2/boxscore'))) {
+          return jsonResponse({ teams: { home: { players: {} } } });
+        }
+        if (urlStr.includes('boxscore')) {
+          return jsonResponse({
+            teams: {
+              home: {
+                players: {
+                  ID123: {
+                    person: { id: 123, fullName: 'Test Player' },
+                    stats: { batting: { atBats: 4, hits: 2, plateAppearances: 4 } },
+                  },
+                },
+              },
+            },
+          });
+        }
+        return jsonResponse({});
+      })
+    );
+
+    await expect(getPlayerBoxscoreSplits(123, 238, 2026)).resolves.toMatchObject({
+      status: 'live',
+      requestedGames: 3,
+      games: 2,
+    });
   });
 
   it('renders boxscore pagination and local preset controls', async () => {

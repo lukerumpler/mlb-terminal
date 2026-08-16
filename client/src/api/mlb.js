@@ -344,6 +344,7 @@ export function __resetMlbClientStateForTests() {
   providerJsonInFlight.clear();
   teamFinancialsCache.clear();
   contractClientCache.clear();
+  playerBoxscoreSplitsCache.clear();
   if (queueTimer != null) {
     globalThis.clearTimeout(queueTimer);
     queueTimer = null;
@@ -843,7 +844,11 @@ function finalizeBoxscoreBucket(bucket, kind) {
   }
   return out;
 }
-export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON) {
+const playerBoxscoreSplitsCache = new Map();
+const PLAYER_BOXSCORE_SPLITS_TTL_MS = 5 * 60_000;
+const MAX_PLAYER_BOXSCORE_GAMES = 10;
+
+async function loadPlayerBoxscoreSplits(playerId, teamId, season, requestOptions) {
   const id = Number(playerId);
   const clubId = Number(teamId);
   const unavailable = (reason = 'No completed official boxscores were returned for this player.') => ({ status: 'unavailable', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: 0, requestedGames: 0, reason, batting: [], pitching: [], recentGames: [] });
@@ -852,13 +857,14 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     const today = new Date();
     const startDate = `${season}-03-01`;
     const endDate = season === today.getUTCFullYear() ? today.toISOString().slice(0, 10) : `${season}-10-05`;
-    const schedule = await mlb('/schedule', { sportId: 1, teamId: clubId, startDate, endDate, gameType: 'R', hydrate: 'team' }, { ttl: 5 * 60_000, timeoutMs: 12_000, quietStatuses:[502, 503, 504] });
-    const games = (schedule?.dates || []).flatMap(date => date.games || []).filter(game => String(game.status?.abstractGameState || '').toLowerCase() === 'final').sort((a, b) => String(b.gameDate || '').localeCompare(String(a.gameDate || ''))).slice(0, 30);
+    const boxscoreRequest = { priority:'optional', stage:'optional', screen:'player-profile', ...requestOptions };
+    const schedule = await mlb('/schedule', { sportId: 1, teamId: clubId, startDate, endDate, gameType: 'R', hydrate: 'team' }, { ttl: 5 * 60_000, timeoutMs: 12_000, quietStatuses:[502, 503, 504], ...boxscoreRequest });
+    const games = (schedule?.dates || []).flatMap(date => date.games || []).filter(game => String(game.status?.abstractGameState || '').toLowerCase() === 'final').sort((a, b) => String(b.gameDate || '').localeCompare(String(a.gameDate || ''))).slice(0, MAX_PLAYER_BOXSCORE_GAMES);
     if (!games.length) return unavailable('No completed regular-season games were returned for the current team and season.');
     const results = [];
     for (const game of games) {
       try {
-        const boxscore = await getGameBoxscore(game.gamePk);
+        const boxscore = await getGameBoxscore(game.gamePk, boxscoreRequest);
         const row = findBoxscorePlayer(boxscore, id);
         if (row) results.push({ game, row });
       } catch { /* one unavailable boxscore must not erase verified rows from other games */ }
@@ -898,6 +904,29 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
   } catch (error) {
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }
+}
+
+export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON, requestOptions = {}) {
+  const id = Number(playerId);
+  const clubId = Number(teamId);
+  if (!Number.isFinite(id) || !Number.isFinite(clubId) || id <= 0 || clubId <= 0) {
+    return loadPlayerBoxscoreSplits(playerId, teamId, season, requestOptions);
+  }
+  const cacheKey = `${id}:${clubId}:${season}`;
+  const cached = playerBoxscoreSplitsCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) playerBoxscoreSplitsCache.delete(cacheKey);
+  const promise = loadPlayerBoxscoreSplits(id, clubId, season, requestOptions).then(result => {
+    // Keep only verified, complete aggregation snapshots. An unavailable
+    // result stays retryable rather than becoming a five-minute local miss.
+    if (result?.status !== 'live') playerBoxscoreSplitsCache.delete(cacheKey);
+    return result;
+  });
+  playerBoxscoreSplitsCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + PLAYER_BOXSCORE_SPLITS_TTL_MS,
+  });
+  return promise;
 }
 export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onImportantReady, signal } = {}) {
   const id = person.id;
@@ -1009,7 +1038,11 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // published. This lowers the immediate request burst after selection and
   // prevents slower per-pitch and full-leaderboard queries from delaying data
   // that is already verified and ready to display.
-  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
+  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season, {
+    priority: 'optional',
+    stage: 'optional',
+    screen: 'player-profile',
+  });
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
   // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
@@ -1379,7 +1412,7 @@ export async function getTeamVenueMetadata(teamId) {
 export function __resetTeamVenueMetadataCacheForTests() { teamVenueMetadataCache.clear(); }
 
 export async function getGameLinescore(gamePk) { return mlb(`/game/${gamePk}/linescore`); }
-export async function getGameBoxscore(gamePk)  { return mlb(`/game/${gamePk}/boxscore`); }
+export async function getGameBoxscore(gamePk, requestOptions = {})  { return mlb(`/game/${gamePk}/boxscore`, {}, requestOptions); }
 
 // Play-by-play — works for both MLB and MiLB
 // MiLB: pitch x/y pixel coords available; Statcast-level data NOT available.
