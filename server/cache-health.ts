@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import { apiCacheTelemetry } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -51,6 +51,21 @@ export function recordCacheOutcome(provider: string, outcome: CacheOutcome, now 
   void request.finally(() => {
     if (writeInFlight.get(telemetryKey) === request) writeInFlight.delete(telemetryKey);
   });
+}
+
+export function retentionCutoffDay(now = Date.now()) {
+  const cutoff = new Date(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  return cutoff.toISOString().slice(0, 10);
+}
+
+export async function cleanupExpiredCacheTelemetry(now = Date.now()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable for cache telemetry cleanup");
+  const cutoffDay = retentionCutoffDay(now);
+  const result = await db.delete(apiCacheTelemetry).where(lt(apiCacheTelemetry.day, cutoffDay));
+  const metadata = result as unknown as { affectedRows?: number; rowsAffected?: number };
+  return { cutoffDay, deletedRows: Number(metadata.affectedRows || metadata.rowsAffected || 0) };
 }
 
 export async function readCacheHealth(now = Date.now()) {

@@ -249,3 +249,10 @@
 - [x] Add regression coverage for durable hits, stale fallback, telemetry counters, and request reduction
 - [x] Run focused tests, full suite, type-check, production build, and visual/runtime checks
 - [x] Save a checkpoint and report the verified cache-health results
+
+- [x] Inspect existing Heartbeat setup, scheduled route registration, and telemetry schema
+- [x] Define idempotent 30-day retention boundary and daily UTC cleanup schedule
+- [x] Implement the cron-only cleanup endpoint and database deletion
+- [x] Add regression coverage for retention boundary, auth, and retry-safe behavior
+- [x] Run focused tests, full suite, type-check, and production build
+- [x] Save a checkpoint and report the deployment/schedule requirement
