@@ -1,4 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../server/durable-cache.ts', () => ({
+  readDurableCache: vi.fn(async () => null),
+  writeDurableCache: vi.fn(async () => undefined),
+}));
 import handler, { __resetFanGraphsProviderStateForTests, __seedFanGraphsModelCacheForTests } from '../server/api/fangraphs-models.js';
 
 function makeResponse() {
