@@ -15,6 +15,13 @@
       "when": 1786916160469,
       "tag": "0001_open_dreaming_celestial",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786917171864,
+      "tag": "0002_shiny_susan_delgado",
+      "breakpoints": true
     }
   ]
 }
