@@ -256,3 +256,14 @@
 - [x] Add regression coverage for retention boundary, auth, and retry-safe behavior
 - [x] Run focused tests, full suite, type-check, and production build
 - [x] Save a checkpoint and report the deployment/schedule requirement
+
+- [ ] Verify the deployed cleanup callback and inspect existing Heartbeat jobs
+- [ ] Create one daily 03:00 UTC Heartbeat for cache telemetry cleanup without duplicates
+- [ ] Run the cleanup job manually and inspect its execution result/log
+- [ ] Report the Heartbeat task identity and verification outcome
+
+- [x] Inventory the loading/data queue, provider caches, request coalescing, and runtime logs
+- [x] Trace Player Profile, Overview, and shared API loading flows for duplicate or blocking requests
+- [x] Identify confirmed bottlenecks, maintainability hazards, and long-line/readability hotspots
+- [x] Create a master debugging and optimization work file with priority, evidence, dependencies, and tests
+- [x] Review the work file for a safe execution order and deliver it for implementation
