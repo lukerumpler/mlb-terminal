@@ -37,6 +37,12 @@ import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
+const VISUAL_QA_PLAYERS = [
+  { id: 660271, name: 'Shohei Ohtani', team: 'LAD' },
+  { id: 592450, name: 'Aaron Judge', team: 'NYY' },
+  { id: 669894, name: 'Juan Soto', team: 'NYM' },
+];
+
 export function humanizePlayerLoadError(error, playerName = 'this player') {
   const status = Number(error?.status);
   if (status === 429) return `Could not load ${playerName} right now because the data provider is limiting requests. Please retry shortly.`;
@@ -1809,7 +1815,7 @@ function PlayersPage() {
 
       {player && derived && (
         <>
-          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} />
+          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -2092,7 +2098,10 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, onCompare }) {
+function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
+  const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
+    ? VISUAL_QA_PLAYERS
+    : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
           gradeRows, careerRows, sparkData, s, p, amd } = derived;
@@ -2186,7 +2195,8 @@ function PlayerProfile({ player, derived, onCompare }) {
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
   const advancedWar = player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war;
   const advancedWrcPlus = player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus;
-  const advancedSource = player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
+  const advancedWarSource = player.advancedMetrics?.provenance?.war || player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
+  const advancedWrcPlusSource = player.advancedMetrics?.provenance?.wrcPlus || player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
   const summaryMetric = (metric, value, config) => ({
     label: metric,
     value: value == null || value === '' ? 'Unavailable' : value,
@@ -2195,8 +2205,8 @@ function PlayerProfile({ player, derived, onCompare }) {
   });
   const performanceSummary = [
     summaryMetric('WAR', Number.isFinite(Number(advancedWar)) ? Number(advancedWar).toFixed(1) : null, {
-      detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:advancedSource,
-      coverage:Number.isFinite(Number(advancedWar)) ? 'Explicit WAR field returned by the verified provider.' : 'The verified MLB seasonAdvanced response did not return an explicit WAR field for this player.',
+      detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:advancedWarSource,
+      coverage:Number.isFinite(Number(advancedWar)) ? (advancedWarSource.includes('Baseball-Reference') ? 'Fallback WAR supplied by the verified Baseball-Reference player summary.' : 'Explicit WAR field returned by the verified provider.') : 'The verified MLB seasonAdvanced response did not return an explicit WAR field for this player; the verified fallback provider also has no explicit WAR field.',
       trend:'No verified comparison series', tone:C.purple,
     }),
     summaryMetric('OPS', s.ops != null ? fmt(s.ops) : null, {
@@ -2205,8 +2215,8 @@ function PlayerProfile({ player, derived, onCompare }) {
       trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber,
     }),
     summaryMetric('wRC+', Number.isFinite(Number(advancedWrcPlus)) ? String(Math.round(Number(advancedWrcPlus))) : null, {
-      detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:advancedSource,
-      coverage:Number.isFinite(Number(advancedWrcPlus)) ? 'Explicit wRC+ field returned by the verified provider.' : 'The verified MLB seasonAdvanced response did not return an explicit wRC+ field for this player.',
+      detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:advancedWrcPlusSource,
+      coverage:Number.isFinite(Number(advancedWrcPlus)) ? (advancedWrcPlusSource.includes('Baseball-Reference') ? 'Fallback wRC+ supplied by the verified Baseball-Reference player summary.' : 'Explicit wRC+ field returned by the verified provider.') : 'The verified MLB seasonAdvanced response did not return an explicit wRC+ field for this player; the verified fallback provider also has no explicit wRC+ field.',
       trend:'No verified comparison series', tone:C.teal,
     }),
     summaryMetric('Statcast', statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : null, {
@@ -2393,9 +2403,20 @@ function PlayerProfile({ player, derived, onCompare }) {
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
-              <button onClick={onCompare} style={{ marginTop:8, padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
-                Compare player
-              </button>
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                <button onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                  Compare player
+                </button>
+                <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 7px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.text3, ...sans({ fontSize:8.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase' }) }}>
+                  Visual QA
+                  <select aria-label="Visual QA player switcher" value={String(player.id)} onChange={e => {
+                    const selected = VISUAL_QA_PLAYERS.find(candidate => String(candidate.id) === e.target.value);
+                    if (selected) onSwitchPlayer?.({ id:selected.id, fullName:selected.name, team:selected.team });
+                  }} style={{ maxWidth:118, border:0, outline:'none', background:'transparent', color:C.text, fontFamily:"'DM Mono',monospace", fontSize:9, cursor:'pointer' }}>
+                    {visualQaOptions.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}{candidate.team ? ` · ${candidate.team}` : ''}</option>)}
+                  </select>
+                </label>
+              </div>
             </div>
           </div>
         </div>

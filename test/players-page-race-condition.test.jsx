@@ -344,6 +344,30 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(summary).toHaveTextContent("did not return an explicit wRC\+ field");
   });
 
+  it("switches players through the compact Visual QA selector", async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([]);
+    loadFullPlayer
+      .mockResolvedValueOnce(mockPlayer(1, "QA Starter"))
+      .mockResolvedValueOnce(mockPlayer(592450, "Aaron Judge"));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "QA");
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading player profile" })).not.toBeInTheDocument());
+    // The profile is loaded directly in this test through the same public search flow.
+    searchPlayers.mockResolvedValueOnce([{ id: 1, fullName: "QA Starter" }]);
+    await user.clear(input);
+    await user.type(input, "QA ");
+    await waitFor(() => expect(screen.getByText("QA Starter")).toBeInTheDocument());
+    await user.click(screen.getByText("QA Starter"));
+
+    const qaSelect = await screen.findByRole("combobox", { name: "Visual QA player switcher" });
+    expect(qaSelect).toHaveValue("1");
+    await user.selectOptions(qaSelect, "592450");
+    await waitFor(() => expect(loadFullPlayer).toHaveBeenLastCalledWith(expect.objectContaining({ id: 592450, fullName: "Aaron Judge" }), expect.anything(), expect.anything()));
+  });
+
   it("opens the side-by-side comparison modal and loads a second player through the live adapter", async () => {
     const user = userEvent.setup();
     const primary = { id: 1, fullName: "Primary Player" };

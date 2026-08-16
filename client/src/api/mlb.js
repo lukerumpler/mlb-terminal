@@ -476,6 +476,40 @@ export async function getSeasonAdvancedStatsSafe(id, season, sportId) {
   }
 }
 
+export function mergeAdvancedMetricSources(primary = {}, fallback = {}) {
+  const explicitNumber = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
+  const primaryWar = explicitNumber(primary.war);
+  const primaryWrcPlus = explicitNumber(primary.wrcPlus);
+  const fallbackWar = explicitNumber(fallback.war);
+  const fallbackWrcPlus = explicitNumber(fallback.wrcPlus);
+  const war = primaryWar ?? fallbackWar;
+  const wrcPlus = primaryWrcPlus ?? fallbackWrcPlus;
+  const sources = [];
+  if (primaryWar != null || primaryWrcPlus != null) sources.push(primary.source || 'MLB Stats API seasonAdvanced');
+  if ((primaryWar == null && fallbackWar != null) || (primaryWrcPlus == null && fallbackWrcPlus != null)) sources.push(fallback.source || 'Verified fallback provider');
+  return {
+    season: primary.season ?? fallback.season,
+    war,
+    wrcPlus,
+    source: sources.join(' + ') || primary.source || fallback.source || 'Verified providers',
+    provenance: {
+      war: primaryWar != null ? (primary.source || 'MLB Stats API seasonAdvanced') : fallbackWar != null ? (fallback.source || 'Verified fallback provider') : null,
+      wrcPlus: primaryWrcPlus != null ? (primary.source || 'MLB Stats API seasonAdvanced') : fallbackWrcPlus != null ? (fallback.source || 'Verified fallback provider') : null,
+    },
+    status: war != null || wrcPlus != null ? 'live' : 'unavailable',
+  };
+}
+
+export async function getBaseballReferenceAdvancedSafe(name, season) {
+  if (!name) return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+  try {
+    const data = await providerJson(`/api/player-advanced?name=${encodeURIComponent(name)}&season=${encodeURIComponent(season)}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
+    return normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary');
+  } catch {
+    return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+  }
+}
+
 // Career year-by-year splits across ALL levels (includes MiLB years)
 export async function getCareerSplits(id, group) {
   try {
@@ -738,6 +772,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
   const hittingPromise = getSeasonStatsSafe(id, 'hitting', season, profileSportId);
   const pitchingPromise = getSeasonStatsSafe(id, 'pitching', season, profileSportId);
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId);
+  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
   const [hittingResult, pitchingResult] = await Promise.all([
     hittingPromise,
     pitchingPromise,
@@ -786,13 +821,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
   };
   try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
 
-  const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics] = await Promise.all([
+  const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
     careerPitchingPromise,
     contractPromise,
     handednessPromise,
     teamFinancialsPromise,
     advancedMetricsPromise,
+    fallbackAdvancedMetricsPromise,
   ]);
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
@@ -972,7 +1008,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
     expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
-    advancedMetrics,
+    advancedMetrics: mergeAdvancedMetricSources(advancedMetricsPrimary, fallbackAdvancedMetrics),
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
