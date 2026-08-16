@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   parseFanGraphsModelHtml,
   parseFanGraphsAggregateWarHtml,
   isFanGraphsProviderBlockedResponse,
 } from "../server/api/fangraphs-models.js";
 
+// Resolved relative to this file rather than a hardcoded absolute path, so
+// the test runs the same in any checkout (CI, a fresh clone, another
+// contributor's machine) instead of only inside one specific sandbox.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const overviewSource = readFileSync(
-  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
+  resolve(__dirname, "../client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 

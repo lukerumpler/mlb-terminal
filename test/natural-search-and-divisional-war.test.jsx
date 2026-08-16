@@ -21,9 +21,14 @@ import {
 } from "../client/src/api/mlb.js";
 import { SEARCH_ANALYTICS_STORAGE_KEY } from "../client/src/lib/searchAnalytics.js";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
+// Resolved relative to this file rather than a hardcoded absolute path — see
+// the same fix in fangraphs-models.test.js for why.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const chartSource = readFileSync(
-  "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
+  resolve(__dirname, "../client/src/components/OverviewCharts.jsx"),
   "utf8"
 );
 
