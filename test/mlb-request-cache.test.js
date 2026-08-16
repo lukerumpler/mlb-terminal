@@ -420,6 +420,32 @@ describe("MLB request cache optimization", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("traces Player Profile contract and team-financial enrichment with explicit priorities", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ found: true, contractAvailable: true, salary: 100 }),
+      text: async () => "",
+    });
+
+    await fetchContractData(125, "Priority Player", {
+      priority: "important",
+      stage: "important",
+      screen: "player-profile",
+    });
+    await fetchTeamFinancials("LAD", 2098, {
+      priority: "important",
+      stage: "important",
+      screen: "player-profile",
+    });
+
+    expect(__getMlbRequestTraceForTests()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "queued", resource: "contract", priority: "important", stage: "important", screen: "player-profile" }),
+      expect.objectContaining({ event: "response", resource: "contract", priority: "important", stage: "important", screen: "player-profile", ok: true }),
+      expect.objectContaining({ event: "queued", resource: "team-financials", priority: "important", stage: "important", screen: "player-profile" }),
+      expect.objectContaining({ event: "response", resource: "team-financials", priority: "important", stage: "important", screen: "player-profile", ok: true }),
+    ]));
+  });
+
   it("evicts failed contract requests so a later attempt can recover", async () => {
     fetch
       .mockResolvedValueOnce({ ok: false, status: 502 })

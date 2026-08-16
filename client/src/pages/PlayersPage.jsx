@@ -853,6 +853,16 @@ export function metricPopulationPercentile(value, population, keys, higherIsBett
   return percentile(raw, values, higherIsBetter);
 }
 
+export function buildSavantPercentileRow({ label, data, aliases, population, digits = 1, suffix = '%' }) {
+  const value = savantField(data, aliases);
+  return {
+    lbl: label,
+    val: formatProfileMetric(value, digits, suffix),
+    raw: profileMetricValue(value),
+    pct: metricPopulationPercentile(value, population, aliases),
+  };
+}
+
 function derivedPopulationPercentile(value, population, derive, higherIsBetter = true) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || !Array.isArray(population)) return null;
@@ -887,9 +897,9 @@ function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStat
     { lbl:'xBA', val:formatProfileMetric(estBa, 3), raw:estBa, pct:savantPercentile(estBa, expectedPopulation, ['est_ba']) },
     { lbl:'xSLG', val:formatProfileMetric(estSlg, 3), raw:estSlg, pct:savantPercentile(estSlg, expectedPopulation, ['est_slg']) },
     { lbl:'Bat Speed', val:formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw:profileMetricValue(bt.avg_bat_speed), pct:savantPercentile(bt.avg_bat_speed, batTrackingRows, ['avg_bat_speed']) },
-    { lbl:'Sweet Spot %', val:formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent'])), pct:savantPercentile(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
-    { lbl:'Barrel %', val:formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent'])), pct:savantPercentile(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), statcastPopulationRows, ['brl_percent','barrel_percent','barrels_per_bbe_percent']) },
-    { lbl:'Hard Hit %', val:formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%'), raw:profileMetricValue(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct'])), pct:savantPercentile(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), statcastPopulationRows, ['hard_hit_percent','ev95percent','hard_hit_pct']) },
+    buildSavantPercentileRow({ label:'Sweet Spot %', data:sv, aliases:['sweet_spot_percent','anglesweetspotpercent'], population:statcastPopulationRows }),
+    buildSavantPercentileRow({ label:'Barrel %', data:sv, aliases:['brl_percent','barrel_percent','barrels_per_bbe_percent'], population:statcastPopulationRows }),
+    buildSavantPercentileRow({ label:'Hard Hit %', data:sv, aliases:['hard_hit_percent','ev95percent','hard_hit_pct'], population:statcastPopulationRows }),
     { lbl:'Expected ISO', val:formatProfileMetric(expectedIso, 3), raw:expectedIso, pct:expectedIsoPercentile(expectedIso) },
     { lbl:'Contact Quality', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
     { lbl:'Swing Decisions', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
@@ -1665,6 +1675,9 @@ function PlayersPage() {
         signal: controller.signal,
         onCoreReady: core => {
           if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
+        },
+        onImportantReady: important => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
         },
       });
       // Only commit if no newer pick has started since — same reasoning as
@@ -2997,7 +3010,7 @@ function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
 
           <PlayerVideoPanel player={player} profile={p} accent={teamAccent} />
 
-          <ContractPanel contractData={player.contractData} loading={player.extrasLoading} />
+          <ContractPanel contractData={player.contractData} loading={player.contractLoading ?? player.extrasLoading} />
 
           <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} confidence={dataConfidence} />
 

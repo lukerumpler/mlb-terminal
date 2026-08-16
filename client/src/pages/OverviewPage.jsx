@@ -829,6 +829,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     }
     return () => { alive = false; };
   }, [todayGames]);
+  // Today's league schedule is global, not team-specific. Keeping it outside
+  // the selected-team lifecycle avoids even cached re-reads whenever a scout
+  // changes teams, while an explicit MLB retry can still refresh it.
+  useEffect(() => {
+    let alive = true;
+    getTodaysGames().then(games => {
+      if (alive) setTodayGames((Array.isArray(games) ? games : []).slice(0, 8));
+    }).catch(() => {
+      if (alive) setTodayGames([]);
+    });
+    return () => { alive = false; };
+  }, [mlbRetryToken]);
   useEffect(() => {
     let alive = true;
     setTeamVenueState('loading');
@@ -1095,7 +1107,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setLiveTeamError(false);
     setTeamPlayersLoading(true);
     setTeamPlayersError(false);
-    getTodaysGames().then(g=>{ if(alive) setTodayGames(g.slice(0,8)); }).catch(()=>{});
 
     const aggregateFresh = Boolean(cachedAggregate?.data?.byAbbr && Date.now() - Number(cachedAggregate.updatedAt || 0) < 5 * 60 * 1000 && mlbRetryToken === 0);
     const playersFresh = Boolean(cachedPlayers?.data && Date.now() - Number(cachedPlayers.updatedAt || 0) < 5 * 60 * 1000 && mlbRetryToken === 0);

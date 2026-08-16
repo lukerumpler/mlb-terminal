@@ -808,6 +808,58 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
   });
 
+  it("publishes verified contract data before optional profile enrichment finishes", async () => {
+    const user = userEvent.setup();
+    const full = mockPlayer(8, "Important Stage Player");
+    let publishImportant;
+    let resolveOptional;
+    searchPlayers.mockResolvedValue([{ id: 8, fullName: "Important Stage Player" }]);
+    loadFullPlayer.mockImplementation(async (_person, _season, options) => {
+      options?.onCoreReady?.({
+        ...full,
+        savant: null,
+        batTracking: null,
+        contractData: null,
+        teamFinancials: null,
+        boxscoreSplits: null,
+        contractLoading: true,
+        extrasLoading: true,
+      });
+      await new Promise(resolve => {
+        publishImportant = () => {
+          options?.onImportantReady?.({
+            ...full,
+            savant: null,
+            batTracking: null,
+            boxscoreSplits: null,
+            contractData: { contractAvailable: true, status: "Under Contract", serviceTime: "3.000" },
+            contractLoading: false,
+            extrasLoading: true,
+          });
+          resolve();
+        };
+      });
+      return new Promise(resolve => {
+        resolveOptional = () => resolve({ ...full, extrasLoading: false, contractLoading: false });
+      });
+    });
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Important");
+    await waitFor(() => expect(screen.getByText("Important Stage Player")).toBeInTheDocument());
+    await user.click(screen.getByText("Important Stage Player"));
+
+    expect(await screen.findByText("Loading contract data")).toBeInTheDocument();
+    await waitFor(() => expect(publishImportant).toEqual(expect.any(Function)));
+    publishImportant();
+    expect(await screen.findByText("Under Contract")).toBeInTheDocument();
+    expect(screen.getByText(/Core MLB profile loaded/)).toBeInTheDocument();
+
+    resolveOptional();
+    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+  });
+
   it("keeps the faster, later-clicked player instead of an older, slower response clobbering it", async () => {
     const user = userEvent.setup();
     const playerA = { id: 1, fullName: "Slow Player A" };

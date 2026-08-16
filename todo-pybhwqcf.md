@@ -289,3 +289,11 @@
 - [x] Add regression coverage for diagnostics summaries and retain the existing Overview provider-flow assertions
 - [x] Run focused tests, full validation, type-check, build, and visual review
 - [x] Save the next verified optimization checkpoint and report results
+
+- [x] Audit client queue traces, request helpers, and error paths for the next measurable bottleneck
+- [x] Harden cancellation, timeout, and priority propagation only where request paths support it safely
+- [x] Reduce Player Profile supplemental request fan-out and preserve truthful panel-level pending states
+- [x] Eliminate confirmed Overview duplicate requests without suppressing independent verified provider coverage
+- [x] Refactor only confirmed long-line/ownership hazards with regression coverage
+- [x] Run focused tests, full suite, type-check, build, and visual checks after each accepted slice
+- [ ] Save final checkpoints and deliver the completed autonomous optimization summary

@@ -215,6 +215,24 @@ describe("Team Overview model source and retry interaction", () => {
     expect(mlbApi.getTeamPlayerStats).not.toHaveBeenCalled();
   });
 
+  it("does not re-request the global daily schedule when the selected team changes", async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await waitFor(() => expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1));
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Select team" }),
+      "sf"
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Select team" })).toHaveValue(
+        "sf"
+      )
+    );
+    expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1);
+  });
+
   it("commits available aggregate data when one provider fails instead of waiting for all feeds", async () => {
     partialAggregate = true;
     render(<OverviewPage />);

@@ -268,7 +268,7 @@ function pumpRequestQueue() {
   recordRequestTrace({ ...job.trace, event: 'started', activeRequests, queuedRequests: requestQueue.length });
   fetch(job.url, { signal: requestAbortSignal(job.timeoutMs, job.signal) })
     .then(response => {
-      if (response.status === 429) {
+      if (response.status === 429 && job.pauseGlobalQueueOn429) {
         proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + parseRetryAfterMs(response));
       }
       recordRequestTrace({ ...job.trace, event: 'response', status: response.status, ok: response.ok });
@@ -305,6 +305,7 @@ function scheduledFetch(url, timeoutMs, trace = {}, signal) {
       trace: requestTraceContext,
       queueId: ++queueSequence,
       priorityWeight: REQUEST_PRIORITY_WEIGHT[priority],
+      pauseGlobalQueueOn429: trace.pauseGlobalQueueOn429 !== false,
       removeQueuedAbortListener: null,
     };
     const cancelWhileQueued = () => {
@@ -637,9 +638,9 @@ export async function getBaseballReferenceAdvancedSafe(name, season) {
 }
 
 // Career year-by-year splits across ALL levels (includes MiLB years)
-export async function getCareerSplits(id, group) {
+export async function getCareerSplits(id, group, requestOptions = {}) {
   try {
-    const data = await mlb(`/people/${id}/stats`, { stats: 'yearByYear', group });
+    const data = await mlb(`/people/${id}/stats`, { stats: 'yearByYear', group }, requestOptions);
     const grp  = findStatGroup(data.stats, group);
     return grp?.splits || [];
   } catch { return []; }
@@ -660,10 +661,10 @@ export function normalizeHandednessSplits(splits) {
   }).filter(Boolean);
 }
 
-export async function getHandednessSplits(id, season) {
+export async function getHandednessSplits(id, season, requestOptions = {}) {
   const fetchRows = async (stats, yr) => {
     try {
-      const data = await mlb(`/people/${id}/stats`, { stats, group:'hitting', season:yr, sitCodes:'vl,vr' });
+      const data = await mlb(`/people/${id}/stats`, { stats, group:'hitting', season:yr, sitCodes:'vl,vr' }, requestOptions);
       const grp = findStatGroup(data.stats, 'hitting');
       return normalizeHandednessSplits(grp?.splits);
     } catch { return []; }
@@ -707,7 +708,11 @@ const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
 const contractClientCache = new Map();
 const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
 
-export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
+export async function fetchTeamFinancials(teamAbbreviation, season = SEASON, {
+  priority = 'background',
+  stage = 'background',
+  screen = 'unknown',
+} = {}) {
   const team = String(teamAbbreviation || '').trim().toUpperCase();
   if (!team) return null;
   const cacheKey = `${team}:${season}`;
@@ -717,7 +722,13 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
   const promise = (async () => {
     try {
       const params = new URLSearchParams({ team, season:String(season) });
-      const res = await fetch(`/api/team-financials?${params}`, { signal:AbortSignal.timeout(18_000) });
+      const res = await scheduledFetch(`/api/team-financials?${params}`, 18_000, {
+        priority,
+        stage,
+        screen,
+        resource: 'team-financials',
+        pauseGlobalQueueOn429: false,
+      });
       if (!res.ok) return null;
       const data = await res.json();
       if (data?.found) recordFeedSuccess('spotrac');
@@ -736,7 +747,11 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
   return promise;
 }
 
-export async function fetchContractData(playerId, fullName) {
+export async function fetchContractData(playerId, fullName, {
+  priority = 'important',
+  stage = 'important',
+  screen = 'player-profile',
+} = {}) {
   const normalizedId = String(playerId || '').trim();
   const normalizedName = String(fullName || '').trim().toLowerCase();
   if (!normalizedId && !normalizedName) return null;
@@ -748,8 +763,12 @@ export async function fetchContractData(playerId, fullName) {
     try {
       const params = new URLSearchParams({ id: normalizedId });
       if (fullName) params.set('name', fullName);
-      const res = await fetch(`/api/contract?${params}`, {
-        signal: AbortSignal.timeout(14_000),  // BRef can be slow
+      const res = await scheduledFetch(`/api/contract?${params}`, 14_000, {
+        priority,
+        stage,
+        screen,
+        resource: 'contract',
+        pauseGlobalQueueOn429: false,
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -880,7 +899,7 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }
 }
-export async function loadFullPlayer(person, season = SEASON, { onCoreReady, signal } = {}) {
+export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onImportantReady, signal } = {}) {
   const id = person.id;
 
   // Fetch the profile first so its current-team context can parameterize the
@@ -936,6 +955,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, sig
     pitchingStats: pitchingResult?.stat || {},
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
+    importantLoading: true,
+    contractLoading: true,
+    optionalLoading: true,
     extrasLoading: true,
   };
   try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
@@ -944,15 +966,13 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, sig
   // snapshot is visible. This prevents slow contract, financial, career, and
   // boxscore work from competing with the request budget that establishes the
   // player identity and current-season statistics.
-  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
-  const careerHittingPromise = getCareerSplits(id, 'hitting');
-  const careerPitchingPromise = getCareerSplits(id, 'pitching');
-  const contractPromise = fetchContractData(id, person.fullName);
-  const handednessPromise = getHandednessSplits(id, season);
-  const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season);
-  const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, {
-    priority: 'important', stage: 'important', screen: 'player-profile',
-  });
+  const importantRequest = { priority: 'important', stage: 'important', screen: 'player-profile' };
+  const careerHittingPromise = getCareerSplits(id, 'hitting', importantRequest);
+  const careerPitchingPromise = getCareerSplits(id, 'pitching', importantRequest);
+  const contractPromise = fetchContractData(id, person.fullName, importantRequest);
+  const handednessPromise = getHandednessSplits(id, season, importantRequest);
+  const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season, importantRequest);
+  const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
   const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
 
   const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
@@ -964,6 +984,32 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, sig
     advancedMetricsPromise,
     fallbackAdvancedMetricsPromise,
   ]);
+
+  // Important enrichment has settled. Publish it before beginning the slower
+  // optional Savant leaderboards and boxscore aggregation, so verified
+  // contract, service-time, advanced, career, and financial data do not wait
+  // behind work that is explicitly non-blocking for this profile.
+  const advancedMetrics = mergeAdvancedMetricSources(advancedMetricsPrimary, fallbackAdvancedMetrics);
+  const importantSnapshot = {
+    ...coreSnapshot,
+    advancedMetrics,
+    career: careerHitting,
+    careerPitching,
+    contractData: contractRaw,
+    handednessSplits: handednessResult,
+    teamFinancials,
+    importantLoading: false,
+    contractLoading: false,
+    optionalLoading: true,
+    extrasLoading: true,
+  };
+  try { onImportantReady?.(importantSnapshot); } catch { /* UI callback is optional */ }
+
+  // Optional enrichment begins only after the important snapshot has been
+  // published. This lowers the immediate request burst after selection and
+  // prevents slower per-pitch and full-leaderboard queries from delaying data
+  // that is already verified and ready to display.
+  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
   // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
@@ -1142,7 +1188,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, sig
     expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
-    advancedMetrics: mergeAdvancedMetricSources(advancedMetricsPrimary, fallbackAdvancedMetrics),
+    advancedMetrics,
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
@@ -1155,6 +1201,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, sig
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
     boxscoreSplits: await boxscoreSplitsPromise,
+    importantLoading: false,
+    contractLoading: false,
+    optionalLoading: false,
     extrasLoading: false,
   };
 }

@@ -4,6 +4,7 @@ import {
   savantField,
   getLivePerformanceItems,
   metricPopulationPercentile,
+  buildSavantPercentileRow,
   buildSavantPercentileAxes,
   normalizeSprayPoint,
   buildRecentGameSeries,
@@ -125,6 +126,22 @@ describe("player profile data accuracy guards", () => {
       barrel_percent: 9.4,
       ev95percent: 44.1,
     }).slice(2, 5).map(item => item.val)).toEqual(["31.2%", "9.4%", "44.1%"]);
+
+    expect(buildSavantPercentileRow({
+      label: "Sweet Spot %",
+      data: { anglesweetspotpercent: 0 },
+      aliases: ["sweet_spot_percent", "anglesweetspotpercent"],
+      population: [
+        { anglesweetspotpercent: 0 },
+        { anglesweetspotpercent: 10 },
+        { anglesweetspotpercent: 20 },
+      ],
+    })).toMatchObject({
+      lbl: "Sweet Spot %",
+      val: "0.0%",
+      raw: 0,
+      pct: 0,
+    });
   });
 
   it("normalizes Baseball Savant spray coordinates and preserves hover metrics", () => {
