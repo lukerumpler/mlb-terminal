@@ -1,0 +1,7 @@
+# MLB Stats API WAR Fallback Audit
+
+The Overview currently uses the MLB Stats API for supported team metadata and conventional season statistics. The audited routes are `/teams/{teamId}` with venue, league, division, and sport hydration; `/teams/{teamId}/stats` for season hitting and pitching groups; `/stats` for player-level season statistics used in rollups; `/standings` for wins, losses, percentage, division, and league; and `/teams/{teamId}/roster` for roster identity. Contract hydration uses `/people/{mlbId}?hydrate=currentTeam,contracts` for service-time and contract metadata.
+
+These responses expose conventional batting, pitching, standings, schedule, roster, venue, and identity fields. They do not expose a verified team-level WAR, offensive WAR, defensive WAR, pitching WAR, aggregate divisional WAR, or official playoff-odds field compatible with the FanGraphs model contract used by Overview. Deriving WAR from ordinary counting stats would change the metric definition and create an unverified estimate. Simulating playoff odds from standings and schedule would likewise be an estimate, not an official source value.
+
+Accordingly, no MLB Stats API WAR fallback is wired into the FanGraphs model contract. The application preserves FanGraphs as the source for its model-specific WAR and playoff-odds fields, uses MLB Stats API only for fields it actually supplies, and displays `Unavailable` / `Provider unavailable` when the model provider has no verified value. This is an intentional integrity boundary, not a provider request failure.

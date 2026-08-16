@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getGameFeedMetadata, getTeamVenueMetadata, getSkipPlayoffOddsEstimate } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -161,6 +161,7 @@ function humanizeFeedStatus(status, fallback = 'Unavailable') {
     'upstream-unavailable': 'Provider unavailable',
     'request-failed': 'Request failed',
     'unparsed': 'Provider returned unreadable data',
+    'calculated': 'Calculated from MLB data',
   };
   return labels[status] || (status ? String(status).replaceAll('-', ' ') : fallback);
 }
@@ -610,7 +611,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
-  const [skipPlayoffEstimate, setSkipPlayoffEstimate] = useState(null);
+  const [calculatedIntelligence, setCalculatedIntelligence] = useState(null);
+  const [calculatedIntelligenceState, setCalculatedIntelligenceState] = useState('idle');
   const [teamPlayersLoading, setTeamPlayersLoading] = useState(true);
   const [teamPlayersError, setTeamPlayersError] = useState(false);
   const [selectedRosterPositions, setSelectedRosterPositions] = useState([]);
@@ -927,11 +929,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, [teamBase?.abbr, fangraphsRetryToken]);
   useEffect(() => {
     let alive = true;
-    setSkipPlayoffEstimate(null);
-    getSkipPlayoffOddsEstimate(teamBase?.id, CURRENT_SEASON).then(estimate => {
-      if (alive) setSkipPlayoffEstimate(estimate);
+    setCalculatedIntelligence(null);
+    setCalculatedIntelligenceState(teamBase?.id ? 'loading' : 'idle');
+    getTeamCalculatedIntelligence(teamBase?.id, CURRENT_SEASON).then(data => {
+      if (!alive) return;
+      setCalculatedIntelligence(data);
+      setCalculatedIntelligenceState(data ? 'ready' : 'unavailable');
     }).catch(() => {
-      if (alive) setSkipPlayoffEstimate({ status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() });
+      if (alive) setCalculatedIntelligenceState('unavailable');
     });
     return () => { alive = false; };
   }, [teamBase?.id, mlbRetryToken]);
@@ -994,10 +999,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const displayedInsights = aiInsights || rosterInsights;
   const playoffOddsValue = teamModelData?.playoffOdds != null
     ? `${Number(teamModelData.playoffOdds).toFixed(1)}%`
-    : skipPlayoffEstimate?.estimate != null
-      ? `${Number(skipPlayoffEstimate.estimate).toFixed(1)}%`
-      : 'Unavailable';
-  const playoffOddsSource = teamModelData?.playoffOdds != null ? 'FanGraphs' : skipPlayoffEstimate?.estimate != null ? 'SKIP estimate' : 'Provider unavailable';
+    : 'Unavailable';
+  const playoffOddsSource = teamModelData?.playoffOdds != null ? 'FanGraphs' : 'Provider unavailable';
   const teamWarValue = teamModelData?.teamWar == null ? 'Unavailable' : Number(teamModelData.teamWar).toFixed(1);
   const divisionWarData = useMemo(() => (Array.isArray(teamModelData?.divisionTeams) ? teamModelData.divisionTeams : [])
     .filter(row => row?.team && row?.totalWAR != null)
@@ -1021,6 +1024,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         : teamModelData?.found || teamModelData?.statuses?.teamWar === 'live' || teamModelData?.statuses?.playoffOdds === 'live'
           ? 'verified'
           : teamModelState === 'source-gap' ? 'coverage-gap' : 'unavailable';
+  const calculatedMetrics = calculatedIntelligence?.metrics || {};
+  const projectedWinsValue = teamModelData?.advancedMetrics?.projectedWins ?? calculatedMetrics.projectedWins;
+  const projectedLossesValue = teamModelData?.advancedMetrics?.projectedLosses ?? calculatedMetrics.projectedLosses;
+  const calculatedModelSource = teamModelData?.advancedMetrics?.projectedWins != null ? 'FanGraphs' : projectedWinsValue != null ? 'MLB Stats API · calculated' : 'FanGraphs';
+  const calculatedModelStatus = teamModelData?.advancedMetrics?.projectedWins != null ? fanGraphsHealthStatus : projectedWinsValue != null ? 'calculated' : fanGraphsHealthStatus;
   const affiliateSavantHealthStatus = affiliateSavant?.status === 'loading'
     ? 'loading'
     : affiliateSavant?.freshness === 'stale-cached'
@@ -1439,7 +1447,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
-        <span>Playoff odds: {playoffOddsSource}{skipPlayoffEstimate?.estimate != null && teamModelData?.playoffOdds == null ? ` · ${skipPlayoffEstimate.simulationCount || 1200} simulations` : ''} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
+        <span>Playoff odds: {playoffOddsSource} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
       </div>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
@@ -1453,9 +1461,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
-          {[['Projected W',teamModelData?.advancedMetrics?.projectedWins,1,'FanGraphs',fanGraphsHealthStatus],['Projected L',teamModelData?.advancedMetrics?.projectedLosses,1,'FanGraphs',fanGraphsHealthStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
+          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
         </div>
-        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>FanGraphs projections · {modelFreshness} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
+        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{calculatedModelSource === 'MLB Stats API · calculated' ? 'Projected wins/losses calculated from verified MLB standings; not official odds.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
       </Panel>
       <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
         {teamVenueMetadata?.venue ? <>

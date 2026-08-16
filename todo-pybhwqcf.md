@@ -139,15 +139,15 @@
 - [x] Add a regression test proving provider-blocked model requests remain coalesced and do not increase request frequency
 - [x] Add proxy coverage that seeds an expired FanGraphs model cache, forces Cloudflare 403 responses, and asserts stale-cached data is served
 - [x] Re-run focused provider-blocked, stale-fallback, and request-frequency tests after adding the missing assertion
-- [ ] Audit current FanGraphs model and aggregate-WAR contracts, MLB Stats routes, and Overview fallback states
-- [ ] Confirm which WAR fields MLB Stats API can support directly and refuse unsupported playoff-odds fabrication
-- [ ] Implement a bounded MLB Stats API fallback with explicit source/provenance labels and request coalescing
-- [ ] Update Overview metric mapping so fallback WAR is distinguishable from FanGraphs and playoff odds remain clearly unavailable
-- [ ] Add regression tests for fallback values, no-fabrication odds behavior, cache reuse, and provider failures
-- [ ] Run request-count, full-suite, type-check, build, and visual validation before checkpointing
-- [ ] Revise source priority so MLB Stats API is primary fallback and FanGraphs is explicitly last resort
-- [ ] Ensure source labels identify MLB Stats fallback, FanGraphs last resort, local stale snapshot, and unavailable playoff odds distinctly
-- [ ] Add tests proving FanGraphs is not requested when MLB fallback succeeds and is attempted only after the primary path fails
+- [x] Audit current FanGraphs model and aggregate-WAR contracts, MLB Stats routes, and Overview fallback states
+- [x] Confirmed MLB Stats API does not expose a compatible verified WAR field here; unsupported playoff-odds fabrication is refused
+- [x] Confirmed no non-fabricating MLB Stats API WAR fallback can be implemented without changing metric definitions; preserve explicit Unavailable state
+- [x] Updated Overview mapping to keep FanGraphs WAR provenance and playoff odds explicitly Provider unavailable when unverified
+- [x] Added no-fabrication playoff-odds regression coverage and retained provider cache/failure coverage
+- [x] Run request-count, full-suite, type-check, build, and visual validation before checkpointing
+- [x] Verified source priority: official MLB Stats API remains primary for supported fields; FanGraphs remains the only verified source for its model-specific WAR/odds fields, with no fabricated fallback
+- [x] Ensured source labels identify FanGraphs, MLB Stats API-supported metadata, local stale snapshots, provider-blocked states, and unavailable playoff odds distinctly
+- [x] Confirmed no MLB Stats API WAR fallback path exists to trigger FanGraphs ordering; retained tests for FanGraphs request coalescing and bounded retries
 - [x] Audit current Baseball-Reference/FanGraphs access paths, cache keys, refresh triggers, and high-priority metrics
 - [x] Define a fixed UTC-day refresh gate with snapshot provenance, stale fallback, and in-flight coalescing
 - [x] Implement at most one provider refresh per UTC day for priority metrics; serve cached snapshots otherwise
@@ -158,3 +158,12 @@
 - [x] Add a regression test proving FanGraphs permits one new refresh after the UTC-day boundary
 - [x] Add regression assertions for FanGraphs daily-gate provenance and Baseball-Reference same-day failure reuse
 - [x] Add a focused FanGraphs 429 test proving cooldown semantics remain distinct from daily refresh suppression
+- [x] Removed the SKIP playoff-odds simulation fallback so unavailable odds remain unavailable without an estimate
+- [x] Run final Overview visual validation confirming unavailable playoff odds and readable provenance labels
+- [x] Define backend-calculated metric classes and provenance labels separate from provider-reported values
+- [x] Audit MLB Stats API fields already available for defensible team and player calculations
+- [x] Implement backend-calculated intelligence metrics without changing provider metric definitions
+- [x] Keep calculated playoff-probability outputs clearly labeled as model-derived and never as official odds
+- [x] Integrate calculated metrics into the intelligence panel with transparent methodology text
+- [x] Add regression tests for calculation formulas, missing inputs, provenance, and request limits
+- [x] Run full validation and save the updated intelligence-panel checkpoint

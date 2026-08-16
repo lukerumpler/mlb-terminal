@@ -1250,97 +1250,6 @@ export async function getTeamScheduleSplits(teamId, season = SEASON) {
   }
 }
 
-function seededRandom(seed) {
-  let value = Math.abs(Number(seed) || 1) % 2147483647;
-  return () => {
-    value = value * 16807 % 2147483647;
-    return (value - 1) / 2147483646;
-  };
-}
-
-function flattenStandings(standings) {
-  return Object.entries(standings || {}).flatMap(([divisionName, teams]) => (teams || []).map(team => ({ ...team, divisionName, leagueName: divisionName.startsWith('American') ? 'American League' : divisionName.startsWith('National') ? 'National League' : '' })));
-}
-
-export async function getSkipPlayoffOddsEstimate(teamId, season = SEASON, simulations = 1200) {
-  if (!teamId) return { status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() };
-  try {
-    const standings = await getStandings(season);
-    const teams = flattenStandings(standings);
-    const selected = teams.find(team => Number(team.id) === Number(teamId));
-    if (!selected || teams.length < 20) throw new Error('Insufficient standings data');
-    const today = new Date();
-    const startDate = today.toISOString().slice(0, 10);
-    const endDate = `${season}-10-05`;
-    const chunkDays = 14;
-    const scheduleDates = [];
-    for (let cursor = new Date(`${startDate}T00:00:00Z`); cursor <= new Date(`${endDate}T00:00:00Z`); cursor = new Date(cursor.getTime() + chunkDays * 86400000)) {
-      const chunkStart = cursor.toISOString().slice(0, 10);
-      const chunkEnd = new Date(Math.min(cursor.getTime() + (chunkDays - 1) * 86400000, new Date(`${endDate}T00:00:00Z`).getTime())).toISOString().slice(0, 10);
-      const chunk = await mlb('/schedule', { sportId: 1, startDate: chunkStart, endDate: chunkEnd, hydrate: 'team', language: 'en' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
-      scheduleDates.push(...(chunk.dates || []));
-    }
-    const remaining = scheduleDates.flatMap(date => date.games || []).filter(game => {
-      const state = String(game.status?.abstractGameState || '').toLowerCase();
-      return game.gameDate && new Date(game.gameDate).getTime() >= today.getTime() && state !== 'final';
-    });
-    if (!remaining.length) throw new Error('No remaining schedule data');
-    const byId = new Map(teams.map(team => [Number(team.id), team]));
-    const games = remaining.map(game => ({
-      home: Number(game.teams?.home?.team?.id),
-      away: Number(game.teams?.away?.team?.id),
-    })).filter(game => byId.has(game.home) && byId.has(game.away));
-    if (!games.length) throw new Error('No usable remaining games');
-    const baseWins = new Map(teams.map(team => [Number(team.id), Number(team.w) || 0]));
-    const seed = Number(teamId) * 1009 + Number(season) * 9176 + games.length;
-    const random = seededRandom(seed);
-    let playoffHits = 0;
-    const count = Math.max(400, Math.min(5000, Number(simulations) || 1200));
-    for (let iteration = 0; iteration < count; iteration += 1) {
-      const wins = new Map(baseWins);
-      for (const game of games) {
-        const home = byId.get(game.home);
-        const away = byId.get(game.away);
-        const homePct = Number(home.pct) || 0.5;
-        const awayPct = Number(away.pct) || 0.5;
-        const probability = Math.min(0.78, Math.max(0.22, (awayPct / (homePct + awayPct)) * 0.96 + 0.04));
-        if (random() < probability) wins.set(game.away, (wins.get(game.away) || 0) + 1);
-        else wins.set(game.home, (wins.get(game.home) || 0) + 1);
-      }
-      const qualified = new Set();
-      const byDivision = new Map();
-      teams.forEach(team => {
-        const key = team.divisionName || 'Unknown division';
-        if (!byDivision.has(key)) byDivision.set(key, []);
-        byDivision.get(key).push(team);
-      });
-      const wildByLeague = new Map();
-      for (const divisionTeams of byDivision.values()) {
-        const ordered = divisionTeams.slice().sort((a, b) => (wins.get(Number(b.id)) - wins.get(Number(a.id))) || ((Number(b.pct) || 0) - (Number(a.pct) || 0)));
-        ordered.slice(0, 1).forEach(team => qualified.add(Number(team.id)));
-        const league = ordered[0]?.leagueName || 'Unknown league';
-        if (!wildByLeague.has(league)) wildByLeague.set(league, []);
-        wildByLeague.get(league).push(...ordered.slice(1));
-      }
-      for (const wildCandidates of wildByLeague.values()) {
-        wildCandidates.sort((a, b) => (wins.get(Number(b.id)) - wins.get(Number(a.id))) || ((Number(b.pct) || 0) - (Number(a.pct) || 0)));
-        wildCandidates.slice(0, 3).forEach(team => qualified.add(Number(team.id)));
-      }
-      if (qualified.has(Number(teamId))) playoffHits += 1;
-    }
-    return {
-      status: 'estimated',
-      source: 'SKIP estimate',
-      estimate: Number(((playoffHits / count) * 100).toFixed(1)),
-      simulationCount: count,
-      remainingGames: games.length,
-      retrievedAt: new Date().toISOString(),
-      method: 'Deterministic Monte Carlo using current MLB winning percentages, home-field adjustment, and remaining MLB schedule.',
-    };
-  } catch {
-    return { status: 'unavailable', source: 'SKIP estimate', estimate: null, retrievedAt: new Date().toISOString() };
-  }
-}
 // MiLB levels
 export const getTripleAStandings = (season = SEASON) => fetchStandings('117,112',     season);
 export const getDoubleAStandings = (season = SEASON) => fetchStandings('113,110,111', season);
@@ -1737,6 +1646,17 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     return null;
   }
 }
+export async function getTeamCalculatedIntelligence(teamId, season = SEASON) {
+  if (!teamId) return null;
+  const params = new URLSearchParams({ teamId: String(teamId), season: String(season) });
+  try {
+    const url = `/api/intelligence-calculations?${params.toString()}`;
+    return await fetchProviderJson(url, { timeoutMs: 12_000, ttlMs: fanGraphsDailyTtlMs() });
+  } catch {
+    return null;
+  }
+}
+
 export async function getTeamModelSources(teamAbbr, season = SEASON) {
   const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
   try {
