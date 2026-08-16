@@ -272,3 +272,7 @@
 - [x] Define a stronger AI-assisted architecture for queueing, caching, provenance, observability, and safe data operations
 - [x] Write an advice-first master blueprint for a more powerful coding AI to execute
 - [x] Deliver the blueprint and recommended AI operating protocol before further code changes
+
+- [x] Consolidate the existing audit, queue optimization plan, and AI blueprint into one master document
+- [x] Review the unified document for implementation order, evidence, guardrails, and readability
+- [x] Deliver the consolidated master document as the project’s primary debugging guide
