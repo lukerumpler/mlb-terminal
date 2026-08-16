@@ -94,3 +94,15 @@
 - [x] Re-run published E2E, full suite, and production build after the live regression is resolved or correctly isolated
 - [x] Stabilize published Overview E2E against transient live browser/page crashes without weakening assertions
 - [x] Re-run the complete test suite, type-check, and build with a clean passing result
+- [x] Inspect SKIP v65.4 ZIP contents and identify any API keys, tokens, or credential-like values without executing archive contents
+- [x] Compare ZIP request construction, cache scope, retry behavior, and data-loading flow with the current project
+- [x] Apply only verified request-minimization improvements; never copy secrets or hardcode credentials
+- [x] Add regression tests for accepted cache/request changes and API-key safety
+- [x] Run request-count, full-suite, type-check, and build validation before checkpointing
+- [x] Remove the duplicate team-financials rate-limit check so cache hits and in-flight followers do not consume upstream-request budget
+- [x] Add a regression test proving cached team-financials reads do not trigger a second rate-limit decision
+- [x] Bound successful browser team-financials cache entries to the server’s 30-minute freshness window while preserving in-flight deduplication
+- [x] Add a client regression test proving team-financials refetches only after the freshness window expires
+- [x] Add browser-side contract request coalescing and six-hour freshness reuse to prevent repeated Spotrac/BRef/MLB contract scrapes for the same player
+- [x] Add contract-cache regression coverage for concurrent reuse, fresh reuse, and retry after failure
+- [x] Persist the v65.4 API-key and cache comparison findings in a project QA note

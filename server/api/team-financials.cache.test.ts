@@ -52,6 +52,23 @@ describe("team-financials proxy cache", () => {
     expect(second.payload.headers["X-Provider-Cache"]).toBe("MISS");
   });
 
+  it("does not rate-limit repeated warm-cache reads", async () => {
+    const fetchMock = vi.fn(upstreamResponse);
+    vi.stubGlobal("fetch", fetchMock);
+    const first = response();
+    await handler(request("10.0.0.6"), first);
+
+    const cachedResponses = [];
+    for (let index = 0; index < 35; index += 1) {
+      const cached = response();
+      await handler(request("10.0.0.6"), cached);
+      cachedResponses.push(cached.payload.statusCode);
+    }
+
+    expect(cachedResponses.every(status => status === 200)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("coalesces concurrent identical upstream loads", async () => {
     let release;
     const gate = new Promise(resolve => { release = resolve; });

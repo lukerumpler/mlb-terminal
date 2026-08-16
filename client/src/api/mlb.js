@@ -168,6 +168,8 @@ export function __resetMlbClientStateForTests() {
   proxyCooldownUntil = 0;
   providerJsonCache.clear();
   providerJsonInFlight.clear();
+  teamFinancialsCache.clear();
+  contractClientCache.clear();
   if (queueTimer != null) {
     globalThis.clearTimeout(queueTimer);
     queueTimer = null;
@@ -465,12 +467,17 @@ export async function getPlayerProfile(id) {
  * Returns null on any failure — never throws.
  */
 const teamFinancialsCache = new Map();
+const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
+const contractClientCache = new Map();
+const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
 
 export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
   const team = String(teamAbbreviation || '').trim().toUpperCase();
   if (!team) return null;
   const cacheKey = `${team}:${season}`;
-  if (teamFinancialsCache.has(cacheKey)) return teamFinancialsCache.get(cacheKey);
+  const cached = teamFinancialsCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) teamFinancialsCache.delete(cacheKey);
   const promise = (async () => {
     try {
       const params = new URLSearchParams({ team, season:String(season) });
@@ -486,22 +493,42 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
     if (result == null) teamFinancialsCache.delete(cacheKey);
     return result;
   });
-  teamFinancialsCache.set(cacheKey, promise);
+  teamFinancialsCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + TEAM_FINANCIALS_CLIENT_TTL_MS,
+  });
   return promise;
 }
 
 export async function fetchContractData(playerId, fullName) {
-  try {
-    const params = new URLSearchParams({ id: String(playerId) });
-    if (fullName) params.set('name', fullName);
-    const res = await fetch(`/api/contract?${params}`, {
-      signal: AbortSignal.timeout(14_000),  // BRef can be slow
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.found) recordFeedSuccess('contracts');
-    return data?.found ? data : null;
-  } catch { return null; }
+  const normalizedId = String(playerId || '').trim();
+  const normalizedName = String(fullName || '').trim().toLowerCase();
+  if (!normalizedId && !normalizedName) return null;
+  const cacheKey = `${normalizedId}:${normalizedName}`;
+  const cached = contractClientCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) contractClientCache.delete(cacheKey);
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ id: normalizedId });
+      if (fullName) params.set('name', fullName);
+      const res = await fetch(`/api/contract?${params}`, {
+        signal: AbortSignal.timeout(14_000),  // BRef can be slow
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data?.found) recordFeedSuccess('contracts');
+      return data?.found ? data : null;
+    } catch { return null; }
+  })().then(result => {
+    if (result == null) contractClientCache.delete(cacheKey);
+    return result;
+  });
+  contractClientCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + CONTRACT_CLIENT_TTL_MS,
+  });
+  return promise;
 }
 
 function parseBoxscoreInnings(value) {

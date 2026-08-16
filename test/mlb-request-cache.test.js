@@ -13,6 +13,7 @@ const {
   mlb,
   __resetMlbClientStateForTests,
   fetchTeamFinancials,
+  fetchContractData,
   getGameFeedMetadata,
   getTeamVenueMetadata,
   __resetTeamVenueMetadataCacheForTests,
@@ -286,6 +287,63 @@ describe("MLB request cache optimization", () => {
     await expect(fetchTeamFinancials("ZZZ", 2098)).resolves.toMatchObject({
       found: true,
     });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes team financials only after the 30-minute browser freshness window", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ found: true, teamAbbr: "ZZZ", season: 2098 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ found: true, teamAbbr: "ZZZ", season: 2098, refreshed: true }),
+      });
+
+    await expect(fetchTeamFinancials("ZZZ", 2098)).resolves.toMatchObject({ found: true });
+    vi.advanceTimersByTime(29 * 60_000);
+    await expect(fetchTeamFinancials("ZZZ", 2098)).resolves.not.toHaveProperty("refreshed");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_000 + 1);
+    await expect(fetchTeamFinancials("ZZZ", 2098)).resolves.toMatchObject({ refreshed: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("coalesces and refreshes contract data within the six-hour proxy window", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ found: true, playerId: "123", salary: 100 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ found: true, playerId: "123", salary: 200 }),
+      });
+
+    const [first, concurrent] = await Promise.all([
+      fetchContractData(123, "Test Player"),
+      fetchContractData(123, "Test Player"),
+    ]);
+    expect(first).toMatchObject({ salary: 100 });
+    expect(concurrent).toMatchObject({ salary: 100 });
+    vi.advanceTimersByTime(6 * 60 * 60_000 - 1);
+    await expect(fetchContractData(123, "Test Player")).resolves.toMatchObject({ salary: 100 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2);
+    await expect(fetchContractData(123, "Test Player")).resolves.toMatchObject({ salary: 200 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("evicts failed contract requests so a later attempt can recover", async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: false, status: 502 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ found: true, playerId: "124", salary: 300 }),
+      });
+    await expect(fetchContractData(124, "Retry Player")).resolves.toBeNull();
+    await expect(fetchContractData(124, "Retry Player")).resolves.toMatchObject({ salary: 300 });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 

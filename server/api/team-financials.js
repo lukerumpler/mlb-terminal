@@ -259,7 +259,6 @@ export default async function handler(req, res) {
       .json({ error: "Missing or invalid team abbreviation" });
 
   const key = financialCacheKey(team, season);
-  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
   const now = Date.now();
   const cached = financialCache.get(key);
   if (cached?.freshUntil > now) {
