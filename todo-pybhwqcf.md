@@ -171,3 +171,13 @@
 - [x] Test intelligence calculation endpoint validation, successful calculation, daily reuse, and unavailable-input behavior
 - [x] Confirmed the backend calculation path is functioning; no active calculation defect required repair after the controlled restart
 - [x] Re-run focused and full validation after the intelligence API audit
+- [x] Inventory each missing Overview metric visible in the supplied screenshot
+- [x] Trace FanGraphs stale fallback, provider-blocked state, and calculated MLB fallback for each missing metric
+- [x] Verify whether any missing metric is a UI mapping defect versus a genuine provider coverage gap
+- [x] Produce a metric-by-metric explanation and prioritized fix list
+- [ ] Compare current project intelligence-calculation and FanGraphs daily-gate files with GitHub origin/main
+- [ ] Verify the published checkpoint endpoint and provenance behavior against the current source
+- [ ] Document any divergence between GitHub, project checkpoint, and deployed behavior without claiming unsupported features
+- [ ] Inspect current GitHub main divergence and local uncommitted changes before export
+- [ ] Push the verified Manus project changes to a safe GitHub branch or commit without overwriting unrelated work
+- [ ] Verify the remote commit and provide the exact GitHub review URL
