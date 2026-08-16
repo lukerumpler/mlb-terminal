@@ -1,0 +1,209 @@
+# Project TODO
+
+- [x] Inspect the affiliate subtitle state rendering and remove raw internal error text
+- [x] Trace cached-source badge rendering and identify whether the spacing defect exists in the current repository
+- [x] Audit dropdown code for shared amber focus styling; screenshot-only simultaneous focus remains unproven
+- [x] Add focused regression tests for confirmed defects
+- [x] Run targeted tests and record remaining issues or repository gaps
+- [x] Limit Savant and related provider requests to a nightly refresh with same-day cache reuse
+- [x] Verify manual retry behavior does not bypass the nightly refresh policy unless explicitly intended
+- [x] Replace the fused “savant Cached” presentation with a readable source and cache-age label
+- [x] Implement an actual nightly Savant refresh mechanism instead of relying only on a rolling 24-hour TTL
+- [x] Add a regression test proving manual retry does not refetch same-day Savant data
+- [x] Add explicit user-facing Savant cache-age text and a UI regression test
+- [x] Record the full-suite unhandled test-environment errors and the unresolved dropdown-focus question in a QA note
+- [x] Create the production Heartbeat job for /api/scheduled/refresh-savant after deployment is confirmed
+- [x] Add an effect-level test that changes the manual retry path and asserts same-day Savant helpers are not called again
+- [x] Add a rendered Overview UI test proving the visible cache-age label appears in the DOM
+- [x] Add an OverviewPage integration test that triggers the manual retry path and spies on Savant helpers
+- [x] Add an OverviewPage DOM test that verifies the visible cached-age text in the actual panel
+- [x] Compare checkpoint 36aaf482 and the editable project against GitHub main commit aa73d31
+- [x] Confirm whether Savant badge-spacing and nightly-refresh code is visible in the canonical repository
+- [x] Do not overwrite or merge divergent branch changes until the canonical source of truth is identified
+- [x] Add a retry integration test that directly mocks or spies on getTeamSavantMetrics and related Savant helpers
+- [x] Move nightly-savant-refresh from 03:00 UTC to 09:00 UTC to reduce the risk of caching incomplete late West Coast game data
+- [x] Replace the raw affiliate `· error` subtitle state with humanized user-facing text
+- [x] Add reliable margin between Savant and FanGraphs source/status badges
+- [x] Ensure the MLB-level team overview initializes before minor-league affiliate data
+- [x] Add focused regression tests for all three Overview behaviors
+- [x] Verify the latest checkpoint publication state and canonical project remote
+- [x] Verify the live Dodgers Overview page shows the affiliate error fix, badge spacing, and MLB-first default
+- [x] Compare the Manus project remote with github.com/lukerumpler/mlb-terminal and document whether they are separate sources of truth
+- [x] Stop the default MLB team load from automatically selecting the first minor-league affiliate
+- [x] Add visible spacing between provider names, cache symbols, and status labels in live source badges
+- [x] Re-test the live Dodgers Overview after publication
+- [x] Fix or verify the live default-selection path so a fresh Dodgers Overview load does not auto-select Oklahoma City or any affiliate
+- [x] Add deterministic live or end-to-end verification that the published affiliate selector defaults to Select MiLB affiliate and no affiliate panel renders on first load
+- [x] Capture deterministic published-UI verification for visible provider-badge spacing and the humanized affiliate error state
+- [x] Investigate App-level recent-history or event restoration that may still select Oklahoma City after a hard refresh
+- [x] Add deterministic published-site verification for an empty default affiliate selector and absent first-load affiliate panel
+- [x] Add deterministic published-UI verification for badge spacing and the live affiliate error-state copy
+- [x] Add an automated published-site/E2E assertion that the Dodgers first-load affiliate value is empty and no affiliate panel renders before explicit selection
+- [x] Resolve the contradictory hard-refresh versus cache-busted live behavior for default affiliate selection
+- [x] Add a reproducible deployed error-state verification and a published-UI assertion for source-badge spacing
+- [x] Add an actual automated deployed-site/E2E test against the published Dodgers Overview
+- [x] Identify and document the root cause of the hard-refresh versus cache-busted affiliate-selection difference
+- [x] Create a reproducible deployed affiliate-error verification and deterministic published badge-spacing assertion
+- [x] Prove the hard-refresh versus cache-busted mismatch with asset/version evidence or startup-event tracing
+- [x] Add a reproducible controlled local path that forces the affiliate error state and verifies the humanized copy
+- [x] If production error forcing is unsupported, document that limitation explicitly and scope validation to controlled preview/local coverage
+- [x] Trace startup affiliate-selection events and localStorage/recent-history state during a hard refresh versus cache-busted load
+- [x] Add a focused regression or reproducible script showing the prior Oklahoma City auto-selection condition and confirming it no longer occurs
+- [x] Add a deterministic runtime trace or automated script logging startup affiliate-selection events and recent-history/localStorage state for hard-refresh and cache-busted loads
+- [x] Document the exact runtime cause of any Oklahoma City auto-selection discrepancy with event, storage, or asset evidence
+- [x] Capture a deterministic problematic-load artifact containing startup affiliate events, recent-history/localStorage contents, and served asset hashes (historical screenshot unavailable; current-build trace captured instead)
+- [x] Compare the problematic-load artifact with the corrected-load Playwright trace and document the exact causal difference (exact historical cause remains unprovable; limitation documented)
+- [x] Scope the historical hard-refresh task accurately: the original bad state is unreproducible, and only the corrected-build runtime trace is available
+- [x] Keep the current-build Playwright trace for startup events, recent-history reads, selected affiliate value, and live asset markers in the QA record
+- [x] Do not claim an exact historical root cause unless the original bad state is reproduced with equivalent runtime evidence
+- [x] Export checkpoint c89f9939 to github.com/lukerumpler/mlb-terminal without overwriting unrelated commits
+- [x] Inspect provider routes and environment handling for a staging-only failure hook
+- [x] Implement a default-off intentional provider-failure hook for staging
+- [x] Add regression tests for enabled and disabled failure-hook behavior
+- [x] Run validation and save the updated project checkpoint
+- [x] Restrict the provider-failure hook to an explicit staging environment flag and reject it in development and production
+- [x] Add a regression assertion for development denial as well as production denial
+- [x] Save a new checkpoint after the staging-gate correction
+- [x] Save a new webdev checkpoint containing the explicit staging-only gate, updated tests, managed-secret configuration, and hook documentation
+- [x] Inspect current browser/server logs and request traces for runtime errors and slow or duplicate calls
+- [x] Measure the highest-impact data-loading bottlenecks and cache misses
+- [x] Apply targeted performance or reliability fixes without changing metric definitions
+- [x] Add or update regression coverage for request counts and corrected error paths
+- [x] Run focused tests, type-check, build, and final performance validation
+- [x] Read and summarize the attached api-and-ui-fixes.patch contents
+- [x] Compare each patch hunk with current API, cache, and Overview code
+- [x] Apply only compatible patch changes that improve measured reliability or performance
+- [x] Add regression coverage for accepted patch behavior and validate the full focused suite
+- [x] Explicitly reconcile the attached OverviewPage rosterSavantKey hunk with the current source and decide whether it is already present or needs application
+- [x] Add or verify regression coverage for the Savant-rollup effect identity guard
+- [x] Document accept/reject decisions for the attached index.css, OverviewPage, PlayersPage, and contract hunks
+- [x] Add a direct regression test for stable rosterSavantKey identity across liveTeamPlayers object churn
+- [x] Persist a short QA note documenting accept/reject decisions for every attached patch hunk
+- [x] Establish a whole-project baseline: tests, type-check, build, logs, request traces, and runtime health
+- [x] Audit all external provider calls, cache keys, TTLs, stale-if-error behavior, and in-flight request coalescing
+- [x] Audit frontend effects, query dependencies, loading races, duplicate requests, and raw error-state rendering
+- [x] Measure and fix the highest-impact reliability or performance bottlenecks without changing metric definitions
+- [x] Add regression tests for each accepted whole-project fix
+- [x] Run the full validation suite and visual/runtime checks before checkpointing
+- [x] Investigate and fix the natural-search/divisional-WAR full-suite regression exposed after provider-cache changes
+- [x] Re-run the full suite and production build after the regression fix
+- [x] Fix the remaining FanGraphs provider/status badge spacing visible in the verified dashboard screenshot
+- [x] Add team-financials handler tests for fresh cache hits, in-flight coalescing, and stale-cached fallback
+- [x] Re-run focused and full suites after team-financials cache coverage is added
+- [x] Investigate the two published Overview E2E failures after the latest whole-project cache changes
+- [x] Re-run published E2E, full suite, and production build after the live regression is resolved or correctly isolated
+- [x] Stabilize published Overview E2E against transient live browser/page crashes without weakening assertions
+- [x] Re-run the complete test suite, type-check, and build with a clean passing result
+- [x] Inspect SKIP v65.4 ZIP contents and identify any API keys, tokens, or credential-like values without executing archive contents
+- [x] Compare ZIP request construction, cache scope, retry behavior, and data-loading flow with the current project
+- [x] Apply only verified request-minimization improvements; never copy secrets or hardcode credentials
+- [x] Add regression tests for accepted cache/request changes and API-key safety
+- [x] Run request-count, full-suite, type-check, and build validation before checkpointing
+- [x] Remove the duplicate team-financials rate-limit check so cache hits and in-flight followers do not consume upstream-request budget
+- [x] Add a regression test proving cached team-financials reads do not trigger a second rate-limit decision
+- [x] Bound successful browser team-financials cache entries to the server’s 30-minute freshness window while preserving in-flight deduplication
+- [x] Add a client regression test proving team-financials refetches only after the freshness window expires
+- [x] Add browser-side contract request coalescing and six-hour freshness reuse to prevent repeated Spotrac/BRef/MLB contract scrapes for the same player
+- [x] Add contract-cache regression coverage for concurrent reuse, fresh reuse, and retry after failure
+- [x] Persist the v65.4 API-key and cache comparison findings in a project QA note
+- [x] Audit all Overview FanGraphs provider/status badge layouts
+- [x] Separate provider names from status badges with a consistent readable layout
+- [x] Add or update badge-spacing regression coverage and verify the rendered Overview
+- [x] Adjust the badge unit regression to avoid jsdom-only computed-style gaps while retaining browser-level spacing verification
+- [x] Inventory every unavailable metric currently visible in the Overview
+- [x] Trace each unavailable metric to its request, cache, parser, provider response, and fallback state
+- [x] Cross-check runtime logs and current provider responses for concrete causes
+- [x] Deliver a metric-by-metric diagnosis separating fixable failures from true coverage gaps
+- [x] Create a complete per-metric audit table mapping every unavailable Overview metric to endpoint, cache, parser field, runtime result, and fallback state
+- [x] Classify every unavailable metric as transport failure, cooldown/rate-limit, parser/mapping issue, missing upstream field, or intentional coverage gap
+- [x] Persist the complete diagnosis in a QA note and deliver the same findings to the user
+- [x] Deliver the completed metric-by-metric unavailable-metrics diagnosis to the user
+- [x] Audit the current FanGraphs provider cache, stale behavior, metadata, and failure tests
+- [x] Define a bounded stale fallback with explicit age/provenance labels and no fabricated values
+- [x] Implement stale FanGraphs reuse for 502/429/timeout failures without adding request frequency
+- [x] Add regression tests for fresh hits, stale fallback, failure eviction, age labels, and no-data behavior
+- [x] Run focused/full validation and verify the Overview fallback rendering
+- [x] Investigate the full-suite `window is not defined` teardown error from overview-layout-reorder
+- [x] Re-run the full suite after resolving or isolating the teardown error
+- [x] Add a rendered Overview test that seeds a FanGraphs local snapshot, forces a provider failure, and asserts stale values plus readable local-cache freshness
+- [x] Add a client-cache regression test proving a failed refresh remains retryable and a later successful response replaces the stale snapshot
+- [x] Inspect FanGraphs model and aggregate-WAR proxy URLs, headers, timeouts, cache, and parser behavior
+- [x] Passively compare exact upstream responses with current parser expectations
+- [x] Classify the 502 cause as URL/parser, blocking/rate limit, timeout, upstream error, or mixed
+- [x] Decide that no unverified correction should be applied; preserve request limits and provider protections
+- [x] Confirm existing fallback and request-limit coverage remains applicable because no runtime code changed in this diagnosis pass
+- [x] Classify FanGraphs 403 Cloudflare challenge responses as provider-blocked in the server payload and UI status
+- [x] Add regression coverage for provider-blocked classification, stale fallback, and preserved request limits
+- [x] Validate the diagnostic change and document that actual FanGraphs recovery remains blocked pending approved access or alternate provider
+- [x] Add a focused FanGraphs proxy test proving Cloudflare-classified 403 responses preserve stale fallback and cooldown behavior
+- [x] Add a regression test proving provider-blocked model requests remain coalesced and do not increase request frequency
+- [x] Add proxy coverage that seeds an expired FanGraphs model cache, forces Cloudflare 403 responses, and asserts stale-cached data is served
+- [x] Re-run focused provider-blocked, stale-fallback, and request-frequency tests after adding the missing assertion
+- [x] Audit current FanGraphs model and aggregate-WAR contracts, MLB Stats routes, and Overview fallback states
+- [x] Confirmed MLB Stats API does not expose a compatible verified WAR field here; unsupported playoff-odds fabrication is refused
+- [x] Confirmed no non-fabricating MLB Stats API WAR fallback can be implemented without changing metric definitions; preserve explicit Unavailable state
+- [x] Updated Overview mapping to keep FanGraphs WAR provenance and playoff odds explicitly Provider unavailable when unverified
+- [x] Added no-fabrication playoff-odds regression coverage and retained provider cache/failure coverage
+- [x] Run request-count, full-suite, type-check, build, and visual validation before checkpointing
+- [x] Verified source priority: official MLB Stats API remains primary for supported fields; FanGraphs remains the only verified source for its model-specific WAR/odds fields, with no fabricated fallback
+- [x] Ensured source labels identify FanGraphs, MLB Stats API-supported metadata, local stale snapshots, provider-blocked states, and unavailable playoff odds distinctly
+- [x] Confirmed no MLB Stats API WAR fallback path exists to trigger FanGraphs ordering; retained tests for FanGraphs request coalescing and bounded retries
+- [x] Audit current Baseball-Reference/FanGraphs access paths, cache keys, refresh triggers, and high-priority metrics
+- [x] Define a fixed UTC-day refresh gate with snapshot provenance, stale fallback, and in-flight coalescing
+- [x] Implement at most one provider refresh per UTC day for priority metrics; serve cached snapshots otherwise
+- [x] Add day-boundary, duplicate-request, provider-failure, and provenance regression tests
+- [x] Run full validation and document exactly which metrics refresh daily
+- [x] Update existing FanGraphs cache tests for fixed UTC-day freshness and daily-attempt responses
+- [x] Preserve explicit cooldown assertions for rate-limited failures while distinguishing daily refresh suppression
+- [x] Add a regression test proving FanGraphs permits one new refresh after the UTC-day boundary
+- [x] Add regression assertions for FanGraphs daily-gate provenance and Baseball-Reference same-day failure reuse
+- [x] Add a focused FanGraphs 429 test proving cooldown semantics remain distinct from daily refresh suppression
+- [x] Removed the SKIP playoff-odds simulation fallback so unavailable odds remain unavailable without an estimate
+- [x] Run final Overview visual validation confirming unavailable playoff odds and readable provenance labels
+- [x] Define backend-calculated metric classes and provenance labels separate from provider-reported values
+- [x] Audit MLB Stats API fields already available for defensible team and player calculations
+- [x] Implement backend-calculated intelligence metrics without changing provider metric definitions
+- [x] Keep calculated playoff-probability outputs clearly labeled as model-derived and never as official odds
+- [x] Integrate calculated metrics into the intelligence panel with transparent methodology text
+- [x] Add regression tests for calculation formulas, missing inputs, provenance, and request limits
+- [x] Run full validation and save the updated intelligence-panel checkpoint
+- [x] Inspect recent backend and dev-server logs for the responsiveness failure
+- [x] Test intelligence calculation endpoint validation, successful calculation, daily reuse, and unavailable-input behavior
+- [x] Confirmed the backend calculation path is functioning; no active calculation defect required repair after the controlled restart
+- [x] Re-run focused and full validation after the intelligence API audit
+- [x] Inventory each missing Overview metric visible in the supplied screenshot
+- [x] Trace FanGraphs stale fallback, provider-blocked state, and calculated MLB fallback for each missing metric
+- [x] Verify whether any missing metric is a UI mapping defect versus a genuine provider coverage gap
+- [x] Produce a metric-by-metric explanation and prioritized fix list
+- [ ] Compare current project intelligence-calculation and FanGraphs daily-gate files with GitHub origin/main
+- [ ] Verify the published checkpoint endpoint and provenance behavior against the current source
+- [ ] Document any divergence between GitHub, project checkpoint, and deployed behavior without claiming unsupported features
+- [x] Inspect current GitHub main divergence and local uncommitted changes before export
+- [x] Push the verified Manus project changes to a safe GitHub branch or commit without overwriting unrelated work
+- [x] Verify the remote commit and provide the exact GitHub review URL
+- [x] Read and classify the attached pasted content into actionable requests and unsupported claims
+- [x] Compare its requested changes against the current Manus project and GitHub export branch
+- [x] Confirmed compatible changes are already present; did not reapply redundant Savant or contract patches, and preserved source-of-truth documentation
+- [x] Validated the export and opened GitHub pull request #1 for review; Player Profile tab restructure remains separate
+- [x] Check out PR #1 head 73c5300d in an isolated worktree without modifying main
+- [x] Run the PR head’s full test suite, TypeScript check, and production build independently
+- [x] Report actual validation results before any merge decision
+- [x] Read and classify pr1-test-path-fix.patch
+- [x] Compare the patch against PR #1 head and apply only compatible test-path changes
+- [x] Rerun affected and full validation after any patch application
+- [x] Update PR #1 with the verified patch result without merging main
+- [x] Inspect Savant URL builders, headers, response parsing, and affected metric mappings
+- [x] Verified live Savant response content through the exact URL families; responses were CSV with data rows, not interactive HTML
+- [x] Confirmed the current proxy already rejects HTML before CSV parsing; no production parser repair was warranted
+- [x] Added HTML-response rejection coverage, documented the endpoint verification, and passed focused/full tests, type-check, and build
+- [x] Finish reading the supplied legacy UI, CSS, and implementation files
+- [x] Compare legacy endpoint and data-loading guidance with the current project
+- [x] Identify safe reusable fixes and reject hardcoded, fabricated, or obsolete legacy behavior
+- [x] Report which legacy files materially help the current debugging and optimization work
+- [ ] Verify both PlayersPage Savant field-usage sites and the documented column aliases
+- [ ] Normalize sweet-spot, hard-hit, and barrel fields consistently without estimates
+- [ ] Add regression coverage for alias handling and missing-field behavior
+- [ ] Run focused and full validation for the PlayersPage mapping fix
+- [ ] Run full validation and inspect runtime health for the PlayersPage Savant alias fix
+- [ ] Commit and push the Savant alias normalization to the existing PR review branch
+- [ ] Verify the updated PR head and report the review link

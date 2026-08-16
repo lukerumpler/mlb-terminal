@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { parseTeamPayrollHtml, parseTeamTaxHtml } from './team-financials.js';
+import { describe, expect, it } from "vitest";
+import { parseTeamPayrollHtml, parseTeamTaxHtml } from "./team-financials.js";
 
 const payrollHtml = `
   <table>
@@ -17,10 +17,10 @@ const taxHtml = `
     <tbody><tr><td>$430,290,578</td><td>$244,000,000</td><td>$186,290,578</td></tr></tbody>
   </table>`;
 
-describe('team financial Spotrac parsers', () => {
-  it('maps payroll fields for the requested team and preserves null-safe values', () => {
-    expect(parseTeamPayrollHtml(payrollHtml, 'LAD', 2026)).toMatchObject({
-      teamAbbr: 'LAD',
+describe("team financial Spotrac parsers", () => {
+  it("maps payroll fields for the requested team and preserves null-safe values", () => {
+    expect(parseTeamPayrollHtml(payrollHtml, "LAD", 2026)).toMatchObject({
+      teamAbbr: "LAD",
       season: 2026,
       payroll: 311496026,
       allocations: null,
@@ -28,20 +28,20 @@ describe('team financial Spotrac parsers', () => {
       injured: 69776556,
       retained: 1639408,
       buried: 11110607,
-      source: 'Spotrac MLB Team Salary Payroll Tracker',
+      source: "Spotrac MLB Team Salary Payroll Tracker",
     });
-    expect(parseTeamPayrollHtml(payrollHtml, 'NYM', 2026)).toBeNull();
+    expect(parseTeamPayrollHtml(payrollHtml, "NYM", 2026)).toBeNull();
   });
 
-  it('maps tax payroll, tax space, estimated bill, and CBT threshold', () => {
-    expect(parseTeamTaxHtml(taxHtml, 'LAD', 2026)).toMatchObject({
-      teamAbbr: 'LAD',
+  it("maps tax payroll, tax space, estimated bill, and CBT threshold", () => {
+    expect(parseTeamTaxHtml(taxHtml, "LAD", 2026)).toMatchObject({
+      teamAbbr: "LAD",
       taxPayroll: 430290578,
       taxSpace: -186290578,
       estimatedTaxBill: 180319636,
       totalTaxPayroll: 610610214,
       taxThreshold: 244000000,
-      source: 'Spotrac MLB Team Tax Tracker',
+      source: "Spotrac MLB Team Tax Tracker",
     });
   });
 });

@@ -5,7 +5,7 @@ export default function LiveScoreTicker({ status = 'loading', ticks = [], onRetr
   const hasScores = status === 'live' || status === 'refreshing' || status === 'stale';
   const label = status === 'live' ? 'LIVE' : status === 'refreshing' ? 'UPDATING' : status === 'stale' ? 'STALE' : status === 'error' ? 'OFFLINE' : status === 'empty' ? 'NO GAMES' : 'CONNECTING';
   return (
-    <div style={{ height:32, flexShrink:0, background:C.navy, borderTop:'1px solid rgba(255,255,255,.1)', display:'flex', alignItems:'center', overflow:'hidden' }}>
+    <div className="skip-ticker-shell" style={{ height:32, flexShrink:0, background:C.navy, borderTop:'1px solid rgba(255,255,255,.1)', display:'flex', alignItems:'center', overflow:'hidden' }}>
       <div style={{ flexShrink:0, padding:'0 14px', height:'100%', display:'flex', alignItems:'center', borderRight:'1px solid rgba(255,255,255,.12)', gap:6 }}>
         <div style={{ width:6, height:6, borderRadius:'50%', background:status === 'live' ? C.teal : 'rgba(255,255,255,.3)', animation:status === 'live' ? 'pulse 1.6s ease-in-out infinite' : 'none' }} />
         <span style={px({ fontSize:10, color:status === 'live' ? C.teal : 'rgba(255,255,255,.45)', letterSpacing:'.12em', fontWeight:500 })}>{label}</span>

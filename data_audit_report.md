@@ -8,13 +8,13 @@ The site now treats current standard MLB values as live data rather than as stat
 
 ## Verified source policy
 
-| Data category | Source used or required | Current handling |
-|---|---|---|
-| MLB standings, schedule, standard team totals, player identity, standard player stats | [MLB Stats API](https://statsapi.mlb.com/api/v1/) | Live requests through the Manus proxy and client adapter |
-| MLB Statcast, expected, batted-ball, pitch, and advanced defensive metrics | [Baseball Savant](https://baseballsavant.mlb.com/league) | Not silently substituted with standard MLB values; unsupported current panels are labeled illustrative, estimated, or unavailable |
-| Prospect identity and minor-league statistics | [MLB prospect statistics](https://www.mlb.com/prospects/stats/top-prospects), MLB Stats API | Live enrichment is used where identifiers and responses are available; curated baseline remains visible as a prospect catalog, not a claim of current completeness |
-| NCAA data | NCAA adapter/provider path | Existing live adapter retained; no fabricated replacement data added |
-| Contract and feed data | Existing API adapters | Existing live/error behavior retained; no static value is presented as a successful live response |
+| Data category                                                                         | Source used or required                                                                     | Current handling                                                                                                                                                   |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MLB standings, schedule, standard team totals, player identity, standard player stats | [MLB Stats API](https://statsapi.mlb.com/api/v1/)                                           | Live requests through the Manus proxy and client adapter                                                                                                           |
+| MLB Statcast, expected, batted-ball, pitch, and advanced defensive metrics            | [Baseball Savant](https://baseballsavant.mlb.com/league)                                    | Not silently substituted with standard MLB values; unsupported current panels are labeled illustrative, estimated, or unavailable                                  |
+| Prospect identity and minor-league statistics                                         | [MLB prospect statistics](https://www.mlb.com/prospects/stats/top-prospects), MLB Stats API | Live enrichment is used where identifiers and responses are available; curated baseline remains visible as a prospect catalog, not a claim of current completeness |
+| NCAA data                                                                             | NCAA adapter/provider path                                                                  | Existing live adapter retained; no fabricated replacement data added                                                                                               |
+| Contract and feed data                                                                | Existing API adapters                                                                       | Existing live/error behavior retained; no static value is presented as a successful live response                                                                  |
 
 ## Corrected shared paths
 
@@ -32,16 +32,16 @@ The Overview page continues to show the requested Bloomberg-terminal visual stru
 
 The final release gate passed after the changes:
 
-| Check | Result |
-|---|---|
-| Prettier-based lint command | Passed |
-| TypeScript check | Passed |
-| Production build | Passed |
-| Vitest suite | 21 test files, 122 tests passed |
-| Focused MLB proxy response tests | 2 tests passed |
-| Preview root request | HTTP 200 |
-| Schedule proxy smoke test | HTTP 200 with current MLB schedule JSON |
-| Invalid MLB proxy path | Controlled HTTP 400 |
+| Check                            | Result                                  |
+| -------------------------------- | --------------------------------------- |
+| Prettier-based lint command      | Passed                                  |
+| TypeScript check                 | Passed                                  |
+| Production build                 | Passed                                  |
+| Vitest suite                     | 21 test files, 122 tests passed         |
+| Focused MLB proxy response tests | 2 tests passed                          |
+| Preview root request             | HTTP 200                                |
+| Schedule proxy smoke test        | HTTP 200 with current MLB schedule JSON |
+| Invalid MLB proxy path           | Controlled HTTP 400                     |
 
 The preview was also captured successfully after the server restart. The official roadmap markdown was not modified as part of this audit.
 
@@ -57,27 +57,19 @@ See `data_audit_official_sources.md` for the official source endpoints and the s
 
 The live preview loaded the Players tab and exposed all six quick profiles (Aaron Judge, Shohei Ohtani, Juan Soto, Gunnar Henderson, Spencer Strider, and Bobby Witt Jr.) with MLB IDs, team abbreviations, and positions from the profile search/quick-access path. The preview root and tab navigation rendered successfully after the dev-server restart. Aaron Judge was selected and remained in the profile loading state while the parallel MLB, Savant, career, and contract requests settled; this is expected for the multi-source profile loader and is being checked against the browser console/network logs before final delivery.
 
-
 The Aaron Judge profile now hydrates and renders authoritative 2026 MLB standard stats (59 G, .248 AVG, 17 HR, .908 OPS) and live Baseball Savant fields where returned. Missing fields such as Sweet Spot %, Hard Hit %, and plate-discipline percentiles show `—` or an explicit unavailable message rather than proxy values. The profile also shows the model-only, illustrative, estimated, and unavailable labels introduced by the accuracy pass. This smoke test exposed no new profile-rendering exception after the split-selection change.
-
 
 The profile search correctly identifies Shohei Ohtani as MLB person ID 660271 and labels the quick-access entry `DH · LAD`; the search result also exposes the MLB profile classification as `TWP`. The current selected profile remains Aaron Judge until the result is explicitly chosen, so the smoke test is checking both identity resolution and selection behavior rather than assuming a typed name changed the loaded record.
 
-
 The Ohtani search result selection correctly enters the same multi-source profile loading state used for every player, indicating that the catalog identity path and detail loader are connected. The next browser check will confirm that his two-way MLB profile resolves to the current Dodgers record and does not inherit Aaron Judge’s hitter data.
-
 
 Shohei Ohtani’s profile resolved correctly to **Los Angeles Dodgers · TWP**, MLB person ID 660271, with current 2026 batting data from MLB Stats API (115 G, .292 AVG, 27 HR, 74 RBI, .937 OPS). The profile did not inherit Aaron Judge’s values, and its live Savant contact-point panel reported 875 tracked swings with left-handed batting. His standard stats and two-way identity are therefore hydrated from the selected MLB record rather than from the curated quick-access card.
 
-
 The Spencer Strider search result resolves to MLB person ID 675911 and is labeled `Free Agent · P`; the current selected profile remains Ohtani until the result is explicitly selected. This confirms the search path is updating candidate identity independently from the loaded profile, which avoids cross-profile data bleed during selection.
-
 
 Spencer Strider’s selected profile entered the shared loading state without a client exception. The initial wait did not yet complete the profile, consistent with the slower Savant pitcher endpoints and contract request; the current test is checking that the loader eventually resolves or fails with a controlled state rather than displaying stale Ohtani data.
 
-
 The complete six-player quick-access identity audit found and corrected one real catalog error: MLB person ID `668939` belonged to Adley Rutschman, not Bobby Witt Jr. MLB’s live people search identified Bobby Witt Jr. as ID `677951`; the quick-access record was corrected and its official position/team abbreviations were aligned (`RF`, `TWP`, `LF`, `SS`, `P`, `SS`). The corrected audit now reports **6/6 identities matched** live MLB name, hydrated current team, position, and ID records.
-
 
 ## Baseball Savant baseline for the UI refinement
 
@@ -87,22 +79,21 @@ Baseball Savant’s Visuals page identifies authentic Statcast visual convention
 
 References: [Baseball Savant Percentile Rankings](https://baseballsavant.mlb.com/leaderboard/percentile-rankings); [Baseball Savant Visuals](https://baseballsavant.mlb.com/visuals); [Baseball Savant CSV Documentation](https://baseballsavant.mlb.com/csv-docs); [Baseball Savant Statcast Metrics Context](https://baseballsavant.mlb.com/statcast-metrics-context).
 
-
 ## UI refinement source baseline — 2026-08-13
+
 - Baseball Savant percentile rankings: https://baseballsavant.mlb.com/leaderboard/percentile-rankings
 - Baseball Savant visuals and Statcast chart conventions: https://baseballsavant.mlb.com/visuals
 - Baseball Savant CSV field documentation: https://baseballsavant.mlb.com/csv-docs
 
 Implementation rule: percentile bars use league-population ranks on a 0–100 scale, while raw values remain secondary labels. Missing Statcast distributions, team spray coordinates, and team pitch arsenals render as unavailable rather than seeded estimates. Player spray charts use Statcast Search `hc_x`/`hc_y` coordinates when present; draft class rows use one canonical SKIP rank map shared by the Big Board, directory, and mover panels.
 
-
 ## Baseball Savant baseline — spray and Statcast visuals
+
 - Official CSV documentation: https://baseballsavant.mlb.com/csv-docs
 - Official visuals glossary: https://baseballsavant.mlb.com/visuals
 - Baseball Savant defines `hc_x` as the hit-coordinate X of the batted ball and `hc_y` as the hit-coordinate Y of the batted ball. These are field-contact coordinates and must not be confused with the batter-relative intercept coordinates used by the Contact Point panel.
 - Baseball Savant defines a hard-hit ball as a batted ball with exit velocity of at least 95 mph, a launch-angle sweet spot as 8–32 degrees, xBA as expected batting average, and xwOBA as a result based on exit velocity, launch angle, and in some cases sprint speed.
 - Baseball Savant’s visuals page is the presentation baseline for batted-ball, pitch, expected-statistics, and bat-tracking labels. Player percentile chart widths must use the 0–100 population rank; raw statistics are contextual labels only.
-
 
 ## UI and chart refinement checkpoint — 2026-08-13
 
@@ -113,7 +104,6 @@ The player spray chart now consumes Baseball Savant field-contact `hc_x`/`hc_y` 
 The Overview smoke test confirmed live Dodgers standings, team hitting and pitching totals, team leaders, and proper 93rd/77th percentile labels. Unsupported team-level Statcast panels remain explicitly unavailable. The Draft tab rendered a canonical SKIP rank order shared by the Big Board, movers, and class directory, with SKIP editorial fields separated from official round results.
 
 A 375px mobile preview was also checked. The terminal now collapses the navigation rail to icons, stacks major Overview grids, and converts the shared metric strip to two columns so the data cards remain readable on a narrow screen while desktop layout remains unchanged.
-
 
 ## Final 2026 source verification — 2026-08-13
 
@@ -136,9 +126,7 @@ A 375px mobile preview was also checked. The terminal now collapses the navigati
 - Current NCAA data and Intel Feed posts were unavailable at audit time; the UI displays explicit unavailable/error states rather than fallback data.
 - `ROADMAP_REFERENCE_FEATURES.md` was not modified.
 
-
 The same parent-organization audit corrected 11 current organization labels in the curated prospect catalog: Leo De Vries to ATH, Zyhir Hope to DET, Arjun Nimmala to LAA, Jefferson Rojas to NYM, Jamie Arnold to ATH, Gage Jump to ATH, Anthony Eyanson to BAL, River Ryan to DET, Kyson Witherspoon to BAL, Brandon Sproat to MIL, and Kyle Harrison to MIL. These are current MLB organization affiliations derived from the live person record’s `currentTeam.parentOrgId`; the table’s level and editorial rank fields remain separate from the live affiliation check.
-
 
 ## Comprehensive metric verification — source research phase
 
@@ -146,13 +134,11 @@ Authoritative online documentation was rechecked on 2026-08-13. Baseball Savant'
 
 The NCAA.com Division I baseball rankings page was also read as an authoritative current-season reference. It identifies the D1Baseball.com Top 25 through games on June 23, 2026 and reports rank, team, overall record, and previous rank. The existing NCAA adapter is therefore treated as a live provider path only when it returns data; NCAA.com rankings are a corroborating reference, not a fabricated fallback. Source: https://www.ncaa.com/rankings/baseball/d1/d1baseballcom-top-25.
 
-
 ### Live endpoint probe results — 2026-08-13
 
 The connected routes were probed after the Overview remount. MLB person identity for Shohei Ohtani, MLB team player stats for the Dodgers, and MLB leader categories returned HTTP 200 JSON from the official Stats API. Baseball Savant expected-statistics and Statcast leaderboard CSV routes returned HTTP 200 with current 2026 rows. The NCAA standings route returned HTTP 500 from `ncaa-api.henrygd.me` with an explicit proxy error, while the current-week scoreboard route returned HTTP 200 with an empty scoreboard response. This confirms the app can display live MLB/Savant data and must retain explicit unavailable states for NCAA standings when the provider fails.
 
 The Overview issue was traced to one `Promise.allSettled` block that waited for slow per-player leader requests before committing successful aggregate standings/team-total responses. The loader now commits the three critical aggregate requests independently and handles team-leader requests in a separate non-blocking promise. A fresh clean remount then displayed live Dodgers values including 73–48, .603, 606 runs scored, 464 runs allowed, +142 run differential, .768 OPS, 155 HR, 3.70 ERA, 1.160 WHIP, .261 AVG, 1081 strikeouts, and 46 stolen bases from the live responses.
-
 
 ## Draft trend source research — 2026-08-13
 
@@ -163,4 +149,5 @@ D1Baseball team-season pages for Georgia Tech 2024–2026 expose season links, t
 UI verification addendum (2026-08-13): desktop and 375px screenshots show the Bloomberg-style shell, responsive icon rail, stacked overview cards, and explicit `LOADING MLB DATA`/dash states when upstream requests are still pending. The comparison modal’s new motion and spinner states are covered by interaction tests; Draft trend cells are source-gated and show `—` when no complete three-season history is available.
 
 ## Overview hierarchy refinement — 2026-08-13
+
 Team Leaders and Front Office Evaluation now appear immediately below the Overview metric strip, before Front Office Read and lower-detail charts. Desktop verification shows the two decision panels side by side; the 375px view stacks them cleanly, with Team Leaders visible directly below the key team metrics. Existing loading/live states remain source-transparent.

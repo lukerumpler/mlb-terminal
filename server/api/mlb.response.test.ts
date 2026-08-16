@@ -54,10 +54,13 @@ describe("MLB proxy upstream response handling", () => {
   });
 
   it("returns a controlled 502 for a non-JSON upstream body", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => "<html>upstream error</html>",
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "<html>upstream error</html>",
+      })
+    );
 
     const response = createResponse();
     await handler(createRequest(), response);
@@ -69,10 +72,13 @@ describe("MLB proxy upstream response handling", () => {
   });
 
   it("returns a controlled 502 for an empty upstream body", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => "   ",
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => "   ",
+      })
+    );
 
     const response = createResponse();
     await handler(createRequest(), response);

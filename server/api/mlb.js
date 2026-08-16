@@ -7,17 +7,17 @@
  * Receives:  GET /api/mlb?path=/people/805299&hydrate=stats(type=season,group=hitting,season=2026)
  * Forwards:  GET https://statsapi.mlb.com/api/v1/people/805299?hydrate=stats(type=season,...)
  */
-import { applyCors, isRateLimited, rateLimitResponse } from './_shared.js';
+import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
-const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
+const MLB_BASE = "https://statsapi.mlb.com/api/v1";
 
 const CACHE_RULES = {
-  '/standings':     { s: 120, swr: 60  },
-  '/schedule':      { s: 90, swr: 60  },
-  '/teams':         { s: 300, swr: 120 },
-  '/stats/leaders': { s: 300, swr: 120 },
-  '/people':        { s: 600, swr: 300 },
-  default:          { s: 180, swr: 90  },
+  "/standings": { s: 120, swr: 60 },
+  "/schedule": { s: 90, swr: 60 },
+  "/teams": { s: 300, swr: 120 },
+  "/stats/leaders": { s: 300, swr: 120 },
+  "/people": { s: 600, swr: 300 },
+  default: { s: 180, swr: 90 },
 };
 
 // The browser has its own request cache, but local development and some
@@ -27,6 +27,18 @@ const CACHE_RULES = {
 // client cache remains the source of truth for verified local snapshots.
 const responseCache = new Map();
 const MLB_FAILURE_COOLDOWN_MS = 15_000;
+const UPSTREAM_TIMEOUT_MS = {
+  "/schedule": 20_000,
+  "/teams": 15_000,
+  default: 12_000,
+};
+
+export function getUpstreamTimeoutMs(path) {
+  for (const [prefix, timeoutMs] of Object.entries(UPSTREAM_TIMEOUT_MS)) {
+    if (prefix !== "default" && path.startsWith(prefix)) return timeoutMs;
+  }
+  return UPSTREAM_TIMEOUT_MS.default;
+}
 const upstreamFailureUntil = new Map();
 // Overview, ticker, and affiliate panels can request the same resource at
 // nearly the same time. Share one upstream promise during a cache miss so a
@@ -43,11 +55,14 @@ function responseCacheKey(path, forwardedQs) {
   return `${path}?${forwardedQs}`;
 }
 
-function setProxyHeaders(res, rule, source, cacheStatus, freshness = 'live') {
-  res.setHeader('Cache-Control', `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`);
-  res.setHeader('X-Proxy-Source', source);
-  res.setHeader('X-Proxy-Cache', cacheStatus);
-  res.setHeader('X-Proxy-Freshness', freshness);
+function setProxyHeaders(res, rule, source, cacheStatus, freshness = "live") {
+  res.setHeader(
+    "Cache-Control",
+    `public, s-maxage=${rule.s}, stale-while-revalidate=${rule.swr}`
+  );
+  res.setHeader("X-Proxy-Source", source);
+  res.setHeader("X-Proxy-Cache", cacheStatus);
+  res.setHeader("X-Proxy-Freshness", freshness);
 }
 
 function getStaleEntry(entry) {
@@ -55,51 +70,56 @@ function getStaleEntry(entry) {
 }
 
 function serveStale(res, rule, entry, reason) {
-  setProxyHeaders(res, rule, entry.source, 'STALE', 'stale-cached');
-  res.setHeader('X-Proxy-Stale-Reason', reason);
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  setProxyHeaders(res, rule, entry.source, "STALE", "stale-cached");
+  res.setHeader("X-Proxy-Stale-Reason", reason);
+  res.setHeader(
+    "Cache-Control",
+    "public, s-maxage=60, stale-while-revalidate=300"
+  );
   return res.status(200).json(entry.data);
 }
 
 function getCacheRule(path) {
   for (const [prefix, rule] of Object.entries(CACHE_RULES)) {
-    if (prefix !== 'default' && path.startsWith(prefix)) return rule;
+    if (prefix !== "default" && path.startsWith(prefix)) return rule;
   }
   return CACHE_RULES.default;
 }
 
 export default async function handler(req, res) {
   applyCors(req, res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
   // Extract path param (URL-decoded) for validation and cache lookup
-  const urlObj = new URL(req.url, 'https://placeholder.invalid');
-  const path = urlObj.searchParams.get('path');
+  const urlObj = new URL(req.url, "https://placeholder.invalid");
+  const path = urlObj.searchParams.get("path");
 
   if (!path) {
     return res.status(400).json({
-      error: 'Missing required query param: path',
-      example: '/api/mlb?path=/people/805299&hydrate=stats(type=season,group=hitting,season=2026)',
+      error: "Missing required query param: path",
+      example:
+        "/api/mlb?path=/people/805299&hydrate=stats(type=season,group=hitting,season=2026)",
     });
   }
 
-  if (!path.startsWith('/') || path.includes('://')) {
-    return res.status(400).json({ error: 'Invalid path parameter' });
+  if (!path.startsWith("/") || path.includes("://")) {
+    return res.status(400).json({ error: "Invalid path parameter" });
   }
 
   // Forward the raw query string (minus "path=...") so that special characters
   // like parentheses and commas in hydrate=stats(type=season,...) reach MLB intact.
-  const rawQuery = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const rawQuery = req.url.includes("?") ? req.url.split("?")[1] : "";
   const forwardedQs = rawQuery
-    .split('&')
-    .filter(part => !part.startsWith('path='))
-    .join('&');
+    .split("&")
+    .filter(part => !part.startsWith("path="))
+    .join("&");
 
   const rule = getCacheRule(path);
   const cacheKey = responseCacheKey(path, forwardedQs);
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    setProxyHeaders(res, rule, cached.source, 'HIT', 'fresh');
+    setProxyHeaders(res, rule, cached.source, "HIT", "fresh");
     return res.status(200).json(cached.data);
   }
   if (cached && !getStaleEntry(cached)) responseCache.delete(cacheKey);
@@ -108,69 +128,111 @@ export default async function handler(req, res) {
   if (existingRequest) {
     try {
       const result = await existingRequest;
-      setProxyHeaders(res, rule, result.source, 'COALESCED');
+      setProxyHeaders(res, rule, result.source, "COALESCED");
       return res.status(200).json(result.data);
     } catch (error) {
-      if (getStaleEntry(cached)) return serveStale(res, rule, cached, error?.status === 429 ? 'upstream-rate-limit' : 'upstream-unavailable');
-      if (error?.retryAfter) res.setHeader('Retry-After', error.retryAfter);
-      return res.status(error?.status || 502).json(error?.payload || { error: 'MLB upstream request failed' });
+      if (getStaleEntry(cached))
+        return serveStale(
+          res,
+          rule,
+          cached,
+          error?.status === 429 ? "upstream-rate-limit" : "upstream-unavailable"
+        );
+      if (error?.retryAfter) res.setHeader("Retry-After", error.retryAfter);
+      return res
+        .status(error?.status || 502)
+        .json(error?.payload || { error: "MLB upstream request failed" });
     }
   }
 
   const failureUntil = upstreamFailureUntil.get(cacheKey) || 0;
   if (failureUntil > Date.now()) {
-    if (getStaleEntry(cached)) return serveStale(res, rule, cached, 'recent-upstream-failure');
+    if (getStaleEntry(cached))
+      return serveStale(res, rule, cached, "recent-upstream-failure");
     const retryAfter = Math.ceil((failureUntil - Date.now()) / 1000);
-    res.setHeader('Retry-After', String(retryAfter));
-    return res.status(503).json({ error: 'MLB resource temporary upstream cooldown active', retryAfter, path });
+    res.setHeader("Retry-After", String(retryAfter));
+    return res
+      .status(503)
+      .json({
+        error: "MLB resource temporary upstream cooldown active",
+        retryAfter,
+        path,
+      });
   }
   if (failureUntil) upstreamFailureUntil.delete(cacheKey);
 
   // Count only cache misses that will create an upstream request. Requests
   // arriving while that miss is in flight share the same promise and do not
   // spend additional rate-limit budget.
-  if (isRateLimited(req, 'mlb')) return rateLimitResponse(res);
+  if (isRateLimited(req, "mlb")) return rateLimitResponse(res);
 
-  const mlbUrl = `${MLB_BASE}${path}${forwardedQs ? '?' + forwardedQs : ''}`;
+  const mlbUrl = `${MLB_BASE}${path}${forwardedQs ? "?" + forwardedQs : ""}`;
   const upstreamRequest = (async () => {
     let mlbRes;
     try {
       mlbRes = await fetch(mlbUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MLBDashboard/1.0)',
-          'Accept': 'application/json',
+          "User-Agent": "Mozilla/5.0 (compatible; MLBDashboard/1.0)",
+          Accept: "application/json",
         },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(getUpstreamTimeoutMs(path)),
       });
     } catch (err) {
-      const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
-      console.error('[mlb-proxy] fetch error:', err.message);
-      throw { status: isTimeout ? 504 : 502, payload: {
-        error: isTimeout ? 'MLB API timed out' : 'Failed to reach MLB API',
-        detail: err.message,
-        url: mlbUrl,
-      }};
+      const isTimeout =
+        err.name === "TimeoutError" || err.name === "AbortError";
+      console.error("[mlb-proxy] fetch error:", err.message);
+      throw {
+        status: isTimeout ? 504 : 502,
+        payload: {
+          error: isTimeout ? "MLB API timed out" : "Failed to reach MLB API",
+          detail: err.message,
+          url: mlbUrl,
+        },
+      };
     }
 
     if (!mlbRes.ok) {
-      const body = await mlbRes.text().catch(() => '');
-      const retryAfter = mlbRes.headers?.get?.('Retry-After');
-      console.error('[mlb-proxy] MLB returned', mlbRes.status, '| url:', mlbUrl);
-      throw { status: mlbRes.status, retryAfter, payload: {
-        error: `MLB API responded with ${mlbRes.status}`,
-        url: mlbUrl,
-        body: body.slice(0, 500),
-      }};
+      const body = await mlbRes.text().catch(() => "");
+      const retryAfter = mlbRes.headers?.get?.("Retry-After");
+      console.error(
+        "[mlb-proxy] MLB returned",
+        mlbRes.status,
+        "| url:",
+        mlbUrl
+      );
+      throw {
+        status: mlbRes.status,
+        retryAfter,
+        payload: {
+          error: `MLB API responded with ${mlbRes.status}`,
+          url: mlbUrl,
+          body: body.slice(0, 500),
+        },
+      };
     }
 
     let data;
     try {
       const body = await mlbRes.text();
-      if (!body.trim()) throw Object.assign(new Error('empty response'), { emptyBody: true });
+      if (!body.trim())
+        throw Object.assign(new Error("empty response"), { emptyBody: true });
       data = JSON.parse(body);
     } catch (err) {
-      console.error('[mlb-proxy] JSON parse error | url:', mlbUrl, '| detail:', err.message);
-      throw { status: 502, payload: { error: err.emptyBody ? 'MLB API returned an empty response' : 'MLB API returned non-JSON response', url: mlbUrl } };
+      console.error(
+        "[mlb-proxy] JSON parse error | url:",
+        mlbUrl,
+        "| detail:",
+        err.message
+      );
+      throw {
+        status: 502,
+        payload: {
+          error: err.emptyBody
+            ? "MLB API returned an empty response"
+            : "MLB API returned non-JSON response",
+          url: mlbUrl,
+        },
+      };
     }
     return { data, source: mlbUrl };
   })();
@@ -180,19 +242,34 @@ export default async function handler(req, res) {
     const result = await upstreamRequest;
     upstreamFailureUntil.delete(cacheKey);
     const expiresAt = Date.now() + rule.s * 1000;
-    responseCache.set(cacheKey, { data: result.data, source: result.source, expiresAt, staleExpiresAt: expiresAt + Math.max(rule.swr * 1000, 60_000) });
+    responseCache.set(cacheKey, {
+      data: result.data,
+      source: result.source,
+      expiresAt,
+      staleExpiresAt: expiresAt + Math.max(rule.swr * 1000, 60_000),
+    });
     if (responseCache.size > 500) {
       const oldestKey = responseCache.keys().next().value;
       if (oldestKey) responseCache.delete(oldestKey);
     }
-    setProxyHeaders(res, rule, result.source, 'MISS', 'fresh');
+    setProxyHeaders(res, rule, result.source, "MISS", "fresh");
     return res.status(200).json(result.data);
   } catch (error) {
-    if (error?.status >= 500) upstreamFailureUntil.set(cacheKey, Date.now() + MLB_FAILURE_COOLDOWN_MS);
-    if (getStaleEntry(cached)) return serveStale(res, rule, cached, error?.status === 429 ? 'upstream-rate-limit' : 'upstream-unavailable');
-    if (error?.retryAfter) res.setHeader('Retry-After', error.retryAfter);
-    return res.status(error?.status || 502).json(error?.payload || { error: 'MLB upstream request failed' });
+    if (error?.status >= 500)
+      upstreamFailureUntil.set(cacheKey, Date.now() + MLB_FAILURE_COOLDOWN_MS);
+    if (getStaleEntry(cached))
+      return serveStale(
+        res,
+        rule,
+        cached,
+        error?.status === 429 ? "upstream-rate-limit" : "upstream-unavailable"
+      );
+    if (error?.retryAfter) res.setHeader("Retry-After", error.retryAfter);
+    return res
+      .status(error?.status || 502)
+      .json(error?.payload || { error: "MLB upstream request failed" });
   } finally {
-    if (inFlightRequests.get(cacheKey) === upstreamRequest) inFlightRequests.delete(cacheKey);
+    if (inFlightRequests.get(cacheKey) === upstreamRequest)
+      inFlightRequests.delete(cacheKey);
   }
 }

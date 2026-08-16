@@ -12,14 +12,14 @@ The current implementation has two server entrypoints that share one handler. `s
 
 The response uses these source states:
 
-| State | Meaning | UI treatment |
-|---|---|---|
-| `tier-1` | The first configured provider returned parseable, non-empty data. | Green/teal Tier 1 badge. |
-| `tier-2` | Tier 1 failed and the second provider returned data. | Blue Tier 2 badge plus a source-failure notice. |
-| `tier-3` | The first two providers failed and the secondary publisher returned data. | Amber Tier 3 badge plus a source-failure notice. |
-| `cached` | A warm verified response is being reused inside its freshness window. | Neutral Cached badge with age. |
-| `cached-fallback` | All live providers failed, but a verified snapshot remains inside its stale window. | Amber Stale Fallback badge with age and reason. |
-| `unavailable` | No provider succeeded and no verified snapshot is available. | Unavailable badge and an empty state. |
+| State             | Meaning                                                                             | UI treatment                                     |
+| ----------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `tier-1`          | The first configured provider returned parseable, non-empty data.                   | Green/teal Tier 1 badge.                         |
+| `tier-2`          | Tier 1 failed and the second provider returned data.                                | Blue Tier 2 badge plus a source-failure notice.  |
+| `tier-3`          | The first two providers failed and the secondary publisher returned data.           | Amber Tier 3 badge plus a source-failure notice. |
+| `cached`          | A warm verified response is being reused inside its freshness window.               | Neutral Cached badge with age.                   |
+| `cached-fallback` | All live providers failed, but a verified snapshot remains inside its stale window. | Amber Stale Fallback badge with age and reason.  |
+| `unavailable`     | No provider succeeded and no verified snapshot is available.                        | Unavailable badge and an empty state.            |
 
 Every response also contains `source`, `sourceUrl`, `tier`, `retrievedAt`, `ageSeconds`, `sourceStatuses`, and `attempts`. The UI can therefore explain what happened instead of displaying a generic failure.
 
@@ -27,12 +27,12 @@ Every response also contains `source`, `sourceUrl`, `tier`, `retrievedAt`, `ageS
 
 The feed order depends on the requested view.
 
-| Request | Tier 1 | Tier 2 | Tier 3 |
-|---|---|---|---|
-| `/api/news?kind=mlb` | MLB official league RSS | ESPN MLB RSS | FOX Sports MLB RSS |
-| `/api/news?team=redsox` | Official MLB club RSS | MLB official league RSS | ESPN MLB RSS |
-| `/api/news?kind=college` | NCAA Division I Baseball RSS | ESPN college RSS | FOX Sports MLB RSS as a last-resort baseball publisher |
-| `/api/news?handle=JonHeyman` | Configured Nitter mirrors | ESPN MLB RSS | MLB official league RSS |
+| Request                      | Tier 1                       | Tier 2                  | Tier 3                                                 |
+| ---------------------------- | ---------------------------- | ----------------------- | ------------------------------------------------------ |
+| `/api/news?kind=mlb`         | MLB official league RSS      | ESPN MLB RSS            | FOX Sports MLB RSS                                     |
+| `/api/news?team=redsox`      | Official MLB club RSS        | MLB official league RSS | ESPN MLB RSS                                           |
+| `/api/news?kind=college`     | NCAA Division I Baseball RSS | ESPN college RSS        | FOX Sports MLB RSS as a last-resort baseball publisher |
+| `/api/news?handle=JonHeyman` | Configured Nitter mirrors    | ESPN MLB RSS            | MLB official league RSS                                |
 
 For a handle request, Nitter remains an optional social-post source. It is not required for the Intel Feed to work. If all Nitter mirrors fail, the verified ESPN MLB feed provides league headlines. The new grouped Intel Feed page uses official league and college chains rather than depending on Nitter.
 
@@ -113,7 +113,7 @@ The relevant route behavior is equivalent to the following simplified flow:
 ```js
 const fresh = cache.get(key);
 if (fresh && fresh.freshUntil > Date.now()) {
-  return json(cachePayload(fresh, 'cached'));
+  return json(cachePayload(fresh, "cached"));
 }
 
 const sources = sourcesFor(kind, team, handle);
@@ -132,21 +132,25 @@ for (const provider of sources) {
       sourceStatuses: completeSourceStatuses(sources, attempts),
     };
     cache.set(key, entry);
-    return json({ ...entry, status: `tier-${provider.tier}`, freshness: 'live' });
+    return json({
+      ...entry,
+      status: `tier-${provider.tier}`,
+      freshness: "live",
+    });
   }
 }
 
 if (fresh && fresh.staleUntil > Date.now()) {
   return json({
-    ...cachePayload(fresh, 'cached-fallback'),
-    reason: 'all-sources-unavailable',
+    ...cachePayload(fresh, "cached-fallback"),
+    reason: "all-sources-unavailable",
   });
 }
 
 return json({
   items: [],
-  status: 'unavailable',
-  freshness: 'unavailable',
+  status: "unavailable",
+  freshness: "unavailable",
   sourceStatuses: completeSourceStatuses(sources, attempts),
 });
 ```
@@ -188,12 +192,12 @@ The current `vercel.json` also bounds the direct news function:
 
 The shared CORS helper follows these rules:
 
-| Environment | Origin behavior |
-|---|---|
-| Local development with no `ALLOWED_ORIGIN` | `*` is retained for convenience. |
-| Production with an allowlist | Only an exact normalized origin is reflected. `Vary: Origin` is set. |
-| Production with no allowlist | No cross-origin access header is returned. Same-origin requests still work. |
-| Any request with an untrusted `Origin` | `Access-Control-Allow-Origin` is omitted, so a browser cannot expose the response to that site. |
+| Environment                                | Origin behavior                                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Local development with no `ALLOWED_ORIGIN` | `*` is retained for convenience.                                                                |
+| Production with an allowlist               | Only an exact normalized origin is reflected. `Vary: Origin` is set.                            |
+| Production with no allowlist               | No cross-origin access header is returned. Same-origin requests still work.                     |
+| Any request with an untrusted `Origin`     | `Access-Control-Allow-Origin` is omitted, so a browser cannot expose the response to that site. |
 
 CORS is not authentication. It only controls browser read access. Keep the per-IP rate limiter, validate all query parameters, bound request timeouts, and use a shared rate-limit store if the Vercel deployment grows beyond a single warm instance. Never place provider credentials in `VITE_*` variables or client code.
 
@@ -204,11 +208,11 @@ If a public FOX Sports RSS URL is used, treat its partner URL as server-side con
 The shared component is `client/src/components/StatusBadge.jsx`. Its normalized states include the existing semantic statuses plus the news-specific states:
 
 ```js
-normalizeStatus('tier-1');          // 'tier-1'
-normalizeStatus('tier-2');          // 'tier-2'
-normalizeStatus('tier-3');          // 'tier-3'
-normalizeStatus('cached-fallback'); // 'cached-fallback'
-normalizeStatus('unavailable');     // 'unavailable'
+normalizeStatus("tier-1"); // 'tier-1'
+normalizeStatus("tier-2"); // 'tier-2'
+normalizeStatus("tier-3"); // 'tier-3'
+normalizeStatus("cached-fallback"); // 'cached-fallback'
+normalizeStatus("unavailable"); // 'unavailable'
 ```
 
 The Intel Feed header uses the overall route state:
@@ -220,18 +224,20 @@ The Intel Feed header uses the overall route state:
 The source-chain sidebar always shows the configured tier badge and separately shows whether that source was selected, failed, or remained on standby:
 
 ```jsx
-{sourceStatuses.map(source => (
-  <div key={`${source.key}:${source.tier}`}>
-    <StatusBadge status={`tier-${source.tier}`} compact />
-    <span>
-      {source.ok === true
-        ? 'Selected'
-        : source.ok === false
-          ? source.reason || 'Unavailable'
-          : 'Standby'}
-    </span>
-  </div>
-))}
+{
+  sourceStatuses.map(source => (
+    <div key={`${source.key}:${source.tier}`}>
+      <StatusBadge status={`tier-${source.tier}`} compact />
+      <span>
+        {source.ok === true
+          ? "Selected"
+          : source.ok === false
+            ? source.reason || "Unavailable"
+            : "Standby"}
+      </span>
+    </div>
+  ));
+}
 ```
 
 This separation is important. A Tier 1 source that was not needed is still a Tier 1 source; it should not be mislabeled as “Unavailable.” The provider attempt status explains what happened, while the tier badge explains where that provider sits in the fallback chain.
@@ -239,9 +245,9 @@ This separation is important. A Tier 1 source that was not needed is still a Tie
 A headline carries its own tier badge as well:
 
 ```jsx
-{item.sourceTier && (
-  <StatusBadge status={`tier-${item.sourceTier}`} compact />
-)}
+{
+  item.sourceTier && <StatusBadge status={`tier-${item.sourceTier}`} compact />;
+}
 ```
 
 The client helper in `client/src/api/feed.js` preserves `status`, `freshness`, `retrievedAt`, `ageSeconds`, `sourceStatuses`, and `sources`. It also keeps the older `fetchFeed(handle)` API compatible by sending handle requests to `/api/news?handle=...`, which exercises the Nitter-to-ESPN path.
@@ -285,15 +291,15 @@ Do not mark a source as live solely because the HTTP status was 200. The handler
 
 The attached specification is now partly implemented and partly intentionally labeled as a source gap:
 
-| Area | Current SKIP implementation | Transparency rule |
-|---|---|---|
-| FanGraphs Team WAR | `server/api/fangraphs-models.js?mode=aggregate` fetches batting and pitching leaderboard tables, matches `Team` and `WAR` by header text, and computes total WAR only when both sides are present. | Missing or partial FanGraphs rows remain missing; no zero is substituted. |
-| Savant team batted balls | `server/api/savant.js` supports `team_batted_balls` and `team_batted_balls_against`, trims verified coordinates, batted-ball type, EV, launch angle, barrel classification, xwOBA, and events, and uses stale-if-error caching. | Overview spray, xwOBA, EV, and contact-quality panels identify Baseball Savant and show unavailable states when rows are absent. |
-| Team spray chart | Overview plots raw `hc_x`/`hc_y` points from the verified Savant team query and labels them as raw Savant coordinates rather than estimated locations. | Do not present a coordinate transform as an official field position without further calibration. |
-| Home/Away and Day/Night splits | MLB Stats API schedule rows are aggregated client-side into verified W–L splits. | OPS and ERA remain `—` because they require per-game boxscore aggregation not present in the schedule-only response. |
-| Playoff odds | FanGraphs playoff odds remain unavailable when the FanGraphs model page cannot be parsed. SKIP's deterministic Monte Carlo estimate is shown only as `SKIP estimate`, never as FanGraphs. | Never relabel the SKIP estimate as an external projection. |
-| Weather | Completed/live game weather uses MLB Stats API game-feed observations through `getGameFeedMetadata`. | Observed weather is not presented as a forecast; missing weather is labeled unavailable. |
-| Ballpark metadata | `getTeamVenueMetadata()` uses MLB Stats API team and venue endpoints with `hydrate=location,fieldInfo`, caching successful snapshots for 24 hours. Overview displays venue name, capacity, surface, roof, coordinates, and wall distances. | Altitude, wall height, orientation, and park factors are not shown without a verified source. |
+| Area                           | Current SKIP implementation                                                                                                                                                                                                                | Transparency rule                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| FanGraphs Team WAR             | `server/api/fangraphs-models.js?mode=aggregate` fetches batting and pitching leaderboard tables, matches `Team` and `WAR` by header text, and computes total WAR only when both sides are present.                                         | Missing or partial FanGraphs rows remain missing; no zero is substituted.                                                        |
+| Savant team batted balls       | `server/api/savant.js` supports `team_batted_balls` and `team_batted_balls_against`, trims verified coordinates, batted-ball type, EV, launch angle, barrel classification, xwOBA, and events, and uses stale-if-error caching.            | Overview spray, xwOBA, EV, and contact-quality panels identify Baseball Savant and show unavailable states when rows are absent. |
+| Team spray chart               | Overview plots raw `hc_x`/`hc_y` points from the verified Savant team query and labels them as raw Savant coordinates rather than estimated locations.                                                                                     | Do not present a coordinate transform as an official field position without further calibration.                                 |
+| Home/Away and Day/Night splits | MLB Stats API schedule rows are aggregated client-side into verified W–L splits.                                                                                                                                                           | OPS and ERA remain `—` because they require per-game boxscore aggregation not present in the schedule-only response.             |
+| Playoff odds                   | FanGraphs playoff odds remain unavailable when the FanGraphs model page cannot be parsed. SKIP's deterministic Monte Carlo estimate is shown only as `SKIP estimate`, never as FanGraphs.                                                  | Never relabel the SKIP estimate as an external projection.                                                                       |
+| Weather                        | Completed/live game weather uses MLB Stats API game-feed observations through `getGameFeedMetadata`.                                                                                                                                       | Observed weather is not presented as a forecast; missing weather is labeled unavailable.                                         |
+| Ballpark metadata              | `getTeamVenueMetadata()` uses MLB Stats API team and venue endpoints with `hydrate=location,fieldInfo`, caching successful snapshots for 24 hours. Overview displays venue name, capacity, surface, roof, coordinates, and wall distances. | Altitude, wall height, orientation, and park factors are not shown without a verified source.                                    |
 
 Weather forecasts for upcoming games may use Open-Meteo only after the venue coordinates are available, with attribution and the documented non-commercial-use constraint. No change should be made to `ROADMAP_REFERENCE_FEATURES.md`.
 

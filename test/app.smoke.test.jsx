@@ -1,12 +1,22 @@
-import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import App from '../client/src/App.jsx';
+import React from "react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import App from "../client/src/App.jsx";
 
 const TABS = [
-  'Overview', 'Players', 'Prospects', 'Draft', 'League', 'Intelligence',
-  'AMD / IMD', 'Knowledge', 'Scouting Notes', 'Intel Feed', 'Follow List', 'Settings',
+  "Overview",
+  "Players",
+  "Prospects",
+  "Draft",
+  "League",
+  "Intelligence",
+  "AMD / IMD",
+  "Knowledge",
+  "Scouting Notes",
+  "Intel Feed",
+  "Follow List",
+  "Settings",
 ];
 
 beforeEach(() => {
@@ -14,36 +24,86 @@ beforeEach(() => {
   global.__consoleErrors.length = 0;
 });
 
-describe('SKIP app — mobile navigation', () => {
-  it('opens the labeled mobile drawer, navigates, and closes the drawer', async () => {
+describe("SKIP app — mobile navigation", () => {
+  it("opens the labeled mobile drawer, navigates, and closes the drawer", async () => {
     const user = userEvent.setup();
-    Object.defineProperty(window, 'innerWidth', { configurable:true, value:375 });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
     render(<App />);
-    const openButton = document.querySelector('.skip-mobile-nav-toggle');
+    const openButton = document.querySelector(".skip-mobile-nav-toggle");
     expect(openButton).toBeTruthy();
     await user.click(openButton);
-    expect(screen.getByRole('button', { name:'Close navigation' })).toBeInTheDocument();
-    expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeTruthy();
-    const playersButton = document.querySelector('.skip-sidebar button[title="Players"]');
+    expect(
+      screen.getByRole("button", { name: "Close navigation" })
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector(".skip-sidebar.skip-mobile-nav-open")
+    ).toBeTruthy();
+    const playersButton = document.querySelector(
+      '.skip-sidebar button[title="Players"]'
+    );
     expect(playersButton).toBeTruthy();
     await user.click(playersButton);
-    await waitFor(() => expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeNull());
-    expect(document.querySelector('.skip-topbar')?.textContent).toContain('Players');
+    await waitFor(() =>
+      expect(
+        document.querySelector(".skip-sidebar.skip-mobile-nav-open")
+      ).toBeNull()
+    );
+    expect(document.querySelector(".skip-topbar")?.textContent).toContain(
+      "Players"
+    );
   });
 
-  it('keeps the desktop sidebar mounted when the mobile drawer is inactive', () => {
-    Object.defineProperty(window, 'innerWidth', { configurable:true, value:1280 });
+  it("supports touch-safe Escape dismissal and focus restoration for the mobile drawer", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
     render(<App />);
-    expect(screen.getByRole('navigation', { name:'SKIP workspace navigation' })).toBeInTheDocument();
-    expect(document.querySelector('.skip-sidebar.skip-mobile-nav-open')).toBeNull();
+    const openButton = document.querySelector(".skip-mobile-nav-toggle");
+    const firstNavItem = document.querySelector(
+      '.skip-sidebar button[title="Overview"]'
+    );
+    expect(openButton).toBeTruthy();
+    expect(firstNavItem).toBeTruthy();
+    await user.click(openButton);
+    await waitFor(() => expect(document.activeElement).toBe(firstNavItem));
+    expect(document.body.style.overflow).toBe("hidden");
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(
+        document.querySelector(".skip-sidebar.skip-mobile-nav-open")
+      ).toBeNull()
+    );
+    expect(document.body.style.overflow).toBe("");
+    await waitFor(() => expect(document.activeElement).toBe(openButton));
+  });
+
+  it("keeps the desktop sidebar mounted when the mobile drawer is inactive", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1280,
+    });
+    render(<App />);
+    expect(
+      screen.getByRole("navigation", { name: "SKIP workspace navigation" })
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector(".skip-sidebar.skip-mobile-nav-open")
+    ).toBeNull();
   });
 });
 
-describe('SKIP app — full tab cycle', () => {
-  it('mounts without crashing', async () => {
+describe("SKIP app — full tab cycle", () => {
+  it("mounts without crashing", async () => {
     render(<App />);
     // Overview is the default tab; give its first async effect a tick.
-    await waitFor(() => expect(document.body.textContent.length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(document.body.textContent.length).toBeGreaterThan(0)
+    );
   });
 
   for (const label of TABS) {
@@ -52,16 +112,24 @@ describe('SKIP app — full tab cycle', () => {
       render(<App />);
 
       const navButton = await waitFor(() => {
-        const button = document.querySelector(`.skip-sidebar button[title="${label.replace(/"/g, '\\"')}"]`);
-        if (!button) throw new Error(`Workspace navigation button not found: ${label}`);
+        const button = document.querySelector(
+          `.skip-sidebar button[title="${label.replace(/"/g, '\\"')}"]`
+        );
+        if (!button)
+          throw new Error(`Workspace navigation button not found: ${label}`);
         return button;
       });
       await user.click(navButton);
 
       // Let lazy() + Suspense + any first-render useEffect settle.
-      await waitFor(() => {
-        expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-      }, { timeout: 10000 });
+      await waitFor(
+        () => {
+          expect(document.body.textContent).not.toMatch(
+            /This tab failed to load/
+          );
+        },
+        { timeout: 10000 }
+      );
 
       // Give async data effects (which all fail fast against the mocked
       // offline fetch) a moment to resolve and re-render before asserting.

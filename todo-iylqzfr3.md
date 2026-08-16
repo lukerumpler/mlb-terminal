@@ -159,3 +159,12 @@
 - [x] Add regression coverage for cache hits, expiry, invalidation, and error fallback
 - [x] Run typecheck, focused tests, full tests, and fresh visual verification
 - [x] Save a checkpoint containing the team cache and optimization update
+
+- [x] Audit roster row fields, existing position/performance filters, and verified hitter inputs
+- [x] Add a true recent-performance quick filter using verified recent-window fields when available
+- [x] Add source-backed Fantasy Points normalization for hitter rows
+- [x] Show an explicit Fantasy Points unavailable label when required source fields are missing
+- [x] Preserve existing roster sorting, minimum thresholds, caching, mobile layout, and source metadata
+- [x] Add rendered interaction coverage for quick-filter changes plus Fantasy Points calculations
+- [x] Run typecheck, focused tests, full tests, and fresh visual verification
+- [x] Save a checkpoint containing the roster filter and Fantasy Points enhancement

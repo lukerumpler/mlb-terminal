@@ -7,6 +7,7 @@ import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerLegacyApiRoutes, legacyApiErrorHandler } from "./api/routes";
 import { serveStatic, setupVite } from "./_core/vite";
+import { scheduledSavantRefresh } from "./api/scheduled-savant-refresh";
 
 export type CreateAppOptions = {
   serveFrontend?: boolean;
@@ -30,6 +31,8 @@ export async function createApp({
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, service: "skip-baseball-api" });
   });
+
+  app.post("/api/scheduled/refresh-savant", scheduledSavantRefresh);
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
