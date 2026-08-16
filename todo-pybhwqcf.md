@@ -127,3 +127,15 @@
 - [x] Re-run the full suite after resolving or isolating the teardown error
 - [x] Add a rendered Overview test that seeds a FanGraphs local snapshot, forces a provider failure, and asserts stale values plus readable local-cache freshness
 - [x] Add a client-cache regression test proving a failed refresh remains retryable and a later successful response replaces the stale snapshot
+- [x] Inspect FanGraphs model and aggregate-WAR proxy URLs, headers, timeouts, cache, and parser behavior
+- [x] Passively compare exact upstream responses with current parser expectations
+- [x] Classify the 502 cause as URL/parser, blocking/rate limit, timeout, upstream error, or mixed
+- [x] Decide that no unverified correction should be applied; preserve request limits and provider protections
+- [x] Confirm existing fallback and request-limit coverage remains applicable because no runtime code changed in this diagnosis pass
+- [x] Classify FanGraphs 403 Cloudflare challenge responses as provider-blocked in the server payload and UI status
+- [x] Add regression coverage for provider-blocked classification, stale fallback, and preserved request limits
+- [x] Validate the diagnostic change and document that actual FanGraphs recovery remains blocked pending approved access or alternate provider
+- [x] Add a focused FanGraphs proxy test proving Cloudflare-classified 403 responses preserve stale fallback and cooldown behavior
+- [x] Add a regression test proving provider-blocked model requests remain coalesced and do not increase request frequency
+- [x] Add proxy coverage that seeds an expired FanGraphs model cache, forces Cloudflare 403 responses, and asserts stale-cached data is served
+- [x] Re-run focused provider-blocked, stale-fallback, and request-frequency tests after adding the missing assertion

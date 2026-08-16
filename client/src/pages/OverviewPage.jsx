@@ -1012,7 +1012,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     .sort((a, b) => b.totalWAR - a.totalWAR), [teamModelData?.divisionTeams]);
   const fanGraphsHealthStatus = teamModelState === 'loading'
     ? 'loading'
-    : ['stale-cached', 'stale-local'].includes(teamModelData?.freshness)
+    : teamModelData?.providerBlocked
+      ? 'provider-blocked'
+      : ['stale-cached', 'stale-local'].includes(teamModelData?.freshness)
       ? 'cached-fallback'
       : teamModelData?.freshness === 'cached'
         ? 'cached'
@@ -1028,9 +1030,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         : affiliateSavant?.status === 'live' || affiliateSavant?.status === 'ready'
           ? 'verified'
           : affiliateSavant?.status ? 'unavailable' : 'loading';
-  const modelFreshness = teamModelData?.freshness === 'stale-local'
-    ? `local cached ${freshnessLabel(teamModelData?.retrievedAt)}`
-    : freshnessLabel(teamModelData?.retrievedAt);
+  const modelFreshness = teamModelData?.providerBlocked
+    ? 'provider blocked by upstream protection'
+    : teamModelData?.freshness === 'stale-local'
+      ? `local cached ${freshnessLabel(teamModelData?.retrievedAt)}`
+      : freshnessLabel(teamModelData?.retrievedAt);
   const rosterPositions = useMemo(() => [...new Set([
     ...(liveTeamPlayers.hitting || []).map(row => row.position),
     ...(liveTeamPlayers.pitching || []).map(row => row.position),

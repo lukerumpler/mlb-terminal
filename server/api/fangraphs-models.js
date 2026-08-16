@@ -18,6 +18,14 @@ const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
 
+export function __seedFanGraphsModelCacheForTests(teamAbbr, season, data, { expiresAt, staleExpiresAt } = {}) {
+  modelCache.set(modelKey(teamAbbr, season), {
+    data,
+    expiresAt: expiresAt ?? Date.now() - 1,
+    staleExpiresAt: staleExpiresAt ?? Date.now() + 60_000,
+  });
+}
+
 export function __resetFanGraphsProviderStateForTests() {
   modelCache.clear();
   modelInFlight.clear();
@@ -25,6 +33,10 @@ export function __resetFanGraphsProviderStateForTests() {
   aggregateWarInFlight.clear();
   modelFailureCooldownUntil.clear();
   fanGraphsCooldownUntil = 0;
+}
+
+export function isFanGraphsProviderBlockedResponse(status, body) {
+  return Number(status) === 403 && /cloudflare|just a moment|challenge/i.test(String(body || ''));
 }
 
 function parseRetryAfterMs(response) {
@@ -237,9 +249,14 @@ async function fetchHtml(url) {
   if (!response.ok) {
     const retryAfterMs =
       response.status === 429 ? parseRetryAfterMs(response) : 0;
+    let providerBlocked = false;
+    if (response.status === 403) {
+      const body = await response.text().catch(() => '');
+      providerBlocked = isFanGraphsProviderBlockedResponse(response.status, body);
+    }
     throw Object.assign(
       new Error(`FanGraphs returned HTTP ${response.status}`),
-      { status: response.status, retryAfterMs }
+      { status: response.status, retryAfterMs, providerBlocked }
     );
   }
   return response.text();
@@ -300,8 +317,16 @@ async function loadAggregateWar(season) {
       battingResult.status === "rejected" &&
       pitchingResult.status === "rejected"
     ) {
-      const error = new Error("FanGraphs aggregate Team WAR unavailable");
+      const providerBlocked = [battingResult, pitchingResult].some(
+        result => result.status === "rejected" && result.reason?.providerBlocked
+      );
+      const error = new Error(
+        providerBlocked
+          ? "FanGraphs provider blocked the aggregate WAR request"
+          : "FanGraphs aggregate Team WAR unavailable"
+      );
       error.status = throttled.length ? 429 : 502;
+      error.providerBlocked = providerBlocked;
       if (throttled.length)
         error.retryAfter = Math.ceil(
           Math.max(
@@ -389,14 +414,17 @@ export default async function handler(req, res) {
     } catch (error) {
       if (error?.retryAfter)
         res.setHeader("Retry-After", String(error.retryAfter));
-      return res
+          return res
         .status(error?.status || 502)
         .json({
           found: false,
           season,
           teams: [],
           statuses: { batting: "unavailable", pitching: "unavailable" },
-          error: "FanGraphs aggregate Team WAR unavailable",
+          providerBlocked: Boolean(error?.providerBlocked),
+          error: error?.providerBlocked
+            ? "FanGraphs provider blocked the aggregate WAR request"
+            : "FanGraphs aggregate Team WAR unavailable",
         });
     }
   }
@@ -542,13 +570,20 @@ export default async function handler(req, res) {
             ) / 1000
           )
         : undefined;
+      const providerBlocked = [oddsResult, warResult].some(
+        result => result.status === "rejected" && result.reason?.providerBlocked
+      );
       throw {
         status: rateLimited ? 429 : 502,
         retryAfter,
+        providerBlocked,
         payload: {
           error: rateLimited
             ? "FanGraphs rate limited both model sources"
-            : "FanGraphs model sources unavailable",
+            : providerBlocked
+              ? "FanGraphs provider blocked the model request"
+              : "FanGraphs model sources unavailable",
+          providerBlocked,
         },
       };
     }
@@ -617,10 +652,12 @@ export default async function handler(req, res) {
           ...fallback.data,
           freshness: "stale-cached",
           servedAt: new Date().toISOString(),
-          staleReason:
-            error?.status === 429
-              ? "FanGraphs rate limit"
-              : "FanGraphs upstream unavailable",
+            staleReason:
+              error?.status === 429
+                ? "FanGraphs rate limit"
+                : error?.providerBlocked
+                  ? "FanGraphs provider blocked the request"
+                  : "FanGraphs upstream unavailable",
         });
     }
     if (error?.retryAfter)

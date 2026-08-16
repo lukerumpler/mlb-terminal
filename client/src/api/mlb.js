@@ -120,7 +120,13 @@ async function fetchProviderJson(url, {
   const request = (async () => {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-      if (!response.ok) throw new Error(`Provider request failed (${response.status})`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw Object.assign(
+          new Error(payload?.error || `Provider request failed (${response.status})`),
+          { status: response.status, providerBlocked: Boolean(payload?.providerBlocked), payload }
+        );
+      }
       const data = await response.json();
       providerJsonCache.set(url, { data, expiresAt: Date.now() + ttlMs });
       writePersistentProviderSnapshot(persistentCacheKey, data);
@@ -1724,9 +1730,10 @@ export async function getTeamModelSources(teamAbbr, season = SEASON) {
   try {
     const url = `/api/fangraphs-models?${params.toString()}`;
     return await fetchProviderJson(url, { timeoutMs: 12_000, persistentCacheKey: `${FANGRAPHS_MODEL_LOCAL_CACHE_KEY}:${url}` });
-  } catch {
+  } catch (error) {
     return {
       found: false,
+      providerBlocked: Boolean(error?.providerBlocked || error?.payload?.providerBlocked),
       retrievedAt: new Date().toISOString(),
       source: 'FanGraphs',
       sourceUrls: {

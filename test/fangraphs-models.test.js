@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   parseFanGraphsModelHtml,
   parseFanGraphsAggregateWarHtml,
+  isFanGraphsProviderBlockedResponse,
 } from "../server/api/fangraphs-models.js";
 
 const overviewSource = readFileSync(
@@ -50,6 +51,12 @@ describe("FanGraphs model source adapter", () => {
     });
   });
 
+  it("classifies Cloudflare challenge bodies as provider-blocked but not ordinary 403 pages", () => {
+    expect(isFanGraphsProviderBlockedResponse(403, '<title>Just a moment...</title> Cloudflare challenge')).toBe(true);
+    expect(isFanGraphsProviderBlockedResponse(403, '<html>Access denied</html>')).toBe(false);
+    expect(isFanGraphsProviderBlockedResponse(502, '<title>Just a moment...</title>')).toBe(false);
+  });
+
   it("returns null model values when the source markup is blocked or changed", () => {
     const result = parseFanGraphsModelHtml(
       { oddsHtml: "<html>challenge</html>", warHtml: "" },
@@ -69,6 +76,8 @@ describe("Overview model freshness and retry contract", () => {
     expect(overviewSource).toContain("retrieved");
     expect(overviewSource).toContain("stale-local");
     expect(overviewSource).toContain("local cached");
+    expect(overviewSource).toContain("provider-blocked");
+    expect(overviewSource).toContain("provider blocked by upstream protection");
     expect(overviewSource).toContain("setMlbRetryToken");
     expect(overviewSource).toContain(">RETRY</button>");
   });
