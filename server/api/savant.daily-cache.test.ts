@@ -59,4 +59,24 @@ describe('Savant daily proxy cache', () => {
     expect(second.headers['X-Provider-Cache']).toBe('HIT');
     expect(second.headers['Cache-Control']).toContain('s-maxage=86400');
   });
+
+  it('rejects an HTML leaderboard response instead of treating it as CSV data', async () => {
+    const upstream = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '<!DOCTYPE html><html><body>Interactive leaderboard</body></html>',
+      headers: { get: () => null },
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = createResponse();
+    await handler(createRequest(), response);
+
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(response.statusCode).toBe(502);
+    expect(response.body).toMatchObject({
+      error: 'Savant returned HTML — endpoint may be unavailable for this year',
+      year: '2026',
+    });
+    expect(response.headers['X-Provider-Cache']).toBeUndefined();
+  });
 });

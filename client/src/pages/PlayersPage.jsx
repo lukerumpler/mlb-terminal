@@ -413,6 +413,18 @@ export function formatProfileMetric(value, digits = 1, suffix = '') {
   return n == null ? '—' : `${n.toFixed(digits)}${suffix}`;
 }
 
+// Savant has renamed several CSV columns across leaderboard families. Read
+// verified aliases consistently and preserve missing values as unavailable.
+export function savantField(row, aliases) {
+  const source = row || {};
+  for (const key of aliases) {
+    if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+      return source[key];
+    }
+  }
+  return undefined;
+}
+
 // Pure — no hooks, no rendering — so it can be reused anywhere the same
 // 0-100 axis shape is needed (currently: the full GeometryRadar below, and
 // the compact "Share Card" RadarCard) without the two drifting out of sync.
@@ -853,9 +865,9 @@ function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStat
     { lbl:'xBA', val:formatProfileMetric(estBa, 3), raw:estBa, pct:savantPercentile(estBa, expectedPopulation, ['est_ba']) },
     { lbl:'xSLG', val:formatProfileMetric(estSlg, 3), raw:estSlg, pct:savantPercentile(estSlg, expectedPopulation, ['est_slg']) },
     { lbl:'Bat Speed', val:formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw:profileMetricValue(bt.avg_bat_speed), pct:savantPercentile(bt.avg_bat_speed, batTrackingRows, ['avg_bat_speed']) },
-    { lbl:'Sweet Spot %', val:formatProfileMetric(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, 1, '%'), raw:profileMetricValue(sv.sweet_spot_percent ?? sv.anglesweetspotpercent), pct:savantPercentile(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
-    { lbl:'Barrel %', val:formatProfileMetric(sv.brl_percent, 1, '%'), raw:profileMetricValue(sv.brl_percent), pct:savantPercentile(sv.brl_percent, statcastPopulationRows, ['brl_percent']) },
-    { lbl:'Hard Hit %', val:formatProfileMetric(sv.hard_hit_percent ?? sv.ev95percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent ?? sv.ev95percent), pct:savantPercentile(sv.hard_hit_percent ?? sv.ev95percent, statcastPopulationRows, ['hard_hit_percent','ev95percent']) },
+    { lbl:'Sweet Spot %', val:formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent'])), pct:savantPercentile(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
+    { lbl:'Barrel %', val:formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%'), raw:profileMetricValue(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent'])), pct:savantPercentile(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), statcastPopulationRows, ['brl_percent','barrel_percent','barrels_per_bbe_percent']) },
+    { lbl:'Hard Hit %', val:formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%'), raw:profileMetricValue(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct'])), pct:savantPercentile(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), statcastPopulationRows, ['hard_hit_percent','ev95percent','hard_hit_pct']) },
     { lbl:'Expected ISO', val:formatProfileMetric(expectedIso, 3), raw:expectedIso, pct:expectedIsoPercentile(expectedIso) },
     { lbl:'Contact Quality', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
     { lbl:'Swing Decisions', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
@@ -1470,9 +1482,9 @@ export function getLivePerformanceItems(savant) {
   return [
     { lbl:'Exit Velocity', val: formatProfileMetric(sv.avg_hit_speed, 1, ' mph') },
     { lbl:'Launch Angle',  val: formatProfileMetric(sv.launch_angle_avg, 1, '°') },
-    { lbl:'Sweet Spot %',  val: formatProfileMetric(sv.sweet_spot_percent, 1, '%') },
-    { lbl:'Barrel %',      val: formatProfileMetric(sv.brl_percent, 1, '%') },
-    { lbl:'Hard Hit %',    val: formatProfileMetric(sv.hard_hit_percent, 1, '%') },
+    { lbl:'Sweet Spot %',  val: formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%') },
+    { lbl:'Barrel %',      val: formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%') },
+    { lbl:'Hard Hit %',    val: formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%') },
     { lbl:'Chase Rate',    val: formatProfileMetric(sv.oz_swing_percent, 1, '%') },
     { lbl:'Zone Contact',  val: formatProfileMetric(sv.z_contact_percent, 1, '%') },
   ];
