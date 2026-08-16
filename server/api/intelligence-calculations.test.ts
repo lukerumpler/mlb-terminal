@@ -91,6 +91,18 @@ describe("backend intelligence calculations", () => {
     expect(second.body.provenance).toBe("calculated-from-verified-standings");
   });
 
+  it("rejects malformed team and season inputs before any upstream request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = response();
+
+    await handler({ method: "GET", url: "/api/intelligence-calculations?teamId=bad&season=2026", headers: {}, socket: { remoteAddress: "198.51.100.12" } }, result);
+
+    expect(result.statusCode).toBe(400);
+    expect(result.body.error).toMatch(/Valid teamId and season/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not calculate when the verified standings lack wins or losses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ records: [{ teamRecords: [{ team: { id: DodgersId } }] }] }), { status: 200 })));
     const result = response();

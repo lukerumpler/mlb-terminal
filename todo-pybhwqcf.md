@@ -167,3 +167,7 @@
 - [x] Integrate calculated metrics into the intelligence panel with transparent methodology text
 - [x] Add regression tests for calculation formulas, missing inputs, provenance, and request limits
 - [x] Run full validation and save the updated intelligence-panel checkpoint
+- [x] Inspect recent backend and dev-server logs for the responsiveness failure
+- [x] Test intelligence calculation endpoint validation, successful calculation, daily reuse, and unavailable-input behavior
+- [x] Confirmed the backend calculation path is functioning; no active calculation defect required repair after the controlled restart
+- [x] Re-run focused and full validation after the intelligence API audit
