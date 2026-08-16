@@ -168,3 +168,11 @@
 - [x] Add rendered interaction coverage for quick-filter changes plus Fantasy Points calculations
 - [x] Run typecheck, focused tests, full tests, and fresh visual verification
 - [x] Save a checkpoint containing the roster filter and Fantasy Points enhancement
+
+- [x] Inspect the latest deployed/local browser, server, and network errors for the non-working page
+- [x] Trace Overview initialization, team selection, and provider fallback flow
+- [x] Identify and repair the root cause of the page failure
+- [x] Improve degraded-provider handling without hiding actual frontend errors
+- [x] Add regression coverage for the failure and recovery path
+- [x] Run typecheck, focused tests, full tests, and fresh deployed/local visual verification
+- [x] Save a checkpoint containing the page repair

@@ -1094,48 +1094,60 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       feedTimeout = window.setTimeout(() => {
         if (alive && !liveTeamData) setLiveTeamError(true);
       }, 12000);
-      Promise.allSettled([
-        getStandings(),
-        getAllTeamStats('hitting'),
-        getAllTeamStats('pitching'),
-      ]).then(([std, hitting, pitching]) => {
+      const aggregateResults = { standings: null, hitting: null, pitching: null };
+      const commitAggregates = () => {
         if (!alive) return;
         const byAbbr = {};
         const byId = {};
-        if (std.status === 'fulfilled') {
+        const std = aggregateResults.standings;
+        const hitting = aggregateResults.hitting;
+        const pitching = aggregateResults.pitching;
+        if (std?.status === 'fulfilled') {
           Object.values(std.value).flat().forEach(row => {
             const record = { standings: row };
             if (row.abbr) byAbbr[row.abbr] = record;
             if (row.id != null) byId[row.id] = record;
           });
         }
-        if (hitting.status === 'fulfilled') {
+        if (hitting?.status === 'fulfilled') {
           Object.values(hitting.value).forEach(stat => {
             const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
             row.hitting = stat;
             if (stat.teamId != null) byId[stat.teamId] = row;
           });
         }
-        if (pitching.status === 'fulfilled') {
+        if (pitching?.status === 'fulfilled') {
           Object.values(pitching.value).forEach(stat => {
             const row = byId[stat.teamId] || byAbbr[stat.teamAbbr] || (byAbbr[stat.teamAbbr] = {});
             row.pitching = stat;
             if (stat.teamId != null) byId[stat.teamId] = row;
           });
         }
-        window.clearTimeout(feedTimeout);
-        if ([std, hitting, pitching].some(result => result.status === 'fulfilled')) {
+        const fulfilled = Object.values(aggregateResults).some(result => result?.status === 'fulfilled');
+        const settled = Object.values(aggregateResults).every(Boolean);
+        if (fulfilled) {
+          window.clearTimeout(feedTimeout);
           const snapshot = saveTeamAggregateCache({ byAbbr, byId }, CURRENT_SEASON);
           setLiveTeamData(snapshot?.data || { byAbbr, byId });
           setLiveTeamDataUpdatedAt(snapshot?.updatedAt || Date.now());
           setLiveTeamDataMode('live');
           setLiveTeamError(false);
-        } else {
+        } else if (settled) {
           const cached = readTeamAggregateCache(CURRENT_SEASON);
           setLiveTeamDataMode(cached ? 'cached' : 'error');
           setLiveTeamError(!cached);
         }
+      };
+      const settleAggregate = (key, promise) => promise.then(value => {
+        aggregateResults[key] = { status:'fulfilled', value };
+        commitAggregates();
+      }).catch(error => {
+        aggregateResults[key] = { status:'rejected', reason:error };
+        commitAggregates();
       });
+      settleAggregate('standings', getStandings());
+      settleAggregate('hitting', getAllTeamStats('hitting'));
+      settleAggregate('pitching', getAllTeamStats('pitching'));
     } else {
       setLiveTeamError(false);
     }

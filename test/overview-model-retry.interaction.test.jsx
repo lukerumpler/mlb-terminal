@@ -7,6 +7,7 @@ let feedAttempt = 0;
 let modelAttempt = 0;
 let savantMode = "pending";
 let modelMode = "fallback";
+let partialAggregate = false;
 
 vi.mock("../client/src/api/mlb.js", async () => {
   const actual = await vi.importActual("../client/src/api/mlb.js");
@@ -32,7 +33,21 @@ vi.mock("../client/src/api/mlb.js", async () => {
         : Promise.reject(new Error("MLB feed stalled"))
     ),
     getAllTeamStats: vi.fn(async group =>
-      feedAttempt > 0
+      partialAggregate && group === "hitting"
+        ? {
+            119: {
+              teamId: 119,
+              teamAbbr: "LAD",
+              teamName: "Los Angeles Dodgers",
+              ops: 0.802,
+              homeRuns: 98,
+              era: 2.98,
+              whip: 1.06,
+              strikeOuts: 628,
+              stolenBases: 54,
+            },
+          }
+        : feedAttempt > 0
         ? {
             119: {
               teamId: 119,
@@ -134,6 +149,7 @@ describe("Team Overview model source and retry interaction", () => {
     modelAttempt = 0;
     savantMode = "pending";
     modelMode = "fallback";
+    partialAggregate = false;
     localStorage.clear();
   });
 
@@ -197,6 +213,14 @@ describe("Team Overview model source and retry interaction", () => {
     expect(mlbApi.getStandings).not.toHaveBeenCalled();
     expect(mlbApi.getAllTeamStats).not.toHaveBeenCalled();
     expect(mlbApi.getTeamPlayerStats).not.toHaveBeenCalled();
+  });
+
+  it("commits available aggregate data when one provider fails instead of waiting for all feeds", async () => {
+    partialAggregate = true;
+    render(<OverviewPage />);
+    expect((await screen.findAllByText(".802", { exact: false })).length).toBeGreaterThan(0);
+    await waitFor(() => expect(mlbApi.getAllTeamStats).toHaveBeenCalledWith("pitching"));
+    expect(screen.queryByRole("status", { name: "Loading team overview" })).not.toBeInTheDocument();
   });
 
   it("updates the roster sort when quick filters are clicked", async () => {
