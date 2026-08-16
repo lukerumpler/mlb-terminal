@@ -216,13 +216,19 @@ describe("PlayersPage — player comparison and race conditions", () => {
       ".skip-performance-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }"
     );
     expect(css).toContain(
-      ".skip-performance-summary-card { min-width:0; padding:10px 12px 9px;"
+      ".skip-performance-summary-card { min-width:0; padding:0;"
     );
     expect(css).toContain(
       ".skip-performance-summary-card-trend { margin-top:6px;"
     );
     expect(css).toContain(
       ".skip-performance-summary-card-expanded { padding:9px 12px 11px;"
+    );
+    expect(css).toContain(
+      ".skip-performance-summary-card-value.is-unavailable"
+    );
+    expect(css).toContain(
+      ".skip-performance-summary-card-coverage"
     );
     expect(css).toContain(
       "scroll-snap-type:x mandatory; scroll-behavior:smooth;"
@@ -294,6 +300,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const summary = screen.getByRole("region", { name: "Performance Summary" });
     expect(summary).toBeInTheDocument();
     expect(summary).toHaveTextContent("WAR");
+    expect(summary).toHaveTextContent("Verified");
     expect(summary).toHaveTextContent(".842");
     expect(summary).toHaveTextContent("3.4");
     expect(summary).toHaveTextContent("128");
@@ -313,6 +320,28 @@ describe("PlayersPage — player comparison and race conditions", () => {
       summary.querySelector(".skip-summary-sparkline")
     ).toBeInTheDocument();
     expect(summary).toHaveTextContent("Last 3 games");
+  });
+
+  it("explains unavailable WAR and wRC+ coverage gaps in the summary cards", async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([{ id: 1, fullName: "Coverage Gap Player" }]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(1, "Coverage Gap Player"));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Coverage");
+    await waitFor(() => expect(screen.getByText("Coverage Gap Player")).toBeInTheDocument());
+    await user.click(screen.getByText("Coverage Gap Player"));
+
+    const summary = await screen.findByRole("region", { name: "Performance Summary" });
+    expect(summary).toHaveTextContent("Coverage gap");
+    expect(summary).toHaveTextContent("Unavailable");
+    const warCard = screen.getByRole("button", { name: /WAR Unavailable/i });
+    await user.click(warCard);
+    expect(summary).toHaveTextContent("did not return an explicit WAR field");
+    const wrcCard = screen.getByRole("button", { name: /wRC\+ Unavailable/i });
+    await user.click(wrcCard);
+    expect(summary).toHaveTextContent("did not return an explicit wRC\+ field");
   });
 
   it("opens the side-by-side comparison modal and loads a second player through the live adapter", async () => {

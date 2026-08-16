@@ -2184,11 +2184,36 @@ function PlayerProfile({ player, derived, onCompare }) {
   const statcastPopulation = player.savant?.est_woba != null
     ? (player.statcastPopulation || []).map(row => row?.est_woba)
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
+  const advancedWar = player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war;
+  const advancedWrcPlus = player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus;
+  const advancedSource = player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
+  const summaryMetric = (metric, value, config) => ({
+    label: metric,
+    value: value == null || value === '' ? 'Unavailable' : value,
+    isUnavailable: value == null || value === '',
+    ...config,
+  });
   const performanceSummary = [
-    { label:'WAR', value:dashIfMissing(player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:player.advancedMetrics?.war != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.purple },
-    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber },
-    { label:'wRC+', value:dashIfMissing(player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:player.advancedMetrics?.wrcPlus != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.teal },
-    { label:'Statcast', value:statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : '—', detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:player.savant ? 'Baseball Savant' : 'Unavailable', trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy },
+    summaryMetric('WAR', Number.isFinite(Number(advancedWar)) ? Number(advancedWar).toFixed(1) : null, {
+      detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:advancedSource,
+      coverage:Number.isFinite(Number(advancedWar)) ? 'Explicit WAR field returned by the verified provider.' : 'The verified MLB seasonAdvanced response did not return an explicit WAR field for this player.',
+      trend:'No verified comparison series', tone:C.purple,
+    }),
+    summaryMetric('OPS', s.ops != null ? fmt(s.ops) : null, {
+      detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:'MLB Stats API',
+      coverage:s.ops != null ? 'Current-season hitting split from the official MLB Stats API.' : 'The official MLB season hitting split is unavailable.',
+      trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber,
+    }),
+    summaryMetric('wRC+', Number.isFinite(Number(advancedWrcPlus)) ? String(Math.round(Number(advancedWrcPlus))) : null, {
+      detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:advancedSource,
+      coverage:Number.isFinite(Number(advancedWrcPlus)) ? 'Explicit wRC+ field returned by the verified provider.' : 'The verified MLB seasonAdvanced response did not return an explicit wRC+ field for this player.',
+      trend:'No verified comparison series', tone:C.teal,
+    }),
+    summaryMetric('Statcast', statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : null, {
+      detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:'Baseball Savant',
+      coverage:player.savant ? 'Verified Baseball Savant player metric.' : 'No verified Baseball Savant player metric is available.',
+      trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy,
+    }),
   ];
 
   const runPdfExport = async kind => {
@@ -2423,15 +2448,16 @@ function PlayerProfile({ player, derived, onCompare }) {
               <div className={`skip-performance-summary-card ${isExpanded ? 'is-expanded' : ''}`} key={metric.label}>
                 <button type="button" className="skip-performance-summary-card-button" aria-expanded={isExpanded} aria-controls={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`} onClick={() => setExpandedSummary(isExpanded ? null : metric.label)}>
                   <span className="skip-performance-summary-card-label">{metric.label}</span>
-                  <span className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</span>
+                  <span className={`skip-performance-summary-card-value ${metric.isUnavailable ? 'is-unavailable' : ''}`} style={{ color:metric.tone }}>{metric.value}</span>
                   <span className="skip-performance-summary-card-detail">{metric.detail}</span>
                   <span className={`skip-performance-summary-card-trend ${metric.trend.startsWith('▼') ? 'is-down' : metric.trend.startsWith('▲') ? 'is-up' : ''}`}>{metric.trend}</span>
-                  <span className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</span>
+                  <span className={`skip-performance-summary-card-source ${metric.isUnavailable ? 'is-unavailable' : ''}`}><span className="skip-performance-summary-card-status">{metric.isUnavailable ? 'Coverage gap' : 'Verified'}</span>{metric.source}</span>
                   <span className="skip-performance-summary-card-expand">{isExpanded ? 'Hide details' : 'Details'}</span>
                 </button>
                 {isExpanded && <div className="skip-performance-summary-card-expanded" id={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`}>
                   <div>{metric.definition}</div>
                   <MetricSparkline values={metric.series} tone={metric.tone} />
+                  <div className={`skip-performance-summary-card-coverage ${metric.isUnavailable ? 'is-unavailable' : ''}`}>{metric.coverage}</div>
                   <strong>Provider:</strong> {metric.source}<br />
                   <strong>Context:</strong> {metric.trend}
                 </div>}

@@ -176,3 +176,12 @@
 - [x] Add regression coverage for the failure and recovery path
 - [x] Run typecheck, focused tests, full tests, and fresh deployed/local visual verification
 - [x] Save a checkpoint containing the page repair
+
+- [x] Audit current Performance Summary fields, unavailable states, spacing, and approved WAR/wRC+ provider coverage
+- [x] Integrate verified WAR and wRC+ values when an approved provider supplies explicit player fields
+- [x] Improve unavailable WAR/wRC+ messaging with clearer coverage and next-data explanations
+- [x] Refine Performance Summary card spacing, labels, value hierarchy, and expanded details
+- [x] Preserve source provenance and never substitute fabricated or unsupported values
+- [x] Add regression coverage for provider mapping, unavailable states, formatting, and expanded interactions
+- [x] Run typecheck, focused tests, full tests, and player-profile visual verification
+- [x] Save a checkpoint containing all three Performance Summary improvements
