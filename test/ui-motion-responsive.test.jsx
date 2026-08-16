@@ -146,9 +146,9 @@ describe("SKIP motion and responsive UI hooks", () => {
       ".skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }"
     );
     expect(overviewSource).toContain(
-      'className="skip-affiliate-overview-grid"'
+      'className="skip-affiliate-overview-grid skip-balanced-grid"'
     );
-    expect(overviewSource).toContain('className="skip-affiliate-savant-grid"');
+    expect(overviewSource).toContain('className="skip-affiliate-savant-grid skip-balanced-grid"');
     expect(indexSource).toContain(
       ".overview-team-context > label { flex:1 1 100% !important;"
     );

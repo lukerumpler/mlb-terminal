@@ -979,3 +979,13 @@
   .skip-boxscore-presets input, .skip-boxscore-presets select { flex:1 1 100%; min-width:0; }
   .skip-boxscore-presets button { flex:1 1 auto; }
 }
+
+/* Content-aware tile alignment for newer dashboard card rows. Grid rows share a baseline,
+   while panel contents keep their natural height so short cards do not gain filler space. */
+.skip-balanced-grid{align-items:stretch;}
+.skip-balanced-grid > *{min-width:0;}
+.skip-balanced-grid > .skip-panel{height:100%;}
+@media (max-width:720px){
+  .skip-overview-page .skip-balanced-grid{gap:8px !important;}
+  .skip-overview-page .skip-balanced-grid > *{min-width:0;}
+}

@@ -181,3 +181,8 @@
 - [x] Add or update regression coverage for the merged Player Profile and card-tile behavior.
 - [x] Run focused/full tests, production build, and responsive verification on the merged state.
 - [x] Save a merged checkpoint and report the combined result.
+- [x] Inspect newly added dashboard module grids and current equal-height tile rules.
+- [x] Extend equal-height alignment to newly added modules using content-aware stretch rather than fixed filler heights.
+- [x] Add compact-card spacing rules to prevent dead space and crowded internal content.
+- [x] Add regression coverage for new-module row alignment and spacing behavior.
+- [x] Run type checks, tests, production build, responsive previews, and save a checkpoint.
