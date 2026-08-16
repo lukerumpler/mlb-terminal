@@ -170,3 +170,14 @@
 - [x] Define and apply explicit Overview accent categories for offense, pitching, defense/baserunning, and context cards.
 - [x] Add regression coverage proving the category accent mapping and empty-state copy rendering.
 - [x] Save a new checkpoint after resolving the remaining recommendation gaps.
+- [x] Inspect Panel markup and Overview/other dashboard grid wrappers for uneven tile behavior.
+- [x] Apply equal-height stretch rules to desktop dashboard card rows without forcing fixed heights.
+- [x] Preserve natural content sizing and readable stacking at mobile breakpoints.
+- [x] Add regression coverage for equal-height grid contracts and responsive card behavior.
+- [x] Run type checks, full tests, production build, responsive previews, and save a checkpoint.
+- [ ] Capture the newer shared Player Profile optimization and local card-tile changes before merging.
+- [ ] Merge both feature sets without overwriting the newer shared Player Profile work.
+- [ ] Resolve any remaining conflict markers and preserve both loading optimization and equal-height tile behavior.
+- [ ] Add or update regression coverage for the merged Player Profile and card-tile behavior.
+- [ ] Run focused/full tests, production build, and responsive verification on the merged state.
+- [ ] Save a merged checkpoint and report the combined result.

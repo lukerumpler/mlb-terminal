@@ -777,3 +777,14 @@
 .skip-overview-empty-heading{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:5px;}
 .skip-overview-empty-separator{color:var(--text4,#888);font:700 10px/1 'DM Mono',monospace;}
 @media (max-width:720px){.skip-overview-empty-heading{gap:4px;}}
+
+/* Dashboard tile alignment: desktop rows share a baseline; mobile stays content-driven. */
+@media (min-width:721px){
+  .skip-overview-page .overview-responsive-grid{align-items:stretch !important;}
+  .skip-overview-page .overview-responsive-grid > .skip-panel{align-self:stretch;height:100%;display:flex;flex-direction:column;}
+  .skip-overview-page .overview-responsive-grid > .skip-panel > div:last-child{flex:1;min-height:0;}
+  .skip-overview-page .overview-responsive-grid > :not(.skip-panel){align-self:stretch;}
+}
+@media (max-width:720px){
+  .skip-overview-page .overview-responsive-grid > .skip-panel{height:auto;}
+}
