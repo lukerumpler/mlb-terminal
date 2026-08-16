@@ -1,5 +1,7 @@
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
+import { createHash } from 'node:crypto';
+import { readDurableCache, writeDurableCache } from '../durable-cache';
 import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
 
 const DEFAULT_SEASON = 2026;
@@ -55,6 +57,10 @@ function parseRetryAfterMs(response) {
   return Number.isFinite(date)
     ? Math.max(1_000, Math.min(120_000, date - Date.now()))
     : DEFAULT_COOLDOWN_MS;
+}
+
+function durableFanGraphsKey(scope) {
+  return `fangraphs:${createHash('sha256').update(scope).digest('hex')}`;
 }
 
 function modelKey(teamAbbr, season) {
@@ -269,10 +275,22 @@ async function fetchHtml(url) {
 }
 
 async function loadAggregateWar(season) {
-  const cached = aggregateWarCache.get(String(season));
+  const key = String(season);
+  let cached = aggregateWarCache.get(key);
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
-  const key = String(season);
+  if (!cached || cached.expiresAt <= Date.now()) {
+    const durable = await readDurableCache(durableFanGraphsKey(`aggregate:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      aggregateWarCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) return { data: cached.data, cache: "DURABLE-HIT" };
+    }
+  }
   const day = utcDayKey();
   const existing = aggregateWarInFlight.get(key);
   if (existing) return { data: await existing, cache: "COALESCED" };
@@ -376,10 +394,20 @@ async function loadAggregateWar(season) {
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
+      const expiresAt = nextUtcMidnightMs();
+      const staleExpiresAt = expiresAt + STALE_TTL_MS;
       aggregateWarCache.set(key, {
         data,
-        expiresAt: nextUtcMidnightMs(),
-        staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
+        expiresAt,
+        staleExpiresAt,
+      });
+      void writeDurableCache({
+        cacheKey: durableFanGraphsKey(`aggregate:${season}`),
+        source: 'FanGraphs',
+        data,
+        freshUntil: new Date(expiresAt),
+        staleUntil: new Date(staleExpiresAt),
+        lastAttemptDay: day,
       });
     return { data, cache: "MISS" };
   } catch (error) {
@@ -448,7 +476,7 @@ export default async function handler(req, res) {
       .json({ error: "Missing or invalid team abbreviation" });
 
   const key = modelKey(teamAbbr, season);
-  const cached = modelCache.get(key);
+  let cached = modelCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader(
       "Cache-Control",
@@ -462,6 +490,21 @@ export default async function handler(req, res) {
         freshness: "cached",
         servedAt: new Date().toISOString(),
       });
+  }
+  if (!cached || cached.expiresAt <= Date.now()) {
+    const durable = await readDurableCache(durableFanGraphsKey(`model:${teamAbbr}:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      modelCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) {
+        res.setHeader('X-Provider-Cache', 'DURABLE-HIT');
+        return res.status(200).json({ ...cached.data, freshness: 'cached', servedAt: new Date().toISOString() });
+      }
+    }
   }
 
   const day = utcDayKey();
@@ -647,10 +690,20 @@ export default async function handler(req, res) {
   try {
     const data = await upstreamRequest;
     modelFailureCooldownUntil.delete(key);
+    const expiresAt = nextUtcMidnightMs();
+    const staleExpiresAt = expiresAt + STALE_TTL_MS;
     modelCache.set(key, {
       data,
-      expiresAt: nextUtcMidnightMs(),
-      staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
+      expiresAt,
+      staleExpiresAt,
+    });
+    void writeDurableCache({
+      cacheKey: durableFanGraphsKey(`model:${teamAbbr}:${season}`),
+      source: 'FanGraphs',
+      data,
+      freshUntil: new Date(expiresAt),
+      staleUntil: new Date(staleExpiresAt),
+      lastAttemptDay: day,
     });
     if (modelCache.size > 200)
       modelCache.delete(modelCache.keys().next().value);

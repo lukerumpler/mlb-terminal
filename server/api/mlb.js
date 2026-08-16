@@ -7,7 +7,9 @@
  * Receives:  GET /api/mlb?path=/people/805299&hydrate=stats(type=season,group=hitting,season=2026)
  * Forwards:  GET https://statsapi.mlb.com/api/v1/people/805299?hydrate=stats(type=season,...)
  */
+import { createHash } from "node:crypto";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { readDurableCache, writeDurableCache } from "../durable-cache";
 
 const MLB_BASE = "https://statsapi.mlb.com/api/v1";
 
@@ -53,6 +55,10 @@ export function __resetMlbProxyStateForTests() {
 
 function responseCacheKey(path, forwardedQs) {
   return `${path}?${forwardedQs}`;
+}
+
+function durableCacheKey(cacheKey) {
+  return `mlb:${createHash("sha256").update(cacheKey).digest("hex")}`;
 }
 
 function setProxyHeaders(res, rule, source, cacheStatus, freshness = "live") {
@@ -117,10 +123,29 @@ export default async function handler(req, res) {
 
   const rule = getCacheRule(path);
   const cacheKey = responseCacheKey(path, forwardedQs);
-  const cached = responseCache.get(cacheKey);
+  let cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     setProxyHeaders(res, rule, cached.source, "HIT", "fresh");
     return res.status(200).json(cached.data);
+  }
+
+  // Warm instances are fastest, but the database-backed record lets separate
+  // server instances and user sessions reuse the same verified response.
+  if (!process.env.VITEST && process.env.DATABASE_URL && (!cached || cached.expiresAt <= Date.now())) {
+    const durable = await readDurableCache(durableCacheKey(cacheKey));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        source: durable.source,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      responseCache.set(cacheKey, cached);
+      if (cached.expiresAt > Date.now()) {
+        setProxyHeaders(res, rule, cached.source, "DURABLE-HIT", "fresh");
+        return res.status(200).json(cached.data);
+      }
+    }
   }
   if (cached && !getStaleEntry(cached)) responseCache.delete(cacheKey);
 
@@ -242,11 +267,19 @@ export default async function handler(req, res) {
     const result = await upstreamRequest;
     upstreamFailureUntil.delete(cacheKey);
     const expiresAt = Date.now() + rule.s * 1000;
+    const staleExpiresAt = expiresAt + Math.max(rule.swr * 1000, 60_000);
     responseCache.set(cacheKey, {
       data: result.data,
       source: result.source,
       expiresAt,
-      staleExpiresAt: expiresAt + Math.max(rule.swr * 1000, 60_000),
+      staleExpiresAt,
+    });
+    void writeDurableCache({
+      cacheKey: durableCacheKey(cacheKey),
+      source: "MLB Stats API",
+      data: result.data,
+      freshUntil: new Date(expiresAt),
+      staleUntil: new Date(staleExpiresAt),
     });
     if (responseCache.size > 500) {
       const oldestKey = responseCache.keys().next().value;

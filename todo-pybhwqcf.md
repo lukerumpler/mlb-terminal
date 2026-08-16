@@ -234,3 +234,10 @@
 - [x] Add regression coverage for each accepted optimization
 - [x] Run focused tests, full suite, type-check, build, and visual/runtime checks
 - [x] Save a checkpoint and report the verified findings
+
+- [x] Inspect the current database schema, server database helpers, and provider cache contracts
+- [x] Define durable cache keys, freshness, stale fallback, and refresh ownership rules
+- [x] Implement durable shared API-response caching without bypassing once-daily provider policies
+- [x] Add regression coverage for durable hits, stale fallback, coalescing, and failure recovery
+- [x] Run migration, focused tests, full suite, type-check, and production build
+- [x] Save a checkpoint and report the durable-cache results

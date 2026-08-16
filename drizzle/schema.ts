@@ -2,6 +2,7 @@ import {
   int,
   mysqlEnum,
   mysqlTable,
+  longtext,
   text,
   timestamp,
   varchar,
@@ -32,4 +33,23 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Shared server-side API cache. Payloads are provider responses only; callers
+ * still decide whether a fresh or stale record is acceptable for their route.
+ */
+export const apiResponseCache = mysqlTable("apiResponseCache", {
+  id: int("id").autoincrement().primaryKey(),
+  cacheKey: varchar("cacheKey", { length: 512 }).notNull().unique(),
+  source: varchar("source", { length: 128 }).notNull(),
+  payload: longtext("payload").notNull(),
+  freshUntil: timestamp("freshUntil").notNull(),
+  staleUntil: timestamp("staleUntil").notNull(),
+  lastAttemptDay: varchar("lastAttemptDay", { length: 10 }),
+  failureUntil: timestamp("failureUntil"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ApiResponseCache = typeof apiResponseCache.$inferSelect;
+export type InsertApiResponseCache = typeof apiResponseCache.$inferInsert;
+

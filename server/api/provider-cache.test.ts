@@ -1,4 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { readDurableCache, writeDurableCache } = vi.hoisted(() => ({
+  readDurableCache: vi.fn().mockResolvedValue(null),
+  writeDurableCache: vi.fn().mockResolvedValue(false),
+}));
+vi.mock('../durable-cache', () => ({ readDurableCache, writeDurableCache }));
+
 import fangraphsHandler, {
   __resetFanGraphsProviderStateForTests,
 } from "./fangraphs-models.js";
