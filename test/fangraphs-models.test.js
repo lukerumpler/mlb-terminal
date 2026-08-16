@@ -67,6 +67,8 @@ describe("Overview model freshness and retry contract", () => {
     expect(overviewSource).toContain("getTeamModelSources");
     expect(overviewSource).toContain("FanGraphs");
     expect(overviewSource).toContain("retrieved");
+    expect(overviewSource).toContain("stale-local");
+    expect(overviewSource).toContain("local cached");
     expect(overviewSource).toContain("setMlbRetryToken");
     expect(overviewSource).toContain(">RETRY</button>");
   });

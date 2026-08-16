@@ -110,3 +110,20 @@
 - [x] Separate provider names from status badges with a consistent readable layout
 - [x] Add or update badge-spacing regression coverage and verify the rendered Overview
 - [x] Adjust the badge unit regression to avoid jsdom-only computed-style gaps while retaining browser-level spacing verification
+- [x] Inventory every unavailable metric currently visible in the Overview
+- [x] Trace each unavailable metric to its request, cache, parser, provider response, and fallback state
+- [x] Cross-check runtime logs and current provider responses for concrete causes
+- [x] Deliver a metric-by-metric diagnosis separating fixable failures from true coverage gaps
+- [x] Create a complete per-metric audit table mapping every unavailable Overview metric to endpoint, cache, parser field, runtime result, and fallback state
+- [x] Classify every unavailable metric as transport failure, cooldown/rate-limit, parser/mapping issue, missing upstream field, or intentional coverage gap
+- [x] Persist the complete diagnosis in a QA note and deliver the same findings to the user
+- [x] Deliver the completed metric-by-metric unavailable-metrics diagnosis to the user
+- [x] Audit the current FanGraphs provider cache, stale behavior, metadata, and failure tests
+- [x] Define a bounded stale fallback with explicit age/provenance labels and no fabricated values
+- [x] Implement stale FanGraphs reuse for 502/429/timeout failures without adding request frequency
+- [x] Add regression tests for fresh hits, stale fallback, failure eviction, age labels, and no-data behavior
+- [x] Run focused/full validation and verify the Overview fallback rendering
+- [x] Investigate the full-suite `window is not defined` teardown error from overview-layout-reorder
+- [x] Re-run the full suite after resolving or isolating the teardown error
+- [x] Add a rendered Overview test that seeds a FanGraphs local snapshot, forces a provider failure, and asserts stale values plus readable local-cache freshness
+- [x] Add a client-cache regression test proving a failed refresh remains retryable and a later successful response replaces the stale snapshot

@@ -1,10 +1,15 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 
 describe('Overview page section reordering for unavailable data', () => {
   beforeEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+  afterEach(async () => {
+    await new Promise(resolve => setImmediate(resolve));
     cleanup();
     vi.restoreAllMocks();
   });
