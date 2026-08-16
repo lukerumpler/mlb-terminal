@@ -719,6 +719,38 @@ describe("PlayersPage — player comparison and race conditions", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders the verified core profile before supplemental data finishes", async () => {
+    const user = userEvent.setup();
+    const full = mockPlayer(7, "Core First Player");
+    let resolveExtras;
+    searchPlayers.mockResolvedValue([{ id: 7, fullName: "Core First Player" }]);
+    loadFullPlayer.mockImplementation(async (_person, _season, options) => {
+      options?.onCoreReady?.({
+        ...full,
+        savant: null,
+        batTracking: null,
+        contractData: null,
+        teamFinancials: null,
+        boxscoreSplits: null,
+        extrasLoading: true,
+      });
+      return new Promise(resolve => { resolveExtras = () => resolve({ ...full, extrasLoading: false }); });
+    });
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Core");
+    await waitFor(() => expect(screen.getByText("Core First Player")).toBeInTheDocument());
+    await user.click(screen.getByText("Core First Player"));
+
+    expect(await screen.findByText(/Core MLB profile loaded/)).toBeInTheDocument();
+    expect(screen.getByText("Career Batting")).toBeInTheDocument();
+    expect(screen.getAllByText("Core First Player").length).toBeGreaterThanOrEqual(1);
+
+    resolveExtras();
+    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+  });
+
   it("keeps the faster, later-clicked player instead of an older, slower response clobbering it", async () => {
     const user = userEvent.setup();
     const playerA = { id: 1, fullName: "Slow Player A" };

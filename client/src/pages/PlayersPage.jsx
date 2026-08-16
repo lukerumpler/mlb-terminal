@@ -1629,7 +1629,11 @@ function PlayersPage() {
     setPlayer(null);
     setError(null);
     try {
-      const data = await loadFullPlayer(person, SEASON);
+      const data = await loadFullPlayer(person, SEASON, {
+        onCoreReady: core => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
+        },
+      });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
@@ -1788,7 +1792,12 @@ function PlayersPage() {
         )}
       </div>
 
-      {loading && <PlayerProfileSkeleton />}
+      {loading && !player && <PlayerProfileSkeleton />}
+      {player?.extrasLoading && (
+        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
+          Core MLB profile loaded. Supplemental Savant, contract, financial, and boxscore data are still loading; unavailable values are not estimates.
+        </div>
+      )}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,
@@ -1859,7 +1868,7 @@ function HandednessSplitComparison({ splits }) {
 }
 
 /* ─── Contract panel (stable component — not IIFE) ─────────────────── */
-function ContractPanel({ contractData: ct }) {
+function ContractPanel({ contractData: ct, loading = false }) {
   const hasVerifiedContract = Boolean(ct?.contractAvailable);
   const statusColor = !ct || !hasVerifiedContract             ? C.text3
     : ct.status === 'Under Contract'                         ? C.teal
@@ -1885,13 +1894,17 @@ function ContractPanel({ contractData: ct }) {
           borderBottom:`0.5px solid ${C.borderLight}`, marginBottom:8 }}>
           <div style={{ width:8, height:8, borderRadius:'50%', background: ct ? statusColor : C.border, flexShrink:0 }} />
           <span style={sans({ fontSize:12, fontWeight:800, color: ct ? statusColor : C.text3 })}>
-            {ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
+            {loading && !ct ? 'Loading contract data' : ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
           </span>
         </div>
         {rows.map(([lbl, val], i) => (
           <KVRow key={lbl} label={lbl} value={val} last={i === rows.length - 1} />
         ))}
-        {ct && !hasVerifiedContract && (
+        {loading && !ct ? (
+          <div role="status" style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
+            Contract and service-time sources are still loading; no absence is being inferred.
+          </div>
+        ) : ct && !hasVerifiedContract && (
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
             Connected sources resolved the player identity, but no verified contract dollar fields were returned.
           </div>
@@ -2873,7 +2886,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
           <PlayerVideoPanel player={player} profile={p} accent={teamAccent} />
 
-          <ContractPanel contractData={player.contractData} />
+          <ContractPanel contractData={player.contractData} loading={player.extrasLoading} />
 
           <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} confidence={dataConfidence} />
 

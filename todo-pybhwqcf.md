@@ -214,3 +214,16 @@
 - [x] Probe production MLB and Savant endpoints and capture status, provenance, cache, and failure metadata
 - [x] Review production deployment status and record the Vercel runtime-log access limitation; no active managed-Manus runtime error observed
 - [x] Prepare a preview summary report of recent bug fixes and performance improvements
+- [x] Audit Player Profile API calls, request sequencing, and loading-state transitions
+- [x] Check Manus and Vercel origins for relative `/api` failures and CORS/base-URL effects
+- [x] Inspect runtime and browser logs for Player Profile-specific errors or timeouts
+- [x] Produce a root-cause diagnosis and safe fix sequence for Player Profile loading
+- [x] Compare attached core-first Player Profile refactor with the current loadFullPlayer implementation
+- [x] Apply compatible core-first loading and explicit pending states for slow optional panels
+- [x] Add or update tests for immediate core rendering, extras merge, race protection, and pending placeholders
+- [x] Run focused and full validation and document the result
+
+- [x] Show Contract & Service Time as pending while supplemental player data is still loading, instead of implying verified data is absent
+- [x] Add a core-first Player Profile regression proving core data renders before supplemental data resolves
+- [x] Run full validation and review the final Player Profile data contract
+- [ ] Push the verified Player Profile loading changes to PR #1 review branch

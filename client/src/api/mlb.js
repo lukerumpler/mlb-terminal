@@ -720,7 +720,7 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }
 }
-export async function loadFullPlayer(person, season = SEASON) {
+export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = {}) {
   const id = person.id;
 
   // All 6 requests run in parallel — contract never blocks stats
@@ -760,6 +760,27 @@ export async function loadFullPlayer(person, season = SEASON) {
 
   let isPitcher = posType === 'Pitcher' || posAbbr === 'SP' || posAbbr === 'RP' || posAbbr === 'P';
   if (isPitcher && hasHitStats && !hasPitchStats) isPitcher = false; // two-way override
+
+  // Core MLB profile and season data are usable before optional contract,
+  // Savant, financial, and boxscore work settles. Publish that core snapshot
+  // immediately so the UI never waits on supplemental providers.
+  const coreSnapshot = {
+    id,
+    profile,
+    isPitcher,
+    stats: (isPitcher ? pitchingResult : hittingResult)?.stat || {},
+    advancedMetrics,
+    statSeason: (isPitcher ? pitchingResult : hittingResult)?.season || season,
+    isFallback: (isPitcher ? pitchingResult : hittingResult)?.isFallback || false,
+    career: careerHitting,
+    careerPitching,
+    hittingStats: hittingResult?.stat || {},
+    pitchingStats: pitchingResult?.stat || {},
+    aggregateSource: 'MLB Stats API season stats',
+    aggregateRetrievedAt: new Date().toISOString(),
+    extrasLoading: true,
+  };
+  try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
   // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
@@ -951,6 +972,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
     boxscoreSplits: await boxscoreSplitsPromise,
+    extrasLoading: false,
   };
 }
 
