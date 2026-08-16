@@ -106,3 +106,7 @@
 - [x] Add browser-side contract request coalescing and six-hour freshness reuse to prevent repeated Spotrac/BRef/MLB contract scrapes for the same player
 - [x] Add contract-cache regression coverage for concurrent reuse, fresh reuse, and retry after failure
 - [x] Persist the v65.4 API-key and cache comparison findings in a project QA note
+- [x] Audit all Overview FanGraphs provider/status badge layouts
+- [x] Separate provider names from status badges with a consistent readable layout
+- [x] Add or update badge-spacing regression coverage and verify the rendered Overview
+- [x] Adjust the badge unit regression to avoid jsdom-only computed-style gaps while retaining browser-level spacing verification

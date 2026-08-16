@@ -45,6 +45,19 @@ describe('published Dodgers Overview', () => {
     assert.equal(await badgeGroups.first().isVisible(), true);
     const gaps = await badgeGroups.evaluateAll(nodes => nodes.map(node => Number.parseFloat(getComputedStyle(node).gap || '0')));
     assert.equal(gaps.some(gap => gap >= 10), true);
+    const badgeLayout = await page.locator('.skip-overview-source-badge').evaluateAll(nodes => nodes.map(node => {
+      const status = node.querySelector('.skip-overview-source-status');
+      const style = getComputedStyle(node);
+      const statusStyle = status ? getComputedStyle(status) : null;
+      return {
+        gap: Number.parseFloat(style.gap || '0'),
+        whiteSpace: style.whiteSpace,
+        statusPadding: Number.parseFloat(statusStyle?.paddingInlineStart || '0'),
+        divider: statusStyle?.borderInlineStartStyle,
+      };
+    }));
+    assert.equal(badgeLayout.length > 0, true);
+    assert.equal(badgeLayout.every(item => item.gap >= 10 && item.whiteSpace === 'nowrap' && item.statusPadding >= 10 && item.divider !== 'none'), true, JSON.stringify(badgeLayout));
   }, 45_000);
 
   it('does not dispatch affiliate selection during either fresh-load mode', async () => {

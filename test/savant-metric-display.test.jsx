@@ -61,5 +61,13 @@ describe('Savant metric display and source badge separation', () => {
     const badgeGroup = document.querySelector('.skip-overview-source-badges');
     expect(badgeGroup).toBeInTheDocument();
     expect(getComputedStyle(badgeGroup).gap).toBe('10px');
+    const providerBadge = badgeGroup.querySelector('.skip-overview-source-badge');
+    const providerName = providerBadge?.querySelector('.skip-overview-source-name');
+    const providerStatus = providerBadge?.querySelector('.skip-overview-source-status');
+    expect(providerBadge).toBeInTheDocument();
+    expect(providerName).toBeInTheDocument();
+    expect(providerStatus).toBeInTheDocument();
+    expect(providerBadge.className).toContain('skip-overview-source-badge');
+    expect(providerStatus.className).toContain('skip-overview-source-status');
   });
 });
