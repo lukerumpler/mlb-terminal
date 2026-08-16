@@ -17,6 +17,7 @@ import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVe
 import { DAILY_CACHE_TTL_MS, shouldRefreshDailyCache, readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache, readTeamSavantSummaryCache, saveTeamSavantSummaryCache, readTeamSavantAgainstCache, saveTeamSavantAgainstCache } from '../lib/teamDataCache.js';
 import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
 import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.js';
+import { shouldResetRosterInsightsState } from '../lib/rosterInsightsState.js';
 import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -775,7 +776,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
   const aiInsightsRequestKeyRef = useRef(null);
+  const aiInsightsTeamRef = useRef(teamBase?.abbr || '');
   useEffect(() => {
+    const nextTeam = teamBase?.abbr || '';
+    if (!shouldResetRosterInsightsState(aiInsightsTeamRef.current, nextTeam)) return;
+    aiInsightsTeamRef.current = nextTeam;
     setAiInsights(null);
     setAiInsightsState('idle');
     aiInsightsRequestKeyRef.current = null;

@@ -227,3 +227,10 @@
 - [x] Add a core-first Player Profile regression proving core data renders before supplemental data resolves
 - [x] Run full validation and review the final Player Profile data contract
 - [x] Push the verified Player Profile loading changes to PR #1 review branch
+
+- [x] Re-audit current runtime health, request traces, and shared project state for new bottlenecks
+- [x] Audit remaining provider/API request paths, cache boundaries, and Player Profile loading races
+- [x] Apply only verified request-minimization or loading-performance fixes
+- [x] Add regression coverage for each accepted optimization
+- [x] Run focused tests, full suite, type-check, build, and visual/runtime checks
+- [x] Save a checkpoint and report the verified findings

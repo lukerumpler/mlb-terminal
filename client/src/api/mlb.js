@@ -723,20 +723,24 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
 export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = {}) {
   const id = person.id;
 
-  // All 6 requests run in parallel — contract never blocks stats
+  // Fetch the profile first so its current-team context can parameterize the
+  // remaining requests. Core season stats are awaited separately from slower
+  // optional providers so the UI can render a verified profile immediately.
   const profile = await getPlayerProfile(id);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
   const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
-  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics] = await Promise.all([
-    getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
-    getSeasonStatsSafe(id, 'pitching', season, profileSportId),
-    getCareerSplits(id, 'hitting'),
-    getCareerSplits(id, 'pitching'),
-    fetchContractData(id, person.fullName),
-    getHandednessSplits(id, season),
-    fetchTeamFinancials(currentTeamAbbreviation, season),
-    getSeasonAdvancedStatsSafe(id, season, profileSportId),
+  const careerHittingPromise = getCareerSplits(id, 'hitting');
+  const careerPitchingPromise = getCareerSplits(id, 'pitching');
+  const contractPromise = fetchContractData(id, person.fullName);
+  const handednessPromise = getHandednessSplits(id, season);
+  const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season);
+  const hittingPromise = getSeasonStatsSafe(id, 'hitting', season, profileSportId);
+  const pitchingPromise = getSeasonStatsSafe(id, 'pitching', season, profileSportId);
+  const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId);
+  const [hittingResult, pitchingResult] = await Promise.all([
+    hittingPromise,
+    pitchingPromise,
   ]);
 
   // Savant & bat-tracking are optional — never block. Each tries current season then prior year
@@ -769,11 +773,11 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
     profile,
     isPitcher,
     stats: (isPitcher ? pitchingResult : hittingResult)?.stat || {},
-    advancedMetrics,
+    advancedMetrics: null,
     statSeason: (isPitcher ? pitchingResult : hittingResult)?.season || season,
     isFallback: (isPitcher ? pitchingResult : hittingResult)?.isFallback || false,
-    career: careerHitting,
-    careerPitching,
+    career: null,
+    careerPitching: null,
     hittingStats: hittingResult?.stat || {},
     pitchingStats: pitchingResult?.stat || {},
     aggregateSource: 'MLB Stats API season stats',
@@ -781,6 +785,15 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
     extrasLoading: true,
   };
   try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
+
+  const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics] = await Promise.all([
+    careerHittingPromise,
+    careerPitchingPromise,
+    contractPromise,
+    handednessPromise,
+    teamFinancialsPromise,
+    advancedMetricsPromise,
+  ]);
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
   // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
