@@ -28,11 +28,16 @@
  * Source 3 (MLB Stats API) is the only official, stable source here.
  */
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { hasAttemptedProviderToday, utcDayKey } from "./daily-provider-policy.js";
 
 const SPOTRAC_CONTRACTS_URL = "https://www.spotrac.com/mlb/contracts/";
 const BREF_CONTRACTS_URL =
   "https://www.baseball-reference.com/leaders/leaders_contract.shtml";
 const MLB_BASE = "https://statsapi.mlb.com/api/v1";
+
+const brefDailyAttemptDay = new Map();
+const brefDailyCache = new Map();
+const brefDailyInFlight = new Map();
 
 // Mirror the User-Agent approach from the Python script (env var or hardcoded fallback)
 const UA =
@@ -160,6 +165,43 @@ async function fetchHtml(url, timeoutMs = 10_000) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
   return res.text();
+}
+
+async function fetchBRefOnceDaily(playerName) {
+  const key = normalizeName(playerName);
+  const now = Date.now();
+  const day = utcDayKey(now);
+  const cached = brefDailyCache.get(key);
+  if (cached?.day === day) return cached.data;
+
+  const existing = brefDailyInFlight.get(key);
+  if (existing) return existing;
+  if (hasAttemptedProviderToday(brefDailyAttemptDay.get(key), now)) return null;
+
+  brefDailyAttemptDay.set(key, day);
+  const request = (async () => {
+    let data = null;
+    try {
+      const brefHtml = await fetchHtml(BREF_CONTRACTS_URL, 12_000);
+      data = parseBRefTable(brefHtml, playerName);
+    } catch {
+      // Preserve the once-daily failure result; do not reopen a blocked provider.
+    }
+    brefDailyCache.set(key, { day, data });
+    return data;
+  })();
+  brefDailyInFlight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    brefDailyInFlight.delete(key);
+  }
+}
+
+export function __resetBRefContractStateForTests() {
+  brefDailyAttemptDay.clear();
+  brefDailyCache.clear();
+  brefDailyInFlight.clear();
 }
 
 // ─── Source 1: Spotrac /mlb/contracts/ ────────────────────────────────────────
@@ -389,12 +431,7 @@ export default async function handler(req, res) {
 
   // Only fall through to BRef if Spotrac produced nothing
   if (!scraped) {
-    try {
-      const brefHtml = await fetchHtml(BREF_CONTRACTS_URL, 12_000);
-      scraped = parseBRefTable(brefHtml, name);
-    } catch {
-      /* BRef also failed — continue with MLB API data only */
-    }
+    scraped = await fetchBRefOnceDaily(name);
   }
 
   // Merge MLB API service-time data with scraped contract data

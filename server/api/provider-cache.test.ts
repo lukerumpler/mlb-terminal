@@ -105,8 +105,53 @@ describe("FanGraphs provider cache", () => {
     );
     expect(first.statusCode).toBe(502);
     expect(second.statusCode).toBe(503);
-    expect(second.headers["Retry-After"]).toBeDefined();
+    expect(second.body).toMatchObject({
+      error: "FanGraphs daily refresh already attempted",
+      retryAfter: expect.any(Number),
+    });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a 429 cooldown distinct from same-key daily suppression", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response("busy", { status: 429, headers: { "Retry-After": "12" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=AAA&season=2091"), first);
+    const differentKey = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=BBB&season=2091"), differentKey);
+    expect(first.statusCode).toBe(429);
+    expect(differentKey.statusCode).toBe(429);
+    expect(differentKey.headers["Retry-After"]).toBeDefined();
+    expect(differentKey.body).toMatchObject({ error: "FanGraphs rate limit cooldown active" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows one new FanGraphs refresh after the UTC day boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-16T23:44:00.000Z"));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(html("DAY", "55.0%", "9.1"), { status: 200 }))
+      .mockResolvedValueOnce(new Response(html("DAY", "55.0%", "9.1"), { status: 200 }))
+      .mockResolvedValueOnce(new Response(html("DAY", "56.0%", "9.4"), { status: 200 }))
+      .mockResolvedValueOnce(new Response(html("DAY", "56.0%", "9.4"), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), first);
+    vi.setSystemTime(new Date("2026-08-16T23:59:59.000Z"));
+    const sameDay = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), sameDay);
+    expect(sameDay.headers["X-Provider-Cache"]).toBe("HIT");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.setSystemTime(new Date("2026-08-17T00:00:01.000Z"));
+    const nextDay = response();
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), nextDay);
+    expect(nextDay.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("serves a verified stale model when FanGraphs returns 429 after cache expiry", async () => {
@@ -131,7 +176,7 @@ describe("FanGraphs provider cache", () => {
       req("/api/fangraphs-models?team=STA&season=2098"),
       seeded
     );
-    vi.advanceTimersByTime(15 * 60_000 + 1);
+    vi.setSystemTime(new Date("2026-08-17T00:00:01.000Z"));
     const stale = response();
     await fangraphsHandler(
       req("/api/fangraphs-models?team=STA&season=2098"),

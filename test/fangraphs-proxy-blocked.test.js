@@ -78,7 +78,7 @@ describe('FanGraphs provider-blocked proxy behavior', () => {
     const cooldownResponse = makeResponse();
     await handler(makeRequest(), cooldownResponse);
     expect(cooldownResponse.statusCode).toBe(503);
-    expect(cooldownResponse.body.error).toMatch(/cooldown/i);
+    expect(cooldownResponse.body.error).toMatch(/daily refresh already attempted/i);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

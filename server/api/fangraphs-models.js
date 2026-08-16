@@ -1,5 +1,7 @@
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
+import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
+
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
@@ -17,6 +19,8 @@ const aggregateWarCache = new Map();
 const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
+const modelDailyAttemptDay = new Map();
+const aggregateDailyAttemptDay = new Map();
 
 export function __seedFanGraphsModelCacheForTests(teamAbbr, season, data, { expiresAt, staleExpiresAt } = {}) {
   modelCache.set(modelKey(teamAbbr, season), {
@@ -32,6 +36,8 @@ export function __resetFanGraphsProviderStateForTests() {
   aggregateWarCache.clear();
   aggregateWarInFlight.clear();
   modelFailureCooldownUntil.clear();
+  modelDailyAttemptDay.clear();
+  aggregateDailyAttemptDay.clear();
   fanGraphsCooldownUntil = 0;
 }
 
@@ -267,8 +273,15 @@ async function loadAggregateWar(season) {
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
   const key = String(season);
+  const day = utcDayKey();
   const existing = aggregateWarInFlight.get(key);
   if (existing) return { data: await existing, cache: "COALESCED" };
+  if (hasAttemptedProviderToday(aggregateDailyAttemptDay.get(key), Date.now())) {
+    if (cached) return { data: { ...cached.data, freshness: 'daily-cached' }, cache: 'DAILY' };
+    const error = new Error('FanGraphs aggregate daily refresh already attempted');
+    error.status = 503;
+    throw error;
+  }
   if (fanGraphsCooldownUntil > Date.now()) {
     if (cached && cached.staleExpiresAt > Date.now())
       return {
@@ -284,6 +297,7 @@ async function loadAggregateWar(season) {
     error.retryAfter = Math.ceil((fanGraphsCooldownUntil - Date.now()) / 1000);
     throw error;
   }
+  aggregateDailyAttemptDay.set(key, day);
   const request = (async () => {
     const [battingResult, pitchingResult] = await Promise.allSettled([
       fetchHtml(AGGREGATE_WAR_URL(season, "bat")),
@@ -362,11 +376,11 @@ async function loadAggregateWar(season) {
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
-    aggregateWarCache.set(key, {
-      data,
-      expiresAt: Date.now() + 60 * 60_000,
-      staleExpiresAt: Date.now() + 2 * 60 * 60_000,
-    });
+      aggregateWarCache.set(key, {
+        data,
+        expiresAt: nextUtcMidnightMs(),
+        staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
+      });
     return { data, cache: "MISS" };
   } catch (error) {
     if (cached && cached.staleExpiresAt > Date.now())
@@ -450,6 +464,7 @@ export default async function handler(req, res) {
       });
   }
 
+  const day = utcDayKey();
   const existing = modelInFlight.get(key);
   if (existing) {
     try {
@@ -473,6 +488,19 @@ export default async function handler(req, res) {
         .status(error?.status || 502)
         .json(error?.payload || { error: "FanGraphs request failed" });
     }
+  }
+
+  if (hasAttemptedProviderToday(modelDailyAttemptDay.get(key), Date.now())) {
+    if (cached) {
+      res.setHeader('X-Provider-Cache', 'DAILY');
+      return res.status(200).json({ ...cached.data, freshness: 'daily-cached', servedAt: new Date().toISOString() });
+    }
+    const staleDaily = staleModel(cached);
+    if (staleDaily) {
+      res.setHeader('X-Provider-Cache', 'STALE');
+      return res.status(200).json({ ...staleDaily.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: 'FanGraphs daily refresh already attempted' });
+    }
+    return res.status(503).json({ error: 'FanGraphs daily refresh already attempted', retryAfter: Math.ceil((nextUtcMidnightMs() - Date.now()) / 1000) });
   }
 
   const stale = staleModel(cached);
@@ -527,6 +555,7 @@ export default async function handler(req, res) {
   if (failureUntil) modelFailureCooldownUntil.delete(key);
 
   if (isRateLimited(req, "fangraphs")) return rateLimitResponse(res);
+  modelDailyAttemptDay.set(key, day);
   const upstreamRequest = (async () => {
     const retrievedAt = new Date().toISOString();
     const [oddsResult, warResult] = await Promise.allSettled([
@@ -620,8 +649,8 @@ export default async function handler(req, res) {
     modelFailureCooldownUntil.delete(key);
     modelCache.set(key, {
       data,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-      staleExpiresAt: Date.now() + CACHE_TTL_MS + STALE_TTL_MS,
+      expiresAt: nextUtcMidnightMs(),
+      staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
     });
     if (modelCache.size > 200)
       modelCache.delete(modelCache.keys().next().value);

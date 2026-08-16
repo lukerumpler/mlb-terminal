@@ -139,3 +139,22 @@
 - [x] Add a regression test proving provider-blocked model requests remain coalesced and do not increase request frequency
 - [x] Add proxy coverage that seeds an expired FanGraphs model cache, forces Cloudflare 403 responses, and asserts stale-cached data is served
 - [x] Re-run focused provider-blocked, stale-fallback, and request-frequency tests after adding the missing assertion
+- [ ] Audit current FanGraphs model and aggregate-WAR contracts, MLB Stats routes, and Overview fallback states
+- [ ] Confirm which WAR fields MLB Stats API can support directly and refuse unsupported playoff-odds fabrication
+- [ ] Implement a bounded MLB Stats API fallback with explicit source/provenance labels and request coalescing
+- [ ] Update Overview metric mapping so fallback WAR is distinguishable from FanGraphs and playoff odds remain clearly unavailable
+- [ ] Add regression tests for fallback values, no-fabrication odds behavior, cache reuse, and provider failures
+- [ ] Run request-count, full-suite, type-check, build, and visual validation before checkpointing
+- [ ] Revise source priority so MLB Stats API is primary fallback and FanGraphs is explicitly last resort
+- [ ] Ensure source labels identify MLB Stats fallback, FanGraphs last resort, local stale snapshot, and unavailable playoff odds distinctly
+- [ ] Add tests proving FanGraphs is not requested when MLB fallback succeeds and is attempted only after the primary path fails
+- [x] Audit current Baseball-Reference/FanGraphs access paths, cache keys, refresh triggers, and high-priority metrics
+- [x] Define a fixed UTC-day refresh gate with snapshot provenance, stale fallback, and in-flight coalescing
+- [x] Implement at most one provider refresh per UTC day for priority metrics; serve cached snapshots otherwise
+- [x] Add day-boundary, duplicate-request, provider-failure, and provenance regression tests
+- [x] Run full validation and document exactly which metrics refresh daily
+- [x] Update existing FanGraphs cache tests for fixed UTC-day freshness and daily-attempt responses
+- [x] Preserve explicit cooldown assertions for rate-limited failures while distinguishing daily refresh suppression
+- [x] Add a regression test proving FanGraphs permits one new refresh after the UTC-day boundary
+- [x] Add regression assertions for FanGraphs daily-gate provenance and Baseball-Reference same-day failure reuse
+- [x] Add a focused FanGraphs 429 test proving cooldown semantics remain distinct from daily refresh suppression

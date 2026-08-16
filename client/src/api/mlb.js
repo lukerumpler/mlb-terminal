@@ -70,6 +70,16 @@ const FANGRAPHS_MODEL_LOCAL_CACHE_KEY = 'skip-fangraphs-model-snapshot-v1';
 const FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY = 'skip-fangraphs-aggregate-snapshot-v1';
 const FANGRAPHS_LOCAL_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
+function nextUtcMidnightMs(now = Date.now()) {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  return next.getTime();
+}
+
+function fanGraphsDailyTtlMs(now = Date.now()) {
+  return Math.max(1_000, nextUtcMidnightMs(now) - now);
+}
+
 function readPersistentProviderSnapshot(cacheKey, now = Date.now()) {
   if (typeof window === 'undefined' || !cacheKey) return null;
   try {
@@ -133,13 +143,15 @@ async function fetchProviderJson(url, {
       return data;
     } catch (error) {
       if (persistent?.data) {
-        return {
+        const staleData = {
           ...persistent.data,
           freshness: 'stale-local',
           staleReason: error?.message || 'FanGraphs refresh failed',
           staleAgeMs: Math.max(0, Date.now() - persistent.savedAt),
           servedAt: new Date().toISOString(),
         };
+        providerJsonCache.set(url, { data: staleData, expiresAt: nextUtcMidnightMs() });
+        return staleData;
       }
       throw error;
     }
@@ -1692,7 +1704,7 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
   try {
     const url = `/api/fangraphs-models?${params.toString()}`;
-    const data = await fetchProviderJson(url, { timeoutMs: 15_000, persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
+    const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
     const teams = data?.teams || [];
     const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
     let divisionAverageWAR = null;
@@ -1729,7 +1741,7 @@ export async function getTeamModelSources(teamAbbr, season = SEASON) {
   const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
   try {
     const url = `/api/fangraphs-models?${params.toString()}`;
-    return await fetchProviderJson(url, { timeoutMs: 12_000, persistentCacheKey: `${FANGRAPHS_MODEL_LOCAL_CACHE_KEY}:${url}` });
+    return await fetchProviderJson(url, { timeoutMs: 12_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_MODEL_LOCAL_CACHE_KEY}:${url}` });
   } catch (error) {
     return {
       found: false,
