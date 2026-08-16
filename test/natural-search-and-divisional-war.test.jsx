@@ -277,7 +277,8 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     expect(chartSource).toContain("Offensive WAR");
     expect(chartSource).toContain("Defensive WAR");
     expect(chartSource).toContain(
-      "Separate defensive WAR was not returned by the verified FanGraphs aggregate feed."
+      "Separate defensive WAR was not returned by the verified FanGraphs"
     );
+    expect(chartSource).toContain("aggregate feed.");
   });
 });

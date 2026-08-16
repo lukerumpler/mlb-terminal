@@ -361,38 +361,157 @@ export function LuxuryTaxTrendChart({ data = [], accent = C.amber }) {
 }
 
 function formatWarValue(value) {
-  return value == null || !Number.isFinite(Number(value)) ? 'Unavailable' : `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(1)}`;
+  return value == null || !Number.isFinite(Number(value))
+    ? "Unavailable"
+    : `${Number(value) >= 0 ? "+" : ""}${Number(value).toFixed(1)}`;
 }
 
 function DivisionalWarTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload || {};
   return (
-    <div style={{ ...TT.contentStyle, minWidth:190, padding:'9px 10px', borderRadius:7 }}>
-      <div style={{ marginBottom:7, color:C.text, fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:11, fontWeight:800 }}>{row.teamName || row.team}</div>
-      <div style={{ display:'grid', gap:4, color:C.text2, fontFamily:"'DM Mono',monospace", fontSize:9.5 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', gap:14 }}><span>Total WAR</span><strong style={{ color:C.purple }}>{formatWarValue(row.totalWAR)}</strong></div>
-        <div style={{ display:'flex', justifyContent:'space-between', gap:14 }}><span>Offensive WAR</span><strong style={{ color:C.amber }}>{formatWarValue(row.offensiveWAR)}</strong></div>
-        <div style={{ display:'flex', justifyContent:'space-between', gap:14 }}><span>Pitching WAR</span><strong style={{ color:C.teal }}>{formatWarValue(row.pitchingWAR)}</strong></div>
-        <div style={{ display:'flex', justifyContent:'space-between', gap:14 }}><span>Defensive WAR</span><strong style={{ color:row.defensiveWAR == null ? C.text4 : C.rust }}>{formatWarValue(row.defensiveWAR)}</strong></div>
+    <div
+      style={{
+        ...TT.contentStyle,
+        minWidth: 190,
+        padding: "9px 10px",
+        borderRadius: 7,
+      }}
+    >
+      <div
+        style={{
+          marginBottom: 7,
+          color: C.text,
+          fontFamily: "'Plus Jakarta Sans',sans-serif",
+          fontSize: 11,
+          fontWeight: 800,
+        }}
+      >
+        {row.teamName || row.team}
       </div>
-      {row.defensiveWAR == null && <div style={{ marginTop:7, color:C.text4, fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:9, lineHeight:1.35 }}>Separate defensive WAR was not returned by the verified FanGraphs aggregate feed.</div>}
+      <div
+        style={{
+          display: "grid",
+          gap: 4,
+          color: C.text2,
+          fontFamily: "'DM Mono',monospace",
+          fontSize: 9.5,
+        }}
+      >
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 14 }}
+        >
+          <span>Total WAR</span>
+          <strong style={{ color: C.purple }}>
+            {formatWarValue(row.totalWAR)}
+          </strong>
+        </div>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 14 }}
+        >
+          <span>Offensive WAR</span>
+          <strong style={{ color: C.amber }}>
+            {formatWarValue(row.offensiveWAR)}
+          </strong>
+        </div>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 14 }}
+        >
+          <span>Pitching WAR</span>
+          <strong style={{ color: C.teal }}>
+            {formatWarValue(row.pitchingWAR)}
+          </strong>
+        </div>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 14 }}
+        >
+          <span>Defensive WAR</span>
+          <strong
+            style={{ color: row.defensiveWAR == null ? C.text4 : C.rust }}
+          >
+            {formatWarValue(row.defensiveWAR)}
+          </strong>
+        </div>
+      </div>
+      {row.defensiveWAR == null && (
+        <div
+          style={{
+            marginTop: 7,
+            color: C.text4,
+            fontFamily: "'Plus Jakarta Sans',sans-serif",
+            fontSize: 9,
+            lineHeight: 1.35,
+          }}
+        >
+          Separate defensive WAR was not returned by the verified FanGraphs
+          aggregate feed.
+        </div>
+      )}
     </div>
   );
 }
 
 export function DivisionalWarChart({ data = [] }) {
   if (!data.length) {
-    return <div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 18px', color:C.text3, fontFamily:"'DM Mono',monospace", fontSize:10, textAlign:'center' }}>Verified divisional WAR rows are unavailable.</div>;
+    return (
+      <div
+        role="status"
+        style={{
+          height: 178,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 18px",
+          color: C.text3,
+          fontFamily: "'DM Mono',monospace",
+          fontSize: 10,
+          textAlign: "center",
+        }}
+      >
+        Verified divisional WAR rows are unavailable.
+      </div>
+    );
   }
   return (
     <ResponsiveContainer width="100%" height={178}>
-      <BarChart data={data} layout="vertical" margin={{ top:4, right:12, bottom:0, left:8 }} barCategoryGap="18%">
+      <BarChart
+        data={data}
+        layout="vertical"
+        margin={{ top: 4, right: 12, bottom: 0, left: 8 }}
+        barCategoryGap="18%"
+      >
         <CartesianGrid stroke={C.borderLight} horizontal={false} />
-        <XAxis type="number" tick={{ fontSize:8.5, fill:C.text3 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}`} />
-        <YAxis type="category" dataKey="team" width={36} tick={{ fontSize:9, fill:C.text2, fontFamily:"'DM Mono',monospace" }} axisLine={false} tickLine={false} />
-        <Tooltip content={<DivisionalWarTooltip />} cursor={{ fill:C.amberSoft, opacity:.55 }} />
-        <Bar dataKey="totalWAR" name="Total WAR" fill={C.purple} radius={[0,3,3,0]} maxBarSize={14} isAnimationActive={false} />
+        <XAxis
+          type="number"
+          tick={{ fontSize: 8.5, fill: C.text3 }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={v => `${v}`}
+        />
+        <YAxis
+          type="category"
+          dataKey="team"
+          width={36}
+          tick={{
+            fontSize: 9,
+            fill: C.text2,
+            fontFamily: "'DM Mono',monospace",
+          }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          content={<DivisionalWarTooltip />}
+          cursor={{ fill: C.amberSoft, opacity: 0.55 }}
+        />
+        <Bar
+          dataKey="totalWAR"
+          name="Total WAR"
+          fill={C.purple}
+          radius={[0, 3, 3, 0]}
+          maxBarSize={14}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

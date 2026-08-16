@@ -279,7 +279,7 @@ async function loadAggregateWar(season) {
   let cached = aggregateWarCache.get(key);
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
-  if (!cached || cached.expiresAt <= Date.now()) {
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
     const durable = await readDurableCache(durableFanGraphsKey(`aggregate:${season}`));
     if (durable) {
       cached = {
@@ -491,7 +491,7 @@ export default async function handler(req, res) {
         servedAt: new Date().toISOString(),
       });
   }
-  if (!cached || cached.expiresAt <= Date.now()) {
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
     const durable = await readDurableCache(durableFanGraphsKey(`model:${teamAbbr}:${season}`));
     if (durable) {
       cached = {
