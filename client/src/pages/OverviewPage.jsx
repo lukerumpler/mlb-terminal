@@ -599,6 +599,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [fangraphsRetryToken, setFangraphsRetryToken] = useState(0);
   const [savantRetryToken, setSavantRetryToken] = useState(0);
   const [rosterInsightsRetryToken, setRosterInsightsRetryToken] = useState(0);
+  const [cacheHealth, setCacheHealth] = useState(null);
   useEffect(() => {
     const onProviderRetry = event => {
       const provider = event.detail?.provider;
@@ -609,6 +610,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     };
     window.addEventListener('skip-provider-retry', onProviderRetry);
     return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/cache-health', { headers: { Accept: 'application/json' } })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (alive) setCacheHealth(data); })
+      .catch(() => { if (alive) setCacheHealth(null); });
+    return () => { alive = false; };
   }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
@@ -1421,6 +1430,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              {affiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>
         </label>
+        {cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
             <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center',minWidth:0}}>

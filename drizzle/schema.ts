@@ -53,3 +53,17 @@ export const apiResponseCache = mysqlTable("apiResponseCache", {
 export type ApiResponseCache = typeof apiResponseCache.$inferSelect;
 export type InsertApiResponseCache = typeof apiResponseCache.$inferInsert;
 
+/** Aggregated cache outcomes for the current and recent UTC days. */
+export const apiCacheTelemetry = mysqlTable("apiCacheTelemetry", {
+  id: int("id").autoincrement().primaryKey(),
+  telemetryKey: varchar("telemetryKey", { length: 256 }).notNull().unique(),
+  provider: varchar("provider", { length: 128 }).notNull(),
+  outcome: varchar("outcome", { length: 32 }).notNull(),
+  day: varchar("day", { length: 10 }).notNull(),
+  count: int("count").default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ApiCacheTelemetry = typeof apiCacheTelemetry.$inferSelect;
+export type InsertApiCacheTelemetry = typeof apiCacheTelemetry.$inferInsert;
+

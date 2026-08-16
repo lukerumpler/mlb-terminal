@@ -241,3 +241,11 @@
 - [x] Add regression coverage for durable hits, stale fallback, coalescing, and failure recovery
 - [x] Run migration, focused tests, full suite, type-check, and production build
 - [x] Save a checkpoint and report the durable-cache results
+
+- [ ] Inspect contract and team-financial cache paths, freshness rules, and provider provenance
+- [ ] Define cache-health telemetry events, counters, retention, and display contract
+- [ ] Extend durable shared caching to contract and team-financial endpoints without weakening existing TTLs or failure fallbacks
+- [ ] Add provider-level durable-hit, stale-hit, and upstream-miss telemetry and display it transparently
+- [ ] Add regression coverage for durable hits, stale fallback, telemetry counters, and request reduction
+- [ ] Run focused tests, full suite, type-check, production build, and visual/runtime checks
+- [ ] Save a checkpoint and report the verified cache-health results
