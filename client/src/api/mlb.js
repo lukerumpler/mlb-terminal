@@ -190,13 +190,17 @@ function staleCacheGet(key) {
 }
 
 function recordRequestTrace(event) {
-  requestTrace.push({
+  const entry = {
     id: ++requestTraceSequence,
     at: Date.now(),
     ...event,
-  });
+  };
+  requestTrace.push(entry);
   if (requestTrace.length > REQUEST_TRACE_LIMIT) {
     requestTrace.splice(0, requestTrace.length - REQUEST_TRACE_LIMIT);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('skip-mlb-request-trace', { detail: entry }));
   }
 }
 

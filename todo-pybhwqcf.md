@@ -283,3 +283,9 @@
 - [x] Apply explicit staged loading to Player Profile; retain existing Overview lifecycle guards pending trace-led grouping work
 - [x] Add queue/order/cache-outcome regression coverage and run full validation
 - [x] Save implementation checkpoints and report each verified milestone
+
+- [x] Add a development-only request diagnostics view using the bounded client trace
+- [x] Trace highest-volume Overview provider effects; preserve independent Savant and FanGraphs coverage when MLB core data is unavailable rather than coupling panels incorrectly
+- [x] Add regression coverage for diagnostics summaries and retain the existing Overview provider-flow assertions
+- [x] Run focused tests, full validation, type-check, build, and visual review
+- [x] Save the next verified optimization checkpoint and report results
