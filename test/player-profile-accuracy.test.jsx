@@ -13,7 +13,9 @@ import { computeAMD } from "../client/src/engine/skip.js";
 import {
   selectSeasonSplit,
   normalizeSeasonAdvancedStat,
+  mergeAdvancedMetricSources,
 } from "../client/src/api/mlb.js";
+import { parseBaseballReferenceAdvanced } from "../server/api/player-advanced.js";
 import { percentileLabel } from "../client/src/lib/percentile.js";
 import {
   comparisonAxes,
@@ -21,6 +23,42 @@ import {
 } from "../client/src/components/PlayerComparisonModal.jsx";
 
 describe("player profile data accuracy guards", () => {
+  it("uses fallback values only for missing primary fields and records per-field provenance", () => {
+    expect(mergeAdvancedMetricSources(
+      { season: 2026, war: 2.8, wrcPlus: null, source: "MLB Stats API seasonAdvanced" },
+      { season: 2026, war: 4.1, wrcPlus: 131, source: "Baseball-Reference player summary" },
+    )).toMatchObject({
+      war: 2.8,
+      wrcPlus: 131,
+      provenance: {
+        war: "MLB Stats API seasonAdvanced",
+        wrcPlus: "Baseball-Reference player summary",
+      },
+      status: "live",
+    });
+  });
+
+  it("fills a missing primary WAR field from the verified fallback while keeping wRC+ unavailable", () => {
+    const merged = mergeAdvancedMetricSources(
+      { season: 2026, war: null, wrcPlus: null, source: "MLB Stats API seasonAdvanced" },
+      { season: 2026, war: 6.4, wrcPlus: null, source: "Baseball-Reference player summary" },
+    );
+    expect(merged).toMatchObject({
+      war: 6.4,
+      wrcPlus: null,
+      provenance: { war: "Baseball-Reference player summary", wrcPlus: null },
+      status: "live",
+    });
+  });
+
+  it("parses only explicit Baseball-Reference WAR and wRC+ fields", () => {
+    const parsed = parseBaseballReferenceAdvanced(
+      '<main>SUMMARY 2026 Career WAR 6.4 57.7 OPS+ 156 160</main>',
+      2026,
+    );
+    expect(parsed).toMatchObject({ war: 6.4, wrcPlus: null, status: "live" });
+  });
+
   it("formats percentile labels with the correct ordinal suffix", () => {
     expect([92, 93, 98, 99, 100].map(percentileLabel)).toEqual([
       "92nd",

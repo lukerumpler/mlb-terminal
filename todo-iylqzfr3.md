@@ -185,3 +185,18 @@
 - [x] Add regression coverage for provider mapping, unavailable states, formatting, and expanded interactions
 - [x] Run typecheck, focused tests, full tests, and player-profile visual verification
 - [x] Save a checkpoint containing all three Performance Summary improvements
+
+- [x] Audit approved fallback provider options, precedence, provenance, and current Player Profile navigation state
+- [x] Add a verified fallback path for player WAR and wRC+ when MLB seasonAdvanced lacks explicit fields
+- [x] Preserve provider precedence, explicit unavailable states, and no-fabrication guarantees
+- [x] Add a compact Player Profile visual-QA player switcher with approved player options
+- [x] Preserve normal player search, tabs, expanded metric details, and mobile layout
+- [x] Add regression coverage for fallback precedence, provenance, unavailable fallback, and QA switching
+- [x] Run typecheck, focused tests, full tests, and visual verification of the QA switcher
+- [x] Save a checkpoint containing the fallback provider and visual-QA navigation
+- [x] Scope the verified Baseball-Reference fallback honestly to explicit WAR coverage and keep wRC+ Unavailable when no verified source field exists
+- [x] Fix the Visual QA selector so an arbitrary loaded player is represented accurately without misleading selection state
+- [x] Add a direct success-case regression for fallback WAR and an explicit no-wRC+ regression
+- [x] Resolve or isolate the unrelated durable FanGraphs cache test failures so the full suite result is documented accurately
+- [x] Capture a loaded Player Profile preview that visibly includes the QA selector
+- [x] Save a checkpoint after all gap corrections are complete
