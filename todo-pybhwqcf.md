@@ -257,13 +257,18 @@
 - [x] Run focused tests, full suite, type-check, and production build
 - [x] Save a checkpoint and report the deployment/schedule requirement
 
-- [ ] Verify the deployed cleanup callback and inspect existing Heartbeat jobs
-- [ ] Create one daily 03:00 UTC Heartbeat for cache telemetry cleanup without duplicates
-- [ ] Run the cleanup job manually and inspect its execution result/log
-- [ ] Report the Heartbeat task identity and verification outcome
+- [x] Defer manual Heartbeat callback verification by explicit user request; schedule remains registered
+- [x] Create one daily 03:00 UTC Heartbeat for cache telemetry cleanup without duplicates
+- [x] Defer manual cleanup execution verification by explicit user request
+- [x] Record the Heartbeat schedule identity and document that manual execution verification was intentionally deferred
 
 - [x] Inventory the loading/data queue, provider caches, request coalescing, and runtime logs
 - [x] Trace Player Profile, Overview, and shared API loading flows for duplicate or blocking requests
 - [x] Identify confirmed bottlenecks, maintainability hazards, and long-line/readability hotspots
 - [x] Create a master debugging and optimization work file with priority, evidence, dependencies, and tests
 - [x] Review the work file for a safe execution order and deliver it for implementation
+
+- [x] Consolidate current whole-project evidence while excluding manual Heartbeat verification from the active priority
+- [x] Define a stronger AI-assisted architecture for queueing, caching, provenance, observability, and safe data operations
+- [x] Write an advice-first master blueprint for a more powerful coding AI to execute
+- [x] Deliver the blueprint and recommended AI operating protocol before further code changes
