@@ -814,14 +814,18 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const playerB = { id: 2, fullName: "Fast Player B" };
     const deferredA = deferred();
     const deferredB = deferred();
+    let slowPlayerSignal;
 
     searchPlayers.mockImplementation(async q => {
       if (q === "Slow") return [playerA];
       if (q === "Fast") return [playerB];
       return [];
     });
-    loadFullPlayer.mockImplementation(async person => {
-      if (person.id === 1) return deferredA.promise;
+    loadFullPlayer.mockImplementation(async (person, _season, options) => {
+      if (person.id === 1) {
+        slowPlayerSignal = options?.signal;
+        return deferredA.promise;
+      }
       if (person.id === 2) return deferredB.promise;
       throw new Error("unexpected player");
     });
@@ -843,6 +847,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
       expect(screen.getByText("Fast Player B")).toBeInTheDocument()
     );
     await user.click(screen.getByText("Fast Player B"));
+    expect(slowPlayerSignal?.aborted).toBe(true);
 
     // B resolves first (it's the faster request).
     deferredB.resolve(mockPlayer(2, "Fast Player B"));

@@ -1605,6 +1605,7 @@ function PlayersPage() {
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
   const mountedRef = useRef(true);
+  const playerAbortRef = useRef(null);
   // Bug fix 2026-08-11: pickPlayer had no equivalent of latestQueryRef's
   // guard below — clicking player A then player B before A's slower
   // loadFullPlayer() resolved let A's response land after B's and silently
@@ -1623,7 +1624,11 @@ function PlayersPage() {
   // natural cleanup function to hang this off of otherwise.
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; clearTimeout(timerRef.current); };
+    return () => {
+      mountedRef.current = false;
+      playerAbortRef.current?.abort();
+      clearTimeout(timerRef.current);
+    };
   }, []);
 
 
@@ -1645,6 +1650,9 @@ function PlayersPage() {
   }, []);
 
   const pickPlayer = useCallback(async (person) => {
+    playerAbortRef.current?.abort();
+    const controller = new AbortController();
+    playerAbortRef.current = controller;
     recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
@@ -1654,6 +1662,7 @@ function PlayersPage() {
     setError(null);
     try {
       const data = await loadFullPlayer(person, SEASON, {
+        signal: controller.signal,
         onCoreReady: core => {
           if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
         },
@@ -1662,7 +1671,9 @@ function PlayersPage() {
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
     } catch (err) {
-      if (mountedRef.current && pickSeqRef.current === mySeq) setError(humanizePlayerLoadError(err, person.fullName));
+      if (err?.name !== 'AbortError' && mountedRef.current && pickSeqRef.current === mySeq) {
+        setError(humanizePlayerLoadError(err, person.fullName));
+      }
     }
     if (mountedRef.current && pickSeqRef.current === mySeq) {
       setLoading(false);

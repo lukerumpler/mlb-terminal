@@ -276,3 +276,10 @@
 - [x] Consolidate the existing audit, queue optimization plan, and AI blueprint into one master document
 - [x] Review the unified document for implementation order, evidence, guardrails, and readability
 - [x] Deliver the consolidated master document as the project’s primary debugging guide
+
+- [x] Inspect shared request helpers and define a backward-compatible tracing contract
+- [x] Add stable request-key tracing and development diagnostics without changing provider refresh policy
+- [x] Extend the client queue with priority and cancellation safeguards
+- [x] Apply explicit staged loading to Player Profile; retain existing Overview lifecycle guards pending trace-led grouping work
+- [x] Add queue/order/cache-outcome regression coverage and run full validation
+- [x] Save implementation checkpoints and report each verified milestone

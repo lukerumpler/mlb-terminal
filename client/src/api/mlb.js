@@ -56,6 +56,7 @@ const STALE_CACHE_TTL_MS = 10 * 60_000;
 const CLIENT_WINDOW_MS = 10_000;
 const CLIENT_MAX_REQUESTS_PER_WINDOW = 18;
 const CLIENT_MAX_CONCURRENT = 4;
+const REQUEST_PRIORITY_WEIGHT = { core: 0, important: 1, optional: 2, background: 3 };
 const cache    = new Map(); // key -> { data, expires, staleExpires }
 const inFlight = new Map(); // key -> Promise
 const requestQueue = [];
@@ -63,6 +64,10 @@ const requestStarts = [];
 let activeRequests = 0;
 let queueTimer = null;
 let proxyCooldownUntil = 0;
+let queueSequence = 0;
+const REQUEST_TRACE_LIMIT = 300;
+const requestTrace = [];
+let requestTraceSequence = 0;
 const providerJsonCache = new Map();
 const providerJsonInFlight = new Map();
 const PROVIDER_JSON_TTL_MS = 10 * 60_000;
@@ -184,6 +189,32 @@ function staleCacheGet(key) {
   return undefined;
 }
 
+function recordRequestTrace(event) {
+  requestTrace.push({
+    id: ++requestTraceSequence,
+    at: Date.now(),
+    ...event,
+  });
+  if (requestTrace.length > REQUEST_TRACE_LIMIT) {
+    requestTrace.splice(0, requestTrace.length - REQUEST_TRACE_LIMIT);
+  }
+}
+
+// Development/test diagnostics only. Durable cache-health telemetry remains
+// the source of truth for aggregate cross-session provider outcomes.
+export function __getMlbRequestTraceForTests() {
+  return requestTrace.map(entry => ({ ...entry }));
+}
+
+export function __getMlbQueueSnapshotForTests() {
+  return {
+    activeRequests,
+    queuedRequests: requestQueue.length,
+    requestStarts: requestStarts.length,
+    proxyCooldownUntil,
+  };
+}
+
 function parseRetryAfterMs(response) {
   const value = response?.headers?.get?.('Retry-After');
   if (!value) return 10_000;
@@ -191,6 +222,21 @@ function parseRetryAfterMs(response) {
   if (Number.isFinite(seconds)) return Math.max(1_000, Math.min(60_000, seconds * 1_000));
   const date = Date.parse(value);
   return Number.isFinite(date) ? Math.max(1_000, Math.min(60_000, date - Date.now())) : 10_000;
+}
+
+function normalizeRequestPriority(priority) {
+  return Object.hasOwn(REQUEST_PRIORITY_WEIGHT, priority) ? priority : 'important';
+}
+
+function abortError() {
+  return Object.assign(new Error('Request aborted'), { name: 'AbortError' });
+}
+
+function requestAbortSignal(timeoutMs, signal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timeoutSignal;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([timeoutSignal, signal]);
+  return signal;
 }
 
 function pumpRequestQueue() {
@@ -210,16 +256,24 @@ function pumpRequestQueue() {
     return;
   }
 
+  requestQueue.sort((left, right) => left.priorityWeight - right.priorityWeight || left.queueId - right.queueId);
   const job = requestQueue.shift();
+  job.removeQueuedAbortListener?.();
   activeRequests += 1;
   requestStarts.push(now);
-  fetch(job.url, { signal: AbortSignal.timeout(job.timeoutMs) })
+  recordRequestTrace({ ...job.trace, event: 'started', activeRequests, queuedRequests: requestQueue.length });
+  fetch(job.url, { signal: requestAbortSignal(job.timeoutMs, job.signal) })
     .then(response => {
       if (response.status === 429) {
         proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + parseRetryAfterMs(response));
       }
+      recordRequestTrace({ ...job.trace, event: 'response', status: response.status, ok: response.ok });
       job.resolve(response);
-    }, job.reject)
+    }, error => {
+      const event = job.signal?.aborted || error?.name === 'AbortError' ? 'aborted' : 'transport-error';
+      recordRequestTrace({ ...job.trace, event, error: error?.name || 'Error' });
+      job.reject(error);
+    })
     .finally(() => {
       activeRequests -= 1;
       pumpRequestQueue();
@@ -228,9 +282,45 @@ function pumpRequestQueue() {
   pumpRequestQueue();
 }
 
-function scheduledFetch(url, timeoutMs) {
+function scheduledFetch(url, timeoutMs, trace = {}, signal) {
   return new Promise((resolve, reject) => {
-    requestQueue.push({ url, timeoutMs, resolve, reject });
+    const priority = normalizeRequestPriority(trace.priority);
+    const requestTraceContext = {
+      key: url,
+      priority,
+      stage: trace.stage || 'unspecified',
+      screen: trace.screen || 'unknown',
+      resource: trace.resource || 'mlb-proxy',
+    };
+    const job = {
+      url,
+      timeoutMs,
+      resolve,
+      reject,
+      signal,
+      trace: requestTraceContext,
+      queueId: ++queueSequence,
+      priorityWeight: REQUEST_PRIORITY_WEIGHT[priority],
+      removeQueuedAbortListener: null,
+    };
+    const cancelWhileQueued = () => {
+      const index = requestQueue.indexOf(job);
+      if (index < 0) return;
+      requestQueue.splice(index, 1);
+      recordRequestTrace({ ...requestTraceContext, event: 'aborted', queuedRequests: requestQueue.length });
+      reject(abortError());
+    };
+    if (signal?.aborted) {
+      recordRequestTrace({ ...requestTraceContext, event: 'aborted', queuedRequests: requestQueue.length });
+      reject(abortError());
+      return;
+    }
+    if (signal) {
+      signal.addEventListener('abort', cancelWhileQueued, { once: true });
+      job.removeQueuedAbortListener = () => signal.removeEventListener('abort', cancelWhileQueued);
+    }
+    requestQueue.push(job);
+    recordRequestTrace({ ...requestTraceContext, event: 'queued', queuedRequests: requestQueue.length });
     pumpRequestQueue();
   });
 }
@@ -240,6 +330,9 @@ export function __resetMlbClientStateForTests() {
   inFlight.clear();
   requestQueue.splice(0, requestQueue.length);
   requestStarts.splice(0, requestStarts.length);
+  requestTrace.splice(0, requestTrace.length);
+  requestTraceSequence = 0;
+  queueSequence = 0;
   activeRequests = 0;
   proxyCooldownUntil = 0;
   providerJsonCache.clear();
@@ -264,7 +357,16 @@ class MlbProxyError extends Error {
 
 // ─── Core fetcher ─────────────────────────────────────────────────────────
 // Keeps commas unencoded in hydrate strings so MLB receives them intact.
-export async function mlb(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL_MS, timeoutMs = 10_000, quietStatuses = [] } = {}) {
+export async function mlb(path, params = {}, {
+  cache: useCache = true,
+  ttl = CACHE_TTL_MS,
+  timeoutMs = 10_000,
+  quietStatuses = [],
+  priority = 'important',
+  stage = 'unspecified',
+  screen = 'unknown',
+  signal,
+} = {}) {
   const extraQs = Object.entries(params)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
     .join('&');
@@ -272,18 +374,31 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
 
   if (useCache) {
     const cached = cacheGet(url);
-    if (cached !== undefined) return cached;
+    if (cached !== undefined) {
+      recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'local-hit' });
+      return cached;
+    }
     const pending = inFlight.get(url);
-    if (pending) return pending;
+    if (pending) {
+      recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'deduplicated' });
+      return pending;
+    }
   }
 
   const request = (async () => {
     let res;
     try {
-      res = await scheduledFetch(url, timeoutMs);
+      res = await scheduledFetch(url, timeoutMs, { priority, stage, screen, resource: 'mlb-proxy' }, signal);
     } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') {
+        recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'aborted' });
+        throw error;
+      }
       const stale = useCache ? staleCacheGet(url) : undefined;
-      if (stale !== undefined) return stale;
+      if (stale !== undefined) {
+        recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'stale-hit', reason: 'transport-error' });
+        return stale;
+      }
       throw error;
     }
     if (!res.ok) {
@@ -298,6 +413,7 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
         } else {
           console.warn(`[mlb] proxy ${res.status}; using verified cached response`, path);
         }
+        recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'stale-hit', status: res.status });
         return stale;
       }
       if (res.status === 429) {
@@ -333,6 +449,7 @@ export async function mlb(path, params = {}, { cache: useCache = true, ttl = CAC
       const expires = Date.now() + ttl;
       cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
     }
+    recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'success' });
     recordFeedSuccess(inferMlbFeedKey(path));
     return data;
   })();
@@ -378,7 +495,12 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
   const request = (async () => {
     let res;
     try {
-      res = await scheduledFetch(url, timeoutMs);
+      res = await scheduledFetch(url, timeoutMs, {
+        priority: 'optional',
+        stage: 'optional',
+        screen: 'player-profile',
+        resource: 'savant-leaderboard',
+      });
     } catch {
       return staleCacheGet(url) ?? null;
     }
@@ -441,10 +563,10 @@ export function selectSeasonSplit(splits, sportId) {
 }
 
 // Try current season, fall back to prior year automatically
-async function getSeasonStatsSafe(id, group, season, sportId) {
+async function getSeasonStatsSafe(id, group, season, sportId, requestOptions = {}) {
   const tryYear = async (yr) => {
     try {
-      const data  = await mlb(`/people/${id}/stats`, { stats: 'season', group, season: yr });
+      const data  = await mlb(`/people/${id}/stats`, { stats: 'season', group, season: yr }, requestOptions);
       const grp   = findStatGroup(data.stats, group);
       const split = selectSeasonSplit(grp?.splits, sportId);
       return split?.stat && Object.keys(split.stat).length > 2 ? split.stat : null;
@@ -465,9 +587,9 @@ export function normalizeSeasonAdvancedStat(stat = {}, season, source = 'MLB Sta
   return { season, war, wrcPlus, source, status:(war != null || wrcPlus != null) ? 'live' : 'unavailable' };
 }
 
-export async function getSeasonAdvancedStatsSafe(id, season, sportId) {
+export async function getSeasonAdvancedStatsSafe(id, season, sportId, requestOptions = {}) {
   try {
-    const data = await mlb(`/people/${id}/stats`, { stats:'seasonAdvanced', group:'hitting', season });
+    const data = await mlb(`/people/${id}/stats`, { stats:'seasonAdvanced', group:'hitting', season }, requestOptions);
     const group = findStatGroup(data.stats, 'hitting');
     const split = selectSeasonSplit(group?.splits, sportId);
     return normalizeSeasonAdvancedStat(split?.stat || {}, season);
@@ -565,8 +687,8 @@ export async function searchPlayers(query, limit = 12) {
   } catch { return []; }
 }
 
-export async function getPlayerProfile(id) {
-  const data = await mlb(`/people/${id}`, { hydrate: 'currentTeam' });
+export async function getPlayerProfile(id, requestOptions = {}) {
+  const data = await mlb(`/people/${id}`, { hydrate: 'currentTeam' }, requestOptions);
   return data.people?.[0] || null;
 }
 
@@ -754,25 +876,18 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }
 }
-export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = {}) {
+export async function loadFullPlayer(person, season = SEASON, { onCoreReady, signal } = {}) {
   const id = person.id;
 
   // Fetch the profile first so its current-team context can parameterize the
   // remaining requests. Core season stats are awaited separately from slower
   // optional providers so the UI can render a verified profile immediately.
-  const profile = await getPlayerProfile(id);
+  const coreRequest = { priority: 'core', stage: 'core', screen: 'player-profile', signal };
+  const profile = await getPlayerProfile(id, coreRequest);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
-  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
-  const careerHittingPromise = getCareerSplits(id, 'hitting');
-  const careerPitchingPromise = getCareerSplits(id, 'pitching');
-  const contractPromise = fetchContractData(id, person.fullName);
-  const handednessPromise = getHandednessSplits(id, season);
-  const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season);
-  const hittingPromise = getSeasonStatsSafe(id, 'hitting', season, profileSportId);
-  const pitchingPromise = getSeasonStatsSafe(id, 'pitching', season, profileSportId);
-  const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId);
-  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
+  const hittingPromise = getSeasonStatsSafe(id, 'hitting', season, profileSportId, coreRequest);
+  const pitchingPromise = getSeasonStatsSafe(id, 'pitching', season, profileSportId, coreRequest);
   const [hittingResult, pitchingResult] = await Promise.all([
     hittingPromise,
     pitchingPromise,
@@ -820,6 +935,21 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = 
     extrasLoading: true,
   };
   try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
+
+  // Important and optional enrichment begins only after the verified core
+  // snapshot is visible. This prevents slow contract, financial, career, and
+  // boxscore work from competing with the request budget that establishes the
+  // player identity and current-season statistics.
+  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
+  const careerHittingPromise = getCareerSplits(id, 'hitting');
+  const careerPitchingPromise = getCareerSplits(id, 'pitching');
+  const contractPromise = fetchContractData(id, person.fullName);
+  const handednessPromise = getHandednessSplits(id, season);
+  const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season);
+  const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, {
+    priority: 'important', stage: 'important', screen: 'player-profile',
+  });
+  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
 
   const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
