@@ -50,6 +50,22 @@ export function humanizePlayerLoadError(error, playerName = 'this player') {
   return `Could not load ${playerName}. Please retry shortly.`;
 }
 
+export function buildAdvancedMetricTrendSeries(rows = [], count = 5) {
+  const numeric = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const bySeason = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const season = Number(row?.season ?? row?.stat?.season);
+    if (!Number.isInteger(season)) return;
+    const stat = row?.stat || row;
+    bySeason.set(season, {
+      season,
+      war: numeric(stat?.war ?? stat?.fWAR ?? stat?.bWAR ?? stat?.rWAR),
+      wrcPlus: numeric(stat?.wrcPlus ?? stat?.wRCPlus ?? stat?.wrc_plus),
+    });
+  });
+  return [...bySeason.values()].sort((a, b) => a.season - b.season).slice(-Math.max(1, count));
+}
+
 function pctBar(pct, color) {
   return (
     <div style={{ flex:'0 0 80px', height:5, background:C.surface3, borderRadius:3, overflow:'hidden' }}>
@@ -1581,7 +1597,9 @@ function PlayersPage() {
   const [results, setResults] = useState([]);
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
+  const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
+  const [error,   setError] = useState(null);
+
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
@@ -1632,7 +1650,7 @@ function PlayersPage() {
     setResults([]);
     setQuery(person.fullName);
     setLoading(true);
-    setPlayer(null);
+    setSwitchingPlayerName(person.fullName || person.name || 'selected player');
     setError(null);
     try {
       const data = await loadFullPlayer(person, SEASON, {
@@ -1646,7 +1664,10 @@ function PlayersPage() {
     } catch (err) {
       if (mountedRef.current && pickSeqRef.current === mySeq) setError(humanizePlayerLoadError(err, person.fullName));
     }
-    if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
+    if (mountedRef.current && pickSeqRef.current === mySeq) {
+      setLoading(false);
+      setSwitchingPlayerName(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -1748,6 +1769,7 @@ function PlayersPage() {
         : (parseFloat(st.ops) || null);
       return { yr: r.season, val };
     }).filter(d => d.val != null);
+    const advancedTrendData = buildAdvancedMetricTrendSeries(player.isPitcher ? player.careerPitching : player.career, 5);
 
     return {
       kpis, score, verd, arch,
@@ -1756,7 +1778,7 @@ function PlayersPage() {
       risks:     getRisks(s, p, player.isPitcher),
       rec:       getRecommendation(score),
       quote, archQuote, savantQuote, contextItems: contextItemsFiltered,
-      gradeRows, careerRows, sparkData, s, p,
+      gradeRows, careerRows, sparkData, advancedTrendData, s, p,
       amd:       computeAMD(player.batTracking),
     };
   }, [player]);
@@ -1798,6 +1820,12 @@ function PlayersPage() {
         )}
       </div>
 
+      {loading && player && (
+        <div role="progressbar" aria-label="Switching player profile" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:7, background:C.surface2, border:`0.5px solid ${C.border}`, color:C.text2, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
+          <span aria-hidden="true" style={{ width:10, height:10, border:`2px solid ${C.border}`, borderTopColor:C.amber, borderRadius:'50%', display:'inline-block', animation:'skip-status-spin 0.8s linear infinite' }} />
+          Loading verified profile data{switchingPlayerName ? ` for ${switchingPlayerName}` : ''}…
+        </div>
+      )}
       {loading && !player && <PlayerProfileSkeleton />}
       {player?.extrasLoading && (
         <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
@@ -2104,7 +2132,7 @@ function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
     : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
-          gradeRows, careerRows, sparkData, s, p, amd } = derived;
+          gradeRows, careerRows, sparkData, advancedTrendData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedChart, setExpandedChart] = useState(null);
@@ -2756,6 +2784,31 @@ function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
               </div>
             </Panel>
           )}
+
+          <Panel title="WAR / wRC+ Trend" accent={C.purple} badge="Last 5 seasons">
+            {advancedTrendData.some(row => row.war != null || row.wrcPlus != null) ? (
+              <div style={{ padding:'6px 4px 2px' }} role="img" aria-label="Verified five-season WAR and wRC+ trend">
+                <ResponsiveContainer width="100%" height={128}>
+                  <LineChart data={advancedTrendData} margin={{ top:8, right:10, bottom:0, left:0 }}>
+                    <CartesianGrid stroke={C.borderLight} vertical={false}/>
+                    <XAxis dataKey="season" tick={{ fontSize:9, fill:C.text3 }} axisLine={false} tickLine={false}/>
+                    <YAxis yAxisId="war" tick={{ fontSize:9, fill:C.purple }} axisLine={false} tickLine={false} width={28} />
+                    <YAxis yAxisId="wrc" orientation="right" tick={{ fontSize:9, fill:C.teal }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip {...TT} formatter={(value, name) => [value == null ? 'Unavailable' : name === 'WAR' ? Number(value).toFixed(1) : Math.round(Number(value)), name]} />
+                    <Line yAxisId="war" isAnimationActive={false} connectNulls={false} dataKey="war" name="WAR" stroke={C.purple} strokeWidth={2} dot={{ r:3, fill:C.purple }} type="monotone" />
+                    <Line yAxisId="wrc" isAnimationActive={false} connectNulls={false} dataKey="wrcPlus" name="wRC+" stroke={C.teal} strokeWidth={2} dot={{ r:3, fill:C.teal }} type="monotone" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display:'flex', justifyContent:'center', gap:14, padding:'2px 0 5px' }}>
+                  <span style={px({ fontSize:8.5, color:C.purple })}>● WAR</span>
+                  <span style={px({ fontSize:8.5, color:C.teal })}>● wRC+</span>
+                </div>
+                <div style={sans({ padding:'0 8px 5px', fontSize:8.5, color:C.text4, lineHeight:1.35 })}>Verified career fields only; missing seasons remain blank.</div>
+              </div>
+            ) : (
+              <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>No verified five-season WAR or wRC+ trend is available.</div>
+            )}
+          </Panel>
 
           {/* ── Swing Precision (AMD / IMD) ── */}
           {amd && (

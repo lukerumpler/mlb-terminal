@@ -346,10 +346,11 @@ describe("PlayersPage — player comparison and race conditions", () => {
 
   it("switches players through the compact Visual QA selector", async () => {
     const user = userEvent.setup();
+    const qaSwitchPending = deferred();
     searchPlayers.mockResolvedValue([]);
     loadFullPlayer
       .mockResolvedValueOnce(mockPlayer(1, "QA Starter"))
-      .mockResolvedValueOnce(mockPlayer(592450, "Aaron Judge"));
+      .mockReturnValueOnce(qaSwitchPending.promise);
 
     render(<PlayersPage />);
     const input = screen.getByPlaceholderText(/Search any MLB player/i);
@@ -365,7 +366,10 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const qaSelect = await screen.findByRole("combobox", { name: "Visual QA player switcher" });
     expect(qaSelect).toHaveValue("1");
     await user.selectOptions(qaSelect, "592450");
-    await waitFor(() => expect(loadFullPlayer).toHaveBeenLastCalledWith(expect.objectContaining({ id: 592450, fullName: "Aaron Judge" }), expect.anything(), expect.anything()));
+    expect(await screen.findByRole("progressbar", { name: "Switching player profile" })).toHaveTextContent("Aaron Judge");
+    qaSwitchPending.resolve(mockPlayer(592450, "Aaron Judge"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: /Aaron Judge/ })).toBeInTheDocument());
+    expect(loadFullPlayer).toHaveBeenLastCalledWith(expect.objectContaining({ id: 592450, fullName: "Aaron Judge" }), expect.anything(), expect.anything());
   });
 
   it("opens the side-by-side comparison modal and loads a second player through the live adapter", async () => {
@@ -555,7 +559,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await user.click(casButton);
 
     expect(casButton).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status")).toHaveTextContent("CAS");
+    expect(screen.getAllByRole("status").find(element => element.textContent.includes("CAS"))).toHaveTextContent("CAS");
     expect(screen.getByText(/Focus: Contact/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /TPVI True Value/i })

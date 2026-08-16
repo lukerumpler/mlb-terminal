@@ -200,3 +200,11 @@
 - [x] Resolve or isolate the unrelated durable FanGraphs cache test failures so the full suite result is documented accurately
 - [x] Capture a loaded Player Profile preview that visibly includes the QA selector
 - [x] Save a checkpoint after all gap corrections are complete
+- [x] Inspect Visual QA switch loading state and available career advanced-metric series
+- [x] Add a compact loading skeleton or spinner during Visual QA player transitions
+- [x] Normalize verified WAR and wRC+ trend points for the last five seasons without fabricating missing values
+- [x] Add a compact interactive five-season WAR/wRC+ trend chart to the Player Profile
+- [x] Preserve fallback provenance, unavailable states, tabs, and mobile layout
+- [x] Add regression tests for transition loading and five-season trend rendering
+- [x] Run typecheck, focused tests, full validation, and visual verification
+- [x] Save a checkpoint containing the Visual QA loading and advanced trend enhancements

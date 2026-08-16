@@ -7,6 +7,7 @@ import {
   buildSavantPercentileAxes,
   normalizeSprayPoint,
   buildRecentGameSeries,
+  buildAdvancedMetricTrendSeries,
   MetricSparkline,
 } from "../client/src/pages/PlayersPage.jsx";
 import { computeAMD } from "../client/src/engine/skip.js";
@@ -23,6 +24,23 @@ import {
 } from "../client/src/components/PlayerComparisonModal.jsx";
 
 describe("player profile data accuracy guards", () => {
+  it("normalizes the last five verified WAR and wRC+ seasons without filling gaps", () => {
+    expect(buildAdvancedMetricTrendSeries([
+      { season: 2021, stat: { war: 2.1, wRCPlus: 111 } },
+      { season: 2022, stat: { fWAR: 3.4 } },
+      { season: 2023, stat: { war: null, wrc_plus: 124 } },
+      { season: 2024, stat: { bWAR: 4.2, wRCPlus: 131 } },
+      { season: 2025, stat: { war: 5.1, wRCPlus: 142 } },
+      { season: 2026, stat: { rWAR: 6.0, wRCPlus: 150 } },
+    ])).toEqual([
+      { season: 2022, war: 3.4, wrcPlus: null },
+      { season: 2023, war: null, wrcPlus: 124 },
+      { season: 2024, war: 4.2, wrcPlus: 131 },
+      { season: 2025, war: 5.1, wrcPlus: 142 },
+      { season: 2026, war: 6.0, wrcPlus: 150 },
+    ]);
+  });
+
   it("uses fallback values only for missing primary fields and records per-field provenance", () => {
     expect(mergeAdvancedMetricSources(
       { season: 2026, war: 2.8, wrcPlus: null, source: "MLB Stats API seasonAdvanced" },
