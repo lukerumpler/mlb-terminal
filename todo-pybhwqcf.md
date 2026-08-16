@@ -175,9 +175,9 @@
 - [x] Trace FanGraphs stale fallback, provider-blocked state, and calculated MLB fallback for each missing metric
 - [x] Verify whether any missing metric is a UI mapping defect versus a genuine provider coverage gap
 - [x] Produce a metric-by-metric explanation and prioritized fix list
-- [ ] Compare current project intelligence-calculation and FanGraphs daily-gate files with GitHub origin/main
-- [ ] Verify the published checkpoint endpoint and provenance behavior against the current source
-- [ ] Document any divergence between GitHub, project checkpoint, and deployed behavior without claiming unsupported features
+- [x] Compare current project intelligence-calculation and FanGraphs daily-gate files with GitHub origin/main
+- [x] Verify the published checkpoint endpoint and provenance behavior against the current source
+- [x] Document any divergence between GitHub, project checkpoint, and deployed behavior without claiming unsupported features
 - [x] Inspect current GitHub main divergence and local uncommitted changes before export
 - [x] Push the verified Manus project changes to a safe GitHub branch or commit without overwriting unrelated work
 - [x] Verify the remote commit and provide the exact GitHub review URL
@@ -200,10 +200,17 @@
 - [x] Compare legacy endpoint and data-loading guidance with the current project
 - [x] Identify safe reusable fixes and reject hardcoded, fabricated, or obsolete legacy behavior
 - [x] Report which legacy files materially help the current debugging and optimization work
-- [ ] Verify both PlayersPage Savant field-usage sites and the documented column aliases
-- [ ] Normalize sweet-spot, hard-hit, and barrel fields consistently without estimates
-- [ ] Add regression coverage for alias handling and missing-field behavior
-- [ ] Run focused and full validation for the PlayersPage mapping fix
-- [ ] Run full validation and inspect runtime health for the PlayersPage Savant alias fix
-- [ ] Commit and push the Savant alias normalization to the existing PR review branch
-- [ ] Verify the updated PR head and report the review link
+- [x] Verify both PlayersPage Savant field-usage sites and the documented column aliases
+- [x] Normalize sweet-spot, hard-hit, and barrel fields consistently without estimates
+- [x] Add regression coverage for alias handling and missing-field behavior
+- [x] Run focused and full validation for the PlayersPage mapping fix
+- [x] Run full validation and inspect runtime health for the PlayersPage Savant alias fix
+- [x] Commit and push the Savant alias normalization to the existing PR review branch
+- [x] Verify the updated PR head and report the review link
+- [x] Audit all remaining mlb.js endpoint response handling for CSV/text parsing assumptions
+- [x] Run final endpoint, focused regression, and merge-readiness checks
+- [x] Merge PR #1 into GitHub main and verify the resulting main commit
+- [x] Identify the merged production deployment and all MLB/Savant proxy health targets
+- [x] Probe production MLB and Savant endpoints and capture status, provenance, cache, and failure metadata
+- [x] Review production deployment status and record the Vercel runtime-log access limitation; no active managed-Manus runtime error observed
+- [x] Prepare a preview summary report of recent bug fixes and performance improvements
