@@ -362,5 +362,5 @@
 - [x] Correct the player-advanced proxy CORS invocation and add a production allowlist regression
 - [x] Apply and validate compatible patch-level overrides for the remaining moderate Streamdown transitive advisories
 - [x] Restore the published-Overview E2E script with a dedicated test configuration that includes E2E files
-- [ ] Merge the user-approved calculated MLB standings fallback proxies with this session’s readiness remediation
-- [ ] Validate the calculated proxy labels, full release gates, and managed checkpoint after the approved merge
+- [x] Merge the user-approved calculated MLB standings fallback proxies with this session’s readiness remediation
+- [x] Validate the calculated proxy labels, full release gates, and managed checkpoint after the approved merge

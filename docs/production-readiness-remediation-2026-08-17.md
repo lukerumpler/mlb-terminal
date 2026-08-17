@@ -29,11 +29,12 @@ The primary managed Manus deployment continues to be the appropriate API host be
 
 > These steps are intentionally not automated here because they change hosting configuration or publish a public deployment. They must be completed only after the final frontend domain is chosen and the reviewed code is promoted through GitHub.
 
-1. Set the Manus production `ALLOWED_ORIGIN` secret to the final Vercel frontend origin or an explicit comma-separated allowlist of final origins. Do not use `*` in production.
-2. Set Vercel’s production `VITE_API_BASE` to the HTTPS Manus API origin. The client’s shared origin helper then directs Vercel-browser API calls to Manus while preserving same-origin calls in the managed Manus deployment.
-3. Export or merge the verified remediation code to the GitHub branch that is intended for release, then trigger a new **production** Vercel frontend deployment. Confirm the deployment has `target: production` and its commit includes this remediation.
-4. Run the published Overview E2E suite with `SKIP_LIVE_URL` set to the exact production candidate. The CI guard now makes this target declaration mandatory.
-5. Confirm the deployed Manus API returns the expected `Access-Control-Allow-Origin` header for the final Vercel origin, then re-run a browser data-load smoke test covering Overview and Player Profile.
+1. Complete the GitHub-main compatibility review. The new release gate correctly halted because GitHub main advanced from the accepted `ffb803e6` baseline to `f7f45a5`; that range includes broader identity, fallback, Vercel-entrypoint, and release-hardening changes. Do not update the accepted baseline until those changes are reviewed against this managed project.
+2. Set the Manus production `ALLOWED_ORIGIN` secret to the final Vercel frontend origin or an explicit comma-separated allowlist of final origins. Do not use `*` in production.
+3. Set Vercel’s production `VITE_API_BASE` to the HTTPS Manus API origin. The client’s shared origin helper then directs Vercel-browser API calls to Manus while preserving same-origin calls in the managed Manus deployment.
+4. Export or merge the verified remediation code to the GitHub branch that is intended for release, then trigger a new **production** Vercel frontend deployment. Confirm the deployment has `target: production` and its commit includes this remediation.
+5. Run the published Overview E2E suite with `SKIP_LIVE_URL` set to the exact production candidate. The CI guard now makes this target declaration mandatory.
+6. Confirm the deployed Manus API returns the expected `Access-Control-Allow-Origin` header for the final Vercel origin, then re-run a browser data-load smoke test covering Overview and Player Profile.
 
 ## Residual non-blocking engineering items
 
