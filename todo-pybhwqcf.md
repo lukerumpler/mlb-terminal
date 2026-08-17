@@ -311,3 +311,10 @@
 - [x] Validate CORS/base-origin behavior without adding secrets or changing provider refresh policies
 - [x] Run focused tests, full suite, type-check, production build, visual/runtime checks, and save a verified checkpoint
 - [x] Report the current-main findings and completed fixes
+
+- [x] Inspect current runtime logs, client traces, cache health, and provider states for the next measurable bottleneck
+- [x] Reduce only confirmed duplicate or unnecessary Overview requests without suppressing independent provider coverage
+- [x] Improve a confirmed loading, cache, or error-state path while preserving official data provenance and daily provider policies
+- [x] Add focused regression coverage for the accepted request or loading improvement
+- [x] Run focused tests, full suite, type-check, production build, visual/runtime checks, and save the next checkpoint
+- [x] Deliver the verified debugging and optimization summary
