@@ -126,6 +126,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
 
     const teamSelect = screen.getByRole("combobox", { name: "Select team" });
     await user.selectOptions(teamSelect, "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
     const affiliateSelect = await screen.findByRole("combobox", {
       name: "Select minor league affiliate",
     });
@@ -155,6 +156,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"
     );
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
     const affiliateSelect = await screen.findByRole("combobox", {
       name: "Select minor league affiliate",
     });
@@ -176,6 +178,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"
     );
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
     await user.selectOptions(
       await screen.findByRole("combobox", {
         name: "Select minor league affiliate",
@@ -201,6 +204,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"
     );
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
     const affiliateSelect = await screen.findByRole("combobox", {
       name: "Select minor league affiliate",
     });

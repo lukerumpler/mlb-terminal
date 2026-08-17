@@ -11267,3 +11267,6 @@
 - [x] Ensure the selected team’s MLB parent club is always preselected on Team Overview.
 - [x] Add regression coverage for initial, team-change, and explicit-affiliate selector behavior.
 - [x] Run release validation and publish the parent-first selector fix.
+- [x] Repair the remaining Team Overview selector behavior without changing the MLB-parent default.
+- [x] Add an explicit Minor League button that reveals affiliate controls only on demand.
+- [x] Add button-driven affiliate-flow regression coverage and publish the fix.
