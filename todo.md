@@ -11264,3 +11264,6 @@
 - [x] Implement the highest-impact data resilience and rendering performance fixes identified in the audit.
 - [x] Improve user-facing loading, retry, and unavailable state presentation where needed.
 - [x] Add targeted regression coverage and complete full release validation.
+- [x] Ensure the selected team’s MLB parent club is always preselected on Team Overview.
+- [x] Add regression coverage for initial, team-change, and explicit-affiliate selector behavior.
+- [x] Run release validation and publish the parent-first selector fix.

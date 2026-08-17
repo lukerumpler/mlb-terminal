@@ -664,7 +664,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       const abbr = e.detail?.abbr?.toLowerCase();
       if (abbr) {
         const foundKey = Object.keys(TEAMS).find(key => key.toLowerCase() === abbr || TEAMS[key].abbr.toLowerCase() === abbr);
-        if (foundKey) setSelTeam(foundKey);
+        if (foundKey) {
+          setPendingAffiliate(null);
+          setAffiliateId('');
+          setAffiliateLevel('11');
+          setAffiliateTab('overview');
+          setSelTeam(foundKey);
+        }
       }
     };
     window.addEventListener('skip-select-team', onSelectTeam);
@@ -677,14 +683,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const teamBase=TEAMS[selTeam];
   useEffect(() => {
     let alive = true;
+    setAffiliateId('');
+    setAffiliateLevel('11');
+    setAffiliateTab('overview');
+    setAffiliateOverview(null);
+    setAffiliateOverviewState('idle');
     if (liveTeamDataMode === 'loading' && !liveTeamData) {
       setAffiliatesState('loading');
       return () => { alive = false; };
     }
     setAffiliatesState('loading');
     setAffiliates([]);
-    setAffiliateId('');
-    setAffiliateOverview(null);
     getTeamAffiliates(teamBase?.id).then(rows => {
       if (!alive) return;
       setAffiliates(rows);
@@ -1445,13 +1454,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
           <span className="sr-only">Select team</span>
-          <select aria-label="Select team" value={selTeam} onChange={e=>{ const key=e.target.value; const selected=TEAMS[key]; setSelTeam(key); if (selected) recordRecentView({ type:'team', abbr:selected.abbr, label:selected.name, secondary:selected.div || 'Team overview' }); }}
+          <select aria-label="Select team" value={selTeam} onChange={e=>{ const key=e.target.value; const selected=TEAMS[key]; setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setSelTeam(key); if (selected) recordRecentView({ type:'team', abbr:selected.abbr, label:selected.name, secondary:selected.div || 'Team overview' }); }}
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
             {sortTeamsByLeagueDivisionName().map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
           </select>
           <select aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=affiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!affiliates.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliates.length?'pointer':'not-allowed',opacity:affiliates.length?1:.65}}>
-             <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':'Select MiLB affiliate'}</option>
+             <option value="">{affiliatesState==='loading'?'MLB parent selected · loading affiliates…':affiliatesState==='error'?'MLB parent selected · affiliates unavailable':'MLB parent selected · choose MiLB affiliate'}</option>
              {affiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>
         </label>
