@@ -11290,3 +11290,6 @@
 - [x] Verify local main and remote origin/main are ready for the authorized push.
 - [x] Push d422e88 and the validated main history to origin/main and confirm the remote tip.
 - [x] Prepare the release pull-request description and run a final remote production smoke test.
+- [x] Inspect the existing Players name-search and player-profile navigation flow.
+- [x] Make matching player names and quick-access cards open the corresponding player profile.
+- [x] Add search and profile-navigation regression tests, verify responsive behavior, and publish the enhancement.

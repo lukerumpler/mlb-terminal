@@ -1608,13 +1608,14 @@ function SkipInline({ quote, color = C.teal }) {
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
-function PlayersPage() {
+function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [query,   setQuery]   = useState('');
   const [results, setResults] = useState([]);
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
   const [error,   setError] = useState(null);
+  const [searchStatus, setSearchStatus] = useState('idle');
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -1650,18 +1651,33 @@ function PlayersPage() {
 
   const onInput = useCallback(e => {
     const q = e.target.value;
+    const normalizedQuery = q.trim();
     setQuery(q);
     latestQueryRef.current = q;
     clearTimeout(timerRef.current);
-    if (q.length < 2) { setResults([]); return; }
+    if (normalizedQuery.length < 2) {
+      setResults([]);
+      setSearchStatus('idle');
+      return;
+    }
+    setSearchStatus('searching');
     timerRef.current = setTimeout(async () => {
       try {
-        const r = await searchPlayers(q);
+        const r = await searchPlayers(normalizedQuery);
         // Only commit if this is still the most recent query — an older,
         // slower request can otherwise resolve after a newer one and
         // clobber its results with stale data.
-        if (mountedRef.current && latestQueryRef.current === q) setResults(r);
-      } catch { if (mountedRef.current && latestQueryRef.current === q) setResults([]); }
+        if (mountedRef.current && latestQueryRef.current === q) {
+          const matches = Array.isArray(r) ? r : [];
+          setResults(matches);
+          setSearchStatus(matches.length ? 'ready' : 'empty');
+        }
+      } catch {
+        if (mountedRef.current && latestQueryRef.current === q) {
+          setResults([]);
+          setSearchStatus('error');
+        }
+      }
     }, 280);
   }, []);
 
@@ -1672,6 +1688,7 @@ function PlayersPage() {
     recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
+    setSearchStatus('idle');
     setQuery(person.fullName);
     setLoading(true);
     setSwitchingPlayerName(person.fullName || person.name || 'selected player');
@@ -1707,6 +1724,27 @@ function PlayersPage() {
     }
   }, []);
 
+  const onSearchKeyDown = useCallback(event => {
+    if (event.key === 'Escape') {
+      clearTimeout(timerRef.current);
+      setResults([]);
+      setSearchStatus('idle');
+      return;
+    }
+    if (event.key === 'Enter' && results.length) {
+      event.preventDefault();
+      pickPlayer(results[0]);
+    }
+  }, [pickPlayer, results]);
+
+  const clearSearch = useCallback(() => {
+    clearTimeout(timerRef.current);
+    latestQueryRef.current = '';
+    setQuery('');
+    setResults([]);
+    setSearchStatus('idle');
+  }, []);
+
   useEffect(() => {
     const onProviderRetry = event => {
       if (event.detail?.provider === 'boxscore') setBoxscoreRetryToken(token => token + 1);
@@ -1730,17 +1768,18 @@ function PlayersPage() {
     return () => { alive = false; };
   }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
-    const onOpenExternalPlayer = e => {
-      const detail = e.detail;
-      if (detail && detail.id) {
-        pickPlayer({ id: detail.id, fullName: detail.fullName || detail.name || 'Player' });
-      }
-    };
-    window.addEventListener('skip-open-player', onOpenExternalPlayer);
-    return () => {
-      window.removeEventListener('skip-open-player', onOpenExternalPlayer);
-    };
-  }, [pickPlayer]);
+    if (!initialPlayer?.id) return;
+    // React's development remount check runs an effect, immediately cleans it
+    // up, and then runs it again. Starting the network request synchronously
+    // lets the first cleanup abort it. Deferring one tick means the first
+    // scheduled load is canceled while the stable remount starts exactly one
+    // profile request and consumes the handoff afterward.
+    const timer = window.setTimeout(() => {
+      pickPlayer({ id:initialPlayer.id, fullName:initialPlayer.fullName || initialPlayer.name || 'Player' });
+      onInitialPlayerConsumed?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialPlayer, onInitialPlayerConsumed, pickPlayer]);
 
   const derived = useMemo(() => {
     if (!player) return null;
@@ -1830,21 +1869,32 @@ function PlayersPage() {
 
       {/* ── Search ── */}
       <div style={{ position:'relative' }}>
-        <input value={query} onChange={onInput}
-          aria-label="Search any MLB player by name"
-          placeholder="Search any MLB player by name…"
-          onFocus={e => e.currentTarget.style.borderColor = C.amber}
-          onBlur={e => e.currentTarget.style.borderColor = C.border}
-          style={{ width:'100%', height:42, padding:'0 16px', border:`1px solid ${C.border}`, borderRadius:8,
-            fontSize:13, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface, color:C.text, outline:'none' }}/>
+        <div style={{ position:'relative' }}>
+          <input value={query} onChange={onInput} onKeyDown={onSearchKeyDown}
+            aria-label="Search any MLB player by name"
+            placeholder="Search any MLB player by name…"
+            aria-autocomplete="list"
+            aria-controls="skip-player-search-results"
+            aria-expanded={results.length > 0}
+            onFocus={e => e.currentTarget.style.borderColor = C.amber}
+            onBlur={e => e.currentTarget.style.borderColor = C.border}
+            style={{ width:'100%', height:42, padding:'0 42px 0 16px', border:`1px solid ${C.border}`, borderRadius:8,
+              fontSize:13, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface, color:C.text, outline:'none' }}/>
+          {query && <button type="button" onClick={clearSearch} aria-label="Clear player search" title="Clear player search" style={{ position:'absolute', right:9, top:'50%', transform:'translateY(-50%)', width:24, height:24, border:0, borderRadius:5, background:'transparent', color:C.text3, cursor:'pointer', fontSize:17, lineHeight:1 }}>×</button>}
+        </div>
+        <div aria-live="polite" aria-atomic="true" style={{ minHeight:18, padding:'4px 2px 0', ...sans({ fontSize:10, color:C.text3 }) }}>
+          {searchStatus === 'searching' && 'Searching verified MLB and MiLB player records…'}
+          {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — select a name to open the profile.`}
+          {searchStatus === 'empty' && `No verified player matches found for “${query.trim()}”.`}
+          {searchStatus === 'error' && 'Player search is temporarily unavailable. Please try again.'}
+        </div>
         {results.length > 0 && (
-          <div style={{ position:'absolute', top:46, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
+          <div id="skip-player-search-results" role="listbox" aria-label="Matching player profiles" style={{ position:'absolute', top:64, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
             borderRadius:8, zIndex:50, boxShadow:'0 6px 24px rgba(0,0,0,.12)', maxHeight:280, overflowY:'auto' }}>
             {results.map(r => (
-              <div key={r.id} onClick={() => pickPlayer(r)}
-                tabIndex={0} role="button"
-                onKeyDown={e => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); pickPlayer(r); } }}
-                style={{ padding:'10px 14px', cursor:'pointer', borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11 }}
+              <button key={r.id} type="button" onClick={() => pickPlayer(r)}
+                aria-label={`Open ${r.fullName || r.name || 'player'} profile`}
+                style={{ width:'100%', padding:'10px 14px', cursor:'pointer', border:0, borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11, textAlign:'left', background:'transparent' }}
                 onMouseEnter={e => e.currentTarget.style.background = C.amberSoft}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 onFocus={e => e.currentTarget.style.background = C.amberSoft}
@@ -1853,10 +1903,10 @@ function PlayersPage() {
                   onError={e => { e.currentTarget.style.display='none'; }}
                   style={{ width:34, height:34, borderRadius:7, objectFit:'cover', border:`0.5px solid ${C.border}`, flexShrink:0 }} alt=""/>
                 <div>
-                  <div style={sans({ fontSize:12, fontWeight:700, color:C.text })}>{r.fullName}</div>
+                  <div style={sans({ fontSize:12, fontWeight:700, color:C.text })}>{r.fullName || r.name || 'Unnamed player'}</div>
                   <div style={px({ fontSize:10, color:C.text3 })}>{r.currentTeam?.name || 'Free Agent'} · {r.primaryPosition?.abbreviation || '—'}</div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

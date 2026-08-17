@@ -270,6 +270,50 @@ describe("PlayersPage — player comparison and race conditions", () => {
     );
   });
 
+  it("searches verified player names and opens the first matching profile with Enter", async () => {
+    const user = userEvent.setup();
+    const matchingPlayer = { id: 44, fullName: "Keyboard Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "SS" } };
+    searchPlayers.mockResolvedValue([matchingPlayer]);
+    loadFullPlayer.mockResolvedValue(mockPlayer(44, "Keyboard Player"));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Keyboard");
+
+    expect(await screen.findByText(/1 matching player.*select a name to open the profile/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Keyboard Player profile" })).toBeInTheDocument();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("heading", { name: /Keyboard Player/ })).toBeInTheDocument();
+    expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 44, fullName: "Keyboard Player" }), expect.anything(), expect.anything());
+  });
+
+  it("shows an honest no-match result and clears the player search", async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([]);
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "No Match");
+
+    expect(await screen.findByText(/No verified player matches found for “No Match”/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear player search" }));
+    expect(input).toHaveValue("");
+    expect(screen.queryByText(/No verified player matches found/i)).not.toBeInTheDocument();
+  });
+
+  it("loads the requested player profile when navigation enters from another workspace", async () => {
+    const consumed = vi.fn();
+    const linkedPlayer = { id: 55, fullName: "Linked Player" };
+    loadFullPlayer.mockResolvedValue(mockPlayer(55, "Linked Player"));
+
+    render(<React.StrictMode><PlayersPage initialPlayer={linkedPlayer} onInitialPlayerConsumed={consumed} /></React.StrictMode>);
+
+    expect(await screen.findByRole("heading", { name: /Linked Player/ })).toBeInTheDocument();
+    expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 55, fullName: "Linked Player" }), expect.anything(), expect.anything());
+    expect(consumed).toHaveBeenCalled();
+  });
+
   it("shows a page-shaped Player Profile skeleton while the selected player is loading", async () => {
     const user = userEvent.setup();
     const pending = deferred();
