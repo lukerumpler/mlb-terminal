@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BoxscoreSplitPanel, readBoxscoreFilterPresets, saveBoxscoreFilterPresets, boxscorePresetStorageKey } from '../client/src/pages/PlayersPage.jsx';
-import { __resetMlbClientStateForTests, getPlayerBoxscoreSplits } from '../client/src/api/mlb.js';
+import { __resetMlbClientStateForTests, createInitialBoxscoreSplits, getPlayerBoxscoreSplits } from '../client/src/api/mlb.js';
 
 function jsonResponse(payload, status = 200) {
   return {
@@ -78,6 +78,30 @@ describe('player boxscore split aggregation', () => {
     expect(allBatting.atBats).toBe(4);
     expect(allBatting.hits).toBe(2);
     expect(allBatting.homeRuns).toBe(1);
+  });
+
+  it('creates a loading state for a valid team without holding the initial profile payload', () => {
+    expect(createInitialBoxscoreSplits(119, 2026)).toMatchObject({
+      status:'loading',
+      season:2026,
+      source:'MLB Stats API boxscores',
+      batting:[],
+      pitching:[],
+      recentGames:[],
+    });
+    expect(createInitialBoxscoreSplits(null, 2026)).toMatchObject({
+      status:'unavailable',
+      reason:'The player does not have a current MLB team identifier.',
+    });
+  });
+
+  it('renders a clear boxscore background-loading state', () => {
+    render(<BoxscoreSplitPanel player={{
+      id:456,
+      boxscoreSplits:createInitialBoxscoreSplits(119, 2026),
+    }} />);
+    expect(screen.getByText('Checking official boxscores')).toBeInTheDocument();
+    expect(screen.getByText(/loading in the background/i)).toBeInTheDocument();
   });
 
   it('renders boxscore pagination and local preset controls', async () => {

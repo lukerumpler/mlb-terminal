@@ -1665,12 +1665,36 @@ function PlayersPage() {
     return () => window.removeEventListener('skip-provider-retry', onProviderRetry);
   }, []);
   useEffect(() => {
-    if (!player || boxscoreRetryToken === 0) return undefined;
+    if (!player || player.boxscoreSplits?.status !== 'loading') return undefined;
+    const teamId = player.profile?.currentTeam?.id;
+    if (!teamId) return undefined;
     let alive = true;
-    getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
+    getPlayerBoxscoreSplits(player.id, teamId, SEASON)
+      .then(boxscoreSplits => {
+        if (alive) setPlayer(current => current?.id === player.id ? { ...current, boxscoreSplits } : current);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setPlayer(current => current?.id === player.id ? {
+          ...current,
+          boxscoreSplits: {
+            ...(current.boxscoreSplits || {}),
+            status:'unavailable',
+            reason:'The official MLB boxscore sample could not be loaded right now. Retry from the provider status control.',
+          },
+        } : current);
+      });
+    return () => { alive = false; };
+  }, [player?.id, player?.profile?.currentTeam?.id, player?.boxscoreSplits?.status]);
+  useEffect(() => {
+    if (!player || boxscoreRetryToken === 0) return undefined;
+    const teamId = player.profile?.currentTeam?.id;
+    if (!teamId) return undefined;
+    let alive = true;
+    getPlayerBoxscoreSplits(player.id, teamId, SEASON)
       .then(boxscoreSplits => {
         if (alive) {
-          setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+          setPlayer(current => current?.id === player.id ? { ...current, boxscoreSplits } : current);
           window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider: 'boxscore', message: 'MLB boxscore data refreshed.' } }));
         }
       })
@@ -1678,7 +1702,7 @@ function PlayersPage() {
         if (alive) window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'boxscore', message: 'MLB boxscore data could not be refreshed. The previous verified state remains visible.' } }));
       });
     return () => { alive = false; };
-  }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
+  }, [player?.id, player?.profile?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
     const onOpenExternalPlayer = e => {
       const detail = e.detail;
@@ -2040,7 +2064,7 @@ export function BoxscoreSplitPanel({ player }) {
     ? 'Earned runs and innings are aggregated from official MLB game boxscores in the recent sample.'
     : 'At-bats, walks, hit-by-pitch, sacrifice flies, and total bases are aggregated from official MLB game boxscores in the recent sample.';
   if (!data || data.status === 'loading') {
-    return <Panel title={title} accent={C.teal} badge="Loading"><ProfileStatusState status="Loading" message="Checking official boxscores" detail="The player profile is retrieving the current verified game sample." /></Panel>;
+    return <Panel title={title} accent={C.teal} badge="Loading"><ProfileStatusState status="Loading" message="Checking official boxscores" detail={data?.reason || 'The player profile is retrieving the current verified game sample.'} /></Panel>;
   }
   if (data.status !== 'live' || !rows.length) {
     return <Panel title={title} accent={C.teal} badge="Unavailable"><ProfileStatusState message={title} detail={data?.reason || 'No verified official MLB boxscore rows are available for this player.'} /></Panel>;

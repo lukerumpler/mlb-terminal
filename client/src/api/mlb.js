@@ -774,6 +774,24 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON)
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');
   }
 }
+export function createInitialBoxscoreSplits(teamId, season = SEASON) {
+  const hasCurrentTeam = Number.isFinite(Number(teamId)) && Number(teamId) > 0;
+  return {
+    status: hasCurrentTeam ? 'loading' : 'unavailable',
+    source: 'MLB Stats API boxscores',
+    season,
+    retrievedAt: null,
+    games: 0,
+    requestedGames: 0,
+    batting: [],
+    pitching: [],
+    recentGames: [],
+    reason: hasCurrentTeam
+      ? 'The official MLB boxscore sample is loading in the background.'
+      : 'The player does not have a current MLB team identifier.',
+  };
+}
+
 export async function loadFullPlayer(person, season = SEASON) {
   const id = person.id;
 
@@ -781,7 +799,11 @@ export async function loadFullPlayer(person, season = SEASON) {
   const profile = await getPlayerProfile(id);
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
-  const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
+  // Official boxscore splits are valuable but can require dozens of game
+  // requests. Keep them visibly loading after the profile shell renders rather
+  // than holding identity, season stats, and Statcast behind that optional
+  // historical window.
+  const boxscoreSplits = createInitialBoxscoreSplits(profile?.currentTeam?.id, season);
   const providerIdentityPromise = fetchPlayerProviderIdentity({
     id,
     fullName: profile?.fullName || person.fullName || person.name,
@@ -1014,7 +1036,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     teamFinancials,
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
-    boxscoreSplits: await boxscoreSplitsPromise,
+    boxscoreSplits,
   };
 }
 
