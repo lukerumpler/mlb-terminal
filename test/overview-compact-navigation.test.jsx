@@ -62,4 +62,20 @@ describe('Team Overview compact navigation', () => {
       expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
     });
   });
+
+  it('defers multi-window completed-game split requests until Operations is explicitly opened', async () => {
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    const completedGameSplitCalls = () => fetch.mock.calls.filter(([url]) => {
+      const value = String(url);
+      return value.includes('path=%2Fschedule') && value.includes('teamId=119') && value.includes('startDate=');
+    });
+    expect(completedGameSplitCalls()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+    await waitFor(() => {
+      expect(completedGameSplitCalls().length).toBeGreaterThan(0);
+    });
+  });
 });

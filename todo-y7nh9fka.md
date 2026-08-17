@@ -200,3 +200,9 @@
 - [x] Run type checks, focused/full tests, production build, responsive previews, and save a live checkpoint.
 
 - [x] Replace long vertical Team Overview scrolling with compact switchable views that keep secondary cards out of the default canvas.
+
+- [x] Inspect the newest shared runtime logs, validation health, data-loading paths, and current UI states for reproducible defects.
+- [x] Implement targeted reliability, performance, accessibility, or layout fixes while preserving verified data and provenance behavior.
+- [x] Add regression coverage for each issue resolved during this debugging pass.
+- [x] Run focused and full validation, production build, and responsive previews.
+- [x] Save a new live checkpoint for the validated debugging and optimization pass.

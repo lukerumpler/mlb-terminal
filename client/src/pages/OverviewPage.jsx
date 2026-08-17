@@ -603,6 +603,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [pdfExportState, setPdfExportState] = useState('idle');
   const [splitTab,setSplitTab]=useState('home');
   const [teamSplitRows, setTeamSplitRows] = useState([]);
+  const [teamSplitsState, setTeamSplitsState] = useState('idle');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
   const [todayGameMetadata, setTodayGameMetadata] = useState({});
@@ -959,11 +960,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [teamBase?.id, mlbRetryToken]);
   useEffect(() => {
+    if (overviewView !== 'operations') return undefined;
     let alive = true;
     setTeamSplitRows([]);
-    getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => { if (alive) setTeamSplitRows(Array.isArray(rows) ? rows : []); }).catch(() => { if (alive) setTeamSplitRows([]); });
+    setTeamSplitsState('loading');
+    getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => {
+      if (!alive) return;
+      setTeamSplitRows(Array.isArray(rows) ? rows : []);
+      setTeamSplitsState('ready');
+    }).catch(() => {
+      if (!alive) return;
+      setTeamSplitRows([]);
+      setTeamSplitsState('unavailable');
+    });
     return () => { alive = false; };
-  }, [teamBase?.id, mlbRetryToken]);
+  }, [overviewView, teamBase?.id, mlbRetryToken]);
   const rosterSavantKey = useMemo(() => buildRosterSavantKey(liveTeamPlayers), [liveTeamPlayers]);
   useEffect(() => {
     let alive = true;
@@ -2202,7 +2213,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </tr>
             </thead>
             <tbody>
-              {splitRows.length ? splitRows.map((row,i)=>(
+              {teamSplitsState === 'loading' ? (
+                <tr><td colSpan={4} style={sans({padding:'28px 14px',fontSize:10.5,color:C.text3,textAlign:'center',lineHeight:1.5})}>Loading verified completed-game splits…</td></tr>
+              ) : splitRows.length ? splitRows.map((row,i)=>(
                 <tr key={i} style={{borderBottom:i<splitRows.length-1?`0.5px solid ${C.borderLight}`:'none'}}
                   onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
                   onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
@@ -2217,7 +2230,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </tbody>
           </table>
           <div style={{padding:'16px 14px',borderTop:`0.5px solid ${C.border}`}}>
-            <div style={sans({fontSize:10.5,color:C.text3,lineHeight:1.5})}>{splitRows.length ? 'W–L is derived from completed MLB schedule games. OPS and ERA require per-game boxscore aggregation and remain unavailable in this view.' : 'No verified completed schedule rows were returned for the selected team. No estimated split rows are shown.'}</div>
+            <div style={sans({fontSize:10.5,color:C.text3,lineHeight:1.5})}>{teamSplitsState === 'loading' ? 'Completed-game split results load only when this Operations workspace is opened.' : splitRows.length ? 'W–L is derived from completed MLB schedule games. OPS and ERA require per-game boxscore aggregation and remain unavailable in this view.' : 'No verified completed schedule rows were returned for the selected team. No estimated split rows are shown.'}</div>
           </div>
         </Panel>
 
