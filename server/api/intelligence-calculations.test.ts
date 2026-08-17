@@ -35,13 +35,14 @@ function request(teamId =  DodgersId, season = 2026) {
 const DodgersId = 119;
 const standingsPayload = {
   records: [{
-    teamRecords: [{
-      team: { id: DodgersId, name: "Los Angeles Dodgers" },
-      wins: 81,
-      losses: 45,
-      runsScored: 700,
-      runsAllowed: 600,
-    }],
+    teamRecords: [
+      { team: { id: DodgersId, name: "Los Angeles Dodgers" }, division:{ id:203 }, league:{ id:103 }, wins:81, losses:45, runsScored:700, runsAllowed:600 },
+      { team: { id:137, name: "San Francisco Giants" }, division:{ id:203 }, league:{ id:103 }, wins:75, losses:51, runsScored:650, runsAllowed:620 },
+      { team: { id:144, name: "Atlanta Braves" }, division:{ id:204 }, league:{ id:103 }, wins:78, losses:48, runsScored:690, runsAllowed:610 },
+      { team: { id:146, name: "Miami Marlins" }, division:{ id:204 }, league:{ id:103 }, wins:70, losses:56, runsScored:620, runsAllowed:640 },
+      { team: { id:158, name: "Milwaukee Brewers" }, division:{ id:205 }, league:{ id:103 }, wins:76, losses:50, runsScored:660, runsAllowed:610 },
+      { team: { id:112, name: "Chicago Cubs" }, division:{ id:205 }, league:{ id:103 }, wins:72, losses:54, runsScored:630, runsAllowed:620 },
+    ],
   }],
 };
 
@@ -74,6 +75,11 @@ describe("backend intelligence calculations", () => {
     });
     expect(result.body.metrics.pythagoreanWinPct).toBeCloseTo(0.57006, 5);
     expect(result.body.methodology.projectedWins).toMatch(/verified win percentage/);
+    expect(result.body.metrics.teamWarProxy).toBeGreaterThan(0);
+    expect(result.body.metrics.playoffProbability).toBeGreaterThan(0);
+    expect(result.body.metrics.playoffProbability).toBeLessThanOrEqual(100);
+    expect(result.body.methodology.teamWarProxy).toMatch(/not FanGraphs Team WAR/);
+    expect(result.body.methodology.playoffProbability).toMatch(/excludes schedule/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

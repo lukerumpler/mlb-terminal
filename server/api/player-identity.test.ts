@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
+import handler, {
   buildBaseballReferencePlayerUrl,
   extractBaseballReferenceId,
   isExactIdentityNameMatch,
@@ -8,7 +8,20 @@ import {
   selectExactBaseballReferenceCandidate,
   resolvePlayerProviderIdentity,
   __resetPlayerIdentityStateForTests,
+  getPlayerIdentityTelemetry,
 } from "./player-identity.js";
+
+function response() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: undefined,
+    setHeader(name, value) { this.headers[name] = String(value); },
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.body = payload; return this; },
+    end() { return this; },
+  };
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -72,6 +85,40 @@ describe("Baseball-Reference player identity resolution", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://www.baseball-reference.com/players/o/ohtansh01.shtml");
+  });
+
+  it("records direct-ID and browser-registry reuse telemetry without identity payloads", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<h1>Shohei Ohtani</h1>", { status:200 })));
+    const direct = response();
+
+    await handler({
+      method:"GET",
+      url:"/api/player-identity?mlbId=660271&name=Shohei%20Ohtani&baseballReferenceId=ohtansh01&identitySource=registry",
+      headers:{},
+      socket:{ remoteAddress:"198.51.100.21" },
+    }, direct);
+
+    expect(direct.statusCode).toBe(200);
+    expect(direct.body.found).toBe(true);
+    expect(getPlayerIdentityTelemetry()).toMatchObject({
+      directIdRequestRate:100,
+      browserRegistryReuseRate:100,
+      directCanonicalVerificationRate:100,
+      counters: expect.objectContaining({
+        directIdRequests:1,
+        browserRegistryReuses:1,
+        directCanonicalRequests:1,
+        directCanonicalVerified:1,
+        nameSearchRequests:0,
+      }),
+    });
+
+    const metrics = response();
+    await handler({ method:"GET", url:"/api/player-identity?mode=metrics", headers:{}, socket:{ remoteAddress:"198.51.100.22" } }, metrics);
+    expect(metrics.statusCode).toBe(200);
+    expect(metrics.body).toMatchObject({ scope:"process", telemetry:expect.objectContaining({ directIdRequestRate:100 }) });
+    expect(JSON.stringify(metrics.body)).not.toContain("Shohei");
+    expect(JSON.stringify(metrics.body)).not.toContain("660271");
   });
 
   it("does not map a near-name search result to historical data", async () => {

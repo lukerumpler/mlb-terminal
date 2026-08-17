@@ -818,7 +818,7 @@
 .skip-status-symbol{display:inline-grid;place-items:center;width:10px;height:10px;margin-right:2px;font-size:10px;line-height:1}
 .skip-status.is-compact{min-height:18px;padding:2px 6px;font-size:7.5px}
 .skip-status-verified{--status-color:var(--status-verified);--status-bg:var(--status-verified-bg);--status-border:var(--status-verified-border)}
-.skip-status-estimated{--status-color:var(--status-estimated);--status-bg:var(--status-estimated-bg);--status-border:var(--status-estimated-border)}
+.skip-status-estimated,.skip-status-calculated{--status-color:var(--status-estimated);--status-bg:var(--status-estimated-bg);--status-border:var(--status-estimated-border)}
 .skip-status-unavailable{--status-color:var(--status-unavailable);--status-bg:var(--status-unavailable-bg);--status-border:var(--status-unavailable-border)}
 .skip-status-coverage-gap{--status-color:var(--status-gap);--status-bg:var(--status-gap-bg);--status-border:var(--status-gap-border)}
 .skip-status-tier-1{--status-color:var(--status-tier-1);--status-bg:var(--status-tier-1-bg);--status-border:var(--status-tier-1-border)}

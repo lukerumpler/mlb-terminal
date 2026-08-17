@@ -26,13 +26,22 @@ function assessText(text, markers) {
     loadedMarkers,
     hasErrorBoundary,
     honestState,
-    status:hasErrorBoundary ? 'error-boundary' : loadedMarkers.length ? 'rendered' : 'marker-missing',
+    safeUserState: Boolean(loadedMarkers.length || honestState),
+    status:hasErrorBoundary ? 'error-boundary' : loadedMarkers.length ? 'rendered' : honestState ? 'honest-state' : 'marker-missing',
   };
 }
 
 async function waitForStable(page) {
   await page.waitForTimeout(900);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
+}
+
+async function waitForWorkspace(page, markers) {
+  await page.waitForFunction(expected => {
+    const text = document.querySelector('#root')?.innerText || '';
+    const lower = text.toLowerCase();
+    return expected.some(marker => lower.includes(String(marker).toLowerCase())) || /unavailable|coverage gap|loading|provider blocked|not retrieved|no verified/i.test(text);
+  }, markers, { timeout:10_000 }).catch(() => {});
 }
 
 async function activateTab(page, name) {
@@ -59,6 +68,7 @@ async function auditViewport(label, viewport) {
       await activateTab(page, state.tab);
       await waitForStable(page);
     }
+    await waitForWorkspace(page, state.markers);
     const text = await page.locator('#root').innerText();
     const assessment = assessText(text, state.markers);
     const screenshot = path.join(outputDir, `${label}-${state.id}.png`);
@@ -88,14 +98,17 @@ async function auditViewport(label, viewport) {
 
 const desktop = await auditViewport('desktop', { width:1440, height:1000 });
 const mobile = await auditViewport('mobile', { width:390, height:844 });
-const report = {
-  auditedAt:new Date().toISOString(),
-  baseUrl,
-  results:[...desktop.results, ...mobile.results],
-  requestFailures:[...desktop.requestFailures, ...mobile.requestFailures],
-};
+  const requestFailures = [...desktop.requestFailures, ...mobile.requestFailures];
+  const report = {
+    auditedAt:new Date().toISOString(),
+    baseUrl,
+    results:[...desktop.results, ...mobile.results],
+    requestFailures:requestFailures.filter(item => item.failure !== 'net::ERR_ABORTED'),
+    abortedRequests:requestFailures.filter(item => item.failure === 'net::ERR_ABORTED'),
+  };
+
 await fs.writeFile(path.join(outputDir, 'ui-data-audit.json'), `${JSON.stringify(report, null, 2)}\n`);
-const rows = report.results.map(item => `| ${item.viewport} | ${item.page} | ${item.status} | ${item.loadedMarkers.join(', ') || '—'} | ${item.honestState ? 'yes' : 'no'} | ${item.hasErrorBoundary ? 'yes' : 'no'} |`);
+const rows = report.results.map(item => `| ${item.viewport} | ${item.page} | ${item.status} | ${item.loadedMarkers.join(', ') || '—'} | ${item.safeUserState ? 'yes' : 'no'} | ${item.hasErrorBoundary ? 'yes' : 'no'} |`);
 const markdown = [
   '# UI Data Audit',
   '',
@@ -105,9 +118,10 @@ const markdown = [
   '| --- | --- | --- | --- | --- | --- |',
   ...rows,
   '',
-  `Request failures recorded by the browser: ${report.requestFailures.length}.`,
+  `Data request failures recorded by the browser: ${report.requestFailures.length}.`,
+  `Navigation-aborted requests excluded from failure count: ${report.abortedRequests.length}.`,
   '',
 ].join('\n');
 await fs.writeFile(path.join(outputDir, 'ui-data-audit.md'), `${markdown}\n`);
-console.table(report.results.map(({ viewport, page, status, loadedMarkers, honestState, hasErrorBoundary }) => ({ viewport, page, status, markers:loadedMarkers.join(', '), honestState, hasErrorBoundary })));
-console.log(`Browser request failures: ${report.requestFailures.length}`);
+console.table(report.results.map(({ viewport, page, status, loadedMarkers, safeUserState, hasErrorBoundary }) => ({ viewport, page, status, markers:loadedMarkers.join(', '), safeUserState, hasErrorBoundary })));
+console.log(`Data request failures: ${report.requestFailures.length}; navigation-aborted requests: ${report.abortedRequests.length}`);

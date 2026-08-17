@@ -3,6 +3,7 @@ import React from 'react';
 const STATUS_META = {
   verified: { label:'Verified', symbol:'✓' },
   estimated: { label:'Estimated', symbol:'~' },
+  calculated: { label:'Calculated', symbol:'∑' },
   'tier-1': { label:'Tier 1 · Official', symbol:'1' },
   'tier-2': { label:'Tier 2 · Backup', symbol:'2' },
   'tier-3': { label:'Tier 3 · Secondary', symbol:'3' },
@@ -18,6 +19,7 @@ export function normalizeStatus(status, fallback = 'unavailable') {
   const value = String(status || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
   if (value === 'ready' || value === 'live' || value === 'verified') return 'verified';
   if (value === 'estimated' || value === 'derived') return 'estimated';
+  if (value === 'calculated' || value === 'calculation') return 'calculated';
   if (value === 'source-gap' || value === 'coverage-gap' || value === 'coverage') return 'coverage-gap';
   if (value === 'provider-blocked' || value === 'blocked' || value === 'cloudflare-blocked') return 'provider-blocked';
   if (value === 'tier-1' || value === 'tier-2' || value === 'tier-3') return value;

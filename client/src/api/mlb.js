@@ -5,6 +5,7 @@ import {
   removeStoredPlayerProviderIdentity,
   storePlayerProviderIdentity,
 } from '../lib/playerIdentityRegistry.js';
+import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js';
 
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
@@ -595,28 +596,44 @@ export async function fetchPlayerProviderIdentity(player) {
   if (cached?.expiresAt > Date.now()) return cached.promise;
   if (cached) playerProviderIdentityCache.delete(cacheKey);
 
+  recordPlayerIdentityTelemetry('resolver-request');
+  if (cachedIdentity) {
+    recordPlayerIdentityTelemetry('registry-reuse');
+    recordPlayerIdentityTelemetry('direct-id-request');
+  } else {
+    recordPlayerIdentityTelemetry('name-search-request');
+  }
+
   const promise = (async () => {
     try {
       const params = new URLSearchParams({ mlbId, name: fullName });
       if (cachedIdentity?.baseballReference?.id) {
         params.set('baseballReferenceId', cachedIdentity.baseballReference.id);
+        params.set('identitySource', 'registry');
       }
       const response = await fetch(`/api/player-identity?${params}`, {
         signal: AbortSignal.timeout(12_000),
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        recordPlayerIdentityTelemetry('transport-fallback');
+        return cachedIdentity || null;
+      }
       const payload = await response.json();
       if (payload?.invalidateBaseballReferenceId) {
         removeStoredPlayerProviderIdentity({ mlbId });
+        recordPlayerIdentityTelemetry('direct-id-invalidated');
       }
       if (payload?.found && payload?.identity) {
         storePlayerProviderIdentity({ mlbId, fullName, identity:payload.identity });
+        recordPlayerIdentityTelemetry(cachedIdentity ? 'direct-id-verified' : 'name-search-resolved');
         return payload.identity;
       }
+      recordPlayerIdentityTelemetry('no-match');
       return payload?.identity || null;
     } catch {
       // A stored exact-name mapping remains safe to use if the resolver is
       // temporarily unavailable; it is not a name-derived fallback.
+      recordPlayerIdentityTelemetry('transport-fallback');
       return cachedIdentity || null;
     }
   })().then(identity => {

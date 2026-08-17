@@ -53,7 +53,7 @@ describe('rendered FanGraphs local fallback', () => {
 
     expect((await screen.findAllByText('42.4')).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('88.1%')).toBeInTheDocument();
+    expect(screen.getAllByText('88.1%').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('FanGraphs').length).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { __resetMlbClientStateForTests, fetchPlayerProviderIdentity } from '../client/src/api/mlb.js';
+import { __resetPlayerIdentityTelemetryForTests, summarizePlayerIdentityTelemetry } from '../client/src/lib/playerIdentityTelemetry.js';
 import {
   __resetPlayerIdentityRegistryForTests,
   getStoredPlayerProviderIdentity,
@@ -27,6 +28,7 @@ const identity = {
 
 afterEach(() => {
   __resetPlayerIdentityRegistryForTests();
+  __resetPlayerIdentityTelemetryForTests();
   __resetMlbClientStateForTests();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -69,6 +71,16 @@ describe('persistent player provider ID registry', () => {
     expect(requestUrl.pathname).toBe('/api/player-identity');
     expect(requestUrl.searchParams.get('mlbId')).toBe('660271');
     expect(requestUrl.searchParams.get('baseballReferenceId')).toBe('ohtansh01');
+    expect(requestUrl.searchParams.get('identitySource')).toBe('registry');
+    expect(summarizePlayerIdentityTelemetry()).toMatchObject({
+      resolverRequests:1,
+      registryReuses:1,
+      directIdRequests:1,
+      directIdVerified:1,
+      registryReuseRate:100,
+      directIdVerificationRate:100,
+      searchAvoidanceRate:100,
+    });
   });
 
   it('invalidates a persisted mapping when direct canonical verification rejects it', async () => {
@@ -82,6 +94,7 @@ describe('persistent player provider ID registry', () => {
     await fetchPlayerProviderIdentity({ id:'660271', fullName:'Shohei Ohtani' });
 
     expect(getStoredPlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani' })).toBeNull();
+    expect(summarizePlayerIdentityTelemetry()).toMatchObject({ directIdInvalidated:1, noMatch:1 });
   });
 
   it('expires persisted mappings and supports explicit invalidation', () => {
