@@ -11287,3 +11287,6 @@
 - [x] Identify the safest branch baseline and document push readiness without changing Git history.
 - [x] Run final release validation against the 29b3a367 baseline.
 - [x] Commit completed todo.md tracking updates and prepare a release-ready Git commit log without pushing.
+- [ ] Verify local main and remote origin/main are ready for the authorized push.
+- [ ] Push d422e88 and the validated main history to origin/main and confirm the remote tip.
+- [ ] Prepare the release pull-request description and run a final remote production smoke test.
