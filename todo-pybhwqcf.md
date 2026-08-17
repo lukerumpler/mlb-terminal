@@ -325,3 +325,10 @@
 - [x] Add dedicated empty-response fallback and coalescing regression coverage
 - [x] Run focused tests, full suite, type-check, production build, runtime checks, and save the next checkpoint
 - [x] Report the verified roster-insights fallback behavior
+
+- [x] Inspect current GitHub remotes and choose a new dedicated review branch for the validated roster-insights fallback checkpoint
+- [x] Push the current validated project state to the dedicated review branch without modifying GitHub main
+- [x] Verify the remote branch head, changed fallback files, and GitHub review URL
+- [x] Report the completed GitHub export and review link
+
+- [x] Test roster-insights fallback output with missing team metrics and review threshold edge cases

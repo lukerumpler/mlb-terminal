@@ -137,4 +137,53 @@ describe("ai.rosterInsights request protection", () => {
       ])
     );
   });
+
+  it("returns a transparent limited-context fallback when team metrics are missing or blank", async () => {
+    vi.mocked(invokeLLM).mockResolvedValue({
+      choices: [{
+        message: {
+          content: JSON.stringify({ strengths: [], weaknesses: [], source: "Empty test model" }),
+        },
+      }],
+    } as never);
+
+    const result = await appRouter.createCaller(context()).ai.rosterInsights({
+      team: { name: "Missing Metrics Club", pct: "", ops: "", era: "", diff: "" },
+      roster: { hitting: [], pitching: [] },
+    });
+
+    expect(result).toEqual({
+      strengths: [],
+      weaknesses: [{
+        title: "Verified roster context is limited",
+        detail: "No supplied aggregate team metric was available for a safe local summary.",
+        evidence: "No verified team-level evidence supplied",
+      }],
+      source: "Local verified roster fallback",
+      fallback: true,
+    });
+  });
+
+  it("classifies exact verified threshold values consistently", async () => {
+    vi.mocked(invokeLLM).mockResolvedValue({
+      choices: [{
+        message: {
+          content: JSON.stringify({ strengths: [], weaknesses: [], source: "Empty test model" }),
+        },
+      }],
+    } as never);
+
+    const result = await appRouter.createCaller(context()).ai.rosterInsights({
+      team: { name: "Threshold Club", pct: 0.5, ops: 0.72, era: 4, diff: 0 },
+      roster: { hitting: [], pitching: [] },
+    });
+
+    expect(result.strengths.map(item => item.title)).toEqual([
+      "Positive run differential",
+      "Offense is producing",
+      "Run prevention is controlled",
+      "Winning record",
+    ]);
+    expect(result.weaknesses).toEqual([]);
+  });
 });
