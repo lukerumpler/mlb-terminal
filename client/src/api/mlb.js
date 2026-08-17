@@ -1,5 +1,6 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
+import { apiUrl } from '../lib/apiOrigin.js';
 
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
@@ -26,7 +27,7 @@ import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 //   /game/{gamePk}/boxscore                                      → full boxscore
 //   /game/{gamePk}/playByPlay                                    → PBP (MLB + MiLB)
 
-const BASE   = '/api/mlb';
+const BASE   = apiUrl('/api/mlb');
 export const SEASON = 2026;
 
 // MiLB league IDs for standings calls
@@ -134,7 +135,7 @@ async function fetchProviderJson(url, {
   const persistent = readPersistentProviderSnapshot(persistentCacheKey, now);
   const request = (async () => {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      const response = await fetch(apiUrl(url), { signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw Object.assign(
@@ -297,7 +298,7 @@ function scheduledFetch(url, timeoutMs, trace = {}, signal) {
       resource: trace.resource || 'mlb-proxy',
     };
     const job = {
-      url,
+      url: apiUrl(url),
       timeoutMs,
       resolve,
       reject,
@@ -928,7 +929,7 @@ export async function getPlayerBoxscoreSplits(playerId, teamId, season = SEASON,
   });
   return promise;
 }
-export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onImportantReady, signal } = {}) {
+export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onImportantReady, onOptionalReady, signal } = {}) {
   const id = person.id;
 
   // Fetch the profile first so its current-team context can parameterize the
@@ -1214,9 +1215,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const contactPoints = await contactPointsPromise.catch(() => null);
   const pitcherPitches = await pitcherPitchesPromise.catch(() => null);
 
-  const statResult = isPitcher ? pitchingResult : hittingResult;
-
-  return {
+    const statResult = isPitcher ? pitchingResult : hittingResult;
+  const boxscoreSplits = await boxscoreSplitsPromise;
+  const optionalSnapshot = {
     id, profile, savant, batTracking, statcastPopulation,
     expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
@@ -1233,12 +1234,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     teamFinancials,
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
-    boxscoreSplits: await boxscoreSplitsPromise,
+    boxscoreSplits,
     importantLoading: false,
     contractLoading: false,
     optionalLoading: false,
     extrasLoading: false,
   };
+  try { onOptionalReady?.(optionalSnapshot); } catch { /* UI callback is optional */ }
+  return optionalSnapshot;
 }
 
 // Intelligence page comparison

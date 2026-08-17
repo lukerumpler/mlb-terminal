@@ -302,3 +302,12 @@
 - [x] Reduce verified optional boxscore fan-out without changing the displayed data’s source or provenance
 - [x] Add focused request-count, cache, and partial-availability regressions for Player Profile boxscore enrichment
 - [x] Run focused tests, full suite, type-check, production build, visual checks, and save the next checkpoint
+
+- [x] Verify current merged main behavior against the reported Player Profile waterfall and missing API-origin helper
+- [x] Make Player Profile core and important data render without waiting for optional boxscore/Savant work
+- [x] Preserve the optional boxscore request cap, cache reuse, cancellation safety, and truthful pending states after main-branch verification
+- [x] Add a shared configurable API-origin helper with empty-value same-origin behavior for Manus hosting
+- [x] Route every client API callsite through the API-origin helper and add split-host URL regression coverage
+- [x] Validate CORS/base-origin behavior without adding secrets or changing provider refresh policies
+- [x] Run focused tests, full suite, type-check, production build, visual/runtime checks, and save a verified checkpoint
+- [x] Report the current-main findings and completed fixes

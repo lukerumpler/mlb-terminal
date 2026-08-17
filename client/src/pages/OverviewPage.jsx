@@ -19,6 +19,7 @@ import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../l
 import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.js';
 import { shouldResetRosterInsightsState } from '../lib/rosterInsightsState.js';
 import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
+import { apiUrl } from '../lib/apiOrigin.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
@@ -614,7 +615,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, []);
   useEffect(() => {
     let alive = true;
-    fetch('/api/cache-health', { headers: { Accept: 'application/json' } })
+    fetch(apiUrl('/api/cache-health'), { headers: { Accept: 'application/json' } })
       .then(response => response.ok ? response.json() : null)
       .then(data => { if (alive) setCacheHealth(data); })
       .catch(() => { if (alive) setCacheHealth(null); });
@@ -1013,7 +1014,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       },
     };
     setAiInsightsState('loading');
-    fetch('/api/trpc/ai.rosterInsights?batch=1', {
+    fetch(apiUrl('/api/trpc/ai.rosterInsights?batch=1'), {
       method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({0:{json:input}}),
     }).then(response => response.json().then(payload => ({ ok:response.ok, payload })))
       .then(({ ok, payload }) => {

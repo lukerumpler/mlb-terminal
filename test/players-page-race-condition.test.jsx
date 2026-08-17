@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { apiUrl } from "../client/src/lib/apiOrigin.js";
 
 // Mocks searchPlayers/loadFullPlayer directly rather than going through
 // fetch — PlayersPage.jsx's pickPlayer race condition (fixed 2026-08-11:
@@ -177,7 +178,7 @@ beforeEach(() => {
   searchPlayers.mockReset();
   loadFullPlayer.mockReset();
   global.fetch = vi.fn(async url => {
-    if (url === "/api/comparison-summary")
+    if (url === apiUrl("/api/comparison-summary"))
       return {
         ok: true,
         json: async () => ({
@@ -812,7 +813,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const user = userEvent.setup();
     const full = mockPlayer(8, "Important Stage Player");
     let publishImportant;
-    let resolveOptional;
+    let publishOptional;
     searchPlayers.mockResolvedValue([{ id: 8, fullName: "Important Stage Player" }]);
     loadFullPlayer.mockImplementation(async (_person, _season, options) => {
       options?.onCoreReady?.({
@@ -840,7 +841,10 @@ describe("PlayersPage — player comparison and race conditions", () => {
         };
       });
       return new Promise(resolve => {
-        resolveOptional = () => resolve({ ...full, extrasLoading: false, contractLoading: false });
+        publishOptional = () => {
+          options?.onOptionalReady?.({ ...full, extrasLoading: false, contractLoading: false });
+          resolve({ ...full, extrasLoading: false, contractLoading: false });
+        };
       });
     });
 
@@ -856,7 +860,8 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(await screen.findByText("Under Contract")).toBeInTheDocument();
     expect(screen.getByText(/Core MLB profile loaded/)).toBeInTheDocument();
 
-    resolveOptional();
+    await waitFor(() => expect(publishOptional).toEqual(expect.any(Function)));
+    publishOptional();
     await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
   });
 

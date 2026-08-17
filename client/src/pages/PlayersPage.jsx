@@ -1674,10 +1674,17 @@ function PlayersPage() {
       const data = await loadFullPlayer(person, SEASON, {
         signal: controller.signal,
         onCoreReady: core => {
-          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(core);
+            setLoading(false);
+            setSwitchingPlayerName(null);
+          }
         },
         onImportantReady: important => {
           if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
+        },
+        onOptionalReady: optional => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
         },
       });
       // Only commit if no newer pick has started since — same reasoning as
