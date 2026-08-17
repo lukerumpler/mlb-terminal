@@ -323,6 +323,12 @@ function PlayersEmptyState({ onPick }) {
         </div>
       </div>
 
+      <div className="skip-profile-source-strip" role="region" aria-label="Players landing data source">
+        <span className="skip-profile-source-title">DATA SOURCE</span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot is-ready" aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">MLB Stats API identity and player search</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">No player profile requested</span></span>
+      </div>
+
       <Panel title="What's in a SKIP report" accent={C.amber}>
         {/* Right-border-only dividers assumed a single row — they'd land in
             the wrong place the moment this wrapped to 2+ rows on a narrower

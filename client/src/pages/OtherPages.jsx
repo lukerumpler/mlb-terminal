@@ -1444,6 +1444,12 @@ function IntelligencePage() {
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      <div className="skip-profile-source-strip" role="region" aria-label="Intelligence data provenance">
+        <span className="skip-profile-source-title">DATA PROVENANCE</span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot is-ready" aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">MLB Stats API comparison lookup</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">Fetched when players are compared</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">SKIP model snapshot; not a live provider feed</span></span>
+      </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
 
         {/* Comparison */}

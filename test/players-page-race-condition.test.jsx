@@ -74,6 +74,12 @@ afterEach(() => {
 });
 
 describe('PlayersPage — player comparison and race conditions', () => {
+  it('shows source and freshness metadata before a player profile is requested', () => {
+    render(<PlayersPage />);
+    expect(screen.getByRole('region', { name: 'Players landing data source' })).toHaveTextContent('MLB Stats API identity and player search');
+    expect(screen.getByRole('region', { name: 'Players landing data source' })).toHaveTextContent('No player profile requested');
+  });
+
   it('keeps the profile layout breathable and collapses it at responsive breakpoints', () => {
     const css = readFileSync(join(process.cwd(), 'client/src/index.css'), 'utf8');
     expect(css).toContain('.skip-player-page { --profile-ease:');
