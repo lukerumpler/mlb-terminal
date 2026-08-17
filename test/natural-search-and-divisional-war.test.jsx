@@ -247,6 +247,31 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     });
   });
 
+  it("matches FanGraphs abbreviation rows to canonical division team names", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          freshness: "live",
+          statuses: { batting: "live", pitching: "live" },
+          teams: [
+            { team: "LAD", totalWAR: 31.4, battingWAR: 21.2, pitchingWAR: 10.2 },
+            { team: "SD", totalWAR: 25.4, battingWAR: 16.4, pitchingWAR: 9.0 },
+          ],
+        }),
+      })
+    );
+    const result = await getTeamAggregateWar(
+      "Los Angeles Dodgers",
+      ["Los Angeles Dodgers", "San Diego Padres"],
+      2026
+    );
+    expect(result).toMatchObject({ teamWar: 31.4, divisionAverageWAR: 28.4 });
+    expect(result.divisionTeams).toHaveLength(2);
+    expect(result.divisionTeams.map(row => row.team)).toEqual(["LAD", "SD"]);
+  });
+
   it("keeps the defensive component unavailable when FanGraphs does not return a verified defensive field", async () => {
     vi.stubGlobal(
       "fetch",

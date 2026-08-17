@@ -319,10 +319,54 @@ const REPORT_SECTIONS = [
   { icon:'⬡', title:'Geometry Radar',     body:'Six-axis player shape compared against league baselines.' },
   { icon:'$', title:'Contract & Value',   body:'Current contract terms alongside SKIP\u2019s estimate of true value.' },
 ];
+const PLAYER_FAVORITES_STORAGE_KEY = 'skip-player-favorites:v1';
+function readPlayerFavorites() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PLAYER_FAVORITES_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter(item => item?.id != null && item?.fullName) : [];
+  } catch { return []; }
+}
+function writePlayerFavorites(favorites) {
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(PLAYER_FAVORITES_STORAGE_KEY, JSON.stringify(favorites.slice(0, 24))); } catch { /* best effort */ }
+}
+function favoritePlayerRecord(person) {
+  return {
+    id: person?.id,
+    fullName: person?.fullName || person?.name || person?.profile?.fullName || 'Player',
+    team: person?.currentTeam?.name || person?.team?.name || person?.team || person?.profile?.currentTeam?.name || person?.profile?.currentTeam?.abbreviation || 'Free Agent',
+    position: person?.primaryPosition?.abbreviation || person?.pos || person?.profile?.primaryPosition?.abbreviation || '—',
+  };
+}
 
-function PlayersEmptyState({ onPick }) {
+function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
   return (
     <div style={{ padding:'8px 2px 0' }}>
+      <div className="skip-player-favorites" role="region" aria-label="Favorite players">
+        <div className="skip-player-favorites-heading">
+          <div>
+            <div className="skip-player-favorites-title">Favorites</div>
+            <div className="skip-player-favorites-caption">Save profiles for one-click access on this browser.</div>
+          </div>
+          <span className="skip-player-favorites-count">{favorites.length}/24</span>
+        </div>
+        {favorites.length ? (
+          <div className="skip-player-favorites-list">
+            {favorites.map(favorite => (
+              <div key={String(favorite.id)} className="skip-player-favorite-row">
+                <button type="button" className="skip-player-favorite-open" onClick={() => onPick({ id:favorite.id, fullName:favorite.fullName, team:favorite.team, pos:favorite.position })}>
+                  <PlayerPhoto id={favorite.id} name={favorite.fullName} size={38} />
+                  <span className="skip-player-favorite-copy"><strong>{favorite.fullName}</strong><small>{favorite.team} · {favorite.position}</small></span>
+                </button>
+                <button type="button" className="skip-player-favorite-remove" aria-label={`Remove ${favorite.fullName} from favorites`} onClick={() => onRemoveFavorite?.(favorite.id)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="skip-player-favorites-empty">No favorite players yet. Select a profile and use the star button to save it.</div>
+        )}
+      </div>
       <div style={{ marginBottom:18 }}>
         <div style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.08em', color:C.text3, textTransform:'uppercase', marginBottom:8 })}>
           Quick access
@@ -1616,6 +1660,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
   const [error,   setError] = useState(null);
   const [searchStatus, setSearchStatus] = useState('idle');
+  const [favorites, setFavorites] = useState(() => readPlayerFavorites());
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -1679,6 +1724,25 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         }
       }
     }, 280);
+  }, []);
+
+  const toggleFavorite = useCallback((person) => {
+    const favorite = favoritePlayerRecord(person);
+    if (favorite.id == null) return;
+    setFavorites(current => {
+      const exists = current.some(item => String(item.id) === String(favorite.id));
+      const next = exists ? current.filter(item => String(item.id) !== String(favorite.id)) : [favorite, ...current];
+      writePlayerFavorites(next);
+      return next;
+    });
+  }, []);
+
+  const removeFavorite = useCallback((playerId) => {
+    setFavorites(current => {
+      const next = current.filter(item => String(item.id) !== String(playerId));
+      writePlayerFavorites(next);
+      return next;
+    });
   }, []);
 
   const pickPlayer = useCallback(async (person) => {
@@ -1930,12 +1994,12 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
           fontFamily:"'DM Mono',monospace" }}>{error}</div>
       )}
       {!loading && !player && !error && results.length === 0 && (
-        <PlayersEmptyState onPick={pickPlayer} />
+        <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} />
       )}
 
       {player && derived && (
         <>
-          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
+          <PlayerProfile player={player} derived={derived} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -2218,7 +2282,7 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
+function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
   const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
     ? VISUAL_QA_PLAYERS
     : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
@@ -2524,7 +2588,10 @@ function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
               <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginTop:8 }}>
-                <button onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                <button type="button" onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? `Remove ${p.fullName} from favorites` : `Add ${p.fullName} to favorites`} title={isFavorite ? 'Remove from favorites' : 'Save to favorites'} style={{ padding:'5px 9px', border:`0.5px solid ${isFavorite ? C.amber : C.border}`, borderRadius:5, background:isFavorite ? C.amberSoft : C.surface2, color:isFavorite ? C.amberDark : C.text2, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                  {isFavorite ? '★ Favorited' : '☆ Favorite'}
+                </button>
+                <button type="button" onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
                   Compare player
                 </button>
                 <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 7px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.text3, ...sans({ fontSize:8.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase' }) }}>
