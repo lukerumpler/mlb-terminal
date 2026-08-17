@@ -37,6 +37,35 @@ import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
+const VISUAL_QA_PLAYERS = [
+  { id: 660271, name: 'Shohei Ohtani', team: 'LAD' },
+  { id: 592450, name: 'Aaron Judge', team: 'NYY' },
+  { id: 669894, name: 'Juan Soto', team: 'NYM' },
+];
+
+export function humanizePlayerLoadError(error, playerName = 'this player') {
+  const status = Number(error?.status);
+  if (status === 429) return `Could not load ${playerName} right now because the data provider is limiting requests. Please retry shortly.`;
+  if (status >= 500 || error?.name === 'AbortError' || error?.name === 'TimeoutError') return `Could not load ${playerName} right now because the data provider did not respond in time.`;
+  return `Could not load ${playerName}. Please retry shortly.`;
+}
+
+export function buildAdvancedMetricTrendSeries(rows = [], count = 5) {
+  const numeric = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const bySeason = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const season = Number(row?.season ?? row?.stat?.season);
+    if (!Number.isInteger(season)) return;
+    const stat = row?.stat || row;
+    bySeason.set(season, {
+      season,
+      war: numeric(stat?.war ?? stat?.fWAR ?? stat?.bWAR ?? stat?.rWAR),
+      wrcPlus: numeric(stat?.wrcPlus ?? stat?.wRCPlus ?? stat?.wrc_plus),
+    });
+  });
+  return [...bySeason.values()].sort((a, b) => a.season - b.season).slice(-Math.max(1, count));
+}
+
 function pctBar(pct, color) {
   return (
     <div style={{ flex:'0 0 80px', height:5, background:C.surface3, borderRadius:3, overflow:'hidden' }}>
@@ -410,6 +439,18 @@ export function profileMetricValue(value) {
 export function formatProfileMetric(value, digits = 1, suffix = '') {
   const n = profileMetricValue(value);
   return n == null ? '—' : `${n.toFixed(digits)}${suffix}`;
+}
+
+// Savant has renamed several CSV columns across leaderboard families. Read
+// verified aliases consistently and preserve missing values as unavailable.
+export function savantField(row, aliases) {
+  const source = row || {};
+  for (const key of aliases) {
+    if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+      return source[key];
+    }
+  }
+  return undefined;
 }
 
 // Pure — no hooks, no rendering — so it can be reused anywhere the same
@@ -818,6 +859,16 @@ export function metricPopulationPercentile(value, population, keys, higherIsBett
   return percentile(raw, values, higherIsBetter);
 }
 
+export function buildSavantPercentileRow({ label, data, aliases, population, digits = 1, suffix = '%' }) {
+  const value = savantField(data, aliases);
+  return {
+    lbl: label,
+    val: formatProfileMetric(value, digits, suffix),
+    raw: profileMetricValue(value),
+    pct: metricPopulationPercentile(value, population, aliases),
+  };
+}
+
 function derivedPopulationPercentile(value, population, derive, higherIsBetter = true) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || !Array.isArray(population)) return null;
@@ -852,9 +903,9 @@ function AnalyticsLayers({ kpis, s, isPitcher, savant, batTracking, expectedStat
     { lbl:'xBA', val:formatProfileMetric(estBa, 3), raw:estBa, pct:savantPercentile(estBa, expectedPopulation, ['est_ba']) },
     { lbl:'xSLG', val:formatProfileMetric(estSlg, 3), raw:estSlg, pct:savantPercentile(estSlg, expectedPopulation, ['est_slg']) },
     { lbl:'Bat Speed', val:formatProfileMetric(bt.avg_bat_speed, 1, ' mph'), raw:profileMetricValue(bt.avg_bat_speed), pct:savantPercentile(bt.avg_bat_speed, batTrackingRows, ['avg_bat_speed']) },
-    { lbl:'Sweet Spot %', val:formatProfileMetric(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, 1, '%'), raw:profileMetricValue(sv.sweet_spot_percent ?? sv.anglesweetspotpercent), pct:savantPercentile(sv.sweet_spot_percent ?? sv.anglesweetspotpercent, statcastPopulationRows, ['sweet_spot_percent','anglesweetspotpercent']) },
-    { lbl:'Barrel %', val:formatProfileMetric(sv.brl_percent, 1, '%'), raw:profileMetricValue(sv.brl_percent), pct:savantPercentile(sv.brl_percent, statcastPopulationRows, ['brl_percent']) },
-    { lbl:'Hard Hit %', val:formatProfileMetric(sv.hard_hit_percent ?? sv.ev95percent, 1, '%'), raw:profileMetricValue(sv.hard_hit_percent ?? sv.ev95percent), pct:savantPercentile(sv.hard_hit_percent ?? sv.ev95percent, statcastPopulationRows, ['hard_hit_percent','ev95percent']) },
+    buildSavantPercentileRow({ label:'Sweet Spot %', data:sv, aliases:['sweet_spot_percent','anglesweetspotpercent'], population:statcastPopulationRows }),
+    buildSavantPercentileRow({ label:'Barrel %', data:sv, aliases:['brl_percent','barrel_percent','barrels_per_bbe_percent'], population:statcastPopulationRows }),
+    buildSavantPercentileRow({ label:'Hard Hit %', data:sv, aliases:['hard_hit_percent','ev95percent','hard_hit_pct'], population:statcastPopulationRows }),
     { lbl:'Expected ISO', val:formatProfileMetric(expectedIso, 3), raw:expectedIso, pct:expectedIsoPercentile(expectedIso) },
     { lbl:'Contact Quality', val:scoreValue(kpis.CAS) == null ? '—' : String(kpis.CAS), raw:scoreValue(kpis.CAS), pct:scoreValue(kpis.CAS) },
     { lbl:'Swing Decisions', val:scoreValue(kpis.DQS) == null ? '—' : String(kpis.DQS), raw:scoreValue(kpis.DQS), pct:scoreValue(kpis.DQS) },
@@ -1469,9 +1520,9 @@ export function getLivePerformanceItems(savant) {
   return [
     { lbl:'Exit Velocity', val: formatProfileMetric(sv.avg_hit_speed, 1, ' mph') },
     { lbl:'Launch Angle',  val: formatProfileMetric(sv.launch_angle_avg, 1, '°') },
-    { lbl:'Sweet Spot %',  val: formatProfileMetric(sv.sweet_spot_percent, 1, '%') },
-    { lbl:'Barrel %',      val: formatProfileMetric(sv.brl_percent, 1, '%') },
-    { lbl:'Hard Hit %',    val: formatProfileMetric(sv.hard_hit_percent, 1, '%') },
+    { lbl:'Sweet Spot %',  val: formatProfileMetric(savantField(sv, ['sweet_spot_percent','anglesweetspotpercent']), 1, '%') },
+    { lbl:'Barrel %',      val: formatProfileMetric(savantField(sv, ['brl_percent','barrel_percent','barrels_per_bbe_percent']), 1, '%') },
+    { lbl:'Hard Hit %',    val: formatProfileMetric(savantField(sv, ['hard_hit_percent','ev95percent','hard_hit_pct']), 1, '%') },
     { lbl:'Chase Rate',    val: formatProfileMetric(sv.oz_swing_percent, 1, '%') },
     { lbl:'Zone Contact',  val: formatProfileMetric(sv.z_contact_percent, 1, '%') },
   ];
@@ -1562,12 +1613,15 @@ function PlayersPage() {
   const [results, setResults] = useState([]);
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
+  const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
+  const [error,   setError] = useState(null);
+
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
   const mountedRef = useRef(true);
+  const playerAbortRef = useRef(null);
   // Bug fix 2026-08-11: pickPlayer had no equivalent of latestQueryRef's
   // guard below — clicking player A then player B before A's slower
   // loadFullPlayer() resolved let A's response land after B's and silently
@@ -1586,7 +1640,11 @@ function PlayersPage() {
   // natural cleanup function to hang this off of otherwise.
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; clearTimeout(timerRef.current); };
+    return () => {
+      mountedRef.current = false;
+      playerAbortRef.current?.abort();
+      clearTimeout(timerRef.current);
+    };
   }, []);
 
 
@@ -1608,22 +1666,45 @@ function PlayersPage() {
   }, []);
 
   const pickPlayer = useCallback(async (person) => {
+    playerAbortRef.current?.abort();
+    const controller = new AbortController();
+    playerAbortRef.current = controller;
     recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
     setQuery(person.fullName);
     setLoading(true);
-    setPlayer(null);
+    setSwitchingPlayerName(person.fullName || person.name || 'selected player');
     setError(null);
     try {
-      const data = await loadFullPlayer(person, SEASON);
+      const data = await loadFullPlayer(person, SEASON, {
+        signal: controller.signal,
+        onCoreReady: core => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(core);
+            setLoading(false);
+            setSwitchingPlayerName(null);
+          }
+        },
+        onImportantReady: important => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
+        },
+        onOptionalReady: optional => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
+        },
+      });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
     } catch (err) {
-      if (mountedRef.current && pickSeqRef.current === mySeq) setError(`Could not load ${person.fullName}. ${err.message}`);
+      if (err?.name !== 'AbortError' && mountedRef.current && pickSeqRef.current === mySeq) {
+        setError(humanizePlayerLoadError(err, person.fullName));
+      }
     }
-    if (mountedRef.current && pickSeqRef.current === mySeq) setLoading(false);
+    if (mountedRef.current && pickSeqRef.current === mySeq) {
+      setLoading(false);
+      setSwitchingPlayerName(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -1725,6 +1806,12 @@ function PlayersPage() {
         : (parseFloat(st.ops) || null);
       return { yr: r.season, val };
     }).filter(d => d.val != null);
+    const advancedTrendData = buildAdvancedMetricTrendSeries(
+      Array.isArray(player.careerAdvanced) && player.careerAdvanced.length
+        ? player.careerAdvanced
+        : (player.isPitcher ? player.careerPitching : player.career),
+      5,
+    );
 
     return {
       kpis, score, verd, arch,
@@ -1733,7 +1820,7 @@ function PlayersPage() {
       risks:     getRisks(s, p, player.isPitcher),
       rec:       getRecommendation(score),
       quote, archQuote, savantQuote, contextItems: contextItemsFiltered,
-      gradeRows, careerRows, sparkData, s, p,
+      gradeRows, careerRows, sparkData, advancedTrendData, s, p,
       amd:       computeAMD(player.batTracking),
     };
   }, [player]);
@@ -1775,7 +1862,18 @@ function PlayersPage() {
         )}
       </div>
 
-      {loading && <PlayerProfileSkeleton />}
+      {loading && player && (
+        <div role="progressbar" aria-label="Switching player profile" style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:7, background:C.surface2, border:`0.5px solid ${C.border}`, color:C.text2, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
+          <span aria-hidden="true" style={{ width:10, height:10, border:`2px solid ${C.border}`, borderTopColor:C.amber, borderRadius:'50%', display:'inline-block', animation:'skip-status-spin 0.8s linear infinite' }} />
+          Loading verified profile data{switchingPlayerName ? ` for ${switchingPlayerName}` : ''}…
+        </div>
+      )}
+      {loading && !player && <PlayerProfileSkeleton />}
+      {player?.extrasLoading && (
+        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
+          Core MLB profile loaded. Supplemental Savant, contract, financial, and boxscore data are still loading; unavailable values are not estimates.
+        </div>
+      )}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,
@@ -1787,7 +1885,7 @@ function PlayersPage() {
 
       {player && derived && (
         <>
-          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} />
+          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -1846,7 +1944,7 @@ function HandednessSplitComparison({ splits }) {
 }
 
 /* ─── Contract panel (stable component — not IIFE) ─────────────────── */
-function ContractPanel({ contractData: ct }) {
+function ContractPanel({ contractData: ct, loading = false }) {
   const hasVerifiedContract = Boolean(ct?.contractAvailable);
   const statusColor = !ct || !hasVerifiedContract             ? C.text3
     : ct.status === 'Under Contract'                         ? C.teal
@@ -1872,13 +1970,17 @@ function ContractPanel({ contractData: ct }) {
           borderBottom:`0.5px solid ${C.borderLight}`, marginBottom:8 }}>
           <div style={{ width:8, height:8, borderRadius:'50%', background: ct ? statusColor : C.border, flexShrink:0 }} />
           <span style={sans({ fontSize:12, fontWeight:800, color: ct ? statusColor : C.text3 })}>
-            {ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
+            {loading && !ct ? 'Loading contract data' : ct ? (hasVerifiedContract ? ct.status : 'No verified contract data') : 'No contract data'}
           </span>
         </div>
         {rows.map(([lbl, val], i) => (
           <KVRow key={lbl} label={lbl} value={val} last={i === rows.length - 1} />
         ))}
-        {ct && !hasVerifiedContract && (
+        {loading && !ct ? (
+          <div role="status" style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
+            Contract and service-time sources are still loading; no absence is being inferred.
+          </div>
+        ) : ct && !hasVerifiedContract && (
           <div style={sans({ fontSize:10.5, color:C.text3, lineHeight:1.45, marginTop:8 })}>
             Connected sources resolved the player identity, but no verified contract dollar fields were returned.
           </div>
@@ -2066,10 +2168,13 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, onCompare }) {
+function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
+  const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
+    ? VISUAL_QA_PLAYERS
+    : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
   const { kpis, score, verd, vcolor, arch, strengths, risks, rec,
           quote, archQuote, savantQuote, contextItems,
-          gradeRows, careerRows, sparkData, s, p, amd } = derived;
+          gradeRows, careerRows, sparkData, advancedTrendData, s, p, amd } = derived;
   const [selectedMetric, setSelectedMetric] = useState('TPVI');
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedChart, setExpandedChart] = useState(null);
@@ -2158,11 +2263,37 @@ function PlayerProfile({ player, derived, onCompare }) {
   const statcastPopulation = player.savant?.est_woba != null
     ? (player.statcastPopulation || []).map(row => row?.est_woba)
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
+  const advancedWar = player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war;
+  const advancedWrcPlus = player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus;
+  const advancedWarSource = player.advancedMetrics?.provenance?.war || player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
+  const advancedWrcPlusSource = player.advancedMetrics?.provenance?.wrcPlus || player.advancedMetrics?.source || 'MLB Stats API seasonAdvanced';
+  const summaryMetric = (metric, value, config) => ({
+    label: metric,
+    value: value == null || value === '' ? 'Unavailable' : value,
+    isUnavailable: value == null || value === '',
+    ...config,
+  });
   const performanceSummary = [
-    { label:'WAR', value:dashIfMissing(player.advancedMetrics?.war ?? player.war ?? s.war ?? player.fangraphs?.war), detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:player.advancedMetrics?.war != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.purple },
-    { label:'OPS', value:dashIfMissing(s.ops != null ? fmt(s.ops) : null), detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:s.ops != null ? 'MLB Stats API' : 'Unavailable', trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber },
-    { label:'wRC+', value:dashIfMissing(player.advancedMetrics?.wrcPlus ?? s.wrcPlus ?? s.wrc_plus ?? player.wrcPlus), detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:player.advancedMetrics?.wrcPlus != null ? player.advancedMetrics.source : 'Unavailable', trend:'No verified comparison series', tone:C.teal },
-    { label:'Statcast', value:statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : '—', detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:player.savant ? 'Baseball Savant' : 'Unavailable', trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy },
+    summaryMetric('WAR', Number.isFinite(Number(advancedWar)) ? Number(advancedWar).toFixed(1) : null, {
+      detail:'Player value', definition:'Wins Above Replacement estimates player value relative to a replacement-level player.', source:advancedWarSource,
+      coverage:Number.isFinite(Number(advancedWar)) ? (advancedWarSource.includes('Baseball-Reference') ? 'Fallback WAR supplied by the verified Baseball-Reference player summary.' : 'Explicit WAR field returned by the verified provider.') : 'The verified MLB seasonAdvanced response did not return an explicit WAR field for this player; the verified fallback provider also has no explicit WAR field.',
+      trend:'No verified comparison series', tone:C.purple,
+    }),
+    summaryMetric('OPS', s.ops != null ? fmt(s.ops) : null, {
+      detail:'On-base + slugging', definition:'On-base Plus Slugging combines on-base percentage and slugging percentage.', source:'MLB Stats API',
+      coverage:s.ops != null ? 'Current-season hitting split from the official MLB Stats API.' : 'The official MLB season hitting split is unavailable.',
+      trend:opsDelta == null ? 'No prior verified season' : `${opsDelta >= 0 ? '▲' : '▼'} ${Math.abs(opsDelta).toFixed(3)} vs prior available season`, series:recentOpsSeries, tone:C.amber,
+    }),
+    summaryMetric('wRC+', Number.isFinite(Number(advancedWrcPlus)) ? String(Math.round(Number(advancedWrcPlus))) : null, {
+      detail:'Offensive runs', definition:'Weighted Runs Created Plus measures offensive production relative to league and park context.', source:advancedWrcPlusSource,
+      coverage:Number.isFinite(Number(advancedWrcPlus)) ? (advancedWrcPlusSource.includes('Baseball-Reference') ? 'Fallback wRC+ supplied by the verified Baseball-Reference player summary.' : 'Explicit wRC+ field returned by the verified provider.') : 'The verified MLB seasonAdvanced response did not return an explicit wRC+ field for this player; the verified fallback provider also has no explicit wRC+ field.',
+      trend:'No verified comparison series', tone:C.teal,
+    }),
+    summaryMetric('Statcast', statcastValue != null ? fmt(statcastValue, player.savant?.est_woba != null ? 3 : 1) : null, {
+      detail:player.savant?.est_woba != null ? 'xwOBA' : 'Exit velocity', definition:'Statcast metrics estimate quality of contact and expected offensive outcomes from tracked events.', source:'Baseball Savant',
+      coverage:player.savant ? 'Verified Baseball Savant player metric.' : 'No verified Baseball Savant player metric is available.',
+      trend:percentileOf(statcastValue, statcastPopulation) != null ? `${percentileOf(statcastValue, statcastPopulation)}th percentile` : 'No verified comparison population', tone:C.navy,
+    }),
   ];
 
   const runPdfExport = async kind => {
@@ -2342,9 +2473,20 @@ function PlayerProfile({ player, derived, onCompare }) {
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
-              <button onClick={onCompare} style={{ marginTop:8, padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
-                Compare player
-              </button>
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                <button onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                  Compare player
+                </button>
+                <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 7px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.text3, ...sans({ fontSize:8.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase' }) }}>
+                  Visual QA
+                  <select aria-label="Visual QA player switcher" value={String(player.id)} onChange={e => {
+                    const selected = VISUAL_QA_PLAYERS.find(candidate => String(candidate.id) === e.target.value);
+                    if (selected) onSwitchPlayer?.({ id:selected.id, fullName:selected.name, team:selected.team });
+                  }} style={{ maxWidth:118, border:0, outline:'none', background:'transparent', color:C.text, fontFamily:"'DM Mono',monospace", fontSize:9, cursor:'pointer' }}>
+                    {visualQaOptions.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}{candidate.team ? ` · ${candidate.team}` : ''}</option>)}
+                  </select>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -2397,15 +2539,16 @@ function PlayerProfile({ player, derived, onCompare }) {
               <div className={`skip-performance-summary-card ${isExpanded ? 'is-expanded' : ''}`} key={metric.label}>
                 <button type="button" className="skip-performance-summary-card-button" aria-expanded={isExpanded} aria-controls={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`} onClick={() => setExpandedSummary(isExpanded ? null : metric.label)}>
                   <span className="skip-performance-summary-card-label">{metric.label}</span>
-                  <span className="skip-performance-summary-card-value" style={{ color:metric.tone }}>{metric.value}</span>
+                  <span className={`skip-performance-summary-card-value ${metric.isUnavailable ? 'is-unavailable' : ''}`} style={{ color:metric.tone }}>{metric.value}</span>
                   <span className="skip-performance-summary-card-detail">{metric.detail}</span>
                   <span className={`skip-performance-summary-card-trend ${metric.trend.startsWith('▼') ? 'is-down' : metric.trend.startsWith('▲') ? 'is-up' : ''}`}>{metric.trend}</span>
-                  <span className={`skip-performance-summary-card-source ${metric.source === 'Unavailable' ? 'is-unavailable' : ''}`}>{metric.source}</span>
+                  <span className={`skip-performance-summary-card-source ${metric.isUnavailable ? 'is-unavailable' : ''}`}><span className="skip-performance-summary-card-status">{metric.isUnavailable ? 'Coverage gap' : 'Verified'}</span>{metric.source}</span>
                   <span className="skip-performance-summary-card-expand">{isExpanded ? 'Hide details' : 'Details'}</span>
                 </button>
                 {isExpanded && <div className="skip-performance-summary-card-expanded" id={`summary-detail-${metric.label.replace(/[^a-z0-9]/gi, '-')}`}>
                   <div>{metric.definition}</div>
                   <MetricSparkline values={metric.series} tone={metric.tone} />
+                  <div className={`skip-performance-summary-card-coverage ${metric.isUnavailable ? 'is-unavailable' : ''}`}>{metric.coverage}</div>
                   <strong>Provider:</strong> {metric.source}<br />
                   <strong>Context:</strong> {metric.trend}
                 </div>}
@@ -2684,6 +2827,31 @@ function PlayerProfile({ player, derived, onCompare }) {
             </Panel>
           )}
 
+          <Panel title="WAR / wRC+ Trend" accent={C.purple} badge="Last 5 seasons">
+            {advancedTrendData.some(row => row.war != null || row.wrcPlus != null) ? (
+              <div style={{ padding:'6px 4px 2px' }} role="img" aria-label="Verified five-season WAR and wRC+ trend">
+                <ResponsiveContainer width="100%" height={128}>
+                  <LineChart data={advancedTrendData} margin={{ top:8, right:10, bottom:0, left:0 }}>
+                    <CartesianGrid stroke={C.borderLight} vertical={false}/>
+                    <XAxis dataKey="season" tick={{ fontSize:9, fill:C.text3 }} axisLine={false} tickLine={false}/>
+                    <YAxis yAxisId="war" tick={{ fontSize:9, fill:C.purple }} axisLine={false} tickLine={false} width={28} />
+                    <YAxis yAxisId="wrc" orientation="right" tick={{ fontSize:9, fill:C.teal }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip {...TT} formatter={(value, name) => [value == null ? 'Unavailable' : name === 'WAR' ? Number(value).toFixed(1) : Math.round(Number(value)), name]} />
+                    <Line yAxisId="war" isAnimationActive={false} connectNulls={false} dataKey="war" name="WAR" stroke={C.purple} strokeWidth={2} dot={{ r:3, fill:C.purple }} type="monotone" />
+                    <Line yAxisId="wrc" isAnimationActive={false} connectNulls={false} dataKey="wrcPlus" name="wRC+" stroke={C.teal} strokeWidth={2} dot={{ r:3, fill:C.teal }} type="monotone" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display:'flex', justifyContent:'center', gap:14, padding:'2px 0 5px' }}>
+                  <span style={px({ fontSize:8.5, color:C.purple })}>● WAR</span>
+                  <span style={px({ fontSize:8.5, color:C.teal })}>● wRC+</span>
+                </div>
+                <div style={sans({ padding:'0 8px 5px', fontSize:8.5, color:C.text4, lineHeight:1.35 })}>Verified career fields only; missing seasons remain blank.</div>
+              </div>
+            ) : (
+              <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>No verified five-season WAR or wRC+ trend is available.</div>
+            )}
+          </Panel>
+
           {/* ── Swing Precision (AMD / IMD) ── */}
           {amd && (
             <Panel
@@ -2860,7 +3028,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
           <PlayerVideoPanel player={player} profile={p} accent={teamAccent} />
 
-          <ContractPanel contractData={player.contractData} />
+          <ContractPanel contractData={player.contractData} loading={player.contractLoading ?? player.extrasLoading} />
 
           <MarketIntelPanel kpis={kpis} ct={player.contractData} p={p} teamFinancials={player.teamFinancials} confidence={dataConfidence} />
 

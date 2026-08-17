@@ -19,29 +19,29 @@
 
 // Public nitter instances — most reliable first. Short list keeps latency down.
 const NITTER_HOSTS = [
-  'https://nitter.privacydev.net',
-  'https://nitter.poast.org',
-  'https://nitter.net',
-  'https://nitter.1d4.us',
+  "https://nitter.privacydev.net",
+  "https://nitter.poast.org",
+  "https://nitter.net",
+  "https://nitter.1d4.us",
 ];
 
-import { applyCors, isRateLimited, rateLimitResponse } from './_shared.js';
+import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
-const CACHE_TTL_S  = 5 * 60;
-const CACHE_SWR_S  = 2 * 60;
-const FETCH_MS     = 7_000;
+const CACHE_TTL_S = 5 * 60;
+const CACHE_SWR_S = 2 * 60;
+const FETCH_MS = 7_000;
 
-function stripHtml(html = '') {
+function stripHtml(html = "") {
   return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g,  '&')
-    .replace(/&lt;/g,   '<')
-    .replace(/&gt;/g,   '>')
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g,  "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s{3,}/g, '  ')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s{3,}/g, "  ")
     .trim();
 }
 
@@ -51,26 +51,27 @@ function parseRss(xml, handle) {
   let match;
   while ((match = itemRe.exec(xml)) !== null) {
     const block = match[1];
-    const get = (tag) => {
+    const get = tag => {
       // Match CDATA or plain text variants
       const re = new RegExp(
         `<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>` +
-        `|<${tag}[^>]*>([^<]*)</${tag}>`
+          `|<${tag}[^>]*>([^<]*)</${tag}>`
       );
       const m = re.exec(block);
-      return m ? (m[1] ?? m[2] ?? '').trim() : '';
+      return m ? (m[1] ?? m[2] ?? "").trim() : "";
     };
-    const title   = stripHtml(get('title'));
-    const link    = get('link') || get('guid');
-    const pubDate = get('pubDate');
-    const desc    = stripHtml(get('description'));
+    const title = stripHtml(get("title"));
+    const link = get("link") || get("guid");
+    const pubDate = get("pubDate");
+    const desc = stripHtml(get("description"));
     // Description usually has the full tweet; title is truncated. Prefer desc
     // when it's actually longer.
     const text = desc.length > title.length ? desc : title;
     if (!text || !link) continue;
     const isoDate = pubDate ? new Date(pubDate).toISOString() : null;
     // Stable id: last path segment of the tweet URL (the numeric tweet id)
-    const id = link.split('/').filter(Boolean).pop() || `${Date.now()}_${items.length}`;
+    const id =
+      link.split("/").filter(Boolean).pop() || `${Date.now()}_${items.length}`;
     items.push({ id, handle, text, url: link, isoDate });
   }
   return items;
@@ -78,24 +79,34 @@ function parseRss(xml, handle) {
 
 async function tryFetch(handle, host) {
   const res = await fetch(`${host}/${handle}/rss`, {
-    headers: { 'User-Agent': 'SKIP-Baseball/1.0 (RSS aggregator; contact via project repo)' },
-    signal:  AbortSignal.timeout(FETCH_MS),
+    headers: {
+      "User-Agent":
+        "SKIP-Baseball/1.0 (RSS aggregator; contact via project repo)",
+    },
+    signal: AbortSignal.timeout(FETCH_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${host}`);
   const xml = await res.text();
-  if (!xml.includes('<channel>')) throw new Error(`Non-RSS response from ${host}`);
+  if (!xml.includes("<channel>"))
+    throw new Error(`Non-RSS response from ${host}`);
   return xml;
 }
 
 export default async function handler(req, res) {
   applyCors(req, res);
-  if (req.method === 'OPTIONS') { res.status(204).end(); return; }
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (isRateLimited(req, 'feed')) return rateLimitResponse(res);
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+  if (isRateLimited(req, "feed")) return rateLimitResponse(res);
 
-  const { handle, n = '10' } = req.query ?? {};
+  const { handle, n = "10" } = req.query ?? {};
   if (!handle || !/^[A-Za-z0-9_]{1,50}$/.test(handle)) {
-    return res.status(400).json({ error: 'Missing or invalid handle', items: [] });
+    return res
+      .status(400)
+      .json({ error: "Missing or invalid handle", items: [] });
   }
 
   const limit = Math.min(25, Math.max(1, parseInt(n, 10) || 10));
@@ -103,8 +114,12 @@ export default async function handler(req, res) {
   let xml = null;
   let lastErr = null;
   for (const host of NITTER_HOSTS) {
-    try { xml = await tryFetch(handle, host); break; }
-    catch (e) { lastErr = e; }
+    try {
+      xml = await tryFetch(handle, host);
+      break;
+    } catch (e) {
+      lastErr = e;
+    }
   }
 
   const fetchedAt = new Date().toISOString();
@@ -112,14 +127,17 @@ export default async function handler(req, res) {
   if (!xml) {
     // All hosts failed — return empty so the client can render other accounts
     return res.status(200).json({
-      handle, items: [], fetchedAt,
-      error: 'Feed unavailable', detail: lastErr?.message,
+      handle,
+      items: [],
+      fetchedAt,
+      error: "Feed unavailable",
+      detail: lastErr?.message,
     });
   }
 
   const items = parseRss(xml, handle).slice(0, limit);
   res.setHeader(
-    'Cache-Control',
+    "Cache-Control",
     `public, s-maxage=${CACHE_TTL_S}, stale-while-revalidate=${CACHE_SWR_S}`
   );
   return res.status(200).json({ handle, items, fetchedAt });

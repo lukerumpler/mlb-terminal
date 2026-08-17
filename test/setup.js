@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// Provider proxy tests must not read shared production durable-cache rows.
+// The application still uses durable caching in development and production.
+process.env.NODE_ENV = "test";
+
 const isBrowserTest =
   typeof window !== "undefined" && typeof document !== "undefined";
 

@@ -1,6 +1,7 @@
 import { recordFeedSuccess } from '../lib/feedFreshness.js';
 
 // SKIP — NCAA College Baseball API Client
+import { apiUrl } from '../lib/apiOrigin.js';
 // Proxies through /api/ncaa (Vercel serverless) → ncaa-api.henrygd.me → ncaa.com
 //
 // Public API: https://ncaa-api.henrygd.me (5 req/sec per IP)
@@ -22,7 +23,7 @@ import { recordFeedSuccess } from '../lib/feedFreshness.js';
 //             155=BB/9, 156=H/9
 //   Team:     28=Offense, 29=Pitching
 
-const BASE = '/api/ncaa';
+const BASE = apiUrl('/api/ncaa');
 const SPORT = 'baseball/d1';
 
 // Same rationale as the cache in src/api/mlb.js: LeaguePage's NcaaWatchPanel

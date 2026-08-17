@@ -1,8 +1,14 @@
-import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import App from '../client/src/App.jsx';
+import React from "react";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import App from "../client/src/App.jsx";
 
 beforeEach(() => {
   cleanup();
@@ -11,94 +17,122 @@ beforeEach(() => {
 
 async function goToTab(user, label, waitForText) {
   render(<App />);
-  const navButton = await screen.findByRole('button', { name: new RegExp(label) });
+  const navButton = await screen.findByRole("button", {
+    name: new RegExp(label),
+  });
   await user.click(navButton);
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
 
-describe('Draft page', () => {
-  it('searches the draft class pool without crashing', async () => {
+describe("Draft page", () => {
+  it("searches the draft class pool without crashing", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Draft', /2026 Draft Class/);
+    await goToTab(user, "Draft", /2026 Draft Class/);
 
     const search = screen.getByPlaceholderText(/Search by name or school/i);
-    await user.type(search, 'Roch');
+    await user.type(search, "Roch");
 
     await waitFor(() => {
       expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     });
-    expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
+    expect(
+      global.__consoleErrors.filter(e => !e.includes("network unavailable"))
+        .length
+    ).toBe(0);
   });
 
-  it('clears the search and still renders the full pool', async () => {
+  it("clears the search and still renders the full pool", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Draft', /2026 Draft Class/);
+    await goToTab(user, "Draft", /2026 Draft Class/);
 
     const search = screen.getByPlaceholderText(/Search by name or school/i);
-    await user.type(search, 'zzzzznomatch');
+    await user.type(search, "zzzzznomatch");
     await user.clear(search);
 
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 
-  it('filters the SKIP Big Board by position and sorts by rank or position', async () => {
+  it("filters the SKIP Big Board by position and sorts by rank or position", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Draft', /2026 Draft Class/);
+    await goToTab(user, "Draft", /2026 Draft Class/);
 
-    const positionFilter = screen.getByRole('combobox', { name: /Filter Draft board by position/i });
-    const sortControl = screen.getByRole('combobox', { name: /Sort Draft board/i });
+    const positionFilter = screen.getByRole("combobox", {
+      name: /Filter Draft board by position/i,
+    });
+    const sortControl = screen.getByRole("combobox", {
+      name: /Sort Draft board/i,
+    });
 
-    await user.selectOptions(positionFilter, 'RHP');
-    const boardTable = screen.getAllByRole('table')[0];
-    expect(within(boardTable).getByText('Jackson Flora')).toBeInTheDocument();
-    expect(within(boardTable).queryByText('Roch Cholowsky')).toBeNull();
+    await user.selectOptions(positionFilter, "RHP");
+    const boardTable = screen.getAllByRole("table")[0];
+    expect(within(boardTable).getByText("Jackson Flora")).toBeInTheDocument();
+    expect(within(boardTable).queryByText("Roch Cholowsky")).toBeNull();
 
-    await user.selectOptions(sortControl, 'rank-desc');
+    await user.selectOptions(sortControl, "rank-desc");
     expect(screen.getByText(/SKIP rank · 100 → 1/)).toBeInTheDocument();
-    await user.selectOptions(sortControl, 'position');
+    await user.selectOptions(sortControl, "position");
     expect(screen.getByText(/Position · A → Z/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
 
-describe('Knowledge page', () => {
-  it('cycles through every knowledge tab without crashing', async () => {
+describe("Knowledge page", () => {
+  it("cycles through every knowledge tab without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole('button', { name: /Knowledge/ });
+    const navButton = await screen.findByRole("button", { name: /Knowledge/ });
     await user.click(navButton);
-    await screen.findByRole('button', { name: /^Game Theory$/ }, { timeout: 8000 });
+    await screen.findByRole(
+      "button",
+      { name: /^Game Theory$/ },
+      { timeout: 8000 }
+    );
 
-    const tabLabels = ['Behavioral Biases', 'Draft Intel', 'Future Value', 'Grade Rubric', 'Projections', 'Leadership Model', 'Game Theory'];
+    const tabLabels = [
+      "Behavioral Biases",
+      "Draft Intel",
+      "Future Value",
+      "Grade Rubric",
+      "Projections",
+      "Leadership Model",
+      "Game Theory",
+    ];
     for (const label of tabLabels) {
-      const btn = screen.getByRole('button', { name: new RegExp(`^${label}$`) });
+      const btn = screen.getByRole("button", {
+        name: new RegExp(`^${label}$`),
+      });
       await user.click(btn);
       expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     }
-    expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
+    expect(
+      global.__consoleErrors.filter(e => !e.includes("network unavailable"))
+        .length
+    ).toBe(0);
   });
 });
 
-describe('Intelligence page', () => {
-  it('exposes source, freshness, and model provenance metadata', async () => {
+describe("Intelligence page", () => {
+  it("exposes source, freshness, and model provenance metadata", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Intelligence', /Player Comparison Engine/i);
-    const provenance = screen.getByRole('region', { name: 'Intelligence data provenance' });
-    expect(provenance).toHaveTextContent('MLB Stats API comparison lookup');
-    expect(provenance).toHaveTextContent('Fetched when players are compared');
-    expect(provenance).toHaveTextContent('SKIP model snapshot; not a live provider feed');
+    await goToTab(user, "Intelligence", /Player Comparison Engine/i);
+    const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
+    expect(provenance).toHaveTextContent("MLB Stats API comparison lookup");
+    expect(provenance).toHaveTextContent("Fetched when players are compared");
+    expect(provenance).toHaveTextContent("SKIP model snapshot; not a live provider feed");
   });
 
-  it('rejects comparing a player against themselves', async () => {
+  it("rejects comparing a player against themselves", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Intelligence', /Player Comparison Engine/i);
+    await goToTab(user, "Intelligence", /Player Comparison Engine/i);
 
-    const inputs = document.querySelectorAll('input[type="text"], input:not([type])');
+    const inputs = document.querySelectorAll(
+      'input[type="text"], input:not([type])'
+    );
     expect(inputs.length).toBeGreaterThanOrEqual(2);
-    await user.type(inputs[0], 'Aaron Judge');
-    await user.type(inputs[1], 'Aaron Judge');
+    await user.type(inputs[0], "Aaron Judge");
+    await user.type(inputs[1], "Aaron Judge");
 
-    const compareBtn = screen.getByRole('button', { name: /Compare/i });
+    const compareBtn = screen.getByRole("button", { name: /Compare/i });
     await user.click(compareBtn);
 
     await waitFor(() => {
@@ -106,35 +140,40 @@ describe('Intelligence page', () => {
     });
   });
 
-  it('shows the notable-trades table and success-rate chart, sortable, without crashing (Roadmap #5)', async () => {
+  it("shows the notable-trades table and success-rate chart, sortable, without crashing (Roadmap #5)", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'Intelligence', /Player Comparison Engine/i);
+    await goToTab(user, "Intelligence", /Player Comparison Engine/i);
 
     await screen.findByText(/Notable Trades — High-End Starting Pitchers/i);
-    expect(screen.getByText(/Team Success Rate — Notable Deadline Trades/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Team Success Rate — Notable Deadline Trades/i)
+    ).toBeInTheDocument();
 
     // Real, known trade — confirms the dataset actually rendered, not just the panel shell.
     expect(screen.getByText(/Justin Verlander/i)).toBeInTheDocument();
 
     // Sorting by netWAR (including toggling direction on a second click)
     // shouldn't crash the table.
-    const netWarHeader = screen.getByRole('button', { name: /^netWAR/ });
+    const netWarHeader = screen.getByRole("button", { name: /^netWAR/ });
     await user.click(netWarHeader);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     await user.click(netWarHeader);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-    expect(global.__consoleErrors.filter(e => !e.includes('network unavailable')).length).toBe(0);
+    expect(
+      global.__consoleErrors.filter(e => !e.includes("network unavailable"))
+        .length
+    ).toBe(0);
   });
 });
 
-describe('AMD page', () => {
-  it('renders without crashing', async () => {
+describe("AMD page", () => {
+  it("renders without crashing", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'AMD', /Metric Overview/);
+    await goToTab(user, "AMD", /Metric Overview/);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 
-  it('marks the leaderboard/scatter/spotlight/pitch-breakdown panels as illustrative, and does not let the pitch-type-breakdown panel silently rename itself after a different leaderboard row', async () => {
+  it("marks the leaderboard/scatter/spotlight/pitch-breakdown panels as illustrative, and does not let the pitch-type-breakdown panel silently rename itself after a different leaderboard row", async () => {
     // Regression test for a real title/content mismatch bug: this panel's
     // title used to interpolate the currently-selected leaderboard player
     // (`AMD by Pitch Type — ${spotlight?.name}`) while its chart data and
@@ -144,11 +183,15 @@ describe('AMD page', () => {
     // by making the title a static, honestly-labeled example instead of a
     // false promise that it reacts to the click above.
     const user = userEvent.setup();
-    await goToTab(user, 'AMD', /Metric Overview/);
+    await goToTab(user, "AMD", /Metric Overview/);
 
     // Illustrative labeling present on every panel using fixed example data.
-    expect(screen.getByText(/AMD\+ Hitter Leaders — 2026 \(Illustrative\)/)).toBeTruthy();
-    expect(screen.getByText('AMD by Pitch Type — Example: Luis Arraez')).toBeTruthy();
+    expect(
+      screen.getByText(/AMD\+ Hitter Leaders — 2026 \(Illustrative\)/)
+    ).toBeTruthy();
+    expect(
+      screen.getByText("AMD by Pitch Type — Example: Luis Arraez")
+    ).toBeTruthy();
     expect(screen.getByText(/AMD\+ Spotlight \(Illustrative\)/)).toBeTruthy();
 
     // Click a different leaderboard row — the spotlight panel should update.
@@ -156,76 +199,100 @@ describe('AMD page', () => {
     // point using the same player names, so there's more than one
     // "Freddie Freeman" node even before anything is clicked — pick the
     // clickable leaderboard row specifically, not just the first match.)
-    const leaderboardRow = screen.getAllByText('Freddie Freeman')
-      .find(el => el.tagName.toLowerCase() === 'span');
+    const leaderboardRow = screen
+      .getAllByText("Freddie Freeman")
+      .find(el => el.tagName.toLowerCase() === "span");
     expect(leaderboardRow).toBeTruthy();
     await user.click(leaderboardRow);
     await waitFor(() => {
       expect(screen.getByText(/AMD\+ Spotlight \(Illustrative\)/)).toBeTruthy();
       // Spotlight big name (17px header) confirms the click landed.
-      const nameEls = screen.getAllByText('Freddie Freeman');
-      expect(nameEls.some(el => el.style.fontSize === '17px')).toBe(true);
+      const nameEls = screen.getAllByText("Freddie Freeman");
+      expect(nameEls.some(el => el.style.fontSize === "17px")).toBe(true);
     });
 
     // ...but the pitch-type-breakdown panel's title must stay the fixed example,
     // not silently relabel itself to the newly-clicked player.
-    expect(screen.getByText('AMD by Pitch Type — Example: Luis Arraez')).toBeTruthy();
-    expect(screen.queryByText(/AMD by Pitch Type — Freddie Freeman/)).toBeNull();
+    expect(
+      screen.getByText("AMD by Pitch Type — Example: Luis Arraez")
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/AMD by Pitch Type — Freddie Freeman/)
+    ).toBeNull();
 
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
 
-describe('League page', () => {
-  it('renders standings without crashing', async () => {
+describe("League page", () => {
+  it("renders standings without crashing", async () => {
     const user = userEvent.setup();
-    await goToTab(user, 'League', /standings|leaders/i);
+    await goToTab(user, "League", /standings|leaders/i);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
 
-describe('Follow List page', () => {
-  it('filters by category without crashing', async () => {
+describe("Follow List page", () => {
+  it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole('button', { name: /Follow List/ });
+    const navButton = await screen.findByRole("button", {
+      name: /Follow List/,
+    });
     await user.click(navButton);
-    await screen.findByPlaceholderText(/Search by name, handle, or bio/i, {}, { timeout: 8000 });
+    await screen.findByPlaceholderText(
+      /Search by name, handle, or bio/i,
+      {},
+      { timeout: 8000 }
+    );
 
-    const allBtn = screen.getByRole('button', { name: /^All$/i });
+    const allBtn = screen.getByRole("button", { name: /^All$/i });
     await user.click(allBtn);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
 
-describe('Scouting Notes page', () => {
-  it('renders and filters without crashing', async () => {
+describe("Scouting Notes page", () => {
+  it("renders and filters without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole('button', { name: /Scouting Notes/ });
+    const navButton = await screen.findByRole("button", {
+      name: /Scouting Notes/,
+    });
     await user.click(navButton);
-    await screen.findByPlaceholderText(/Search by player or team/i, {}, { timeout: 8000 });
+    await screen.findByPlaceholderText(
+      /Search by player or team/i,
+      {},
+      { timeout: 8000 }
+    );
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
 });
 
-describe('Settings roster defaults', () => {
-  it('updates batting and pitching defaults for the Overview roster filters', async () => {
+describe("Settings roster defaults", () => {
+  it("updates batting and pitching defaults for the Overview roster filters", async () => {
     const user = userEvent.setup();
-    localStorage.removeItem('skip-roster-sample-defaults');
-    await goToTab(user, 'Settings', /Preferences/);
+    localStorage.removeItem("skip-roster-sample-defaults");
+    await goToTab(user, "Settings", /Preferences/);
 
-    const battingDefault = screen.getByRole('combobox', { name: 'Default batting minimum plate appearances' });
-    const pitchingDefault = screen.getByRole('combobox', { name: 'Default pitching minimum innings pitched' });
-    await user.selectOptions(battingDefault, '150');
-    await user.selectOptions(pitchingDefault, '30');
+    const battingDefault = screen.getByRole("combobox", {
+      name: "Default batting minimum plate appearances",
+    });
+    const pitchingDefault = screen.getByRole("combobox", {
+      name: "Default pitching minimum innings pitched",
+    });
+    await user.selectOptions(battingDefault, "150");
+    await user.selectOptions(pitchingDefault, "30");
 
-    expect(battingDefault).toHaveValue('150');
-    expect(pitchingDefault).toHaveValue('30');
+    expect(battingDefault).toHaveValue("150");
+    expect(pitchingDefault).toHaveValue("30");
 
-    const overviewButton = screen.getByTitle('Overview');
+    const overviewButton = screen.getByTitle("Overview");
     await user.click(overviewButton);
-    await screen.findByText('AI Scout Insights');
-    expect(screen.getByRole('combobox', { name: 'Minimum plate appearances' })).toHaveValue('150');
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+    await screen.findByText("AI Scout Insights");
+    expect(
+      screen.getByRole("combobox", { name: "Minimum plate appearances" })
+    ).toHaveValue("150");
   });
 });

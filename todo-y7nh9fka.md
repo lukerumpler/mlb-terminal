@@ -170,3 +170,33 @@
 - [x] Define and apply explicit Overview accent categories for offense, pitching, defense/baserunning, and context cards.
 - [x] Add regression coverage proving the category accent mapping and empty-state copy rendering.
 - [x] Save a new checkpoint after resolving the remaining recommendation gaps.
+- [x] Inspect Panel markup and Overview/other dashboard grid wrappers for uneven tile behavior.
+- [x] Apply equal-height stretch rules to desktop dashboard card rows without forcing fixed heights.
+- [x] Preserve natural content sizing and readable stacking at mobile breakpoints.
+- [x] Add regression coverage for equal-height grid contracts and responsive card behavior.
+- [x] Run type checks, full tests, production build, responsive previews, and save a checkpoint.
+- [x] Capture the newer shared Player Profile optimization and local card-tile changes before merging.
+- [x] Merge both feature sets without overwriting the newer shared Player Profile work.
+- [x] Resolve any remaining conflict markers and preserve both loading optimization and equal-height tile behavior.
+- [x] Add or update regression coverage for the merged Player Profile and card-tile behavior.
+- [x] Run focused/full tests, production build, and responsive verification on the merged state.
+- [x] Save a merged checkpoint and report the combined result.
+- [x] Inspect newly added dashboard module grids and current equal-height tile rules.
+- [x] Extend equal-height alignment to newly added modules using content-aware stretch rather than fixed filler heights.
+- [x] Add compact-card spacing rules to prevent dead space and crowded internal content.
+- [x] Add regression coverage for new-module row alignment and spacing behavior.
+- [x] Run type checks, tests, production build, responsive previews, and save a checkpoint.
+
+- [x] Inspect the fast-forwarded durable-cache and Player Profile changes, runtime logs, type health, test stability, and build output.
+- [x] Fix concrete reliability, performance, accessibility, or layout issues found in the latest shared state while preserving durable caching and verified Player Profile fields.
+- [x] Add regression coverage for every optimization or bug fix applied in this pass.
+- [x] Run focused and full validation, production build, and responsive preview inspection.
+- [x] Save a new live checkpoint for the validated latest-state optimization/debugging pass.
+
+- [x] Audit Team Overview card density, page hierarchy, and navigation friction across desktop and mobile.
+- [x] Design and implement a summary-first Team Overview with progressive disclosure for secondary analytics.
+- [x] Preserve direct access to verified data, statuses, source provenance, and existing deep-dive modules.
+- [x] Add regression coverage for the new Overview navigation and responsive behavior.
+- [x] Run type checks, focused/full tests, production build, responsive previews, and save a live checkpoint.
+
+- [x] Replace long vertical Team Overview scrolling with compact switchable views that keep secondary cards out of the default canvas.

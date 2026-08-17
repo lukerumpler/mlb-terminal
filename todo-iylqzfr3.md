@@ -168,3 +168,58 @@
 - [x] Add rendered interaction coverage for quick-filter changes plus Fantasy Points calculations
 - [x] Run typecheck, focused tests, full tests, and fresh visual verification
 - [x] Save a checkpoint containing the roster filter and Fantasy Points enhancement
+
+- [x] Inspect the latest deployed/local browser, server, and network errors for the non-working page
+- [x] Trace Overview initialization, team selection, and provider fallback flow
+- [x] Identify and repair the root cause of the page failure
+- [x] Improve degraded-provider handling without hiding actual frontend errors
+- [x] Add regression coverage for the failure and recovery path
+- [x] Run typecheck, focused tests, full tests, and fresh deployed/local visual verification
+- [x] Save a checkpoint containing the page repair
+
+- [x] Audit current Performance Summary fields, unavailable states, spacing, and approved WAR/wRC+ provider coverage
+- [x] Integrate verified WAR and wRC+ values when an approved provider supplies explicit player fields
+- [x] Improve unavailable WAR/wRC+ messaging with clearer coverage and next-data explanations
+- [x] Refine Performance Summary card spacing, labels, value hierarchy, and expanded details
+- [x] Preserve source provenance and never substitute fabricated or unsupported values
+- [x] Add regression coverage for provider mapping, unavailable states, formatting, and expanded interactions
+- [x] Run typecheck, focused tests, full tests, and player-profile visual verification
+- [x] Save a checkpoint containing all three Performance Summary improvements
+
+- [x] Audit approved fallback provider options, precedence, provenance, and current Player Profile navigation state
+- [x] Add a verified fallback path for player WAR and wRC+ when MLB seasonAdvanced lacks explicit fields
+- [x] Preserve provider precedence, explicit unavailable states, and no-fabrication guarantees
+- [x] Add a compact Player Profile visual-QA player switcher with approved player options
+- [x] Preserve normal player search, tabs, expanded metric details, and mobile layout
+- [x] Add regression coverage for fallback precedence, provenance, unavailable fallback, and QA switching
+- [x] Run typecheck, focused tests, full tests, and visual verification of the QA switcher
+- [x] Save a checkpoint containing the fallback provider and visual-QA navigation
+- [x] Scope the verified Baseball-Reference fallback honestly to explicit WAR coverage and keep wRC+ Unavailable when no verified source field exists
+- [x] Fix the Visual QA selector so an arbitrary loaded player is represented accurately without misleading selection state
+- [x] Add a direct success-case regression for fallback WAR and an explicit no-wRC+ regression
+- [x] Resolve or isolate the unrelated durable FanGraphs cache test failures so the full suite result is documented accurately
+- [x] Capture a loaded Player Profile preview that visibly includes the QA selector
+- [x] Save a checkpoint after all gap corrections are complete
+- [x] Inspect Visual QA switch loading state and available career advanced-metric series
+- [x] Add a compact loading skeleton or spinner during Visual QA player transitions
+- [x] Normalize verified WAR and wRC+ trend points for the last five seasons without fabricating missing values
+- [x] Add a compact interactive five-season WAR/wRC+ trend chart to the Player Profile
+- [x] Preserve fallback provenance, unavailable states, tabs, and mobile layout
+- [x] Add regression tests for transition loading and five-season trend rendering
+- [x] Run typecheck, focused tests, full validation, and visual verification
+- [x] Save a checkpoint containing the Visual QA loading and advanced trend enhancements
+- [x] Inspect current career-season loaders and verified provider contracts
+- [x] Add historical WAR and wRC+ adapters using explicit provider fields only
+- [x] Merge historical advanced series without overriding primary values or fabricating gaps
+- [x] Wire historical provenance into the Player Profile trend chart
+- [x] Add adapter, merge, and rendered trend regression tests
+- [x] Run typecheck and broader validation
+- [x] Create a downloadable ZIP of the project
+- [x] Save a checkpoint with historical advanced metrics and ZIP-ready code
+- [x] Inspect current MLB, Baseball-Reference, and historical advanced identifiers and matching boundaries
+- [x] Add stable player ID mapping with explicit confidence and provider provenance
+- [x] Use mapped IDs for historical WAR/wRC+ requests without unsafe name-only substitution
+- [x] Debug profile loading, fallback precedence, trend integration, and unavailable states
+- [x] Add mapping, mismatch, and regression coverage
+- [x] Run typecheck, focused tests, broader validation, and production build
+- [x] Verify desktop/mobile behavior and save a checkpoint

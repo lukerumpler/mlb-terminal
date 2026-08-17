@@ -1,11 +1,16 @@
-import { applyCors, isRateLimited, rateLimitResponse } from './_shared.js';
+import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+
+import { createHash } from 'node:crypto';
+import { readDurableCache, writeDurableCache } from '../durable-cache';
+import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
 
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
-const ODDS_URL = 'https://www.fangraphs.com/standings/playoff-odds/fg/mlb';
-const WAR_URL = 'https://www.fangraphs.com/depthcharts.aspx?position=Team';
-const AGGREGATE_WAR_URL = (season, stats) => `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
-const UA = 'Mozilla/5.0 (compatible; SKIPBaseball/1.0)';
+const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
+const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
+const AGGREGATE_WAR_URL = (season, stats) =>
+  `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
+const UA = "Mozilla/5.0 (compatible; SKIPBaseball/1.0)";
 const CACHE_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
 const DEFAULT_COOLDOWN_MS = 30_000;
@@ -16,6 +21,16 @@ const aggregateWarCache = new Map();
 const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
+const modelDailyAttemptDay = new Map();
+const aggregateDailyAttemptDay = new Map();
+
+export function __seedFanGraphsModelCacheForTests(teamAbbr, season, data, { expiresAt, staleExpiresAt } = {}) {
+  modelCache.set(modelKey(teamAbbr, season), {
+    data,
+    expiresAt: expiresAt ?? Date.now() - 1,
+    staleExpiresAt: staleExpiresAt ?? Date.now() + 60_000,
+  });
+}
 
 export function __resetFanGraphsProviderStateForTests() {
   modelCache.clear();
@@ -23,16 +38,29 @@ export function __resetFanGraphsProviderStateForTests() {
   aggregateWarCache.clear();
   aggregateWarInFlight.clear();
   modelFailureCooldownUntil.clear();
+  modelDailyAttemptDay.clear();
+  aggregateDailyAttemptDay.clear();
   fanGraphsCooldownUntil = 0;
 }
 
+export function isFanGraphsProviderBlockedResponse(status, body) {
+  return Number(status) === 403 && /cloudflare|just a moment|challenge/i.test(String(body || ''));
+}
+
 function parseRetryAfterMs(response) {
-  const value = response?.headers?.get?.('Retry-After');
+  const value = response?.headers?.get?.("Retry-After");
   if (!value) return DEFAULT_COOLDOWN_MS;
   const seconds = Number(value);
-  if (Number.isFinite(seconds)) return Math.max(1_000, Math.min(120_000, seconds * 1_000));
+  if (Number.isFinite(seconds))
+    return Math.max(1_000, Math.min(120_000, seconds * 1_000));
   const date = Date.parse(value);
-  return Number.isFinite(date) ? Math.max(1_000, Math.min(120_000, date - Date.now())) : DEFAULT_COOLDOWN_MS;
+  return Number.isFinite(date)
+    ? Math.max(1_000, Math.min(120_000, date - Date.now()))
+    : DEFAULT_COOLDOWN_MS;
+}
+
+function durableFanGraphsKey(scope) {
+  return `fangraphs:${createHash('sha256').update(scope).digest('hex')}`;
 }
 
 function modelKey(teamAbbr, season) {
@@ -40,29 +68,37 @@ function modelKey(teamAbbr, season) {
 }
 
 function staleModel(cacheEntry) {
-  return cacheEntry && cacheEntry.staleExpiresAt > Date.now() ? cacheEntry : null;
+  return cacheEntry && cacheEntry.staleExpiresAt > Date.now()
+    ? cacheEntry
+    : null;
 }
 
 function stripTags(value) {
-  return String(value || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function cellsFromRow(row) {
-  return [...String(row || '').matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match => stripTags(match[1]));
+  return [
+    ...String(row || "").matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi),
+  ].map(match => stripTags(match[1]));
 }
 
 function tablesFromHtml(html) {
-  return [...String(html || '').matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)].map(match => match[1]);
+  return [
+    ...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi),
+  ].map(match => match[1]);
 }
 
 function numeric(value) {
-  const match = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  const match = String(value || "")
+    .replace(/,/g, "")
+    .match(/-?\d+(?:\.\d+)?/);
   return match ? Number(match[0]) : null;
 }
 
@@ -71,19 +107,27 @@ function findTeamRow(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (cells.some(cell => new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, 'i').test(cell))) return cells;
+      if (
+        cells.some(cell =>
+          new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
+        )
+      )
+        return cells;
     }
   }
   return null;
 }
 
 function parsePercentage(value) {
-  const match = String(value || '').match(/(\d+(?:\.\d+)?)\s*%/);
+  const match = String(value || "").match(/(\d+(?:\.\d+)?)\s*%/);
   return match ? Number(match[1]) : null;
 }
 
 function normalizeMetricKey(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 function findTeamRowDetails(html, teamAbbr) {
@@ -93,7 +137,11 @@ function findTeamRowDetails(html, teamAbbr) {
     const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (cells.some(cell => new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, 'i').test(cell))) {
+      if (
+        cells.some(cell =>
+          new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
+        )
+      ) {
         const metrics = {};
         cells.forEach((cell, index) => {
           const key = normalizeMetricKey(headers[index]);
@@ -107,45 +155,72 @@ function findTeamRowDetails(html, teamAbbr) {
   return null;
 }
 
-export function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season = DEFAULT_SEASON) {
+export function parseFanGraphsModelHtml(
+  { oddsHtml, warHtml },
+  teamAbbr,
+  season = DEFAULT_SEASON
+) {
   const oddsDetails = findTeamRowDetails(oddsHtml, teamAbbr);
   const warDetails = findTeamRowDetails(warHtml, teamAbbr);
   const oddsRow = oddsDetails?.cells || findTeamRow(oddsHtml, teamAbbr);
   const warRow = warDetails?.cells || findTeamRow(warHtml, teamAbbr);
-  const playoffOdds = oddsRow ? oddsRow.map(parsePercentage).find(value => value != null) ?? null : null;
-  const teamWar = warRow ? warRow.map(numeric).find(value => value != null) ?? null : null;
-  const metrics = { ...(oddsDetails?.metrics || {}), ...(warDetails?.metrics || {}) };
-  const pick = (...keys) => keys.map(key => metrics[key]).find(value => value != null) ?? null;
+  const playoffOdds = oddsRow
+    ? (oddsRow.map(parsePercentage).find(value => value != null) ?? null)
+    : null;
+  const teamWar = warRow
+    ? (warRow.map(numeric).find(value => value != null) ?? null)
+    : null;
+  const metrics = {
+    ...(oddsDetails?.metrics || {}),
+    ...(warDetails?.metrics || {}),
+  };
+  const pick = (...keys) =>
+    keys.map(key => metrics[key]).find(value => value != null) ?? null;
   return {
     playoffOdds,
     teamWar,
     season,
     teamAbbr,
-    source: 'FanGraphs',
+    source: "FanGraphs",
     sourceUrls: { playoffOdds: ODDS_URL, teamWar: WAR_URL },
     advancedMetrics: {
-      projectedWins: pick('projected_wins', 'wins', 'w'),
-      projectedLosses: pick('projected_losses', 'losses', 'l'),
-      projectedRuns: pick('projected_runs', 'runs', 'r'),
-      projectedRunsAllowed: pick('projected_runs_allowed', 'runs_allowed', 'ra'),
-      offenseWar: pick('offense_war', 'off_war', 'batting_war'),
-      defenseWar: pick('defense_war', 'def_war', 'fielding_war'),
-      bullpenWar: pick('bullpen_war', 'relief_war'),
-      projectedWrcPlus: pick('projected_wrc_plus', 'wrc_plus'),
-      projectedFip: pick('projected_fip', 'fip'),
+      projectedWins: pick("projected_wins", "wins", "w"),
+      projectedLosses: pick("projected_losses", "losses", "l"),
+      projectedRuns: pick("projected_runs", "runs", "r"),
+      projectedRunsAllowed: pick(
+        "projected_runs_allowed",
+        "runs_allowed",
+        "ra"
+      ),
+      offenseWar: pick("offense_war", "off_war", "batting_war"),
+      defenseWar: pick("defense_war", "def_war", "fielding_war"),
+      bullpenWar: pick("bullpen_war", "relief_war"),
+      projectedWrcPlus: pick("projected_wrc_plus", "wrc_plus"),
+      projectedFip: pick("projected_fip", "fip"),
     },
   };
 }
 
-export function parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, season = DEFAULT_SEASON) {
+export function parseFanGraphsAggregateWarHtml(
+  { battingHtml, pitchingHtml },
+  season = DEFAULT_SEASON
+) {
   const parseRows = html => {
     const rows = new Map();
     for (const table of tablesFromHtml(html)) {
       const matches = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
       if (!matches.length) continue;
       const headers = cellsFromRow(matches[0][1]);
-      const teamIndex = headers.findIndex(header => normalizeMetricKey(header) === 'team' || normalizeMetricKey(header).includes('team'));
-      const warIndex = headers.findIndex(header => normalizeMetricKey(header) === 'war' || normalizeMetricKey(header).endsWith('_war'));
+      const teamIndex = headers.findIndex(
+        header =>
+          normalizeMetricKey(header) === "team" ||
+          normalizeMetricKey(header).includes("team")
+      );
+      const warIndex = headers.findIndex(
+        header =>
+          normalizeMetricKey(header) === "war" ||
+          normalizeMetricKey(header).endsWith("_war")
+      );
       if (teamIndex < 0 || warIndex < 0) continue;
       for (const match of matches.slice(1)) {
         const cells = cellsFromRow(match[1]);
@@ -160,146 +235,429 @@ export function parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, se
   const batting = parseRows(battingHtml);
   const pitching = parseRows(pitchingHtml);
   const names = new Set([...batting.keys(), ...pitching.keys()]);
-  return { season, teams: [...names].map(team => ({ team, battingWAR: batting.get(team) ?? null, pitchingWAR: pitching.get(team) ?? null, totalWAR: batting.has(team) && pitching.has(team) ? Number((batting.get(team) + pitching.get(team)).toFixed(1)) : null })) };
+  return {
+    season,
+    teams: [...names].map(team => ({
+      team,
+      battingWAR: batting.get(team) ?? null,
+      pitchingWAR: pitching.get(team) ?? null,
+      totalWAR:
+        batting.has(team) && pitching.has(team)
+          ? Number((batting.get(team) + pitching.get(team)).toFixed(1))
+          : null,
+    })),
+  };
 }
 
 async function fetchHtml(url) {
   const response = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*' },
-    redirect: 'follow',
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html,application/xhtml+xml,*/*",
+    },
+    redirect: "follow",
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response) : 0;
-    throw Object.assign(new Error(`FanGraphs returned HTTP ${response.status}`), { status: response.status, retryAfterMs });
+    const retryAfterMs =
+      response.status === 429 ? parseRetryAfterMs(response) : 0;
+    let providerBlocked = false;
+    if (response.status === 403) {
+      const body = await response.text().catch(() => '');
+      providerBlocked = isFanGraphsProviderBlockedResponse(response.status, body);
+    }
+    throw Object.assign(
+      new Error(`FanGraphs returned HTTP ${response.status}`),
+      { status: response.status, retryAfterMs, providerBlocked }
+    );
   }
   return response.text();
 }
 
 async function loadAggregateWar(season) {
-  const cached = aggregateWarCache.get(String(season));
-  if (cached && cached.expiresAt > Date.now()) return { data: cached.data, cache: 'HIT' };
   const key = String(season);
+  let cached = aggregateWarCache.get(key);
+  if (cached && cached.expiresAt > Date.now())
+    return { data: cached.data, cache: "HIT" };
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
+    const durable = await readDurableCache(durableFanGraphsKey(`aggregate:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      aggregateWarCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) return { data: cached.data, cache: "DURABLE-HIT" };
+    }
+  }
+  const day = utcDayKey();
   const existing = aggregateWarInFlight.get(key);
-  if (existing) return { data: await existing, cache: 'COALESCED' };
+  if (existing) return { data: await existing, cache: "COALESCED" };
+  if (hasAttemptedProviderToday(aggregateDailyAttemptDay.get(key), Date.now())) {
+    if (cached) return { data: { ...cached.data, freshness: 'daily-cached' }, cache: 'DAILY' };
+    const error = new Error('FanGraphs aggregate daily refresh already attempted');
+    error.status = 503;
+    throw error;
+  }
   if (fanGraphsCooldownUntil > Date.now()) {
-    if (cached && cached.staleExpiresAt > Date.now()) return { data: { ...cached.data, freshness: 'stale-cached', staleReason: 'FanGraphs rate limit cooldown' }, cache: 'STALE' };
-    const error = new Error('FanGraphs aggregate rate limit cooldown active');
+    if (cached && cached.staleExpiresAt > Date.now())
+      return {
+        data: {
+          ...cached.data,
+          freshness: "stale-cached",
+          staleReason: "FanGraphs rate limit cooldown",
+        },
+        cache: "STALE",
+      };
+    const error = new Error("FanGraphs aggregate rate limit cooldown active");
     error.status = 429;
     error.retryAfter = Math.ceil((fanGraphsCooldownUntil - Date.now()) / 1000);
     throw error;
   }
+  aggregateDailyAttemptDay.set(key, day);
   const request = (async () => {
-    const [battingResult, pitchingResult] = await Promise.allSettled([fetchHtml(AGGREGATE_WAR_URL(season, 'bat')), fetchHtml(AGGREGATE_WAR_URL(season, 'pit'))]);
-    const throttled = [battingResult, pitchingResult].filter(result => result.status === 'rejected' && result.reason?.status === 429);
-    if (throttled.length) fanGraphsCooldownUntil = Math.max(fanGraphsCooldownUntil, Date.now() + Math.max(...throttled.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS)));
-    const parsed = parseFanGraphsAggregateWarHtml({ battingHtml: battingResult.status === 'fulfilled' ? battingResult.value : '', pitchingHtml: pitchingResult.status === 'fulfilled' ? pitchingResult.value : '' }, season);
+    const [battingResult, pitchingResult] = await Promise.allSettled([
+      fetchHtml(AGGREGATE_WAR_URL(season, "bat")),
+      fetchHtml(AGGREGATE_WAR_URL(season, "pit")),
+    ]);
+    const throttled = [battingResult, pitchingResult].filter(
+      result => result.status === "rejected" && result.reason?.status === 429
+    );
+    if (throttled.length)
+      fanGraphsCooldownUntil = Math.max(
+        fanGraphsCooldownUntil,
+        Date.now() +
+          Math.max(
+            ...throttled.map(
+              result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS
+            )
+          )
+      );
+    const parsed = parseFanGraphsAggregateWarHtml(
+      {
+        battingHtml:
+          battingResult.status === "fulfilled" ? battingResult.value : "",
+        pitchingHtml:
+          pitchingResult.status === "fulfilled" ? pitchingResult.value : "",
+      },
+      season
+    );
     const hasRows = parsed.teams.some(team => team.totalWAR != null);
-    if (!hasRows && battingResult.status === 'rejected' && pitchingResult.status === 'rejected') {
-      const error = new Error('FanGraphs aggregate Team WAR unavailable');
+    if (
+      !hasRows &&
+      battingResult.status === "rejected" &&
+      pitchingResult.status === "rejected"
+    ) {
+      const providerBlocked = [battingResult, pitchingResult].some(
+        result => result.status === "rejected" && result.reason?.providerBlocked
+      );
+      const error = new Error(
+        providerBlocked
+          ? "FanGraphs provider blocked the aggregate WAR request"
+          : "FanGraphs aggregate Team WAR unavailable"
+      );
       error.status = throttled.length ? 429 : 502;
-      if (throttled.length) error.retryAfter = Math.ceil(Math.max(...throttled.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS)) / 1000);
+      error.providerBlocked = providerBlocked;
+      if (throttled.length)
+        error.retryAfter = Math.ceil(
+          Math.max(
+            ...throttled.map(
+              result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS
+            )
+          ) / 1000
+        );
       throw error;
     }
-    return { found: hasRows, ...parsed, source: 'FanGraphs', sourceUrls: { batting: AGGREGATE_WAR_URL(season, 'bat'), pitching: AGGREGATE_WAR_URL(season, 'pit') }, retrievedAt: new Date().toISOString(), freshness: 'live', statuses: { batting: battingResult.status === 'fulfilled' && battingResult.value ? 'live' : 'upstream-unavailable', pitching: pitchingResult.status === 'fulfilled' && pitchingResult.value ? 'live' : 'upstream-unavailable' } };
+    return {
+      found: hasRows,
+      ...parsed,
+      source: "FanGraphs",
+      sourceUrls: {
+        batting: AGGREGATE_WAR_URL(season, "bat"),
+        pitching: AGGREGATE_WAR_URL(season, "pit"),
+      },
+      retrievedAt: new Date().toISOString(),
+      freshness: "live",
+      statuses: {
+        batting:
+          battingResult.status === "fulfilled" && battingResult.value
+            ? "live"
+            : "upstream-unavailable",
+        pitching:
+          pitchingResult.status === "fulfilled" && pitchingResult.value
+            ? "live"
+            : "upstream-unavailable",
+      },
+    };
   })();
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
-    aggregateWarCache.set(key, { data, expiresAt: Date.now() + 60 * 60_000, staleExpiresAt: Date.now() + 2 * 60 * 60_000 });
-    return { data, cache: 'MISS' };
+      const expiresAt = nextUtcMidnightMs();
+      const staleExpiresAt = expiresAt + STALE_TTL_MS;
+      aggregateWarCache.set(key, {
+        data,
+        expiresAt,
+        staleExpiresAt,
+      });
+      void writeDurableCache({
+        cacheKey: durableFanGraphsKey(`aggregate:${season}`),
+        source: 'FanGraphs',
+        data,
+        freshUntil: new Date(expiresAt),
+        staleUntil: new Date(staleExpiresAt),
+        lastAttemptDay: day,
+      });
+    return { data, cache: "MISS" };
   } catch (error) {
-    if (cached && cached.staleExpiresAt > Date.now()) return { data: { ...cached.data, freshness: 'stale-cached', staleReason: error.status === 429 ? 'FanGraphs rate limit' : 'FanGraphs upstream unavailable' }, cache: 'STALE' };
+    if (cached && cached.staleExpiresAt > Date.now())
+      return {
+        data: {
+          ...cached.data,
+          freshness: "stale-cached",
+          staleReason:
+            error.status === 429
+              ? "FanGraphs rate limit"
+              : "FanGraphs upstream unavailable",
+        },
+        cache: "STALE",
+      };
     throw error;
   } finally {
-    if (aggregateWarInFlight.get(key) === request) aggregateWarInFlight.delete(key);
+    if (aggregateWarInFlight.get(key) === request)
+      aggregateWarInFlight.delete(key);
   }
 }
 
 export default async function handler(req, res) {
   applyCors(req, res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const url = new URL(req.url, 'https://placeholder.invalid');
-  const teamAbbr = String(url.searchParams.get('team') || '').trim().toUpperCase();
-  const seasonValue = Number(url.searchParams.get('season') || DEFAULT_SEASON);
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+  const url = new URL(req.url, "https://placeholder.invalid");
+  const teamAbbr = String(url.searchParams.get("team") || "")
+    .trim()
+    .toUpperCase();
+  const seasonValue = Number(url.searchParams.get("season") || DEFAULT_SEASON);
   const season = Number.isInteger(seasonValue) ? seasonValue : DEFAULT_SEASON;
-  if (url.searchParams.get('mode') === 'aggregate') {
-    if (isRateLimited(req, 'fangraphs')) return rateLimitResponse(res);
+  if (url.searchParams.get("mode") === "aggregate") {
+    if (isRateLimited(req, "fangraphs")) return rateLimitResponse(res);
     try {
       const result = await loadAggregateWar(season);
-      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=1800');
-      res.setHeader('X-Provider-Cache', result.cache);
-      return res.status(200).json({ ...result.data, servedAt: new Date().toISOString() });
+      res.setHeader(
+        "Cache-Control",
+        "public, s-maxage=3600, stale-while-revalidate=1800"
+      );
+      res.setHeader("X-Provider-Cache", result.cache);
+      return res
+        .status(200)
+        .json({ ...result.data, servedAt: new Date().toISOString() });
     } catch (error) {
-      if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
-      return res.status(error?.status || 502).json({ found: false, season, teams: [], statuses: { batting: 'unavailable', pitching: 'unavailable' }, error: 'FanGraphs aggregate Team WAR unavailable' });
+      if (error?.retryAfter)
+        res.setHeader("Retry-After", String(error.retryAfter));
+          return res
+        .status(error?.status || 502)
+        .json({
+          found: false,
+          season,
+          teams: [],
+          statuses: { batting: "unavailable", pitching: "unavailable" },
+          providerBlocked: Boolean(error?.providerBlocked),
+          error: error?.providerBlocked
+            ? "FanGraphs provider blocked the aggregate WAR request"
+            : "FanGraphs aggregate Team WAR unavailable",
+        });
     }
   }
-  if (!TEAM_CODE.test(teamAbbr)) return res.status(400).json({ error: 'Missing or invalid team abbreviation' });
+  if (!TEAM_CODE.test(teamAbbr))
+    return res
+      .status(400)
+      .json({ error: "Missing or invalid team abbreviation" });
 
   const key = modelKey(teamAbbr, season);
-  const cached = modelCache.get(key);
+  let cached = modelCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
-    res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
-    res.setHeader('X-Provider-Cache', 'HIT');
-    return res.status(200).json({ ...cached.data, freshness: 'cached', servedAt: new Date().toISOString() });
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=900, stale-while-revalidate=1800"
+    );
+    res.setHeader("X-Provider-Cache", "HIT");
+    return res
+      .status(200)
+      .json({
+        ...cached.data,
+        freshness: "cached",
+        servedAt: new Date().toISOString(),
+      });
+  }
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
+    const durable = await readDurableCache(durableFanGraphsKey(`model:${teamAbbr}:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      modelCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) {
+        res.setHeader('X-Provider-Cache', 'DURABLE-HIT');
+        return res.status(200).json({ ...cached.data, freshness: 'cached', servedAt: new Date().toISOString() });
+      }
+    }
   }
 
+  const day = utcDayKey();
   const existing = modelInFlight.get(key);
   if (existing) {
     try {
       const data = await existing;
-      res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
-      res.setHeader('X-Provider-Cache', 'COALESCED');
-      return res.status(200).json({ ...data, freshness: 'live', servedAt: new Date().toISOString() });
+      res.setHeader(
+        "Cache-Control",
+        "public, s-maxage=900, stale-while-revalidate=1800"
+      );
+      res.setHeader("X-Provider-Cache", "COALESCED");
+      return res
+        .status(200)
+        .json({
+          ...data,
+          freshness: "live",
+          servedAt: new Date().toISOString(),
+        });
     } catch (error) {
-      if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
-      return res.status(error?.status || 502).json(error?.payload || { error: 'FanGraphs request failed' });
+      if (error?.retryAfter)
+        res.setHeader("Retry-After", String(error.retryAfter));
+      return res
+        .status(error?.status || 502)
+        .json(error?.payload || { error: "FanGraphs request failed" });
     }
+  }
+
+  if (hasAttemptedProviderToday(modelDailyAttemptDay.get(key), Date.now())) {
+    if (cached) {
+      res.setHeader('X-Provider-Cache', 'DAILY');
+      return res.status(200).json({ ...cached.data, freshness: 'daily-cached', servedAt: new Date().toISOString() });
+    }
+    const staleDaily = staleModel(cached);
+    if (staleDaily) {
+      res.setHeader('X-Provider-Cache', 'STALE');
+      return res.status(200).json({ ...staleDaily.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: 'FanGraphs daily refresh already attempted' });
+    }
+    return res.status(503).json({ error: 'FanGraphs daily refresh already attempted', retryAfter: Math.ceil((nextUtcMidnightMs() - Date.now()) / 1000) });
   }
 
   const stale = staleModel(cached);
   if (fanGraphsCooldownUntil > Date.now()) {
     if (stale) {
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      res.setHeader('X-Provider-Cache', 'STALE');
-      return res.status(200).json({ ...stale.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: 'FanGraphs rate limit cooldown' });
+      res.setHeader(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      res.setHeader("X-Provider-Cache", "STALE");
+      return res
+        .status(200)
+        .json({
+          ...stale.data,
+          freshness: "stale-cached",
+          servedAt: new Date().toISOString(),
+          staleReason: "FanGraphs rate limit cooldown",
+        });
     }
     const retryAfter = Math.ceil((fanGraphsCooldownUntil - Date.now()) / 1000);
-    res.setHeader('Retry-After', String(retryAfter));
-    return res.status(429).json({ error: 'FanGraphs rate limit cooldown active', retryAfter });
+    res.setHeader("Retry-After", String(retryAfter));
+    return res
+      .status(429)
+      .json({ error: "FanGraphs rate limit cooldown active", retryAfter });
   }
   const failureUntil = modelFailureCooldownUntil.get(key) || 0;
   if (failureUntil > Date.now()) {
     if (stale) {
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      res.setHeader('X-Provider-Cache', 'STALE');
-      return res.status(200).json({ ...stale.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: 'FanGraphs recent upstream failure' });
+      res.setHeader(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      res.setHeader("X-Provider-Cache", "STALE");
+      return res
+        .status(200)
+        .json({
+          ...stale.data,
+          freshness: "stale-cached",
+          servedAt: new Date().toISOString(),
+          staleReason: "FanGraphs recent upstream failure",
+        });
     }
     const retryAfter = Math.ceil((failureUntil - Date.now()) / 1000);
-    res.setHeader('Retry-After', String(retryAfter));
-    return res.status(503).json({ error: 'FanGraphs temporary upstream cooldown active', retryAfter });
+    res.setHeader("Retry-After", String(retryAfter));
+    return res
+      .status(503)
+      .json({
+        error: "FanGraphs temporary upstream cooldown active",
+        retryAfter,
+      });
   }
   if (failureUntil) modelFailureCooldownUntil.delete(key);
 
-  if (isRateLimited(req, 'fangraphs')) return rateLimitResponse(res);
+  if (isRateLimited(req, "fangraphs")) return rateLimitResponse(res);
+  modelDailyAttemptDay.set(key, day);
   const upstreamRequest = (async () => {
     const retrievedAt = new Date().toISOString();
-    const [oddsResult, warResult] = await Promise.allSettled([fetchHtml(ODDS_URL), fetchHtml(WAR_URL)]);
-    const throttledResults = [oddsResult, warResult].filter(result => result.status === 'rejected' && result.reason?.status === 429);
+    const [oddsResult, warResult] = await Promise.allSettled([
+      fetchHtml(ODDS_URL),
+      fetchHtml(WAR_URL),
+    ]);
+    const throttledResults = [oddsResult, warResult].filter(
+      result => result.status === "rejected" && result.reason?.status === 429
+    );
     const rateLimited = throttledResults.length > 0;
     if (rateLimited) {
-      const cooldownMs = Math.max(...throttledResults.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS));
-      fanGraphsCooldownUntil = Math.max(fanGraphsCooldownUntil, Date.now() + cooldownMs);
+      const cooldownMs = Math.max(
+        ...throttledResults.map(
+          result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS
+        )
+      );
+      fanGraphsCooldownUntil = Math.max(
+        fanGraphsCooldownUntil,
+        Date.now() + cooldownMs
+      );
     }
-    const parsed = parseFanGraphsModelHtml({
-      oddsHtml: oddsResult.status === 'fulfilled' ? oddsResult.value : '',
-      warHtml: warResult.status === 'fulfilled' ? warResult.value : '',
-    }, teamAbbr, season);
-    if (!parsed.found && oddsResult.status === 'rejected' && warResult.status === 'rejected') {
-      const retryAfter = rateLimited ? Math.ceil(Math.max(...throttledResults.map(result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS)) / 1000) : undefined;
-      throw { status: rateLimited ? 429 : 502, retryAfter, payload: { error: rateLimited ? 'FanGraphs rate limited both model sources' : 'FanGraphs model sources unavailable' } };
+    const parsed = parseFanGraphsModelHtml(
+      {
+        oddsHtml: oddsResult.status === "fulfilled" ? oddsResult.value : "",
+        warHtml: warResult.status === "fulfilled" ? warResult.value : "",
+      },
+      teamAbbr,
+      season
+    );
+    if (
+      !parsed.found &&
+      oddsResult.status === "rejected" &&
+      warResult.status === "rejected"
+    ) {
+      const retryAfter = rateLimited
+        ? Math.ceil(
+            Math.max(
+              ...throttledResults.map(
+                result => result.reason?.retryAfterMs || DEFAULT_COOLDOWN_MS
+              )
+            ) / 1000
+          )
+        : undefined;
+      const providerBlocked = [oddsResult, warResult].some(
+        result => result.status === "rejected" && result.reason?.providerBlocked
+      );
+      throw {
+        status: rateLimited ? 429 : 502,
+        retryAfter,
+        providerBlocked,
+        payload: {
+          error: rateLimited
+            ? "FanGraphs rate limited both model sources"
+            : providerBlocked
+              ? "FanGraphs provider blocked the model request"
+              : "FanGraphs model sources unavailable",
+          providerBlocked,
+        },
+      };
     }
     return {
       found: parsed.playoffOdds != null || parsed.teamWar != null,
@@ -312,31 +670,83 @@ export default async function handler(req, res) {
       teamWar: parsed.teamWar,
       advancedMetrics: parsed.advancedMetrics,
       statuses: {
-        playoffOdds: parsed.playoffOdds != null ? 'live' : oddsResult.status === 'fulfilled' ? 'unparsed' : 'upstream-unavailable',
-        teamWar: parsed.teamWar != null ? 'live' : warResult.status === 'fulfilled' ? 'unparsed' : 'upstream-unavailable',
+        playoffOdds:
+          parsed.playoffOdds != null
+            ? "live"
+            : oddsResult.status === "fulfilled"
+              ? "unparsed"
+              : "upstream-unavailable",
+        teamWar:
+          parsed.teamWar != null
+            ? "live"
+            : warResult.status === "fulfilled"
+              ? "unparsed"
+              : "upstream-unavailable",
       },
-      freshness: 'live',
+      freshness: "live",
     };
   })();
   modelInFlight.set(key, upstreamRequest);
   try {
     const data = await upstreamRequest;
     modelFailureCooldownUntil.delete(key);
-    modelCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS, staleExpiresAt: Date.now() + CACHE_TTL_MS + STALE_TTL_MS });
-    if (modelCache.size > 200) modelCache.delete(modelCache.keys().next().value);
-    res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=1800');
-    res.setHeader('X-Provider-Cache', 'MISS');
-    return res.status(200).json({ ...data, servedAt: new Date().toISOString() });
+    const expiresAt = nextUtcMidnightMs();
+    const staleExpiresAt = expiresAt + STALE_TTL_MS;
+    modelCache.set(key, {
+      data,
+      expiresAt,
+      staleExpiresAt,
+    });
+    void writeDurableCache({
+      cacheKey: durableFanGraphsKey(`model:${teamAbbr}:${season}`),
+      source: 'FanGraphs',
+      data,
+      freshUntil: new Date(expiresAt),
+      staleUntil: new Date(staleExpiresAt),
+      lastAttemptDay: day,
+    });
+    if (modelCache.size > 200)
+      modelCache.delete(modelCache.keys().next().value);
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=900, stale-while-revalidate=1800"
+    );
+    res.setHeader("X-Provider-Cache", "MISS");
+    return res
+      .status(200)
+      .json({ ...data, servedAt: new Date().toISOString() });
   } catch (error) {
-    if (error?.status >= 500) modelFailureCooldownUntil.set(key, Date.now() + FANGRAPHS_FAILURE_COOLDOWN_MS);
+    if (error?.status >= 500)
+      modelFailureCooldownUntil.set(
+        key,
+        Date.now() + FANGRAPHS_FAILURE_COOLDOWN_MS
+      );
     const fallback = staleModel(cached);
     if (fallback) {
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-      res.setHeader('X-Provider-Cache', 'STALE');
-      return res.status(200).json({ ...fallback.data, freshness: 'stale-cached', servedAt: new Date().toISOString(), staleReason: error?.status === 429 ? 'FanGraphs rate limit' : 'FanGraphs upstream unavailable' });
+      res.setHeader(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      res.setHeader("X-Provider-Cache", "STALE");
+      return res
+        .status(200)
+        .json({
+          ...fallback.data,
+          freshness: "stale-cached",
+          servedAt: new Date().toISOString(),
+            staleReason:
+              error?.status === 429
+                ? "FanGraphs rate limit"
+                : error?.providerBlocked
+                  ? "FanGraphs provider blocked the request"
+                  : "FanGraphs upstream unavailable",
+        });
     }
-    if (error?.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
-    return res.status(error?.status || 502).json(error?.payload || { error: 'FanGraphs request failed' });
+    if (error?.retryAfter)
+      res.setHeader("Retry-After", String(error.retryAfter));
+    return res
+      .status(error?.status || 502)
+      .json(error?.payload || { error: "FanGraphs request failed" });
   } finally {
     if (modelInFlight.get(key) === upstreamRequest) modelInFlight.delete(key);
   }

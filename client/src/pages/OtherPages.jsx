@@ -1033,7 +1033,7 @@ function LeaguePage() {
       )}
 
       {/* ── Stat charts row ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+      <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
         <Panel title="Competitive Balance Index" accent={C.amber} badge="Unavailable">
           <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             No authoritative league-wide parity source is connected. The prior snapshot is hidden.
@@ -1151,7 +1151,7 @@ function LeaguePage() {
       </Panel>
 
       {/* ── Stat leaders + trends + injury + farm ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+      <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
         <Panel title="League Trends 2026" accent={C.amber} badge="Unavailable">
           <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             No verified trend feed is connected. The prior editorial snapshot is hidden.
@@ -1173,7 +1173,7 @@ function LeaguePage() {
 
       {/* ── Live stat leaders (when available) ── */}
       {hasLeaders && (
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12 }}>
+        <div className="skip-balanced-grid" style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12 }}>
           {[
             ['HR Leaders',          leaders.homeRuns,           C.rust],
             ['AVG Leaders',         leaders.battingAverage,     C.amber],

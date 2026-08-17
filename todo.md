@@ -1,5 +1,9 @@
 # Project TODO
 
+- [x] Fix OverviewPage team selector handling so MLB parent selection displays main MLB team overview instead of forcing affiliate stats.
+- [x] Add regression test for MLB parent versus affiliate selector routing.
+- [x] Run release validation, review preview, and publish release.
+
 - [x] Inspect the latest uploaded `skip-baseball-3.zip` archive and compare its files with the current Manus project.
 - [x] Migrate all latest SKIP frontend source files under `src/` into the Manus client source tree.
 - [x] Migrate all latest public assets and the original HTML metadata/theme bootstrap without changing the roadmap markdown.
@@ -10836,7 +10840,6 @@
 
 ## Final audit
 
-
 ## Final cleanup items
 
 - [x] Remove unused root-level API copies from the earlier partial migration if no references remain.
@@ -10890,7 +10893,7 @@
 - [x] Audit and verify the required Recharts visualizations by source presence and render coverage.
 - [x] Add and run targeted localStorage tests for Watchlist stars and Scouting Notes persistence across remount.
 - [x] Add and run targeted interaction tests for Cmd/Ctrl+K, CompareModal’s multi-player workflow, and ProspectCard behavior.
-LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB proxy requests returned HTTP 200 with expected Express, CORS, cache-control, and proxy-source headers.
+      LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB proxy requests returned HTTP 200 with expected Express, CORS, cache-control, and proxy-source headers.
 
 ## Data audit and correction
 
@@ -10933,6 +10936,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add a deterministic test for the MLB proxy’s non-JSON/empty upstream response handling.
 
 ## Player profile accuracy audit — all profiles
+
 - [x] Inventory every player profile field, source, formatter, derived metric, and fallback used by PlayersPage and profile detail components.
 - [x] Extract the complete player profile catalog and verify every player identity, MLB ID, position, organization, level, handedness, and age against authoritative MLB records.
 - [x] Verify all standard batting, pitching, fielding, and season-split values shown in player profiles against MLB Stats API responses.
@@ -10943,8 +10947,8 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Smoke-test all player profile routes and rerun lint, TypeScript, build, API checks, and the full Vitest suite.
 - [x] Review the final diff to confirm ROADMAP_REFERENCE_FEATURES.md remains unchanged, save a checkpoint, and deliver the all-profile audit summary.
 
-
 ## UI, percentile, team, prospect, and draft refinement
+
 - [x] Inventory the player-card, percentile, spray-chart, team-overview, prospect, draft, and other data-bearing surfaces against the supplied dashboard examples.
 - [x] Replace raw-value bar scales with percentile scales wherever percentile data exists, preserving the underlying raw statistic as a secondary label.
 - [x] Reorganize the top player card around SKIP proprietary metrics and remove the unnecessary slider interaction.
@@ -10961,6 +10965,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Use Baseball Savant as the primary baseline for Statcast definitions, percentile direction, pitch/batted-ball chart conventions, and percentile-card presentation across the affected tabs.
 
 ## New features and skill creation
+
 - [x] Initialize the reusable `skip-baseball-audit` skill using `init_skill.py`.
 - [x] Author `SKILL.md` and reference materials capturing the live data audit, percentile population rules, Savant baselines, and Bloomberg-terminal UI patterns.
 - [x] Add side-by-side player percentile radar comparison feature.
@@ -10972,6 +10977,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Re-run the full release checks after the final source-audit corrections and save the final checkpoint.
 
 ## Comprehensive metric verification & online source audit
+
 - [x] Audit every statistic card, radar metric, league leader, team overview aggregate, and prospect stat column across all tabs.
 - [x] Search authoritative online sources (MLB Stats API, Baseball Savant leaderboard exports, NCAA D1 scoreboards, and Spotrac/BRef contract indices) to verify current 2026 data availability.
 - [x] Connect any missing or broken live data flows where authoritative endpoints exist, and explicitly label unsupported or unavailable panels.
@@ -10981,12 +10987,14 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Prevent Prospect tables from silently falling back to stale static numeric stats after a live response is present but a player or field is missing; keep only editorial identity/rank fields and show em dashes for unavailable live metrics.
 
 ## AI comparison and Draft trend enhancements
+
 - [x] Add an AI-generated summary to the side-by-side player comparison modal using only the two players' source-backed Savant percentile profiles.
 - [x] Add smooth modal transition states and accessible loading spinners while comparison players and the summary are fetching.
 - [x] Add authoritative three-season historical trend sparklines for each Draft board player's key metrics, with explicit unavailable states when history is missing.
 - [x] Add regression tests, run lint/check/build/full Vitest, visually verify the new interactions, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## New user requests (video links, recommendation, trajectory sorting, exact sparkline tooltips)
+
 - [x] Add a lightweight source-safe player video section to player pages using player name/team search queries and verified MLB video links without fabricating media files.
 - [x] Enhance the AI comparison summary to include a brief recommendation on which player better fits specific team needs or play styles.
 - [x] Implement a sorting feature on the Draft board that allows users to order players based on the upward or downward trajectory of their historical trend sparklines.
@@ -10994,54 +11002,64 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Add regression tests, verify desktop/mobile UI, run lint/check/build/full Vitest, save checkpoint, and deliver.
 
 ## Overview hierarchy refinement
+
 - [x] Move Team Leaders and Front Office Evaluation higher on the team overview page, before lower-detail panels, while preserving responsive behavior.
 - [x] Run focused tests and responsive visual verification, confirm the roadmap remains unchanged, and save a checkpoint.
 
 ## Front Office radar and player video thumbnails
+
 - [x] Add a source-backed team-strength radar beside Front Office Evaluation using the overall team rating fields and explicit unavailable values.
 - [x] Replace plain player video links with clickable thumbnails and clear external-source labels, without fabricating video records.
 - [x] Add regression tests, verify responsive visuals, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Team report export, video tooltips, and financial context
+
 - [x] Add a downloadable Team Overview PDF report that includes the Team Strength radar and source/provenance notes.
 - [x] Add hover and keyboard-focus tooltips to player video thumbnails with concise titles/descriptions and source labels.
 - [x] Integrate verified team payroll and luxury-tax tracking data into contract valuation panels, with explicit unavailable states when no authoritative feed is available.
 - [x] Add regression tests, verify responsive/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Low-bandwidth video follow-up
+
 - [x] Reconcile the latest concurrent player-video implementation before editing shared video-card code.
 - [x] Keep video references optional and low-data: no autoplay, no embedded players, lazy or deferred thumbnails, lightweight external search links, and accessible text fallbacks.
 - [x] Preserve the team PDF export and payroll/luxury-tax work while resolving any shared-file merge issues.
 - [x] Run focused and full tests, lint/check/build, responsive verification, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Player exports and repeater-tier contract modeling
+
 - [x] Add a reusable Player Valuation Card PDF export with player identity, SKIP metrics, percentile profile, contract value, and source notes.
 - [x] Add a reusable Executive Scouting Summary PDF export with team/player context, decision signals, financial context, and source notes.
 - [x] Add luxury-tax repeater-tier tracking and multi-year tax-adjusted contract projections with explicit assumptions and unavailable states.
 - [x] Add regression tests, verify download flows and responsive UI, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Player PDF templates and luxury-tax repeater tiers
+
 - [x] Add reusable PDF export templates for individual player valuation cards and executive scouting summaries.
 - [x] Integrate team luxury-tax penalty repeater tier tracking into multi-year contract projection models with transparent assumptions and source notes.
 - [x] Add regression tests, verify download flows and responsive UI, run release checks, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Low-data mode, comparison PDF, and CBT tooltips
+
 - [x] Add a persisted Low Data Mode toggle that disables or defers heavy assets such as video thumbnails and high-resolution images.
 - [x] Add a side-by-side two-player valuation PDF export using existing comparison data and clear source notes.
 - [x] Add accessible interactive tooltips explaining CBT repeater tiers and their financial implications.
 - [x] Add regression tests, verify responsive/settings/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Global Low Data indicator and CBT severity colors
+
 - [x] Add a global header indicator showing when Low Data Mode is active, synchronized with the persisted preference.
 - [x] Add accessible severity color coding for CBT repeater-tier badges, table cells, and tooltip content.
 - [x] Add regression tests, verify responsive contrast, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Extension surcharge warnings and team financial CSV export
+
 - [x] Add source-backed luxury-tax surcharge impact warnings to individual player extension recommendation banners.
 - [x] Add a CSV export option for team payroll, CBT, repeater-tier, and multi-year luxury-tax projection data alongside PDF reports.
 - [x] Add regression tests, verify warning/export flows, run lint/check/build/full Vitest, confirm ROADMAP_REFERENCE_FEATURES.md is unchanged, and save a checkpoint.
 
 ## Surcharge badges, historical tax trends, and team identity
+
 - [x] Add a visual surcharge-risk badge to player cards when an extension would add payroll inside a CBT surcharge band.
 - [x] Add historical multi-season franchise luxury-tax trend charts beside the existing five-year projection model using verified data only.
 - [x] Add stronger team-focused visual identity to team overview and player pages with verified logos/colors and accessible fallbacks.
@@ -11091,6 +11109,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Stabilize the command-palette preservation regression under full-suite parallel load without changing its behavioral coverage.
 
 ## Recent history header dropdown
+
 - [x] Implement recent history utility for persisting viewed players and teams with deduplication and cap.
 - [x] Add header dropdown component with quick-action links and clear history controls.
 - [x] Wire automatic view tracking into player selection and team overview selection.
@@ -11098,6 +11117,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## Recent history and Bloomberg × Apple visual refinement
+
 - [x] Implement recent history utility for persisting viewed players and teams with deduplication and a capped list.
 - [x] Add an accessible recent-history dropdown to the global header with quick navigation and clear-history controls.
 - [x] Wire automatic view tracking into player selection and team overview selection.
@@ -11114,6 +11134,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Run regression tests, verify responsive layout, preserve ROADMAP_REFERENCE_FEATURES.md, and save a final data-repair checkpoint.
 
 ## Player projection card data confidence score
+
 - [x] Implement a transparent data-confidence scoring utility that evaluates source completeness, freshness age, and live versus cached status.
 - [x] Add the confidence score indicator to player valuation and projection cards on player profile pages.
 - [x] Include detailed breakdown tooltips explaining the confidence rating without fabricating unverified metrics.
@@ -11121,6 +11142,7 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Verify responsive rendering, run final release gates, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## MLB 429 Rate-Limit Mitigation
+
 - [x] Implement rate-limit cooldown and exponential backoff on 429 responses in client/src/api/mlb.js.
 - [x] Add request coalescing and extended cache TTL for team aggregate and schedule queries.
 - [x] Ensure OverviewPage catches 429 errors gracefully and uses last-successful cached data without console spam.
@@ -11128,9 +11150,11 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Run release gates and save checkpoint.
 
 ## Current MLB Rate-Limit Fix
+
 - [x] Verify live, cached, and unavailable MLB data states render correctly and never replace verified values with misleading blanks.
 
 ## Three-Tier News Fallback
+
 - [x] Implement Tier 1–3 news fallback in api/news.js with stale-if-error cache metadata.
 - [x] Update React news components to display accessible Tier 1, Tier 2, Tier 3, cached, and unavailable badges.
 - [x] Complete RESILIENCE_GUIDE.md with configuration, feed provenance, and deployment steps.
@@ -11138,33 +11162,39 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Run release gates and save a published checkpoint.
 
 ## Attached Data-Gaps Specification
+
 - [x] Review and reconcile the attached FanGraphs, Savant, splits, weather, metadata, and playoff-odds requirements.
 - [x] Preserve honest unavailable states where a source or endpoint is not verified.
 - [x] Implement only verified data-gap improvements without modifying ROADMAP_REFERENCE_FEATURES.md.
 - [x] Add regression coverage and verify desktop/mobile rendering for each changed panel.
 
 ## ESPN RSS and Secure API Configuration
+
 - [x] Integrate the verified ESPN MLB RSS XML feed into the resilient news fallback route.
 - [x] Add environment-based Vercel CORS allowlisting and document required variables.
 - [x] Add simulated Nitter/ESPN failure-injection tests for fallback ordering and stale cache behavior.
 - [x] Preserve and continue the attached FanGraphs, Savant, splits, weather, and metadata gap work.
 
 ## Shared Checkpoint Reconciliation and Reapplication
+
 - [x] Merge latest origin/main changes while keeping uncommitted news fallback, CORS, guide, venue, and Savant updates.
 - [x] Reapply and verify all 60 test files and build output.
 - [x] Save final checkpoint.
 
 ## News Feed Loading Skeleton
+
 - [x] Add animated news skeleton component respecting reduced-motion and low-data modes.
 - [x] Integrate skeleton into FeedPage.jsx during loading states.
 - [x] Add test coverage and publish checkpoint.
 
 ## Compact Farm-System Summary Score Card
+
 - [x] Trace existing prospect page ranking data and card structures.
 - [x] Implement farm-system summary score card with source-aware metrics and unavailable states.
 - [x] Add unit and rendering tests, verify desktop/mobile views, and publish checkpoint.
 
 ## Broad Debugging and Optimization Pass
+
 - [x] Audit current shared code, runtime logs, request behavior, and production preview for actionable issues.
 - [x] Reduce verified client/server data-loading failures, timeout noise, and stale-state ambiguity without fabricating baseball data.
 - [x] Improve measurable frontend performance, low-data behavior, responsive layout, and accessibility where regressions are found.
@@ -11172,12 +11202,14 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Run the complete release gate, review desktop/mobile previews, preserve ROADMAP_REFERENCE_FEATURES.md, and save a new checkpoint.
 
 ## Mobile Experience & Source-Health Badges
+
 - [x] Refine touch scrolling momentum, gesture inertia, and menu drawer backdrop handling for iOS and Android.
 - [x] Integrate verified FanGraphs WAR and Baseball Savant source-health badges into affected metric and overview cards.
 - [x] Add unit and rendering regression tests for touch navigation and badge rendering.
 - [x] Run full release gates, verify desktop/mobile viewports, and publish the verified checkpoint.
 
 ## Savant Refetch & Source-Health Repair
+
 - [x] Stabilize Savant roster rollup effect dependency with stable rosterSavantKey to prevent repeated loading loops on poll ticks.
 - [x] Add proper spacing and separation between provider names and source-health badge pills to eliminate visual text collision.
 - [x] Run full release gates, verify all 338 tests pass successfully, and save the publishable checkpoint.
@@ -11191,3 +11223,70 @@ LOG_REVIEW=browser console had no error/exception/failed entries; recent MLB pro
 - [x] Implement local search-query analytics store with privacy-safe normalization and frequency aggregation.
 - [x] Add common query summary and shortcut prioritization view in the command palette / search interface.
 - [x] Add unit and integration tests for query analytics and shortcut recommendations.
+- [x] Conduct end-to-end audit of server proxies (mlb.js, savant.js, fangraphs-models.js, news.js, feed.js, ncaa.js, contract.js, team-financials.js).
+- [x] Optimize response caching, rate-limit backoffs, and stale-if-error resilience across all data sources.
+- [x] Ensure strict data provenance badges and zero synthetic/fabricated stat fallbacks across player and team views.
+- [x] Run full test suite and build verification for the optimized API and data architecture.
+- [x] Ensure MLB team identity and core stats load before affiliate requests on OverviewPage.
+- [x] Add explicit loading skeleton and retry status indicators for team identity fetching.
+- [x] Verify team loading sequence with unit tests and production build.
+- [x] Inspect development server logs and browser console logs for any lingering warnings or unhandled rejections.
+- [x] Run independent debugging pass with webdev_debug to detect subtle race conditions or memory leaks.
+- [x] Implement targeted refinements for data resilience and UI responsiveness based on debugging findings.
+- [x] Run full test suite, verify build and publish new checkpoint.
+- [x] Profile bundle chunks and eliminate redundant re-renders across Overview and Players pages.
+- [x] Optimize client API request de-duplication and memory cache cleanup.
+- [x] Add performance regression test coverage and verify build outputs.
+- [x] Run release validation and publish the optimized release.
+- [x] Reorder Overview sections so unavailable and coverage-gap panels are positioned toward the bottom.
+- [x] Preserve live, cached, and loading provenance badges and loading states.
+- [x] Add layout regression tests and verify desktop/mobile rendering.
+- [x] Run full release validation, review preview, and publish release.
+- [x] Fix Savant metric rendering on OverviewPage to display actual numerical stats instead of source/cache status strings.
+- [x] Add explicit unit and rendering tests for Savant metrics and source badges.
+- [x] Run release validation, review preview, and publish release.
+- [x] Fix affiliate metric mapping for OPS, HR, ERA, and K on OverviewPage to prevent mixed-up or mismatched stats.
+- [x] Add regression tests for affiliate stats and badge separation.
+- [x] Run release validation, review preview, and publish release.
+- [x] Fix Savant metric extraction in client/src/api/mlb.js for expectedBA, expectedSLG, hardHitPercent, and barrelPercent.
+- [x] Add regression tests for Savant metrics extraction.
+- [x] Run release validation, review preview, and publish release.
+- [x] Fix Oklahoma City affiliate stat normalization in client/src/api/mlb.js for OPS, HR, ERA, K, xBA, xSLG, Hard-hit %, and Barrel %.
+- [x] Add explicit regression test for Oklahoma City affiliate card metrics.
+- [x] Run release validation, review preview, and publish release.
+- [x] Fix OverviewPage team selector handling so MLB parent selection displays main MLB team overview instead of forcing affiliate stats.
+- [x] Add regression test for MLB parent versus affiliate selector routing.
+- [x] Run release validation, review preview, and publish release.
+- [x] Add 502 and non-JSON quiet status handling for affiliate schedule requests in client/src/api/mlb.js.
+- [x] Add regression test for affiliate schedule upstream errors.
+- [x] Run release validation and publish release.
+- [x] Audit current runtime, production build, and API request behavior for performance and reliability bottlenecks.
+- [x] Implement the highest-impact data resilience and rendering performance fixes identified in the audit.
+- [x] Improve user-facing loading, retry, and unavailable state presentation where needed.
+- [x] Add targeted regression coverage and complete full release validation.
+- [x] Ensure the selected team’s MLB parent club is always preselected on Team Overview.
+- [x] Add regression coverage for initial, team-change, and explicit-affiliate selector behavior.
+- [x] Run release validation and publish the parent-first selector fix.
+- [x] Repair the remaining Team Overview selector behavior without changing the MLB-parent default.
+- [x] Add an explicit Minor League button that reveals affiliate controls only on demand.
+- [x] Add button-driven affiliate-flow regression coverage and publish the fix.
+- [x] Add classification filters for Triple-A, Double-A, High-A, Single-A, and other verified affiliate levels.
+- [x] Preserve explicit affiliate selection and reset the filter safely on team changes.
+- [x] Add filtering regressions, validate responsive controls, and publish the release.
+- [x] Add sortable affiliate standings controls for record, winning percentage, games back, and team name.
+- [x] Optimize standings ordering and preserve verified/unavailable source states.
+- [x] Add sorting regressions, validate responsive controls, and publish the release.
+- [x] Exclude MLB parent club rows from the affiliate selector and level filters.
+- [x] Preserve explicit true-affiliate selection and add parent-exclusion regression coverage.
+- [x] Run release validation and publish the selector correction.
+- [x] Audit team selection, affiliate loading, filters, standings sorting, and source-failure behavior end to end.
+- [x] Implement high-impact correctness, resilience, and interaction-performance improvements.
+- [x] Refine responsive loading and unavailable feedback and add end-to-end regression coverage.
+- [x] Complete production validation and publish the optimized workflow.
+- [x] Inventory and compare local and remote branches against the current optimized release.
+- [x] Identify the safest branch baseline and document push readiness without changing Git history.
+- [x] Run final release validation against the 29b3a367 baseline.
+- [x] Commit completed todo.md tracking updates and prepare a release-ready Git commit log without pushing.
+- [ ] Verify local main and remote origin/main are ready for the authorized push.
+- [ ] Push d422e88 and the validated main history to origin/main and confirm the remote tip.
+- [ ] Prepare the release pull-request description and run a final remote production smoke test.

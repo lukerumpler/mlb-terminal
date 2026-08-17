@@ -170,6 +170,7 @@
 - [x] Save and publish the validated data-quality toolkit and merge-resolution checkpoint.
 
 ## Historical checklist items completed in this session
+
 - [x] Add regression coverage, run the full suite and TypeScript check, and verify responsive desktop/mobile flows.
 - [x] Save and publish the validated data-quality toolkit checkpoint.
 - [x] Add team-level CSV and JSON exports with current team values and freshness/source metadata, exposed from Overview.
