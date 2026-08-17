@@ -15,6 +15,7 @@ import { computeAMD } from "../client/src/engine/skip.js";
 import {
   selectSeasonSplit,
   normalizeSeasonAdvancedStat,
+  normalizeYearByYearAdvancedStats,
   mergeAdvancedMetricSources,
 } from "../client/src/api/mlb.js";
 import { parseBaseballReferenceAdvanced } from "../server/api/player-advanced.js";
@@ -39,6 +40,17 @@ describe("player profile data accuracy guards", () => {
       { season: 2024, war: 4.2, wrcPlus: 131 },
       { season: 2025, war: 5.1, wrcPlus: 142 },
       { season: 2026, war: 6.0, wrcPlus: 150 },
+    ]);
+  });
+
+  it("normalizes official yearByYearAdvanced rows without treating OPS+ as wRC+", () => {
+    const rows = normalizeYearByYearAdvancedStats({ stats: [{ group: { displayName: "hitting" }, splits: [
+      { season: "2024", stat: { war: 4.2, wRCPlus: 131 } },
+      { season: "2025", stat: { OPSPlus: 150 } },
+    ] }] });
+    expect(rows).toEqual([
+      { season: 2024, war: 4.2, wrcPlus: 131, source: "MLB Stats API yearByYearAdvanced", status: "live" },
+      { season: 2025, war: null, wrcPlus: null, source: "MLB Stats API yearByYearAdvanced", status: "unavailable" },
     ]);
   });
 

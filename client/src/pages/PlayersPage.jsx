@@ -1800,7 +1800,12 @@ function PlayersPage() {
         : (parseFloat(st.ops) || null);
       return { yr: r.season, val };
     }).filter(d => d.val != null);
-    const advancedTrendData = buildAdvancedMetricTrendSeries(player.isPitcher ? player.careerPitching : player.career, 5);
+    const advancedTrendData = buildAdvancedMetricTrendSeries(
+      Array.isArray(player.careerAdvanced) && player.careerAdvanced.length
+        ? player.careerAdvanced
+        : (player.isPitcher ? player.careerPitching : player.career),
+      5,
+    );
 
     return {
       kpis, score, verd, arch,

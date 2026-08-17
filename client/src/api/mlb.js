@@ -605,6 +605,21 @@ export async function getSeasonAdvancedStatsSafe(id, season, sportId, requestOpt
   }
 }
 
+export function normalizeYearByYearAdvancedStats(data, groupName = 'hitting', source = 'MLB Stats API yearByYearAdvanced') {
+  const group = findStatGroup(data?.stats, groupName);
+  return (group?.splits || []).map(split => normalizeSeasonAdvancedStat(split?.stat || {}, Number(split?.season), source))
+    .filter(row => Number.isInteger(row.season));
+}
+
+export async function getCareerAdvancedStatsSafe(id, group = 'hitting', requestOptions = {}) {
+  try {
+    const data = await mlb(`/people/${id}/stats`, { stats:'yearByYearAdvanced', group }, requestOptions);
+    return normalizeYearByYearAdvancedStats(data, group);
+  } catch {
+    return [];
+  }
+}
+
 export function mergeAdvancedMetricSources(primary = {}, fallback = {}) {
   const explicitNumber = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
   const primaryWar = explicitNumber(primary.war);
@@ -1006,6 +1021,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const careerPitchingPromise = isPitcher
     ? getCareerSplits(id, 'pitching', importantRequest)
     : Promise.resolve([]);
+  const careerAdvancedPromise = getCareerAdvancedStatsSafe(id, isPitcher ? 'pitching' : 'hitting', importantRequest);
   const contractPromise = fetchContractData(id, person.fullName, importantRequest);
   const handednessPromise = isPitcher
     ? Promise.resolve({ rows: [], careerRows: [], season, isFallback: false, status: 'unavailable' })
@@ -1014,9 +1030,10 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
   const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
 
-  const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
+  const [careerHitting, careerPitching, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
     careerPitchingPromise,
+    careerAdvancedPromise,
     contractPromise,
     handednessPromise,
     teamFinancialsPromise,
@@ -1034,6 +1051,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     advancedMetrics,
     career: careerHitting,
     careerPitching,
+    careerAdvanced,
     contractData: contractRaw,
     handednessSplits: handednessResult,
     teamFinancials,
@@ -1239,6 +1257,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
     careerPitching,
+    careerAdvanced,
     hittingStats:  hittingResult?.stat    || {},
     pitchingStats: pitchingResult?.stat   || {},
     contractData:  contractRaw,
