@@ -348,3 +348,16 @@
 - [x] Add focused regressions for accepted Player Profile optimizations
 - [x] Run focused tests, full suite, type-check, build, visual/runtime checks, and save a verified checkpoint
 - [x] Report the GitHub export and completed Player Profile optimization work
+
+- [x] Validate the supplied readiness review against current source, package graph, test scripts, release targets, and deployment configuration
+- [x] Repair confirmed full-test, formatting/lint, and deployment-candidate targeting failures without weakening coverage
+- [x] Audit and remediate critical/high production dependency advisories and the active pnpm override configuration
+- [x] Verify non-secret production configuration presence, CORS/OAuth behavior, and deployment-target provenance without exposing values
+- [x] Document any remaining platform-only or production-only release blockers with a safe closure path
+- [ ] Run complete release-gate validation, checkpoint safe changes, and report whether public promotion remains blocked
+
+- [x] Move ignored pnpm overrides and patched-dependency settings into pnpm 10 workspace configuration
+- [x] Upgrade directly vulnerable production dependencies and regenerate the lockfile
+- [x] Verify production audit findings after upgrades and document any advisories that remain only in development tooling
+- [ ] Correct the player-advanced proxy CORS invocation and add a production allowlist regression
+- [ ] Apply and validate compatible patch-level overrides for the remaining moderate Streamdown transitive advisories

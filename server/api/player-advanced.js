@@ -49,7 +49,7 @@ export function parseBaseballReferenceAdvanced(html, season) {
 }
 
 export default async function playerAdvancedHandler(req, res) {
-  applyCors(res);
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   const name = String(req.query?.name || "").trim();
   const season = Number(req.query?.season || new Date().getUTCFullYear());
