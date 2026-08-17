@@ -233,3 +233,8 @@
 - [x] Add regression tests for OAA context, modal opening/closing, and source labels.
 - [x] Repair the release-blocking package-manager declaration introduced by the shared production-readiness update.
 - [x] Run full validation, review responsive behavior, and publish the enhancements.
+
+- [x] Inspect existing player-profile navigation and depth-chart row semantics.
+- [x] Make organization depth-chart prospect rows open the matching detailed player profile.
+- [x] Preserve accessible modal behavior and add profile-link navigation regression coverage.
+- [x] Run validation, review the interaction, and publish the linked rows.

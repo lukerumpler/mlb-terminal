@@ -764,6 +764,10 @@
 .skip-future-value-position-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border-light);color:var(--purple,#7656a8);font:800 9px/1.2 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
 .skip-future-value-prospect-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-bottom:1px solid var(--border-light)}
 .skip-future-value-prospect-row:last-child{border-bottom:0}
+.skip-future-value-prospect-link{color:inherit;text-decoration:none;cursor:pointer;transition:background-color .16s cubic-bezier(.23,1,.32,1),transform .16s cubic-bezier(.23,1,.32,1)}
+.skip-future-value-prospect-link:hover{background:color-mix(in srgb,var(--purple-soft,#eee7f6) 58%,var(--surface2))}
+.skip-future-value-prospect-link:focus-visible{outline:2px solid var(--purple,#7656a8);outline-offset:-2px;background:color-mix(in srgb,var(--purple-soft,#eee7f6) 58%,var(--surface2))}
+.skip-future-value-prospect-link:active{transform:scale(.99)}
 .skip-future-value-prospect-row div{min-width:0;display:flex;flex-direction:column;gap:2px}
 .skip-future-value-prospect-row strong{overflow:hidden;color:var(--text);font:700 11px/1.25 'Plus Jakarta Sans',sans-serif;text-overflow:ellipsis;white-space:nowrap}
 .skip-future-value-prospect-row span{color:var(--text4);font:9px/1.25 'DM Mono',monospace}
@@ -772,7 +776,7 @@
 @keyframes skip-future-value-fade{from{opacity:0}to{opacity:1}}
 @keyframes skip-future-value-dialog{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media (max-width:640px){.skip-future-value-modal-backdrop{align-items:end;padding:10px}.skip-future-value-modal{max-height:calc(100vh - 20px);border-radius:11px}.skip-future-value-modal-header{padding:14px}.skip-future-value-modal-summary{padding:10px 14px}.skip-future-value-depth-grid{grid-template-columns:1fr;padding:10px 14px}.skip-future-value-modal-note{padding:0 14px 14px}}
-@media (prefers-reduced-motion:reduce){.skip-future-value-modal-backdrop,.skip-future-value-modal{animation:none}.skip-future-value-modal-close{transition:none}}
+@media (prefers-reduced-motion:reduce){.skip-future-value-modal-backdrop,.skip-future-value-modal{animation:none}.skip-future-value-modal-close,.skip-future-value-prospect-link{transition:none}}
 
 
 /* Overview feed states share one compact visual language. */

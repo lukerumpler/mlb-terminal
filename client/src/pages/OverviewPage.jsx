@@ -9,7 +9,7 @@ import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
-import { openTab } from '../lib/navigation.js';
+import { openPlayerProfile, openTab } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
@@ -1843,9 +1843,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             {organizationProspectDepth.rows.length ? <div className="skip-future-value-depth-grid">
               {organizationProspectDepth.rows.map(row => <section key={row.position} className="skip-future-value-position-group">
                 <div className="skip-future-value-position-heading"><span>{row.position}</span><span>Top FV {row.topFutureValue.toFixed(0)}</span></div>
-                {row.prospects.slice(0, 4).map(prospect => <div key={`${prospect.mlbId || prospect.name}-${prospect.pos}`} className="skip-future-value-prospect-row">
+                {row.prospects.slice(0, 4).map(prospect => <a key={`${prospect.mlbId || prospect.name}-${prospect.pos}`} href="#players" className="skip-future-value-prospect-row skip-future-value-prospect-link" onClick={event => { event.preventDefault(); setFutureValueModalOpen(false); openPlayerProfile(prospect.mlbId, prospect.name); }} aria-label={`Open ${prospect.name} detailed player profile`}>
                   <div><strong>{prospect.name}</strong><span>{prospect.level} · age {prospect.age}</span></div><b>{prospect.futureValue.toFixed(0)} FV</b>
-                </div>)}
+                </a>)}
               </section>)}
             </div> : <OverviewEmptyState message="Prospect depth chart" detail="The current SKIP prospect snapshot has no graded prospects for this organization." />}
             <p className="skip-future-value-modal-note">Source: curated SKIP prospect snapshot. This chart is an organization-level planning view, not a live MLB Pipeline or third-party prospect ranking feed.</p>

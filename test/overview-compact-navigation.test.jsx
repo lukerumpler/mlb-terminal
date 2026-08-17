@@ -91,7 +91,14 @@ describe('Team Overview compact navigation', () => {
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getAllByText(/SKIP prospect snapshot/i).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close organization prospect depth chart' }));
+    const onOpenPlayer = vi.fn();
+    window.addEventListener('skip-open-player', onOpenPlayer);
+    const profileLink = within(dialog).getAllByRole('link', { name: /open .* detailed player profile/i })[0];
+    expect(profileLink).toHaveAttribute('href', '#players');
+    fireEvent.click(profileLink);
+    expect(onOpenPlayer).toHaveBeenCalledTimes(1);
+    expect(onOpenPlayer.mock.calls[0][0].detail).toMatchObject({ id: expect.any(Number), fullName: expect.any(String) });
     expect(screen.queryByRole('dialog', { name: /organization depth/i })).not.toBeInTheDocument();
+    window.removeEventListener('skip-open-player', onOpenPlayer);
   });
 });
