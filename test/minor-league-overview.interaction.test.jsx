@@ -122,6 +122,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
   it("selects the Giants and displays the Sacramento River Cats affiliate overview while keeping MLB context visible", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
 
     const teamSelect = screen.getByRole("combobox", { name: "Select team" });
     await user.selectOptions(teamSelect, "sf");
@@ -149,6 +150,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
     affiliateMode = "loading";
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"
@@ -169,6 +171,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
   it("switches between affiliate standings and schedule views and reports Savant freshness", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"
@@ -193,6 +196,7 @@ describe("Team Overview minor-league affiliate interaction", () => {
     affiliateMode = "error";
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Select team" }),
       "sf"

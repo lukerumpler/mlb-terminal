@@ -280,6 +280,7 @@ describe("Settings roster defaults", () => {
 
     const overviewButton = screen.getByTitle("Overview");
     await user.click(overviewButton);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await screen.findByText("AI Scout Insights");
     expect(
       screen.getByRole("combobox", { name: "Minimum plate appearances" })

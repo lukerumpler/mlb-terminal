@@ -24,6 +24,7 @@ describe('Savant metric display and source badge separation', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok:true, status:200, headers:{ get:() => null }, json:async()=>({}), text:async()=>JSON.stringify({}) })));
 
     render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     expect(await screen.findByText('cached 2h ago')).toBeInTheDocument();
   });
 
@@ -36,6 +37,7 @@ describe('Savant metric display and source badge separation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     await screen.findByText('cached 2h ago');
     const beforeRetry = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/savant')).length;
     fireEvent(window, new CustomEvent('skip-provider-retry', { detail:{ provider:'savant' } }));
@@ -55,6 +57,7 @@ describe('Savant metric display and source badge separation', () => {
     );
 
     render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     
     const xwobaLabel = await screen.findByText(/xwOBA/i);
     expect(xwobaLabel).toBeInTheDocument();

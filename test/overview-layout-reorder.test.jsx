@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 
 describe('Overview page section reordering for unavailable data', () => {
@@ -14,7 +14,7 @@ describe('Overview page section reordering for unavailable data', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders core season overview metrics above the Advanced Models and Divisional WAR panels', async () => {
+  it('keeps the core season briefing concise while preserving advanced models and divisional WAR in the Performance view', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -29,6 +29,8 @@ describe('Overview page section reordering for unavailable data', () => {
     render(<OverviewPage />);
     
     const seasonOverviewHeading = await screen.findByText(/Season overview/i);
+    expect(screen.queryByText(/Advanced Models & Savant/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     const advancedModelsPanel = screen.getByText(/Advanced Models & Savant/i);
     const divisionalWarPanel = screen.getByText(/Divisional WAR Comparison/i);
 

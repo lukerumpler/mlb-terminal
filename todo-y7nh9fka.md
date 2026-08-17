@@ -192,3 +192,11 @@
 - [x] Add regression coverage for every optimization or bug fix applied in this pass.
 - [x] Run focused and full validation, production build, and responsive preview inspection.
 - [x] Save a new live checkpoint for the validated latest-state optimization/debugging pass.
+
+- [x] Audit Team Overview card density, page hierarchy, and navigation friction across desktop and mobile.
+- [x] Design and implement a summary-first Team Overview with progressive disclosure for secondary analytics.
+- [x] Preserve direct access to verified data, statuses, source provenance, and existing deep-dive modules.
+- [x] Add regression coverage for the new Overview navigation and responsive behavior.
+- [x] Run type checks, focused/full tests, production build, responsive previews, and save a live checkpoint.
+
+- [x] Replace long vertical Team Overview scrolling with compact switchable views that keep secondary cards out of the default canvas.

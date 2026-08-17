@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 
 const modelKey = 'skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=LAD&season=2026';
@@ -50,6 +50,7 @@ describe('rendered FanGraphs local fallback', () => {
     }));
 
     render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
     expect((await screen.findAllByText('42.4')).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
