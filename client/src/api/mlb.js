@@ -1665,7 +1665,11 @@ export async function getAllTeams(sportId = 1) {
 
 export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
   const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season }, { ttl: 10 * 60_000, timeoutMs: 8_000 });
-  return (data.teams || []).map(t => ({
+  return (data.teams || []).filter(t => {
+    const sportId = Number(t.sport?.id);
+    const sportName = String(t.sport?.name || '');
+    return Number(t.id) !== Number(mlbTeamId) && sportId !== 1 && !/major league baseball/i.test(sportName);
+  }).map(t => ({
     id: t.id, name: t.name, abbr: t.abbreviation,
     level: t.sport?.name || '', levelId: t.sport?.id || 0, league: t.league?.name || '',
   })).sort((a, b) => a.levelId - b.levelId);

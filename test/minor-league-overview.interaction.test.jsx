@@ -272,4 +272,20 @@ describe("Team Overview minor-league affiliate interaction", () => {
     expect(affiliateSelect).not.toHaveTextContent("Sacramento River Cats");
     expect(affiliateSelect).not.toHaveTextContent("Eugene Emeralds");
   });
+
+  it("excludes the MLB parent club from the affiliate selector while retaining genuine minor-league teams", async () => {
+    getTeamAffiliates.mockImplementationOnce(async () => [
+      { id: 137, name: "San Francisco Giants", abbr: "SF", level: "Major League Baseball", levelId: 1, league: "National League" },
+      { id: 6141, name: "Sacramento River Cats", abbr: "SAC", level: "Triple-A", levelId: 11, league: "Pacific Coast League" },
+    ]);
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
+
+    const affiliateSelect = await screen.findByRole("combobox", { name: "Select minor league affiliate" });
+    expect(affiliateSelect).toHaveTextContent("Sacramento River Cats");
+    expect(affiliateSelect).not.toHaveTextContent("San Francisco Giants");
+    expect(screen.queryByRole("option", { name: /Major League Baseball/i })).not.toBeInTheDocument();
+  });
 });

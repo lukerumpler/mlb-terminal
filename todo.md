@@ -11276,3 +11276,6 @@
 - [x] Add sortable affiliate standings controls for record, winning percentage, games back, and team name.
 - [x] Optimize standings ordering and preserve verified/unavailable source states.
 - [x] Add sorting regressions, validate responsive controls, and publish the release.
+- [x] Exclude MLB parent club rows from the affiliate selector and level filters.
+- [x] Preserve explicit true-affiliate selection and add parent-exclusion regression coverage.
+- [x] Run release validation and publish the selector correction.

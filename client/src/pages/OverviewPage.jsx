@@ -659,6 +659,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       const parentAbbr = String(detail.parentAbbr || '').toLowerCase();
       const foundKey = Object.keys(TEAMS).find(key => key === parentAbbr || TEAMS[key].abbr.toLowerCase() === parentAbbr);
       if (foundKey) {
+        const parentTeam = TEAMS[foundKey];
+        if (Number(detail.affiliateId) === Number(parentTeam.id) || Number(detail.levelId) === 1) {
+          setPendingAffiliate(null);
+          setAffiliateId('');
+          setAffiliateControlsOpen(false);
+          setSelTeam(foundKey);
+          return;
+        }
         setSelTeam(foundKey);
         setPendingAffiliate({ id: String(detail.affiliateId || ''), levelId: String(detail.levelId || '11') });
         setAffiliateControlsOpen(true);
@@ -700,7 +708,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setAffiliates([]);
     getTeamAffiliates(teamBase?.id).then(rows => {
       if (!alive) return;
-      setAffiliates(rows);
+      setAffiliates(rows.filter(row => Number(row.id) !== Number(teamBase?.id) && Number(row.levelId) !== 1 && !/major league baseball/i.test(String(row.level || ''))));
       setAffiliatesState('ready');
     }).catch(() => { if (alive) setAffiliatesState('error'); });
     return () => { alive = false; };
