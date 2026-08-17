@@ -225,3 +225,11 @@
 - [x] Preserve explicit unavailable labels when a required verified input is absent.
 - [x] Add regression tests for populated and unavailable Front Office grades.
 - [x] Run validation, review the rating strip, and publish the repair.
+
+- [x] Inspect existing Baseball Savant OAA inputs and prospect-chart patterns.
+- [x] Display verified Statcast OAA alongside the calculated Defense grade with a clear source distinction.
+- [x] Add a clickable Future Value rating that opens an accessible organization-level prospect depth-chart modal.
+- [x] Preserve explicit OAA and prospect-data unavailable states.
+- [x] Add regression tests for OAA context, modal opening/closing, and source labels.
+- [x] Repair the release-blocking package-manager declaration introduced by the shared production-readiness update.
+- [x] Run full validation, review responsive behavior, and publish the enhancements.

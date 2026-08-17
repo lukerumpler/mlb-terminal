@@ -12,6 +12,7 @@ import {
   buildPitchArsenalRows,
   buildLiveRadarData,
   buildLiveRunDiffData,
+  buildOrganizationProspectDepthChart,
   deriveFrontOfficeCoverageGrades,
   formatDataAge,
   resolveTeamSavantSnapshot,
@@ -111,6 +112,15 @@ describe("team data cache and freshness helpers", () => {
 
     const unavailable = deriveFrontOfficeCoverageGrades({ liveDataMode: "unavailable", teamAbbr: "ZZZ", players: { hitting: [], pitching: [] } });
     expect(unavailable).toMatchObject({ defensePct: null, depthPct: null, futureValuePct: null, prospectCount: 0 });
+  });
+
+  it("builds an organization depth chart from only the current SKIP prospect snapshot", () => {
+    const dodgers = buildOrganizationProspectDepthChart("LAD");
+    expect(dodgers.prospects.length).toBeGreaterThan(0);
+    expect(dodgers.rows.length).toBeGreaterThan(0);
+    expect(dodgers.rows.every(row => row.prospects.every(prospect => prospect.team === "LAD"))).toBe(true);
+    expect(dodgers.rows.every(row => row.topFutureValue === row.prospects[0].futureValue)).toBe(true);
+    expect(buildOrganizationProspectDepthChart("ZZZ")).toEqual({ prospects: [], rows: [] });
   });
 
   beforeEach(() => localStorage.clear());

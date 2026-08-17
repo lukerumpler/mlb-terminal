@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
 
@@ -77,5 +77,21 @@ describe('Team Overview compact navigation', () => {
     await waitFor(() => {
       expect(completedGameSplitCalls().length).toBeGreaterThan(0);
     });
+  });
+
+  it('keeps Statcast OAA distinct from calculated Defense and opens a closable Future Value depth modal', async () => {
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    expect(await screen.findByText(/OAA — · Savant/i)).toBeInTheDocument();
+    expect(screen.getByText(/Statcast OAA is a separate Baseball Savant fielding signal/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
+    const dialog = screen.getByRole('dialog', { name: /organization depth/i });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/SKIP prospect snapshot/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close organization prospect depth chart' }));
+    expect(screen.queryByRole('dialog', { name: /organization depth/i })).not.toBeInTheDocument();
   });
 });

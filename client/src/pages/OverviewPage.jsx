@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } fro
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines } from '../engine/skip.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -242,6 +242,31 @@ export function deriveFrontOfficeCoverageGrades({ players = { hitting:[], pitchi
   const prospectFvs = teamProspects.map(({ prospect, isPitcher }) => computeFV(prospect, isPitcher ? pitcherBaselines : hitterBaselines, isPitcher)).filter(value => value != null).sort((a,b) => b-a).slice(0, 5);
   const futureValuePct = prospectFvs.length ? Math.round(((prospectFvs.reduce((sum, value) => sum + value, 0) / prospectFvs.length) - 35) / 35 * 100) : null;
   return { defensePct, depthPct, futureValuePct, fieldingPositions:fieldingPositions.length, activePlayers:rollups.activePlayers, prospectCount:prospectFvs.length };
+}
+
+export function buildOrganizationProspectDepthChart(teamAbbr = '') {
+  const hitterBaselines = fvBaselines(PROSPECT_BATTERS, false);
+  const pitcherBaselines = fvBaselines(PROSPECT_PITCHERS, true);
+  const prospects = [
+    ...PROSPECT_BATTERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ ...prospect, isPitcher:false })),
+    ...PROSPECT_PITCHERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ ...prospect, isPitcher:true })),
+  ].map(prospect => ({
+    ...prospect,
+    futureValue: computeFV(prospect, prospect.isPitcher ? pitcherBaselines : hitterBaselines, prospect.isPitcher),
+  })).filter(prospect => prospect.futureValue != null);
+  const byPosition = new Map();
+  prospects.forEach(prospect => {
+    const position = String(prospect.pos || (prospect.isPitcher ? 'P' : '—'));
+    const group = byPosition.get(position) || [];
+    group.push(prospect);
+    byPosition.set(position, group);
+  });
+  const rows = [...byPosition.entries()].map(([position, playerRows]) => ({
+    position,
+    prospects: playerRows.sort((a, b) => b.futureValue - a.futureValue || a.rank - b.rank),
+    topFutureValue: Math.max(...playerRows.map(prospect => prospect.futureValue)),
+  })).sort((a, b) => b.topFutureValue - a.topFutureValue || a.position.localeCompare(b.position));
+  return { prospects, rows };
 }
 function rankAmong(teams, key, asc=false) {
   const vals=Object.values(teams).map(t=>t[key]).sort((a,b)=>asc?a-b:b-a);
@@ -621,6 +646,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [affiliateSchedule, setAffiliateSchedule] = useState(null);
   const [affiliateSavant, setAffiliateSavant] = useState(null);
   const [teamSavantData, setTeamSavantData] = useState(null);
+  const [teamOaaData, setTeamOaaData] = useState(null);
+  const [futureValueModalOpen, setFutureValueModalOpen] = useState(false);
   const [pendingAffiliate, setPendingAffiliate] = useState(null);
   const overviewRef = useRef(null);
   const [pdfExportState, setPdfExportState] = useState('idle');
@@ -1124,6 +1151,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [teamBase?.abbr]);
 
+  useEffect(() => {
+    let alive = true;
+    setTeamOaaData(null);
+    getTeamSavantOaa(teamBase?.abbr, teamBase?.name, CURRENT_SEASON).then(data => {
+      if (alive) setTeamOaaData(data);
+    }).catch(() => {
+      if (alive) setTeamOaaData({ status:'upstream-unavailable', source:'Baseball Savant Statcast OAA leaderboard', retrievedAt:new Date().toISOString(), oaa:null, playerCount:0, playerRows:[] });
+    });
+    return () => { alive = false; };
+  }, [teamBase?.abbr, teamBase?.name, savantRetryToken]);
+
   const rosterInsightKey = useMemo(() => JSON.stringify({
     team: { name:team.name, abbr:team.abbr, w:team.w, l:team.l, pct:team.pct, rs:team.rs, ra:team.ra, ops:team.ops, hr:team.hr, era:team.era, whip:team.whip, k:team.k, sb:team.sb },
     roster: { hitting:liveTeamPlayers.hitting.slice(0, 12), pitching:liveTeamPlayers.pitching.slice(0, 12) },
@@ -1533,6 +1571,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         : teamSavantDisplayData?.status === 'live' || teamSavantState === 'ready'
           ? 'verified'
           : 'unavailable';
+  const oaaHealthStatus = teamOaaData?.freshness === 'stale-cached'
+    ? 'cached-fallback'
+    : teamOaaData?.freshness === 'cached'
+      ? 'cached'
+      : teamOaaData?.status === 'live'
+        ? 'verified'
+        : teamOaaData?.status === 'upstream-unavailable'
+          ? 'unavailable'
+          : 'coverage-gap';
+  const organizationProspectDepth = useMemo(() => buildOrganizationProspectDepthChart(team.abbr), [team.abbr]);
+  const formatOaa = value => value == null ? '—' : `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(0)}`;
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
   const offRows=[['OPS',formatTeamMetric(team.ops,3)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',formatTeamMetric(team.avg,3)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
   const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','—'],['OAA','—'],['BsR','—'] ];
@@ -1759,17 +1808,49 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
-                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth',D.depthGrade,C.slate],['Future Value',D.futureValueGrade,C.purple]].map(([lbl,val,color])=>(
-                  <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>
+                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth',D.depthGrade,C.slate],['Future Value',D.futureValueGrade,C.purple]].map(([lbl,val,color])=>{
+                  const content = <>
                     <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
                     <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
-                  </div>
-                ))}
+                    {lbl === 'Defense' && <div style={sans({fontSize:7.5,color:teamOaaData?.oaa == null ? C.text4 : C.teal,marginTop:4,lineHeight:1.15})}>OAA {formatOaa(teamOaaData?.oaa)} · Savant</div>}
+                  </>;
+                  return lbl === 'Future Value' ? (
+                    <button key={lbl} type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px',border:`1px solid ${C.borderLight}`,cursor:'pointer',font:'inherit',color:'inherit'}}>{content}</button>
+                  ) : <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>{content}</div>;
+                })}
               </div>
-              <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Defense and Depth are calculated from verified active-roster position coverage. Future Value is calculated from the current SKIP prospect snapshot; neither substitutes for Statcast OAA or a live external prospect provider.</div>
+              <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Defense and Depth are calculated from verified active-roster position coverage. Statcast OAA is a separate Baseball Savant fielding signal ({teamOaaData?.playerCount || 0} verified player row{teamOaaData?.playerCount === 1 ? '' : 's'}; <OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Future Value is calculated from the current SKIP prospect snapshot; select its rating to inspect organization depth. Neither calculated grade substitutes for a live external prospect provider.</div>
             </div>
           </div>
         </Panel>
+
+        {futureValueModalOpen && <div className="skip-future-value-modal-backdrop" role="presentation" onMouseDown={() => setFutureValueModalOpen(false)}>
+          <section className="skip-future-value-modal" role="dialog" aria-modal="true" aria-labelledby="future-value-depth-title" onMouseDown={event => event.stopPropagation()}>
+            <header className="skip-future-value-modal-header">
+              <div>
+                <div style={sans({fontSize:9,color:C.purple,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em'})}>SKIP prospect snapshot</div>
+                <h2 id="future-value-depth-title" style={px({fontSize:19,fontWeight:800,color:C.text,margin:'3px 0 0'})}>{team.name} Organization Depth</h2>
+              </div>
+              <button type="button" className="skip-future-value-modal-close" onClick={() => setFutureValueModalOpen(false)} aria-label="Close organization prospect depth chart">×</button>
+            </header>
+            <div className="skip-future-value-modal-summary">
+              <span>{organizationProspectDepth.prospects.length} graded prospect{organizationProspectDepth.prospects.length === 1 ? '' : 's'}</span>
+              <span>·</span>
+              <span>{organizationProspectDepth.rows.length} position group{organizationProspectDepth.rows.length === 1 ? '' : 's'}</span>
+              <span>·</span>
+              <span>FV uses the established SKIP eFV baseline</span>
+            </div>
+            {organizationProspectDepth.rows.length ? <div className="skip-future-value-depth-grid">
+              {organizationProspectDepth.rows.map(row => <section key={row.position} className="skip-future-value-position-group">
+                <div className="skip-future-value-position-heading"><span>{row.position}</span><span>Top FV {row.topFutureValue.toFixed(0)}</span></div>
+                {row.prospects.slice(0, 4).map(prospect => <div key={`${prospect.mlbId || prospect.name}-${prospect.pos}`} className="skip-future-value-prospect-row">
+                  <div><strong>{prospect.name}</strong><span>{prospect.level} · age {prospect.age}</span></div><b>{prospect.futureValue.toFixed(0)} FV</b>
+                </div>)}
+              </section>)}
+            </div> : <OverviewEmptyState message="Prospect depth chart" detail="The current SKIP prospect snapshot has no graded prospects for this organization." />}
+            <p className="skip-future-value-modal-note">Source: curated SKIP prospect snapshot. This chart is an organization-level planning view, not a live MLB Pipeline or third-party prospect ranking feed.</p>
+          </section>
+        </div>}
 
         <Panel title="Team Strength Radar" accent={OVERVIEW_ACCENTS.context} badge="Percentiles">
           <div style={{padding:'3px 8px 0'}}>

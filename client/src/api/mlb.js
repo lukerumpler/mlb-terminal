@@ -2193,3 +2193,39 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
     return { status: 'upstream-unavailable', source: 'Baseball Savant', retrievedAt: new Date().toISOString(), sampleSize: 0 };
   }
 }
+
+export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
+  try {
+    const rows = await fetchLeaderboard(`/api/savant?endpoint=oaa&year=${year}`, { timeoutMs: 8_000 });
+    const providerMeta = Array.isArray(rows) ? rows.__providerMeta || null : null;
+    const targetAbbr = String(teamAbbr || '').toUpperCase();
+    const targetName = canonicalTeamName(teamName || teamAbbr);
+    const teamRows = (Array.isArray(rows) ? rows : []).filter(row => {
+      const rowAbbr = String(row?.team_abbr || row?.team_code || row?.team || '').toUpperCase();
+      const rowName = canonicalTeamName(row?.team_name || row?.team_full_name || row?.team || '');
+      return rowAbbr === targetAbbr || rowName === targetName;
+    });
+    const playerRows = teamRows.map(row => {
+      const oaa = Number(row?.oaa ?? row?.outs_above_average);
+      return {
+        name: String(row?.last_name_first || row?.player_name || row?.name || 'Unknown player'),
+        position: String(row?.position || row?.pos || '—'),
+        oaa: Number.isFinite(oaa) ? oaa : null,
+      };
+    }).filter(row => row.oaa != null);
+    const freshness = providerMeta?.freshness || 'live';
+    const oaa = playerRows.length ? playerRows.reduce((sum, row) => sum + row.oaa, 0) : null;
+    return {
+      status: oaa == null ? 'source-gap' : (freshness === 'stale-cached' ? 'cached' : 'live'),
+      source: 'Baseball Savant Statcast OAA leaderboard',
+      freshness,
+      cache: providerMeta?.cache || null,
+      retrievedAt: new Date().toISOString(),
+      oaa,
+      playerCount: playerRows.length,
+      playerRows: playerRows.sort((a, b) => b.oaa - a.oaa),
+    };
+  } catch {
+    return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, playerCount: 0, playerRows: [] };
+  }
+}
