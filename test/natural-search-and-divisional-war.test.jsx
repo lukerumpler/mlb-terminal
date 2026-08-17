@@ -281,7 +281,7 @@ describe("divisional WAR comparison data and tooltip contract", () => {
   it("contains exact offensive and defensive WAR hover labels and honest unavailable copy", () => {
     expect(chartSource).toContain("Offensive WAR");
     expect(chartSource).toContain("Defensive WAR");
-    expect(chartSource).toContain(
+    expect(chartSource.replace(/\s+/g, " ")).toContain(
       "Separate defensive WAR was not returned by the verified FanGraphs aggregate feed."
     );
   });

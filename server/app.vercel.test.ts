@@ -50,4 +50,13 @@ describe("Vercel-compatible API app", () => {
     const response = await fetch(`${baseUrl}/api/mlb?path=not-a-real-path`);
     expect(response.status).not.toBe(404);
   });
+
+  it("matches multi-segment storage keys with the Express 5 wildcard route", async () => {
+    const baseUrl = await startTestServer();
+    const response = await fetch(
+      `${baseUrl}/manus-storage/snapshots/2026/player.json`
+    );
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("Storage proxy not configured");
+  });
 });

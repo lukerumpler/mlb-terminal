@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { afterAll, describe, it } from 'vitest';
 import { chromium } from 'playwright';
 
-const LIVE_URL = process.env.SKIP_LIVE_URL || 'https://skipbasebal-mm6hz9ps.manus.space/?e2e=overview-default';
+const LIVE_URL = process.env.SKIP_LIVE_URL;
+const describePublished = LIVE_URL ? describe : describe.skip;
 let browser;
 
 async function openLivePage(url, setup) {
@@ -24,7 +25,7 @@ async function openLivePage(url, setup) {
   throw lastError;
 }
 
-describe('published Dodgers Overview', () => {
+describePublished('published Dodgers Overview', () => {
   it('keeps the MLB team selected first and separates source badges', async () => {
     browser = await chromium.launch({
       headless: true,

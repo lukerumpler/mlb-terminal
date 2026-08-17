@@ -156,6 +156,7 @@ describe("FanGraphs provider cache", () => {
 
   it("serves a verified stale model when FanGraphs returns 429 after cache expiry", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-16T23:59:00.000Z"));
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
