@@ -201,8 +201,8 @@
 - [x] Trace player-identity telemetry through current source, branches, commits, and repository history.
 - [x] Report the audit, test-health, and telemetry-history findings with exact discrepancies.
 
-- [ ] Search reflogs, remote branches, tags, and unreachable objects for d65383c or the missing telemetry branch.
-- [ ] Inspect Players and Intelligence source contracts and add honest source/freshness metadata where verified.
-- [ ] Add regression coverage for the new Players and Intelligence metadata states.
-- [ ] Run the current 360-test suite with coverage reporting and review file/test distribution.
-- [ ] Verify metadata changes and publish a validated checkpoint if implementation is required and passes.
+- [x] Search reflogs, remote branches, tags, and unreachable objects for d65383c or the missing telemetry branch.
+- [x] Inspect Players and Intelligence source contracts and add honest source/freshness metadata where verified.
+- [x] Add regression coverage for the new Players and Intelligence metadata states.
+- [x] Run the current 360-test suite with coverage reporting and review file/test distribution; after the shared merge, 101 files and 483 tests passed with V8 coverage.
+- [x] Verify metadata changes and publish a validated checkpoint if implementation is required and passes.
