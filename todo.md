@@ -11305,3 +11305,9 @@
 - [x] Define the release-gate acceptance criteria for the selected release-gate-only workflow.
 - [x] Implement local release comparison and provider-health smoke-test commands.
 - [x] Add release-gate tests, document the exact procedure, validate it, and publish the workflow.
+- [x] Inspect the current shared and GitHub release references plus the production package-manager build failure.
+- [x] Preserve the strongest compatible version set and repair the package-manager configuration for production builds.
+- [x] Re-run the release gate, verify the deployed application, and publish the reconciled release.
+- [x] Inventory every GitHub 9aeea29 change against the current shared release.
+- [x] Integrate compatible GitHub identity, Vercel, data-resilience, and test improvements without losing shared functionality.
+- [x] Resolve all merge conflicts, update release-gate baseline and audit evidence, validate, and publish the full combined release.

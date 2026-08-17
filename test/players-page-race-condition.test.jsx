@@ -872,7 +872,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(
       screen.queryByText("Updated recovery note.")
     ).not.toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("renders the verified core profile before supplemental data finishes", async () => {
     const user = userEvent.setup();

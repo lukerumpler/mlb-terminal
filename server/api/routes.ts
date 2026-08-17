@@ -51,6 +51,8 @@ export async function registerLegacyApiRoutes(app: Express) {
     import("./cache-health.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./player-advanced.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./player-identity.js"),
   ])) as ApiModule[];
 
   const paths = [
@@ -67,6 +69,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/intelligence-calculations",
     "/api/cache-health",
     "/api/player-advanced",
+    "/api/player-identity",
   ] as const;
   paths.forEach((path, index) => {
     app.all(path, wrapLegacyHandler(modules[index].default));
@@ -99,6 +102,8 @@ export const legacyApiPaths = [
   "/api/contract",
   "/api/comparison-summary",
   "/api/natural-search",
+  "/api/player-advanced",
+  "/api/player-identity",
 ] as const;
 
 void legacyApiPaths;

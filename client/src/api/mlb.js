@@ -1,6 +1,13 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
+import {
+  getStoredPlayerProviderIdentity,
+  isUsablePlayerProviderIdentity,
+  removeStoredPlayerProviderIdentity,
+  storePlayerProviderIdentity,
+} from '../lib/playerIdentityRegistry.js';
+import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js';
 
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
@@ -760,6 +767,8 @@ const teamFinancialsCache = new Map();
 const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
 const contractClientCache = new Map();
 const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
+const playerProviderIdentityCache = new Map();
+const PLAYER_PROVIDER_IDENTITY_TTL_MS = 10 * 60_000;
 
 export async function fetchTeamFinancials(teamAbbreviation, season = SEASON, {
   priority = 'background',
@@ -835,6 +844,66 @@ export async function fetchContractData(playerId, fullName, {
   contractClientCache.set(cacheKey, {
     promise,
     expiresAt: Date.now() + CONTRACT_CLIENT_TTL_MS,
+  });
+  return promise;
+}
+
+export async function fetchPlayerProviderIdentity(player, requestOptions = {}) {
+  const mlbId = String(player?.id || '').trim();
+  const fullName = String(player?.fullName || '').trim();
+  if (!mlbId || !fullName) return null;
+  const cachedIdentity = getStoredPlayerProviderIdentity({ mlbId, fullName });
+  const cacheKey = `${mlbId}:${fullName.toLowerCase()}`;
+  const cached = playerProviderIdentityCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) playerProviderIdentityCache.delete(cacheKey);
+
+  recordPlayerIdentityTelemetry('resolver-request');
+  recordPlayerIdentityTelemetry(cachedIdentity ? 'registry-reuse' : 'name-search-request');
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ mlbId, name: fullName });
+      if (cachedIdentity?.baseballReference?.id) {
+        params.set('baseballReferenceId', cachedIdentity.baseballReference.id);
+        recordPlayerIdentityTelemetry('direct-id-request');
+      }
+      const response = await scheduledFetch(apiUrl(`/api/player-identity?${params}`), 12_000, {
+        priority: requestOptions.priority || 'important',
+        stage: requestOptions.stage || 'important',
+        screen: requestOptions.screen || 'player-profile',
+        resource: 'player-identity',
+        signal: requestOptions.signal,
+        pauseGlobalQueueOn429: false,
+      });
+      if (!response.ok) {
+        recordPlayerIdentityTelemetry('transport-fallback');
+        return cachedIdentity || null;
+      }
+      const payload = await response.json();
+      if (payload?.invalidateBaseballReferenceId) {
+        removeStoredPlayerProviderIdentity({ mlbId });
+        recordPlayerIdentityTelemetry('direct-id-invalidated');
+      }
+      if (payload?.found && payload?.identity) {
+        storePlayerProviderIdentity({ mlbId, fullName, identity: payload.identity });
+        recordPlayerIdentityTelemetry(cachedIdentity ? 'direct-id-verified' : 'name-search-resolved');
+        return payload.identity;
+      }
+      recordPlayerIdentityTelemetry('no-match');
+      return payload?.identity || null;
+    } catch {
+      recordPlayerIdentityTelemetry('transport-fallback');
+      return cachedIdentity || null;
+    }
+  })().then(identity => {
+    if (!isUsablePlayerProviderIdentity(identity, { mlbId, fullName })) {
+      playerProviderIdentityCache.delete(cacheKey);
+    }
+    return identity;
+  });
+  playerProviderIdentityCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + PLAYER_PROVIDER_IDENTITY_TTL_MS,
   });
   return promise;
 }
@@ -1086,6 +1155,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     ...coreSnapshot,
     advancedMetrics,
     providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
+    providerIdentity: null,
     career: careerHitting,
     careerPitching,
     careerAdvanced,
@@ -1291,6 +1361,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     stats:        statResult?.stat        || {},
     advancedMetrics,
     providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
+    providerIdentity: null,
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
@@ -1310,6 +1381,23 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     extrasLoading: false,
   };
   try { onOptionalReady?.(optionalSnapshot); } catch { /* UI callback is optional */ }
+  void fetchPlayerProviderIdentity(profile || person, {
+    priority: 'background',
+    stage: 'background',
+    screen: 'player-profile',
+    signal,
+  }).then(providerIdentity => {
+    if (!providerIdentity || signal?.aborted) return;
+    const identitySnapshot = {
+      ...optionalSnapshot,
+      providerIdentity,
+      providerIds: {
+        ...optionalSnapshot.providerIds,
+        ...(providerIdentity.baseballReference?.id ? { baseballReference: providerIdentity.baseballReference.id } : {}),
+      },
+    };
+    try { onOptionalReady?.(identitySnapshot); } catch { /* UI callback is optional */ }
+  });
   return optionalSnapshot;
 }
 

@@ -12,6 +12,8 @@ describe("legacy API route registration", () => {
       "/api/contract",
       "/api/comparison-summary",
       "/api/natural-search",
+      "/api/player-advanced",
+      "/api/player-identity",
     ]);
   });
 });

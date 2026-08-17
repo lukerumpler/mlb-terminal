@@ -23,6 +23,17 @@ let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
 const modelDailyAttemptDay = new Map();
 const aggregateDailyAttemptDay = new Map();
+const TEAM_NAME_ALIASES = {
+  ARI: ["Diamondbacks"], ATH: ["Athletics"], ATL: ["Braves"],
+  BAL: ["Orioles"], BOS: ["Red Sox"], CHC: ["Cubs"], CIN: ["Reds"],
+  CLE: ["Guardians"], COL: ["Rockies"], CWS: ["White Sox"], DET: ["Tigers"],
+  HOU: ["Astros"], KC: ["Royals"], KCR: ["Royals"], LAA: ["Angels"],
+  LAD: ["Dodgers"], MIA: ["Marlins"], MIL: ["Brewers"], MIN: ["Twins"],
+  NYM: ["Mets"], NYY: ["Yankees"], OAK: ["Athletics"], PHI: ["Phillies"],
+  PIT: ["Pirates"], SD: ["Padres"], SEA: ["Mariners"], SF: ["Giants"],
+  STL: ["Cardinals"], TB: ["Rays"], TEX: ["Rangers"], TOR: ["Blue Jays"],
+  WSH: ["Nationals"],
+};
 
 export function __seedFanGraphsModelCacheForTests(teamAbbr, season, data, { expiresAt, staleExpiresAt } = {}) {
   modelCache.set(modelKey(teamAbbr, season), {
@@ -103,16 +114,10 @@ function numeric(value) {
 }
 
 function findTeamRow(html, teamAbbr) {
-  const upper = String(teamAbbr).toUpperCase();
   for (const table of tablesFromHtml(html)) {
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (
-        cells.some(cell =>
-          new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
-        )
-      )
-        return cells;
+      if (cells.some(cell => matchesTeamName(cell, teamAbbr))) return cells;
     }
   }
   return null;
@@ -130,18 +135,24 @@ function normalizeMetricKey(value) {
     .replace(/^_|_$/g, "");
 }
 
-function findTeamRowDetails(html, teamAbbr) {
+function matchesTeamName(cell, teamAbbr) {
   const upper = String(teamAbbr).toUpperCase();
+  const aliases = [upper, ...(TEAM_NAME_ALIASES[upper] || [])];
+  return aliases.some(alias =>
+    new RegExp(
+      `(?:^|\\s)${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|$)`,
+      "i"
+    ).test(cell)
+  );
+}
+
+function findTeamRowDetails(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
     const headerMatch = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
     const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (
-        cells.some(cell =>
-          new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
-        )
-      ) {
+      if (cells.some(cell => matchesTeamName(cell, teamAbbr))) {
         const metrics = {};
         cells.forEach((cell, index) => {
           const key = normalizeMetricKey(headers[index]);
@@ -164,18 +175,23 @@ export function parseFanGraphsModelHtml(
   const warDetails = findTeamRowDetails(warHtml, teamAbbr);
   const oddsRow = oddsDetails?.cells || findTeamRow(oddsHtml, teamAbbr);
   const warRow = warDetails?.cells || findTeamRow(warHtml, teamAbbr);
-  const playoffOdds = oddsRow
-    ? (oddsRow.map(parsePercentage).find(value => value != null) ?? null)
-    : null;
-  const teamWar = warRow
-    ? (warRow.map(numeric).find(value => value != null) ?? null)
-    : null;
   const metrics = {
     ...(oddsDetails?.metrics || {}),
     ...(warDetails?.metrics || {}),
   };
   const pick = (...keys) =>
     keys.map(key => metrics[key]).find(value => value != null) ?? null;
+  const playoffOdds = pick(
+    "make_playoffs",
+    "playoff_odds",
+    "make_postseason",
+    "postseason_odds"
+  ) ?? (oddsRow
+    ? (oddsRow.map(parsePercentage).find(value => value != null) ?? null)
+    : null);
+  const teamWar = pick("war", "team_war", "total_war") ?? (warRow
+    ? (warRow.map(numeric).find(value => value != null) ?? null)
+    : null);
   return {
     playoffOdds,
     teamWar,
@@ -184,8 +200,8 @@ export function parseFanGraphsModelHtml(
     source: "FanGraphs",
     sourceUrls: { playoffOdds: ODDS_URL, teamWar: WAR_URL },
     advancedMetrics: {
-      projectedWins: pick("projected_wins", "wins", "w"),
-      projectedLosses: pick("projected_losses", "losses", "l"),
+      projectedWins: pick("projected_wins", "proj_w", "wins", "w"),
+      projectedLosses: pick("projected_losses", "proj_l", "losses", "l"),
       projectedRuns: pick("projected_runs", "runs", "r"),
       projectedRunsAllowed: pick(
         "projected_runs_allowed",
