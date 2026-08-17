@@ -11299,3 +11299,9 @@
 - [x] Capture the current local and shared-main commit state before synchronization.
 - [x] Synchronize the local project to the latest shared main branch without overwriting newer work.
 - [x] Inspect, validate, and document the best compatible combined release state.
+- [x] Inspect existing release scripts, provider health checks, and GitHub comparison conventions.
+- [x] Add a permanent release comparison and deterministic provider-health smoke-test workflow.
+- [x] Document the preferred release procedure, validate the workflow, and publish it.
+- [x] Define the release-gate acceptance criteria for the selected release-gate-only workflow.
+- [x] Implement local release comparison and provider-health smoke-test commands.
+- [x] Add release-gate tests, document the exact procedure, validate it, and publish the workflow.

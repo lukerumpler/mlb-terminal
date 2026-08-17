@@ -14,3 +14,5 @@ Every release checkpoint triggers automated deployment. Before checkpointing, al
 2. `pnpm run lint`
 3. `pnpm run test`
 4. `pnpm run build`
+
+For the complete source-comparison and provider-health workflow, use `pnpm release:gate` and follow [the preferred release workflow](./RELEASE_WORKFLOW.md).
