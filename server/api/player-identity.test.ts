@@ -111,6 +111,10 @@ describe("Baseball-Reference player identity resolution", () => {
         directCanonicalVerified:1,
         nameSearchRequests:0,
       }),
+      latencyMs: expect.objectContaining({
+        directCanonical: expect.objectContaining({ samples:1, averageMs:expect.any(Number) }),
+        nameSearch: expect.objectContaining({ samples:0, averageMs:null }),
+      }),
     });
 
     const metrics = response();
@@ -119,6 +123,9 @@ describe("Baseball-Reference player identity resolution", () => {
     expect(metrics.body).toMatchObject({ scope:"process", telemetry:expect.objectContaining({ directIdRequestRate:100 }) });
     expect(JSON.stringify(metrics.body)).not.toContain("Shohei");
     expect(JSON.stringify(metrics.body)).not.toContain("660271");
+
+    await resolvePlayerProviderIdentity({ mlbId:"660271", name:"Shohei Ohtani", baseballReferenceId:"ohtansh01" });
+    expect(getPlayerIdentityTelemetry().latencyMs.serverRegistryHit).toMatchObject({ samples:1, averageMs:expect.any(Number) });
   });
 
   it("does not map a near-name search result to historical data", async () => {

@@ -2,6 +2,7 @@
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import {
   getStoredPlayerProviderIdentity,
+  isUsablePlayerProviderIdentity,
   removeStoredPlayerProviderIdentity,
   storePlayerProviderIdentity,
 } from '../lib/playerIdentityRegistry.js';
@@ -637,7 +638,12 @@ export async function fetchPlayerProviderIdentity(player) {
       return cachedIdentity || null;
     }
   })().then(identity => {
-    if (!identity) playerProviderIdentityCache.delete(cacheKey);
+    // Preserve the visible MLB-only fallback for this profile render, but do
+    // not cache it as a provider resolution. This keeps the next profile load
+    // eligible to transition from unavailable to a newly recovered exact map.
+    if (!isUsablePlayerProviderIdentity(identity, { mlbId, fullName })) {
+      playerProviderIdentityCache.delete(cacheKey);
+    }
     return identity;
   });
   playerProviderIdentityCache.set(cacheKey, {

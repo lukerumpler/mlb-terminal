@@ -29,6 +29,32 @@ const telemetryCounters = {
   directIdInvalidations: 0,
 };
 
+const telemetryLatency = {
+  directCanonical: { samples:0, totalMs:0, minMs:null, maxMs:0 },
+  nameSearch: { samples:0, totalMs:0, minMs:null, maxMs:0 },
+  serverRegistryHit: { samples:0, totalMs:0, minMs:null, maxMs:0 },
+};
+
+function recordLatency(bucket, startedAtMs) {
+  const entry = telemetryLatency[bucket];
+  if (!entry) return;
+  const durationMs = Math.max(0, Date.now() - Number(startedAtMs || Date.now()));
+  entry.samples += 1;
+  entry.totalMs += durationMs;
+  entry.minMs = entry.minMs == null ? durationMs : Math.min(entry.minMs, durationMs);
+  entry.maxMs = Math.max(entry.maxMs, durationMs);
+}
+
+function summarizeLatency(entry) {
+  return {
+    samples:entry.samples,
+    totalMs:Math.round(entry.totalMs),
+    averageMs:entry.samples ? Number((entry.totalMs / entry.samples).toFixed(1)) : null,
+    minMs:entry.minMs == null ? null : Math.round(entry.minMs),
+    maxMs:entry.samples ? Math.round(entry.maxMs) : null,
+  };
+}
+
 function recordTelemetry(key) {
   if (Object.prototype.hasOwnProperty.call(telemetryCounters, key)) telemetryCounters[key] += 1;
 }
@@ -46,6 +72,7 @@ export function getPlayerIdentityTelemetry() {
     serverRegistryHitRate: percentage(counters.serverRegistryHits, counters.resolverRequests),
     directCanonicalVerificationRate: percentage(counters.directCanonicalVerified, counters.directCanonicalRequests),
     nameSearchExactMatchRate: percentage(counters.nameSearchExactMatches, counters.nameSearchRequests),
+    latencyMs: Object.fromEntries(Object.entries(telemetryLatency).map(([key, value]) => [key, summarizeLatency(value)])),
   };
 }
 
@@ -197,6 +224,7 @@ function storeIdentity(mlbId, expectedName, identity) {
 }
 
 async function resolveDirectBaseballReferenceIdentity({ mlbId, expectedName, baseballReferenceId }) {
+  const startedAt = Date.now();
   const canonicalUrl = buildBaseballReferencePlayerUrl(baseballReferenceId);
   if (!canonicalUrl) return null;
   recordTelemetry('directCanonicalRequests');
@@ -218,32 +246,40 @@ async function resolveDirectBaseballReferenceIdentity({ mlbId, expectedName, bas
   } catch (error) {
     recordTelemetry('directCanonicalErrors');
     throw error;
+  } finally {
+    recordLatency('directCanonical', startedAt);
   }
 }
 
 async function resolveSearchBaseballReferenceIdentity({ mlbId, expectedName }) {
+  const startedAt = Date.now();
   recordTelemetry('nameSearchRequests');
-  const url = `${BREF_SEARCH_URL}?search=${encodeURIComponent(expectedName)}`;
-  const html = await fetchHtml(url, 10_000);
-  const candidate = selectExactBaseballReferenceCandidate(
-    parseBaseballReferenceSearchCandidates(html),
-    expectedName,
-  );
-  if (!candidate) {
-    recordTelemetry('nameSearchRejected');
-    return null;
+  try {
+    const url = `${BREF_SEARCH_URL}?search=${encodeURIComponent(expectedName)}`;
+    const html = await fetchHtml(url, 10_000);
+    const candidate = selectExactBaseballReferenceCandidate(
+      parseBaseballReferenceSearchCandidates(html),
+      expectedName,
+    );
+    if (!candidate) {
+      recordTelemetry('nameSearchRejected');
+      return null;
+    }
+    recordTelemetry('nameSearchExactMatches');
+    return buildIdentityRecord({
+      mlbId,
+      expectedName,
+      baseballReferenceId: candidate.id,
+      matchedName: candidate.name,
+      method: "exact-search",
+    });
+  } finally {
+    recordLatency('nameSearch', startedAt);
   }
-  recordTelemetry('nameSearchExactMatches');
-  return buildIdentityRecord({
-    mlbId,
-    expectedName,
-    baseballReferenceId: candidate.id,
-    matchedName: candidate.name,
-    method: "exact-search",
-  });
 }
 
 export async function resolvePlayerProviderIdentity({ mlbId, name, baseballReferenceId } = {}) {
+  const startedAt = Date.now();
   const normalizedMlbId = String(mlbId || "").trim();
   const expectedName = String(name || "").trim();
   if (!/^\d+$/.test(normalizedMlbId) || !expectedName || expectedName.length < 2) return null;
@@ -256,6 +292,7 @@ export async function resolvePlayerProviderIdentity({ mlbId, name, baseballRefer
   // differently keyed warm entry from an earlier name search.
   if (cached && (!hasDirectId || cached.baseballReference?.id === normalizedBRefId)) {
     recordTelemetry('serverRegistryHits');
+    recordLatency('serverRegistryHit', startedAt);
     recordTelemetry('resolved');
     return cached;
   }
@@ -310,6 +347,12 @@ export function __resetPlayerIdentityStateForTests() {
   identityRegistry.clear();
   identityInFlight.clear();
   Object.keys(telemetryCounters).forEach(key => { telemetryCounters[key] = 0; });
+  Object.values(telemetryLatency).forEach(entry => {
+    entry.samples = 0;
+    entry.totalMs = 0;
+    entry.minMs = null;
+    entry.maxMs = 0;
+  });
 }
 
 export default async function handler(req, res) {

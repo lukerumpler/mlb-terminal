@@ -8,6 +8,7 @@ import {
   removeStoredPlayerProviderIdentity,
   storePlayerProviderIdentity,
 } from '../client/src/lib/playerIdentityRegistry.js';
+import { getProviderIdConfidenceSourceCheck } from '../client/src/pages/PlayersPage.jsx';
 
 const identity = {
   mlb: {
@@ -95,6 +96,26 @@ describe('persistent player provider ID registry', () => {
 
     expect(getStoredPlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani' })).toBeNull();
     expect(summarizePlayerIdentityTelemetry()).toMatchObject({ directIdInvalidated:1, noMatch:1 });
+  });
+
+  it('transitions from unavailable to exact-name provider confidence when Baseball-Reference recovers', async () => {
+    const unavailableIdentity = { mlb:identity.mlb, baseballReference:null };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ found:false, identity:unavailableIdentity, invalidateBaseballReferenceId:false }), { status:200, headers:{ 'content-type':'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ found:true, identity, invalidateBaseballReferenceId:false }), { status:200, headers:{ 'content-type':'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const player = { id:'660271', mlbId:'660271', fullName:'Shohei Ohtani' };
+
+    const unavailable = await fetchPlayerProviderIdentity(player);
+    const unavailableCheck = getProviderIdConfidenceSourceCheck({ ...player, providerIdentity:unavailable }, player);
+    expect(unavailableCheck).toMatchObject({ label:'B-Ref ID', ready:false, source:'Unavailable' });
+
+    const recovered = await fetchPlayerProviderIdentity(player);
+    const recoveredCheck = getProviderIdConfidenceSourceCheck({ ...player, providerIdentity:recovered }, player);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(recoveredCheck).toMatchObject({ label:'B-Ref ID', ready:true, source:'Exact name' });
+    expect(recoveredCheck.detail).toContain('ohtansh01');
+    expect(getStoredPlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani' })).toEqual(identity);
   });
 
   it('expires persisted mappings and supports explicit invalidation', () => {
