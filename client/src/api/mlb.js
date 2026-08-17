@@ -190,6 +190,25 @@ function staleCacheGet(key) {
   return undefined;
 }
 
+function setMlbResponseMeta(data, meta) {
+  if (!data || (typeof data !== 'object' && typeof data !== 'function')) return data;
+  try {
+    Object.defineProperty(data, '__skipResponseMeta', {
+      value: { ...meta },
+      enumerable: false,
+      configurable: true,
+    });
+  } catch {
+    // Provider data may be frozen in tests; returning the verified payload is
+    // still preferable to dropping a safe stale response.
+  }
+  return data;
+}
+
+function getMlbResponseMeta(data) {
+  return data && typeof data === 'object' ? data.__skipResponseMeta || null : null;
+}
+
 function recordRequestTrace(event) {
   const entry = {
     id: ++requestTraceSequence,
@@ -403,6 +422,7 @@ export async function mlb(path, params = {}, {
       }
       const stale = useCache ? staleCacheGet(url) : undefined;
       if (stale !== undefined) {
+        setMlbResponseMeta(stale, { freshness: 'stale-cached', retrievedAt: getMlbResponseMeta(stale)?.retrievedAt || null, source: 'MLB Stats API' });
         recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'stale-hit', reason: 'transport-error' });
         return stale;
       }
@@ -414,6 +434,7 @@ export async function mlb(path, params = {}, {
       const stale = useCache ? staleCacheGet(url) : undefined;
       const canUseStale = [429, 500, 502, 503, 504].includes(res.status);
       if (canUseStale && stale !== undefined) {
+        setMlbResponseMeta(stale, { freshness: 'stale-cached', retrievedAt: getMlbResponseMeta(stale)?.retrievedAt || null, source: 'MLB Stats API' });
         if (res.status === 429) {
           proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + retryAfterMs);
           console.warn('[mlb] proxy rate limit; using verified cached response', path);
@@ -452,6 +473,11 @@ export async function mlb(path, params = {}, {
       }
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
+    setMlbResponseMeta(data, {
+      freshness: res.headers?.get?.('X-Proxy-Freshness') || 'live',
+      retrievedAt: new Date().toISOString(),
+      source: 'MLB Stats API',
+    });
     if (useCache) {
       const expires = Date.now() + ttl;
       cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
@@ -605,6 +631,21 @@ export async function getSeasonAdvancedStatsSafe(id, season, sportId, requestOpt
   }
 }
 
+export function normalizeYearByYearAdvancedStats(data, groupName = 'hitting', source = 'MLB Stats API yearByYearAdvanced') {
+  const group = findStatGroup(data?.stats, groupName);
+  return (group?.splits || []).map(split => normalizeSeasonAdvancedStat(split?.stat || {}, Number(split?.season), source))
+    .filter(row => Number.isInteger(row.season));
+}
+
+export async function getCareerAdvancedStatsSafe(id, group = 'hitting', requestOptions = {}) {
+  try {
+    const data = await mlb(`/people/${id}/stats`, { stats:'yearByYearAdvanced', group }, requestOptions);
+    return normalizeYearByYearAdvancedStats(data, group);
+  } catch {
+    return [];
+  }
+}
+
 export function mergeAdvancedMetricSources(primary = {}, fallback = {}) {
   const explicitNumber = value => value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
   const primaryWar = explicitNumber(primary.war);
@@ -629,13 +670,16 @@ export function mergeAdvancedMetricSources(primary = {}, fallback = {}) {
   };
 }
 
-export async function getBaseballReferenceAdvancedSafe(name, season) {
-  if (!name) return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+export async function getBaseballReferenceAdvancedSafe(name, season, { mlbId } = {}) {
+  const unavailable = { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', providerIds:{}, status:'unavailable' };
+  if (!name) return unavailable;
   try {
-    const data = await providerJson(`/api/player-advanced?name=${encodeURIComponent(name)}&season=${encodeURIComponent(season)}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
-    return normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary');
+    const params = new URLSearchParams({ name, season: String(season) });
+    if (mlbId != null) params.set('mlbId', String(mlbId));
+    const data = await providerJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
+    return { ...normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary'), providerIds: data?.providerIds || {} };
   } catch {
-    return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+    return unavailable;
   }
 }
 
@@ -983,6 +1027,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     isFallback: (isPitcher ? pitchingResult : hittingResult)?.isFallback || false,
     career: null,
     careerPitching: null,
+    careerAdvanced: null,
+    providerIds: { mlb: id },
     hittingStats: hittingResult?.stat || {},
     pitchingStats: pitchingResult?.stat || {},
     aggregateSource: 'MLB Stats API season stats',
@@ -1006,17 +1052,19 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const careerPitchingPromise = isPitcher
     ? getCareerSplits(id, 'pitching', importantRequest)
     : Promise.resolve([]);
+  const careerAdvancedPromise = getCareerAdvancedStatsSafe(id, isPitcher ? 'pitching' : 'hitting', importantRequest);
   const contractPromise = fetchContractData(id, person.fullName, importantRequest);
   const handednessPromise = isPitcher
     ? Promise.resolve({ rows: [], careerRows: [], season, isFallback: false, status: 'unavailable' })
     : getHandednessSplits(id, season, importantRequest);
   const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season, importantRequest);
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
-  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
+  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season, { mlbId: id });
 
-  const [careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
+  const [careerHitting, careerPitching, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
     careerPitchingPromise,
+    careerAdvancedPromise,
     contractPromise,
     handednessPromise,
     teamFinancialsPromise,
@@ -1032,8 +1080,10 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const importantSnapshot = {
     ...coreSnapshot,
     advancedMetrics,
+    providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
     career: careerHitting,
     careerPitching,
+    careerAdvanced,
     contractData: contractRaw,
     handednessSplits: handednessResult,
     teamFinancials,
@@ -1235,10 +1285,12 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
     advancedMetrics,
+    providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
     careerPitching,
+    careerAdvanced,
     hittingStats:  hittingResult?.stat    || {},
     pitchingStats: pitchingResult?.stat   || {},
     contractData:  contractRaw,
@@ -1613,7 +1665,11 @@ export async function getAllTeams(sportId = 1) {
 
 export async function getTeamAffiliates(mlbTeamId, season = SEASON) {
   const data = await mlb(`/teams/${mlbTeamId}/affiliates`, { season }, { ttl: 10 * 60_000, timeoutMs: 8_000 });
-  return (data.teams || []).map(t => ({
+  return (data.teams || []).filter(t => {
+    const sportId = Number(t.sport?.id);
+    const sportName = String(t.sport?.name || '');
+    return Number(t.id) !== Number(mlbTeamId) && sportId !== 1 && !/major league baseball/i.test(sportName);
+  }).map(t => ({
     id: t.id, name: t.name, abbr: t.abbreviation,
     level: t.sport?.name || '', levelId: t.sport?.id || 0, league: t.league?.name || '',
   })).sort((a, b) => a.levelId - b.levelId);
@@ -1910,6 +1966,19 @@ export async function getFirstRoundResults(year) {
   return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
 }
 
+const TEAM_NAME_ALIASES = {
+  ath:'athletics', ari:'arizona diamondbacks', az:'arizona diamondbacks', atl:'atlanta braves', bal:'baltimore orioles', bos:'boston red sox', chc:'chicago cubs', cws:'chicago white sox',
+  cle:'cleveland guardians', col:'colorado rockies', det:'detroit tigers', hou:'houston astros', kc:'kansas city royals', laa:'los angeles angels', lad:'los angeles dodgers', mia:'miami marlins', mil:'milwaukee brewers', min:'minnesota twins',
+  nyy:'new york yankees', nym:'new york mets', oak:'athletics', phi:'philadelphia phillies', pit:'pittsburgh pirates', sd:'san diego padres', sdp:'san diego padres', sea:'seattle mariners', sf:'san francisco giants', sfg:'san francisco giants', stl:'st louis cardinals', tb:'tampa bay rays', tex:'texas rangers', tor:'toronto blue jays', wsh:'washington nationals', was:'washington nationals',
+};
+function canonicalTeamName(value) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[.'’]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  return TEAM_NAME_ALIASES[normalized] || normalized.replace(/^la dodgers$/, 'los angeles dodgers').replace(/^sf giants$/, 'san francisco giants').replace(/^ny mets$/, 'new york mets').replace(/^ny yankees$/, 'new york yankees').replace(/^sd padres$/, 'san diego padres');
+}
+export function normalizeFanGraphsTeamName(value) {
+  return canonicalTeamName(value);
+}
+
 export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
     const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
@@ -1917,11 +1986,12 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     const url = `/api/fangraphs-models?${params.toString()}`;
     const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
     const teams = data?.teams || [];
-    const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
+    const selected = teams.find(row => canonicalTeamName(row.team) === canonicalTeamName(teamName));
     let divisionAverageWAR = null;
     let divisionTeams = [];
     if (divisionTeamNames.length && teams.length) {
-      const divRows = teams.filter(row => divisionTeamNames.some(name => String(name).toLowerCase() === String(row.team).toLowerCase()) && row.totalWAR != null);
+      const divisionKeys = new Set(divisionTeamNames.map(canonicalTeamName));
+      const divRows = teams.filter(row => divisionKeys.has(canonicalTeamName(row.team)) && row.totalWAR != null);
       divisionTeams = divRows.map(row => ({
         team: row.team,
         totalWAR: row.totalWAR ?? null,
@@ -2055,7 +2125,15 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
       language: 'en',
     }, { ttl: 60_000, timeoutMs: 15_000, quietStatuses: [404, 502, 503, 504] });
     const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
-    return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
+    const responseMeta = getMlbResponseMeta(data);
+    const freshness = responseMeta?.freshness || 'live';
+    return {
+      games,
+      source: 'MLB Stats API',
+      freshness,
+      retrievedAt: responseMeta?.retrievedAt || new Date().toISOString(),
+      status: games.length ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'source-gap',
+    };
   } catch {
     return { games: [], retrievedAt: new Date().toISOString(), status: 'upstream-unavailable' };
   }

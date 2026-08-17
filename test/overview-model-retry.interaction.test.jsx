@@ -244,6 +244,7 @@ describe("Team Overview model source and retry interaction", () => {
   it("updates the roster sort when quick filters are clicked", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     const sortSelect = screen.getByRole("combobox", {
       name: "Sort roster insights by player statistic",
     });
@@ -259,7 +260,9 @@ describe("Team Overview model source and retry interaction", () => {
   });
 
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -270,7 +273,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("renders verified team spray and opponent contact-quality rollups when Savant returns rows", async () => {
     savantMode = "ready";
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByRole("img", {
         name: "Verified Baseball Savant batted-ball spray coordinates",
@@ -284,7 +289,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("shows explicit unavailable states when Savant returns no verified rows", async () => {
     savantMode = "empty";
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -295,7 +302,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("leaves model panels in explicit unavailable state after a FanGraphs 502", async () => {
     modelMode = "502";
+    const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
@@ -332,13 +341,16 @@ describe("Team Overview model source and retry interaction", () => {
       retrievedAt: "2026-08-14T02:02:00.000Z",
       status: "live",
     });
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText(/div avg/)).toBeInTheDocument();
   });
 
   it("shows explicit unavailable model states, exposes retry, and recovers MLB data without refreshing FanGraphs", async () => {
     const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
 
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)

@@ -23,6 +23,37 @@ function numeric(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeName(value = "") {
+  return String(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function parseBaseballReferenceIdentity(html, targetName) {
+  const target = normalizeName(targetName);
+  if (!target) return null;
+  const linkPattern = new RegExp('<a[^>]+href="(\\/players\\/[a-z]\\/[^" ]+\\.shtml)"[^>]*>([\\s\\S]*?)<\\/a>', 'gi');
+  let match;
+  while ((match = linkPattern.exec(String(html))) !== null) {
+    const displayName = cleanText(match[2]);
+    if (normalizeName(displayName) !== target) continue;
+    const path = match[1];
+    const id = path.split('/').pop()?.replace(/\.shtml$/i, '') || null;
+    if (!id) continue;
+    return {
+      id,
+      name: displayName,
+      url: `https://www.baseball-reference.com${path}`,
+      confidence: 'exact',
+      source: 'Baseball-Reference player identity',
+    };
+  }
+  return null;
+}
+
 function currentYearValue(html, label, season) {
   const escapedLabel = label.replace(/[+]/g, "\\+");
   const pattern = new RegExp(
@@ -65,7 +96,13 @@ export default async function playerAdvancedHandler(req, res) {
     });
     if (!response.ok) return res.status(response.status).json({ error: `Baseball-Reference returned ${response.status}` });
     const html = await response.text();
-    return res.status(200).json(parseBaseballReferenceAdvanced(html, season));
+    const metrics = parseBaseballReferenceAdvanced(html, season);
+    const identity = parseBaseballReferenceIdentity(html, name);
+    return res.status(200).json({
+      ...metrics,
+      providerIds: identity ? { baseballReference: identity.id } : {},
+      identity,
+    });
   } catch {
     return res.status(502).json({ error: "Baseball-Reference player data is unavailable." });
   }

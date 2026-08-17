@@ -11260,3 +11260,42 @@
 - [x] Add 502 and non-JSON quiet status handling for affiliate schedule requests in client/src/api/mlb.js.
 - [x] Add regression test for affiliate schedule upstream errors.
 - [x] Run release validation and publish release.
+- [x] Audit current runtime, production build, and API request behavior for performance and reliability bottlenecks.
+- [x] Implement the highest-impact data resilience and rendering performance fixes identified in the audit.
+- [x] Improve user-facing loading, retry, and unavailable state presentation where needed.
+- [x] Add targeted regression coverage and complete full release validation.
+- [x] Ensure the selected team’s MLB parent club is always preselected on Team Overview.
+- [x] Add regression coverage for initial, team-change, and explicit-affiliate selector behavior.
+- [x] Run release validation and publish the parent-first selector fix.
+- [x] Repair the remaining Team Overview selector behavior without changing the MLB-parent default.
+- [x] Add an explicit Minor League button that reveals affiliate controls only on demand.
+- [x] Add button-driven affiliate-flow regression coverage and publish the fix.
+- [x] Add classification filters for Triple-A, Double-A, High-A, Single-A, and other verified affiliate levels.
+- [x] Preserve explicit affiliate selection and reset the filter safely on team changes.
+- [x] Add filtering regressions, validate responsive controls, and publish the release.
+- [x] Add sortable affiliate standings controls for record, winning percentage, games back, and team name.
+- [x] Optimize standings ordering and preserve verified/unavailable source states.
+- [x] Add sorting regressions, validate responsive controls, and publish the release.
+- [x] Exclude MLB parent club rows from the affiliate selector and level filters.
+- [x] Preserve explicit true-affiliate selection and add parent-exclusion regression coverage.
+- [x] Run release validation and publish the selector correction.
+- [x] Audit team selection, affiliate loading, filters, standings sorting, and source-failure behavior end to end.
+- [x] Implement high-impact correctness, resilience, and interaction-performance improvements.
+- [x] Refine responsive loading and unavailable feedback and add end-to-end regression coverage.
+- [x] Complete production validation and publish the optimized workflow.
+- [x] Inventory and compare local and remote branches against the current optimized release.
+- [x] Identify the safest branch baseline and document push readiness without changing Git history.
+- [x] Run final release validation against the 29b3a367 baseline.
+- [x] Commit completed todo.md tracking updates and prepare a release-ready Git commit log without pushing.
+- [x] Verify local main and remote origin/main are ready for the authorized push.
+- [x] Push d422e88 and the validated main history to origin/main and confirm the remote tip.
+- [x] Prepare the release pull-request description and run a final remote production smoke test.
+- [x] Inspect the existing Players name-search and player-profile navigation flow.
+- [x] Make matching player names and quick-access cards open the corresponding player profile.
+- [x] Add search and profile-navigation regression tests, verify responsive behavior, and publish the enhancement.
+- [x] Inspect the current Players search keyboard flow and result accessibility semantics.
+- [x] Add Up/Down arrow navigation, Enter selection, and active-result feedback to player search results.
+- [x] Add keyboard-navigation regressions, validate the interaction, and publish the enhancement.
+- [x] Capture the current local and shared-main commit state before synchronization.
+- [x] Synchronize the local project to the latest shared main branch without overwriting newer work.
+- [x] Inspect, validate, and document the best compatible combined release state.

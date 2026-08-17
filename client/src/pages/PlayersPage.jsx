@@ -319,10 +319,54 @@ const REPORT_SECTIONS = [
   { icon:'⬡', title:'Geometry Radar',     body:'Six-axis player shape compared against league baselines.' },
   { icon:'$', title:'Contract & Value',   body:'Current contract terms alongside SKIP\u2019s estimate of true value.' },
 ];
+const PLAYER_FAVORITES_STORAGE_KEY = 'skip-player-favorites:v1';
+function readPlayerFavorites() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PLAYER_FAVORITES_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter(item => item?.id != null && item?.fullName) : [];
+  } catch { return []; }
+}
+function writePlayerFavorites(favorites) {
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(PLAYER_FAVORITES_STORAGE_KEY, JSON.stringify(favorites.slice(0, 24))); } catch { /* best effort */ }
+}
+function favoritePlayerRecord(person) {
+  return {
+    id: person?.id,
+    fullName: person?.fullName || person?.name || person?.profile?.fullName || 'Player',
+    team: person?.currentTeam?.name || person?.team?.name || person?.team || person?.profile?.currentTeam?.name || person?.profile?.currentTeam?.abbreviation || 'Free Agent',
+    position: person?.primaryPosition?.abbreviation || person?.pos || person?.profile?.primaryPosition?.abbreviation || '—',
+  };
+}
 
-function PlayersEmptyState({ onPick }) {
+function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
   return (
     <div style={{ padding:'8px 2px 0' }}>
+      <div className="skip-player-favorites" role="region" aria-label="Favorite players">
+        <div className="skip-player-favorites-heading">
+          <div>
+            <div className="skip-player-favorites-title">Favorites</div>
+            <div className="skip-player-favorites-caption">Save profiles for one-click access on this browser.</div>
+          </div>
+          <span className="skip-player-favorites-count">{favorites.length}/24</span>
+        </div>
+        {favorites.length ? (
+          <div className="skip-player-favorites-list">
+            {favorites.map(favorite => (
+              <div key={String(favorite.id)} className="skip-player-favorite-row">
+                <button type="button" className="skip-player-favorite-open" onClick={() => onPick({ id:favorite.id, fullName:favorite.fullName, team:favorite.team, pos:favorite.position })}>
+                  <PlayerPhoto id={favorite.id} name={favorite.fullName} size={38} />
+                  <span className="skip-player-favorite-copy"><strong>{favorite.fullName}</strong><small>{favorite.team} · {favorite.position}</small></span>
+                </button>
+                <button type="button" className="skip-player-favorite-remove" aria-label={`Remove ${favorite.fullName} from favorites`} onClick={() => onRemoveFavorite?.(favorite.id)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="skip-player-favorites-empty">No favorite players yet. Select a profile and use the star button to save it.</div>
+        )}
+      </div>
       <div style={{ marginBottom:18 }}>
         <div style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.08em', color:C.text3, textTransform:'uppercase', marginBottom:8 })}>
           Quick access
@@ -350,6 +394,12 @@ function PlayersEmptyState({ onPick }) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="skip-profile-source-strip" role="region" aria-label="Players landing data source">
+        <span className="skip-profile-source-title">DATA SOURCE</span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot is-ready" aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">MLB Stats API identity and player search</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">No player profile requested</span></span>
       </div>
 
       <Panel title="What's in a SKIP report" accent={C.amber}>
@@ -1602,13 +1652,16 @@ function SkipInline({ quote, color = C.teal }) {
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
 ═══════════════════════════════════════════════════════════════════ */
-function PlayersPage() {
+function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [query,   setQuery]   = useState('');
   const [results, setResults] = useState([]);
   const [player,  setPlayer]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
   const [error,   setError] = useState(null);
+  const [searchStatus, setSearchStatus] = useState('idle');
+  const [activeResultIndex, setActiveResultIndex] = useState(-1);
+  const [favorites, setFavorites] = useState(() => readPlayerFavorites());
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -1616,6 +1669,7 @@ function PlayersPage() {
   const latestQueryRef = useRef('');
   const mountedRef = useRef(true);
   const playerAbortRef = useRef(null);
+  const resultListRef = useRef(null);
   // Bug fix 2026-08-11: pickPlayer had no equivalent of latestQueryRef's
   // guard below — clicking player A then player B before A's slower
   // loadFullPlayer() resolved let A's response land after B's and silently
@@ -1644,19 +1698,56 @@ function PlayersPage() {
 
   const onInput = useCallback(e => {
     const q = e.target.value;
+    const normalizedQuery = q.trim();
     setQuery(q);
+    setActiveResultIndex(-1);
     latestQueryRef.current = q;
     clearTimeout(timerRef.current);
-    if (q.length < 2) { setResults([]); return; }
+    if (normalizedQuery.length < 2) {
+      setResults([]);
+      setSearchStatus('idle');
+      return;
+    }
+    setSearchStatus('searching');
     timerRef.current = setTimeout(async () => {
       try {
-        const r = await searchPlayers(q);
+        const r = await searchPlayers(normalizedQuery);
         // Only commit if this is still the most recent query — an older,
         // slower request can otherwise resolve after a newer one and
         // clobber its results with stale data.
-        if (mountedRef.current && latestQueryRef.current === q) setResults(r);
-      } catch { if (mountedRef.current && latestQueryRef.current === q) setResults([]); }
+        if (mountedRef.current && latestQueryRef.current === q) {
+          const matches = Array.isArray(r) ? r : [];
+          setResults(matches);
+          setActiveResultIndex(-1);
+          setSearchStatus(matches.length ? 'ready' : 'empty');
+        }
+      } catch {
+        if (mountedRef.current && latestQueryRef.current === q) {
+          setResults([]);
+          setActiveResultIndex(-1);
+          setSearchStatus('error');
+        }
+      }
     }, 280);
+  }, []);
+
+  const toggleFavorite = useCallback((person) => {
+    const favorite = favoritePlayerRecord(person);
+    if (favorite.id == null) return;
+    setFavorites(current => {
+      const exists = current.some(item => String(item.id) === String(favorite.id));
+      const next = exists ? current.filter(item => String(item.id) !== String(favorite.id)) : [favorite, ...current];
+      writePlayerFavorites(next);
+      return next;
+    });
+  }, []);
+
+  const removeFavorite = useCallback((playerId) => {
+    setFavorites(current => {
+      const next = current.filter(item => String(item.id) !== String(playerId));
+      writePlayerFavorites(next);
+      return next;
+    });
   }, []);
 
   const pickPlayer = useCallback(async (person) => {
@@ -1666,6 +1757,8 @@ function PlayersPage() {
     recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
+    setActiveResultIndex(-1);
+    setSearchStatus('idle');
     setQuery(person.fullName);
     setLoading(true);
     setSwitchingPlayerName(person.fullName || person.name || 'selected player');
@@ -1701,6 +1794,45 @@ function PlayersPage() {
     }
   }, []);
 
+  const onSearchKeyDown = useCallback(event => {
+    if (event.key === 'ArrowDown' && results.length) {
+      event.preventDefault();
+      setActiveResultIndex(index => index >= results.length - 1 ? 0 : index + 1);
+      return;
+    }
+    if (event.key === 'ArrowUp' && results.length) {
+      event.preventDefault();
+      setActiveResultIndex(index => index <= 0 ? results.length - 1 : index - 1);
+      return;
+    }
+    if (event.key === 'Escape') {
+      clearTimeout(timerRef.current);
+      setResults([]);
+      setActiveResultIndex(-1);
+      setSearchStatus('idle');
+      return;
+    }
+    if (event.key === 'Enter' && results.length) {
+      event.preventDefault();
+      pickPlayer(results[activeResultIndex >= 0 ? activeResultIndex : 0]);
+    }
+  }, [activeResultIndex, pickPlayer, results]);
+
+  const clearSearch = useCallback(() => {
+    clearTimeout(timerRef.current);
+    latestQueryRef.current = '';
+    setQuery('');
+    setResults([]);
+    setActiveResultIndex(-1);
+    setSearchStatus('idle');
+  }, []);
+
+  useEffect(() => {
+    if (activeResultIndex < 0) return;
+    resultListRef.current?.querySelector(`[data-player-search-index="${activeResultIndex}"]`)
+      ?.scrollIntoView({ block:'nearest' });
+  }, [activeResultIndex]);
+
   useEffect(() => {
     const onProviderRetry = event => {
       if (event.detail?.provider === 'boxscore') setBoxscoreRetryToken(token => token + 1);
@@ -1724,17 +1856,18 @@ function PlayersPage() {
     return () => { alive = false; };
   }, [player?.id, player?.currentTeam?.id, boxscoreRetryToken]);
   useEffect(() => {
-    const onOpenExternalPlayer = e => {
-      const detail = e.detail;
-      if (detail && detail.id) {
-        pickPlayer({ id: detail.id, fullName: detail.fullName || detail.name || 'Player' });
-      }
-    };
-    window.addEventListener('skip-open-player', onOpenExternalPlayer);
-    return () => {
-      window.removeEventListener('skip-open-player', onOpenExternalPlayer);
-    };
-  }, [pickPlayer]);
+    if (!initialPlayer?.id) return;
+    // React's development remount check runs an effect, immediately cleans it
+    // up, and then runs it again. Starting the network request synchronously
+    // lets the first cleanup abort it. Deferring one tick means the first
+    // scheduled load is canceled while the stable remount starts exactly one
+    // profile request and consumes the handoff afterward.
+    const timer = window.setTimeout(() => {
+      pickPlayer({ id:initialPlayer.id, fullName:initialPlayer.fullName || initialPlayer.name || 'Player' });
+      onInitialPlayerConsumed?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialPlayer, onInitialPlayerConsumed, pickPlayer]);
 
   const derived = useMemo(() => {
     if (!player) return null;
@@ -1800,7 +1933,12 @@ function PlayersPage() {
         : (parseFloat(st.ops) || null);
       return { yr: r.season, val };
     }).filter(d => d.val != null);
-    const advancedTrendData = buildAdvancedMetricTrendSeries(player.isPitcher ? player.careerPitching : player.career, 5);
+    const advancedTrendData = buildAdvancedMetricTrendSeries(
+      Array.isArray(player.careerAdvanced) && player.careerAdvanced.length
+        ? player.careerAdvanced
+        : (player.isPitcher ? player.careerPitching : player.career),
+      5,
+    );
 
     return {
       kpis, score, verd, arch,
@@ -1819,34 +1957,46 @@ function PlayersPage() {
 
       {/* ── Search ── */}
       <div style={{ position:'relative' }}>
-        <input value={query} onChange={onInput}
-          aria-label="Search any MLB player by name"
-          placeholder="Search any MLB player by name…"
-          onFocus={e => e.currentTarget.style.borderColor = C.amber}
-          onBlur={e => e.currentTarget.style.borderColor = C.border}
-          style={{ width:'100%', height:42, padding:'0 16px', border:`1px solid ${C.border}`, borderRadius:8,
-            fontSize:13, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface, color:C.text, outline:'none' }}/>
+        <div style={{ position:'relative' }}>
+          <input value={query} onChange={onInput} onKeyDown={onSearchKeyDown}
+            role="combobox"
+            aria-label="Search any MLB player by name"
+            placeholder="Search any MLB player by name…"
+            aria-autocomplete="list"
+            aria-controls="skip-player-search-results"
+            aria-expanded={results.length > 0}
+            aria-activedescendant={activeResultIndex >= 0 ? `skip-player-search-result-${results[activeResultIndex]?.id}-${activeResultIndex}` : undefined}
+            onFocus={e => e.currentTarget.style.borderColor = C.amber}
+            onBlur={e => e.currentTarget.style.borderColor = C.border}
+            style={{ width:'100%', height:42, padding:'0 42px 0 16px', border:`1px solid ${C.border}`, borderRadius:8,
+              fontSize:13, fontFamily:"'Plus Jakarta Sans',sans-serif", background:C.surface, color:C.text, outline:'none' }}/>
+          {query && <button type="button" onClick={clearSearch} aria-label="Clear player search" title="Clear player search" style={{ position:'absolute', right:9, top:'50%', transform:'translateY(-50%)', width:24, height:24, border:0, borderRadius:5, background:'transparent', color:C.text3, cursor:'pointer', fontSize:17, lineHeight:1 }}>×</button>}
+        </div>
+        <div aria-live="polite" aria-atomic="true" style={{ minHeight:18, padding:'4px 2px 0', ...sans({ fontSize:10, color:C.text3 }) }}>
+          {searchStatus === 'searching' && 'Searching verified MLB and MiLB player records…'}
+          {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — use Up and Down arrows to navigate, then press Enter to open the profile.${activeResultIndex >= 0 ? ` ${activeResultIndex + 1} of ${results.length} selected.` : ''}`}
+          {searchStatus === 'empty' && `No verified player matches found for “${query.trim()}”.`}
+          {searchStatus === 'error' && 'Player search is temporarily unavailable. Please try again.'}
+        </div>
         {results.length > 0 && (
-          <div style={{ position:'absolute', top:46, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
+          <div ref={resultListRef} id="skip-player-search-results" role="listbox" aria-label="Matching player profiles" onMouseLeave={() => setActiveResultIndex(-1)} style={{ position:'absolute', top:64, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
             borderRadius:8, zIndex:50, boxShadow:'0 6px 24px rgba(0,0,0,.12)', maxHeight:280, overflowY:'auto' }}>
-            {results.map(r => (
-              <div key={r.id} onClick={() => pickPlayer(r)}
-                tabIndex={0} role="button"
-                onKeyDown={e => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); pickPlayer(r); } }}
-                style={{ padding:'10px 14px', cursor:'pointer', borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11 }}
-                onMouseEnter={e => e.currentTarget.style.background = C.amberSoft}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                onFocus={e => e.currentTarget.style.background = C.amberSoft}
-                onBlur={e => e.currentTarget.style.background = 'transparent'}>
+            {results.map((r, index) => {
+              const active = index === activeResultIndex;
+              return <button key={r.id} id={`skip-player-search-result-${r.id}-${index}`} data-player-search-index={index} type="button" role="option" aria-selected={active} onClick={() => pickPlayer(r)}
+                aria-label={`Open ${r.fullName || r.name || 'player'} profile`}
+                style={{ width:'100%', padding:'10px 14px', cursor:'pointer', border:0, borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11, textAlign:'left', background:active ? C.amberSoft : 'transparent' }}
+                onMouseEnter={() => setActiveResultIndex(index)}
+                onFocus={() => setActiveResultIndex(index)}>
                 <img loading="lazy" src={`https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_96,q_auto:best/v1/people/${r.id}/headshot/67/current`}
                   onError={e => { e.currentTarget.style.display='none'; }}
                   style={{ width:34, height:34, borderRadius:7, objectFit:'cover', border:`0.5px solid ${C.border}`, flexShrink:0 }} alt=""/>
                 <div>
-                  <div style={sans({ fontSize:12, fontWeight:700, color:C.text })}>{r.fullName}</div>
+                  <div style={sans({ fontSize:12, fontWeight:700, color:C.text })}>{r.fullName || r.name || 'Unnamed player'}</div>
                   <div style={px({ fontSize:10, color:C.text3 })}>{r.currentTeam?.name || 'Free Agent'} · {r.primaryPosition?.abbreviation || '—'}</div>
                 </div>
-              </div>
-            ))}
+              </button>
+            })}
           </div>
         )}
       </div>
@@ -1869,12 +2019,12 @@ function PlayersPage() {
           fontFamily:"'DM Mono',monospace" }}>{error}</div>
       )}
       {!loading && !player && !error && results.length === 0 && (
-        <PlayersEmptyState onPick={pickPlayer} />
+        <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} />
       )}
 
       {player && derived && (
         <>
-          <PlayerProfile player={player} derived={derived} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
+          <PlayerProfile player={player} derived={derived} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -2157,7 +2307,7 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
+function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
   const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
     ? VISUAL_QA_PLAYERS
     : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
@@ -2463,7 +2613,10 @@ function PlayerProfile({ player, derived, onCompare, onSwitchPlayer }) {
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
               <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginTop:8 }}>
-                <button onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                <button type="button" onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? `Remove ${p.fullName} from favorites` : `Add ${p.fullName} to favorites`} title={isFavorite ? 'Remove from favorites' : 'Save to favorites'} style={{ padding:'5px 9px', border:`0.5px solid ${isFavorite ? C.amber : C.border}`, borderRadius:5, background:isFavorite ? C.amberSoft : C.surface2, color:isFavorite ? C.amberDark : C.text2, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
+                  {isFavorite ? '★ Favorited' : '☆ Favorite'}
+                </button>
+                <button type="button" onClick={onCompare} style={{ padding:'5px 9px', border:`0.5px solid ${C.teal}`, borderRadius:5, background:`color-mix(in srgb, ${C.teal} 8%, transparent)`, color:C.teal, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
                   Compare player
                 </button>
                 <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 7px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.text3, ...sans({ fontSize:8.5, fontWeight:800, letterSpacing:'.05em', textTransform:'uppercase' }) }}>

@@ -190,3 +190,26 @@
 - [x] Persist presets safely per player/browser and support applying and deleting them.
 - [x] Add regression tests for pagination, preset persistence, apply/delete, and responsive controls.
 - [x] Verify desktop/mobile presentation and publish the validated update.
+
+- [x] Rerun the focused regression suite against the current local workspace and record the result.
+- [x] Inspect /api/player-identity?mode=metrics for privacy-safe telemetry fields and response behavior; current local and published routes return the SPA HTML shell rather than JSON.
+- [x] Extract and review the attached observability audit archive methodology and evidence outputs.
+- [x] Report focused-test, endpoint, and archive-review findings with any discrepancies.
+
+- [x] Explain the Players and Intelligence honestState false flags from ui-data-audit.json and related evidence.
+- [x] Run the full local 433-test suite and identify the exact cause of every failing test; the current workspace instead contains 360 passing tests and no reproduced failures.
+- [x] Trace player-identity telemetry through current source, branches, commits, and repository history.
+- [x] Report the audit, test-health, and telemetry-history findings with exact discrepancies.
+
+- [x] Search reflogs, remote branches, tags, and unreachable objects for d65383c or the missing telemetry branch.
+- [x] Inspect Players and Intelligence source contracts and add honest source/freshness metadata where verified.
+- [x] Add regression coverage for the new Players and Intelligence metadata states.
+- [x] Run the current 360-test suite with coverage reporting and review file/test distribution; after the shared merge, 101 files and 483 tests passed with V8 coverage.
+- [x] Verify metadata changes and publish a validated checkpoint if implementation is required and passes.
+
+- [x] Add persistent Players Favorites with save, remove, and quick-open profile actions.
+- [x] Add responsive Favorites presentation to the Players landing and selected-profile states.
+- [x] Trace the divisional WAR payload and fix verified division-row normalization/rendering.
+- [x] Preserve an explicit unavailable state when no verified divisional WAR rows exist.
+- [x] Add regression tests for Favorites and verified/unavailable divisional WAR states.
+- [x] Run full validation, review responsive behavior, and publish the update.

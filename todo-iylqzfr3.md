@@ -208,3 +208,18 @@
 - [x] Add regression tests for transition loading and five-season trend rendering
 - [x] Run typecheck, focused tests, full validation, and visual verification
 - [x] Save a checkpoint containing the Visual QA loading and advanced trend enhancements
+- [x] Inspect current career-season loaders and verified provider contracts
+- [x] Add historical WAR and wRC+ adapters using explicit provider fields only
+- [x] Merge historical advanced series without overriding primary values or fabricating gaps
+- [x] Wire historical provenance into the Player Profile trend chart
+- [x] Add adapter, merge, and rendered trend regression tests
+- [x] Run typecheck and broader validation
+- [x] Create a downloadable ZIP of the project
+- [x] Save a checkpoint with historical advanced metrics and ZIP-ready code
+- [x] Inspect current MLB, Baseball-Reference, and historical advanced identifiers and matching boundaries
+- [x] Add stable player ID mapping with explicit confidence and provider provenance
+- [x] Use mapped IDs for historical WAR/wRC+ requests without unsafe name-only substitution
+- [x] Debug profile loading, fallback precedence, trend integration, and unavailable states
+- [x] Add mapping, mismatch, and regression coverage
+- [x] Run typecheck, focused tests, broader validation, and production build
+- [x] Verify desktop/mobile behavior and save a checkpoint

@@ -15,9 +15,10 @@ import { computeAMD } from "../client/src/engine/skip.js";
 import {
   selectSeasonSplit,
   normalizeSeasonAdvancedStat,
+  normalizeYearByYearAdvancedStats,
   mergeAdvancedMetricSources,
 } from "../client/src/api/mlb.js";
-import { parseBaseballReferenceAdvanced } from "../server/api/player-advanced.js";
+import { parseBaseballReferenceAdvanced, parseBaseballReferenceIdentity } from "../server/api/player-advanced.js";
 import { percentileLabel } from "../client/src/lib/percentile.js";
 import {
   comparisonAxes,
@@ -39,6 +40,17 @@ describe("player profile data accuracy guards", () => {
       { season: 2024, war: 4.2, wrcPlus: 131 },
       { season: 2025, war: 5.1, wrcPlus: 142 },
       { season: 2026, war: 6.0, wrcPlus: 150 },
+    ]);
+  });
+
+  it("normalizes official yearByYearAdvanced rows without treating OPS+ as wRC+", () => {
+    const rows = normalizeYearByYearAdvancedStats({ stats: [{ group: { displayName: "hitting" }, splits: [
+      { season: "2024", stat: { war: 4.2, wRCPlus: 131 } },
+      { season: "2025", stat: { OPSPlus: 150 } },
+    ] }] });
+    expect(rows).toEqual([
+      { season: 2024, war: 4.2, wrcPlus: 131, source: "MLB Stats API yearByYearAdvanced", status: "live" },
+      { season: 2025, war: null, wrcPlus: null, source: "MLB Stats API yearByYearAdvanced", status: "unavailable" },
     ]);
   });
 
@@ -68,6 +80,12 @@ describe("player profile data accuracy guards", () => {
       provenance: { war: "Baseball-Reference player summary", wrcPlus: null },
       status: "live",
     });
+  });
+
+  it("maps an exact Baseball-Reference identity and rejects a near-name mismatch", () => {
+    const html = '<a href="/players/o/ohtansh01.shtml">Shohei Ohtani</a><a href="/players/o/ohtansh02.shtml">Shohei Other</a>';
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani")).toMatchObject({ id: "ohtansh01", confidence: "exact" });
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani Jr.")).toBeNull();
   });
 
   it("parses only explicit Baseball-Reference WAR and wRC+ fields", () => {

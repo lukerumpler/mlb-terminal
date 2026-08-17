@@ -15,7 +15,7 @@ const MLB_BASE = "https://statsapi.mlb.com/api/v1";
 
 const CACHE_RULES = {
   "/standings": { s: 120, swr: 60 },
-  "/schedule": { s: 90, swr: 60 },
+  "/schedule": { s: 90, swr: 600 },
   "/teams": { s: 300, swr: 120 },
   "/stats/leaders": { s: 300, swr: 120 },
   "/people": { s: 600, swr: 300 },
@@ -205,7 +205,7 @@ export default async function handler(req, res) {
     } catch (err) {
       const isTimeout =
         err.name === "TimeoutError" || err.name === "AbortError";
-      console.error("[mlb-proxy] fetch error:", err.message);
+      console.warn("[mlb-proxy] fetch error:", err.message);
       throw {
         status: isTimeout ? 504 : 502,
         payload: {
@@ -219,7 +219,7 @@ export default async function handler(req, res) {
     if (!mlbRes.ok) {
       const body = await mlbRes.text().catch(() => "");
       const retryAfter = mlbRes.headers?.get?.("Retry-After");
-      console.error(
+      console.warn(
         "[mlb-proxy] MLB returned",
         mlbRes.status,
         "| url:",
@@ -243,7 +243,7 @@ export default async function handler(req, res) {
         throw Object.assign(new Error("empty response"), { emptyBody: true });
       data = JSON.parse(body);
     } catch (err) {
-      console.error(
+      console.warn(
         "[mlb-proxy] JSON parse error | url:",
         mlbUrl,
         "| detail:",
