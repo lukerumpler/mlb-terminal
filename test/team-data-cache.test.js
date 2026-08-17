@@ -12,6 +12,7 @@ import {
   buildPitchArsenalRows,
   buildLiveRadarData,
   buildLiveRunDiffData,
+  deriveFrontOfficeCoverageGrades,
   formatDataAge,
   resolveTeamSavantSnapshot,
 } from "../client/src/pages/OverviewPage.jsx";
@@ -83,6 +84,33 @@ describe("team data cache and freshness helpers", () => {
     expect(
       buildLiveRadarData({ team: {}, liveTeamData: null }).strengthData
     ).toEqual([]);
+  });
+
+  it("derives transparent Defense, Depth, and Future Value values only from available roster/prospect inputs", () => {
+    const populated = deriveFrontOfficeCoverageGrades({
+      liveDataMode: "live",
+      teamAbbr: "LAD",
+      players: {
+        hitting: [
+          { position: "C", stat: { plateAppearances: 100 } },
+          { position: "1B", stat: { plateAppearances: 100 } },
+          { position: "2B", stat: { plateAppearances: 100 } },
+          { position: "SS", stat: { plateAppearances: 100 } },
+          { position: "3B", stat: { plateAppearances: 100 } },
+          { position: "LF", stat: { plateAppearances: 100 } },
+          { position: "CF", stat: { plateAppearances: 100 } },
+          { position: "RF", stat: { plateAppearances: 100 } },
+        ],
+        pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
+      },
+    });
+    expect(populated.defensePct).toBe(100);
+    expect(populated.depthPct).toBe(100);
+    expect(populated.futureValuePct).not.toBeNull();
+    expect(populated.prospectCount).toBeGreaterThan(0);
+
+    const unavailable = deriveFrontOfficeCoverageGrades({ liveDataMode: "unavailable", teamAbbr: "ZZZ", players: { hitting: [], pitching: [] } });
+    expect(unavailable).toMatchObject({ defensePct: null, depthPct: null, futureValuePct: null, prospectCount: 0 });
   });
 
   beforeEach(() => localStorage.clear());
