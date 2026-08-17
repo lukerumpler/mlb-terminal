@@ -35,6 +35,8 @@ export async function registerLegacyApiRoutes(app: Express) {
     import("./news.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./contract.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./player-identity.js"),
     // Server-side structured AI comparison summary; credentials stay inside invokeLLM.
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./comparison-summary.js"),
@@ -56,6 +58,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/feed",
     "/api/news",
     "/api/contract",
+    "/api/player-identity",
     "/api/comparison-summary",
     "/api/natural-search",
     "/api/team-financials",
@@ -91,6 +94,7 @@ export const legacyApiPaths = [
   "/api/feed",
   "/api/news",
   "/api/contract",
+  "/api/player-identity",
   "/api/comparison-summary",
   "/api/natural-search",
 ] as const;

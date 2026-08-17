@@ -21,6 +21,7 @@ import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
+import { isUsablePlayerProviderIdentity } from '../lib/playerIdentityRegistry.js';
 import { buildReconciliationRows, buildDataQualityPayload, downloadDataQualityExport } from '../lib/dataQuality.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
@@ -42,6 +43,23 @@ export function humanizePlayerLoadError(error, playerName = 'this player') {
   if (status === 429) return `Could not load ${playerName} right now because the data provider is limiting requests. Please retry shortly.`;
   if (status >= 500 || error?.name === 'AbortError' || error?.name === 'TimeoutError') return `Could not load ${playerName} right now because the data provider did not respond in time.`;
   return `Could not load ${playerName}. Please retry shortly.`;
+}
+
+export function getProviderIdConfidenceSourceCheck(player, profile) {
+  const identity = player?.providerIdentity;
+  const ready = isUsablePlayerProviderIdentity(identity, {
+    mlbId: player?.mlbId || player?.id || profile?.id,
+    fullName: profile?.fullName,
+  });
+  const baseballReference = identity?.baseballReference;
+  return {
+    label:'B-Ref ID',
+    ready,
+    source: ready ? 'Exact name' : 'Unavailable',
+    detail: ready
+      ? `Baseball-Reference ID ${baseballReference.id} verified through an exact normalized name match. ${baseballReference.provenance}`
+      : 'No exact Baseball-Reference provider-ID mapping is available. Near-name matches are intentionally rejected.',
+  };
 }
 
 function pctBar(pct, color) {
@@ -2127,11 +2145,13 @@ function PlayerProfile({ player, derived, onCompare }) {
                       : verd.includes('MONITOR') ? C.amber
                       : verd.includes('HOLD')    ? C.slate : C.rust;
   const hasProfileContractMetadata = Boolean(player.contractData && Object.values(player.contractData).some(value => value != null && value !== ''));
+  const providerIdConfidence = getProviderIdConfidenceSourceCheck(player, p);
   const profileSourceChecks = [
-    ['Identity', Boolean(p?.id), 'MLB'],
-    ['Season stats', Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), 'MLB'],
-    ['Statcast', Boolean(player.savant), 'Savant'],
-    ['Contract', hasProfileContractMetadata, 'Spotrac'],
+    { label:'Identity', ready:Boolean(p?.id), source:'MLB', detail:'Official MLB Stats API player identifier.' },
+    { label:'Season stats', ready:Boolean(s?.gamesPlayed || s?.atBats || s?.inningsPitched), source:'MLB', detail:'Official MLB Stats API season statistics.' },
+    { label:'Statcast', ready:Boolean(player.savant), source:'Savant', detail:'Baseball Savant Statcast profile data.' },
+    { label:'Contract', ready:hasProfileContractMetadata, source:'Spotrac', detail:'Verified contract metadata from the active contract data path.' },
+    providerIdConfidence,
   ];
   // Player's own team brand color for panel accents — TEAMS is a curated
   // subset (not all 30 clubs), so this gracefully falls back to the app's
@@ -2430,7 +2450,7 @@ function PlayerProfile({ player, derived, onCompare }) {
 
       <div className="skip-profile-source-strip" aria-label="Player profile data sources">
         <span className="skip-profile-source-title">DATA CONFIDENCE</span>
-        {profileSourceChecks.map(([label, ready, source]) => <div className="skip-profile-source-item" key={label}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{ready ? source : 'Unavailable'}</span></div>)}
+        {profileSourceChecks.map(({ label, ready, source, detail }) => <div className="skip-profile-source-item" key={label} title={detail}><span className={`skip-profile-source-dot ${ready ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">{label}</span><span className="skip-profile-source-provider">{source}</span></div>)}
       </div>
       <ProfileTabRail activeTab={activeTab} onChange={setActiveTab} />
 

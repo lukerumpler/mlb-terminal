@@ -10,6 +10,7 @@ describe("legacy API route registration", () => {
       "/api/feed",
       "/api/news",
       "/api/contract",
+      "/api/player-identity",
       "/api/comparison-summary",
       "/api/natural-search",
     ]);

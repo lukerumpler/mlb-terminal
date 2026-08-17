@@ -1,5 +1,10 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
+import {
+  getStoredPlayerProviderIdentity,
+  removeStoredPlayerProviderIdentity,
+  storePlayerProviderIdentity,
+} from '../lib/playerIdentityRegistry.js';
 
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
@@ -246,6 +251,7 @@ export function __resetMlbClientStateForTests() {
   providerJsonInFlight.clear();
   teamFinancialsCache.clear();
   contractClientCache.clear();
+  playerProviderIdentityCache.clear();
   if (queueTimer != null) {
     globalThis.clearTimeout(queueTimer);
     queueTimer = null;
@@ -546,6 +552,8 @@ const teamFinancialsCache = new Map();
 const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
 const contractClientCache = new Map();
 const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
+const playerProviderIdentityCache = new Map();
+const PLAYER_PROVIDER_IDENTITY_TTL_MS = 10 * 60_000;
 
 export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
   const team = String(teamAbbreviation || '').trim().toUpperCase();
@@ -572,6 +580,52 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON) {
   teamFinancialsCache.set(cacheKey, {
     promise,
     expiresAt: Date.now() + TEAM_FINANCIALS_CLIENT_TTL_MS,
+  });
+  return promise;
+}
+
+export async function fetchPlayerProviderIdentity(player) {
+  const mlbId = String(player?.id || '').trim();
+  const fullName = String(player?.fullName || '').trim();
+  if (!mlbId || !fullName) return null;
+
+  const cachedIdentity = getStoredPlayerProviderIdentity({ mlbId, fullName });
+  const cacheKey = `${mlbId}:${fullName.toLowerCase()}`;
+  const cached = playerProviderIdentityCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) playerProviderIdentityCache.delete(cacheKey);
+
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ mlbId, name: fullName });
+      if (cachedIdentity?.baseballReference?.id) {
+        params.set('baseballReferenceId', cachedIdentity.baseballReference.id);
+      }
+      const response = await fetch(`/api/player-identity?${params}`, {
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) return null;
+      const payload = await response.json();
+      if (payload?.invalidateBaseballReferenceId) {
+        removeStoredPlayerProviderIdentity({ mlbId });
+      }
+      if (payload?.found && payload?.identity) {
+        storePlayerProviderIdentity({ mlbId, fullName, identity:payload.identity });
+        return payload.identity;
+      }
+      return payload?.identity || null;
+    } catch {
+      // A stored exact-name mapping remains safe to use if the resolver is
+      // temporarily unavailable; it is not a name-derived fallback.
+      return cachedIdentity || null;
+    }
+  })().then(identity => {
+    if (!identity) playerProviderIdentityCache.delete(cacheKey);
+    return identity;
+  });
+  playerProviderIdentityCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + PLAYER_PROVIDER_IDENTITY_TTL_MS,
   });
   return promise;
 }
@@ -728,7 +782,11 @@ export async function loadFullPlayer(person, season = SEASON) {
   const profileSportId = profile?.currentTeam?.sport?.id ?? profile?.sport?.id ?? null;
   const currentTeamAbbreviation = profile?.currentTeam?.abbreviation || person.team || null;
   const boxscoreSplitsPromise = getPlayerBoxscoreSplits(id, profile?.currentTeam?.id, season);
-  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics] = await Promise.all([
+  const providerIdentityPromise = fetchPlayerProviderIdentity({
+    id,
+    fullName: profile?.fullName || person.fullName || person.name,
+  });
+  const [hittingResult, pitchingResult, careerHitting, careerPitching, contractRaw, handednessResult, teamFinancials, advancedMetrics, providerIdentity] = await Promise.all([
     getSeasonStatsSafe(id, 'hitting',  season, profileSportId),
     getSeasonStatsSafe(id, 'pitching', season, profileSportId),
     getCareerSplits(id, 'hitting'),
@@ -737,6 +795,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     getHandednessSplits(id, season),
     fetchTeamFinancials(currentTeamAbbreviation, season),
     getSeasonAdvancedStatsSafe(id, season, profileSportId),
+    providerIdentityPromise,
   ]);
 
   // Savant & bat-tracking are optional — never block. Each tries current season then prior year
@@ -934,7 +993,12 @@ export async function loadFullPlayer(person, season = SEASON) {
   const statResult = isPitcher ? pitchingResult : hittingResult;
 
   return {
-    id, profile, savant, batTracking, statcastPopulation,
+    id,
+    mlbId: String(id),
+    baseballReferenceId: providerIdentity?.baseballReference?.id || null,
+    baseballReferenceUrl: providerIdentity?.baseballReference?.canonicalUrl || null,
+    providerIdentity,
+    profile, savant, batTracking, statcastPopulation,
     expectedStatisticsPopulation, batTrackingPopulation, isPitcher,
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
