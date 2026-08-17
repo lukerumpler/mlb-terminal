@@ -644,13 +644,16 @@ export function mergeAdvancedMetricSources(primary = {}, fallback = {}) {
   };
 }
 
-export async function getBaseballReferenceAdvancedSafe(name, season) {
-  if (!name) return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+export async function getBaseballReferenceAdvancedSafe(name, season, { mlbId } = {}) {
+  const unavailable = { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', providerIds:{}, status:'unavailable' };
+  if (!name) return unavailable;
   try {
-    const data = await providerJson(`/api/player-advanced?name=${encodeURIComponent(name)}&season=${encodeURIComponent(season)}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
-    return normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary');
+    const params = new URLSearchParams({ name, season: String(season) });
+    if (mlbId != null) params.set('mlbId', String(mlbId));
+    const data = await providerJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
+    return { ...normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary'), providerIds: data?.providerIds || {} };
   } catch {
-    return { season, war:null, wrcPlus:null, source:'Baseball-Reference player summary', status:'unavailable' };
+    return unavailable;
   }
 }
 
@@ -998,6 +1001,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     isFallback: (isPitcher ? pitchingResult : hittingResult)?.isFallback || false,
     career: null,
     careerPitching: null,
+    careerAdvanced: null,
+    providerIds: { mlb: id },
     hittingStats: hittingResult?.stat || {},
     pitchingStats: pitchingResult?.stat || {},
     aggregateSource: 'MLB Stats API season stats',
@@ -1028,7 +1033,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     : getHandednessSplits(id, season, importantRequest);
   const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season, importantRequest);
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
-  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
+  const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season, { mlbId: id });
 
   const [careerHitting, careerPitching, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
@@ -1049,6 +1054,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const importantSnapshot = {
     ...coreSnapshot,
     advancedMetrics,
+    providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
     career: careerHitting,
     careerPitching,
     careerAdvanced,
@@ -1253,6 +1259,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     pitchArsenal, pitchArsenalPopulation, contactPoints, pitcherPitches,
     stats:        statResult?.stat        || {},
     advancedMetrics,
+    providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,

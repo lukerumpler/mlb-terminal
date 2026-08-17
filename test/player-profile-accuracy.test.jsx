@@ -18,7 +18,7 @@ import {
   normalizeYearByYearAdvancedStats,
   mergeAdvancedMetricSources,
 } from "../client/src/api/mlb.js";
-import { parseBaseballReferenceAdvanced } from "../server/api/player-advanced.js";
+import { parseBaseballReferenceAdvanced, parseBaseballReferenceIdentity } from "../server/api/player-advanced.js";
 import { percentileLabel } from "../client/src/lib/percentile.js";
 import {
   comparisonAxes,
@@ -80,6 +80,12 @@ describe("player profile data accuracy guards", () => {
       provenance: { war: "Baseball-Reference player summary", wrcPlus: null },
       status: "live",
     });
+  });
+
+  it("maps an exact Baseball-Reference identity and rejects a near-name mismatch", () => {
+    const html = '<a href="/players/o/ohtansh01.shtml">Shohei Ohtani</a><a href="/players/o/ohtansh02.shtml">Shohei Other</a>';
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani")).toMatchObject({ id: "ohtansh01", confidence: "exact" });
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani Jr.")).toBeNull();
   });
 
   it("parses only explicit Baseball-Reference WAR and wRC+ fields", () => {
