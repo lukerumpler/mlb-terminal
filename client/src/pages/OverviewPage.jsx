@@ -940,12 +940,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [teamBase?.abbr, savantRetryToken]);
   useEffect(() => {
+    if (overviewView !== 'performance') return undefined;
     let alive = true;
     setTeamModelState('loading');
-    getTeamModelSources(teamBase?.abbr, CURRENT_SEASON).then(async data => {
+    const divisionTeamNames = Object.values(TEAMS).filter(t => t.div === teamBase?.div).map(t => t.name);
+    Promise.all([
+      getTeamModelSources(teamBase?.abbr, CURRENT_SEASON),
+      getTeamAggregateWar(teamBase?.name, divisionTeamNames, CURRENT_SEASON),
+    ]).then(([baseModel, aggregate]) => {
       if (!alive) return;
-      const divisionTeamNames = Object.values(TEAMS).filter(t => t.div === teamBase?.div).map(t => t.name);
-      const aggregate = await getTeamAggregateWar(teamBase?.name, divisionTeamNames, CURRENT_SEASON);
+      let data = baseModel;
       if (aggregate && alive) {
         if (data?.teamWar == null && aggregate.teamWar != null) {
           data = { ...data, found: true, teamWar: aggregate.teamWar, source: `${data.source || 'FanGraphs'} + ${aggregate.source}`, retrievedAt: aggregate.retrievedAt || data.retrievedAt, freshness: aggregate.freshness, statuses: { ...(data.statuses || {}), teamWar: aggregate.status } };
@@ -962,7 +966,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
-  }, [teamBase?.abbr, fangraphsRetryToken]);
+  }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
   useEffect(() => {
     let alive = true;
     setCalculatedIntelligence(null);
@@ -1499,7 +1503,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           {affiliateOverviewState==='error' && <div style={{padding:'0 14px 12px',...sans({fontSize:10,color:C.rust})}}>The selected affiliate’s live overview is unavailable right now. The MLB parent overview remains available above.</div>}
         </>}
         {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Triple-A standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateStandings?.status, 'Loading')}</div>{affiliateStandings?.rows?.length ? affiliateStandings.rows.slice(0,12).map((row,index)=><div key={row.id || row.name} style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
-        {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSchedule?.status, 'Loading')}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
+        {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.freshness === 'stale-cached' ? 'verified cached schedule · provider temporarily unavailable' : affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSchedule?.status, 'Loading')}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
       </Panel>}
 
       {overviewView === 'performance' && <StatStrip items={[

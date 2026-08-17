@@ -27,5 +27,8 @@ export default defineConfig({
       "test/**/*.test.jsx",
       "test/**/*.test.js",
     ],
+    exclude: [
+      "**/*.e2e.test.js",
+    ],
   },
 });

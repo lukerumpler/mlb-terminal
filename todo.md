@@ -11260,3 +11260,7 @@
 - [x] Add 502 and non-JSON quiet status handling for affiliate schedule requests in client/src/api/mlb.js.
 - [x] Add regression test for affiliate schedule upstream errors.
 - [x] Run release validation and publish release.
+- [x] Audit current runtime, production build, and API request behavior for performance and reliability bottlenecks.
+- [x] Implement the highest-impact data resilience and rendering performance fixes identified in the audit.
+- [x] Improve user-facing loading, retry, and unavailable state presentation where needed.
+- [x] Add targeted regression coverage and complete full release validation.

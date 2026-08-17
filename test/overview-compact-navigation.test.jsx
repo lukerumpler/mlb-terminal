@@ -1,12 +1,15 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
+import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
 
 describe('Team Overview compact navigation', () => {
   beforeEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    __resetMlbClientStateForTests();
+    __resetFanGraphsLocalSnapshotForTests();
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -46,5 +49,17 @@ describe('Team Overview compact navigation', () => {
     expect(screen.getByText('Ballpark Environment')).toBeInTheDocument();
     expect(screen.getByText('Franchise CBT Trend')).toBeInTheDocument();
     expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
+  });
+
+  it('defers FanGraphs model requests until Performance is explicitly opened', async () => {
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
+    await waitFor(() => {
+      expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
+    });
   });
 });

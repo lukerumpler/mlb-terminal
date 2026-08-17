@@ -190,6 +190,25 @@ function staleCacheGet(key) {
   return undefined;
 }
 
+function setMlbResponseMeta(data, meta) {
+  if (!data || (typeof data !== 'object' && typeof data !== 'function')) return data;
+  try {
+    Object.defineProperty(data, '__skipResponseMeta', {
+      value: { ...meta },
+      enumerable: false,
+      configurable: true,
+    });
+  } catch {
+    // Provider data may be frozen in tests; returning the verified payload is
+    // still preferable to dropping a safe stale response.
+  }
+  return data;
+}
+
+function getMlbResponseMeta(data) {
+  return data && typeof data === 'object' ? data.__skipResponseMeta || null : null;
+}
+
 function recordRequestTrace(event) {
   const entry = {
     id: ++requestTraceSequence,
@@ -403,6 +422,7 @@ export async function mlb(path, params = {}, {
       }
       const stale = useCache ? staleCacheGet(url) : undefined;
       if (stale !== undefined) {
+        setMlbResponseMeta(stale, { freshness: 'stale-cached', retrievedAt: getMlbResponseMeta(stale)?.retrievedAt || null, source: 'MLB Stats API' });
         recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'stale-hit', reason: 'transport-error' });
         return stale;
       }
@@ -414,6 +434,7 @@ export async function mlb(path, params = {}, {
       const stale = useCache ? staleCacheGet(url) : undefined;
       const canUseStale = [429, 500, 502, 503, 504].includes(res.status);
       if (canUseStale && stale !== undefined) {
+        setMlbResponseMeta(stale, { freshness: 'stale-cached', retrievedAt: getMlbResponseMeta(stale)?.retrievedAt || null, source: 'MLB Stats API' });
         if (res.status === 429) {
           proxyCooldownUntil = Math.max(proxyCooldownUntil, Date.now() + retryAfterMs);
           console.warn('[mlb] proxy rate limit; using verified cached response', path);
@@ -452,6 +473,11 @@ export async function mlb(path, params = {}, {
       }
       throw new Error(`MLB API returned an unreadable response — ${path}`);
     }
+    setMlbResponseMeta(data, {
+      freshness: res.headers?.get?.('X-Proxy-Freshness') || 'live',
+      retrievedAt: new Date().toISOString(),
+      source: 'MLB Stats API',
+    });
     if (useCache) {
       const expires = Date.now() + ttl;
       cache.set(url, { data, expires, staleExpires: expires + STALE_CACHE_TTL_MS });
@@ -2081,7 +2107,15 @@ export async function getMinorLeagueTeamSchedule(teamId, levelId = 11, season = 
       language: 'en',
     }, { ttl: 60_000, timeoutMs: 15_000, quietStatuses: [404, 502, 503, 504] });
     const games = (data.dates || []).flatMap(date => (date.games || []).map(normalizeGame));
-    return { games, retrievedAt: new Date().toISOString(), status: games.length ? 'live' : 'source-gap' };
+    const responseMeta = getMlbResponseMeta(data);
+    const freshness = responseMeta?.freshness || 'live';
+    return {
+      games,
+      source: 'MLB Stats API',
+      freshness,
+      retrievedAt: responseMeta?.retrievedAt || new Date().toISOString(),
+      status: games.length ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'source-gap',
+    };
   } catch {
     return { games: [], retrievedAt: new Date().toISOString(), status: 'upstream-unavailable' };
   }

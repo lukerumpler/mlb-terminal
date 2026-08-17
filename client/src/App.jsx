@@ -185,7 +185,7 @@ export default function App() {
         const team = Object.values(TEAMS).find(item => item.abbr === parentAbbr);
         recordRecentView({ type:'affiliate', affiliateId:detail.affiliateId, parentAbbr, levelId:detail.levelId, label:detail.label || 'Minor-league affiliate', secondary:detail.secondary || `${team?.name || parentAbbr} affiliate` });
         setTab('overview');
-        window.dispatchEvent(new CustomEvent('skip-select-affiliate', { detail }));
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent('skip-select-affiliate', { detail })), 0);
       }
     };
     const onOpenTeam = e => {
@@ -202,12 +202,12 @@ export default function App() {
     window.addEventListener('skip-navigate', onNavigate);
     window.addEventListener('skip-open-player', onOpenPlayer);
     window.addEventListener('skip-open-team', onOpenTeam);
-    window.addEventListener('skip-select-affiliate', onOpenAffiliate);
+    window.addEventListener('skip-open-affiliate', onOpenAffiliate);
     return () => {
       window.removeEventListener('skip-navigate', onNavigate);
       window.removeEventListener('skip-open-player', onOpenPlayer);
       window.removeEventListener('skip-open-team', onOpenTeam);
-      window.removeEventListener('skip-select-affiliate', onOpenAffiliate);
+      window.removeEventListener('skip-open-affiliate', onOpenAffiliate);
     };
   }, []);
 

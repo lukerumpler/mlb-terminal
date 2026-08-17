@@ -56,5 +56,7 @@ describe('Schedule fallback caching mechanism', () => {
     const res2 = await getMinorLeagueTeamSchedule(999, 11, 2026, 14);
     expect(res2.games.length).toBe(1);
     expect(res2.games[0].gamePk).toBe(101);
+    expect(res2.status).toBe('cached');
+    expect(res2.freshness).toBe('stale-cached');
   });
 });
