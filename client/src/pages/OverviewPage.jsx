@@ -574,6 +574,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [affiliates, setAffiliates] = useState([]);
   const [affiliatesState, setAffiliatesState] = useState('idle');
   const [affiliateControlsOpen, setAffiliateControlsOpen] = useState(false);
+  const [affiliateLevelFilter, setAffiliateLevelFilter] = useState('all');
   const [affiliateOverview, setAffiliateOverview] = useState(null);
   const [affiliateOverviewState, setAffiliateOverviewState] = useState('idle');
   const [affiliateTab, setAffiliateTab] = useState('overview');
@@ -660,6 +661,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         setSelTeam(foundKey);
         setPendingAffiliate({ id: String(detail.affiliateId || ''), levelId: String(detail.levelId || '11') });
         setAffiliateControlsOpen(true);
+        setAffiliateLevelFilter(String(detail.levelId || 'all'));
         setOverviewView('roster');
       }
     };
@@ -673,6 +675,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           setAffiliateLevel('11');
           setAffiliateTab('overview');
           setAffiliateControlsOpen(false);
+          setAffiliateLevelFilter('all');
           setSelTeam(foundKey);
         }
       }
@@ -700,7 +703,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setAffiliatesState('ready');
     }).catch(() => { if (alive) setAffiliatesState('error'); });
     return () => { alive = false; };
-  }, [teamBase?.id, affiliateControlsOpen, liveTeamDataMode, liveTeamData]);
+  }, [teamBase?.id, affiliateControlsOpen]);
 
   useEffect(() => {
     if (!pendingAffiliate?.id || !affiliateControlsOpen) return;
@@ -708,12 +711,27 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     if (preferred) {
       setAffiliateLevel(String(preferred.levelId));
       setAffiliateId(String(preferred.id));
+      setAffiliateLevelFilter(String(preferred.levelId));
       setAffiliateTab('overview');
       setPendingAffiliate(null);
     } else if (affiliatesState === 'ready' || affiliatesState === 'error') {
       setPendingAffiliate(null);
     }
   }, [pendingAffiliate?.id, affiliateControlsOpen, affiliates, affiliatesState]);
+
+  const affiliateLevelOptions = useMemo(() => Object.values(
+    affiliates.reduce((levels, affiliate) => {
+      const id = String(affiliate.levelId || 'unknown');
+      if (!levels[id]) levels[id] = { id, label: affiliate.level || 'Other' };
+      return levels;
+    }, {})
+  ).sort((left, right) => Number(right.id) - Number(left.id)), [affiliates]);
+  const visibleAffiliates = useMemo(
+    () => affiliateLevelFilter === 'all'
+      ? affiliates
+      : affiliates.filter(affiliate => String(affiliate.levelId) === affiliateLevelFilter),
+    [affiliates, affiliateLevelFilter]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -1456,16 +1474,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
           <span className="sr-only">Select team</span>
-          <select aria-label="Select team" value={selTeam} onChange={e=>{ const key=e.target.value; const selected=TEAMS[key]; setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateControlsOpen(false); setSelTeam(key); if (selected) recordRecentView({ type:'team', abbr:selected.abbr, label:selected.name, secondary:selected.div || 'Team overview' }); }}
+          <select aria-label="Select team" value={selTeam} onChange={e=>{ const key=e.target.value; const selected=TEAMS[key]; setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateControlsOpen(false); setAffiliateLevelFilter('all'); setSelTeam(key); if (selected) recordRecentView({ type:'team', abbr:selected.abbr, label:selected.name, secondary:selected.div || 'Team overview' }); }}
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
             {sortTeamsByLeagueDivisionName().map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
           </select>
-          <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
+          <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateLevelFilter('all'); setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateLevelFilter('all'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
             style={{height:34,padding:'0 12px',border:`1px solid ${affiliateControlsOpen?C.tealMid:C.border}`,borderRadius:7,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:'.04em',background:affiliateControlsOpen?C.tealSoft:C.surface,color:affiliateControlsOpen?C.teal:C.text2,cursor:mlbParentReadyForAffiliate?'pointer':'wait',opacity:mlbParentReadyForAffiliate?1:.65}}>MINOR LEAGUE{affiliateControlsOpen?' · CLOSE':''}</button>
-          {affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=affiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!affiliates.length || affiliatesState==='loading'}
+          {affiliateControlsOpen && <select aria-label="Filter minor league affiliates by level" value={affiliateLevelFilter} onChange={e=>{ const nextFilter=e.target.value; setAffiliateLevelFilter(nextFilter); const selected=affiliates.find(row=>String(row.id)===String(affiliateId)); if (selected && nextFilter !== 'all' && String(selected.levelId) !== nextFilter) { setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); } }} disabled={!affiliateLevelOptions.length || affiliatesState==='loading'}
+           style={{height:34,padding:'0 10px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliateLevelOptions.length?'pointer':'not-allowed',opacity:affiliateLevelOptions.length?1:.65}}>
+             <option value="all">All levels</option>
+             {affiliateLevelOptions.map(level=><option key={level.id} value={level.id}>{level.label}</option>)}
+           </select>}
+          {affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=visibleAffiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!visibleAffiliates.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliates.length?'pointer':'not-allowed',opacity:affiliates.length?1:.65}}>
-             <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':'Select MiLB affiliate'}</option>
-             {affiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
+             <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':visibleAffiliates.length?'Select MiLB affiliate':'No affiliates at this level'}</option>
+             {visibleAffiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>}
         </label>
         {overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}

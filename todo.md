@@ -11270,3 +11270,6 @@
 - [x] Repair the remaining Team Overview selector behavior without changing the MLB-parent default.
 - [x] Add an explicit Minor League button that reveals affiliate controls only on demand.
 - [x] Add button-driven affiliate-flow regression coverage and publish the fix.
+- [x] Add classification filters for Triple-A, Double-A, High-A, Single-A, and other verified affiliate levels.
+- [x] Preserve explicit affiliate selection and reset the filter safely on team changes.
+- [x] Add filtering regressions, validate responsive controls, and publish the release.

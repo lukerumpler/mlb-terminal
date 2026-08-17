@@ -220,4 +220,26 @@ describe("Team Overview minor-league affiliate interaction", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("filters the visible affiliates by verified minor-league classification", async () => {
+    getTeamAffiliates.mockImplementationOnce(async () => [
+      { id: 6141, name: "Sacramento River Cats", abbr: "SAC", level: "Triple-A", levelId: 11, league: "Pacific Coast League" },
+      { id: 6999, name: "Richmond Flying Squirrels", abbr: "RIC", level: "Double-A", levelId: 12, league: "Eastern League" },
+      { id: 6888, name: "Eugene Emeralds", abbr: "EUG", level: "High-A", levelId: 13, league: "Northwest League" },
+    ]);
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
+
+    const filter = await screen.findByRole("combobox", { name: "Filter minor league affiliates by level" });
+    const affiliateSelect = screen.getByRole("combobox", { name: "Select minor league affiliate" });
+    expect(affiliateSelect).toHaveTextContent("Sacramento River Cats");
+    expect(affiliateSelect).toHaveTextContent("Richmond Flying Squirrels");
+
+    await user.selectOptions(filter, "12");
+    await waitFor(() => expect(affiliateSelect).toHaveTextContent("Richmond Flying Squirrels"));
+    expect(affiliateSelect).not.toHaveTextContent("Sacramento River Cats");
+    expect(affiliateSelect).not.toHaveTextContent("Eugene Emeralds");
+  });
 });
