@@ -11293,3 +11293,6 @@
 - [x] Inspect the existing Players name-search and player-profile navigation flow.
 - [x] Make matching player names and quick-access cards open the corresponding player profile.
 - [x] Add search and profile-navigation regression tests, verify responsive behavior, and publish the enhancement.
+- [x] Inspect the current Players search keyboard flow and result accessibility semantics.
+- [x] Add Up/Down arrow navigation, Enter selection, and active-result feedback to player search results.
+- [x] Add keyboard-navigation regressions, validate the interaction, and publish the enhancement.

@@ -1660,6 +1660,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [switchingPlayerName, setSwitchingPlayerName] = useState(null);
   const [error,   setError] = useState(null);
   const [searchStatus, setSearchStatus] = useState('idle');
+  const [activeResultIndex, setActiveResultIndex] = useState(-1);
   const [favorites, setFavorites] = useState(() => readPlayerFavorites());
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
@@ -1668,6 +1669,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const latestQueryRef = useRef('');
   const mountedRef = useRef(true);
   const playerAbortRef = useRef(null);
+  const resultListRef = useRef(null);
   // Bug fix 2026-08-11: pickPlayer had no equivalent of latestQueryRef's
   // guard below — clicking player A then player B before A's slower
   // loadFullPlayer() resolved let A's response land after B's and silently
@@ -1698,6 +1700,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
     const q = e.target.value;
     const normalizedQuery = q.trim();
     setQuery(q);
+    setActiveResultIndex(-1);
     latestQueryRef.current = q;
     clearTimeout(timerRef.current);
     if (normalizedQuery.length < 2) {
@@ -1715,11 +1718,13 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         if (mountedRef.current && latestQueryRef.current === q) {
           const matches = Array.isArray(r) ? r : [];
           setResults(matches);
+          setActiveResultIndex(-1);
           setSearchStatus(matches.length ? 'ready' : 'empty');
         }
       } catch {
         if (mountedRef.current && latestQueryRef.current === q) {
           setResults([]);
+          setActiveResultIndex(-1);
           setSearchStatus('error');
         }
       }
@@ -1752,6 +1757,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
     recordRecentView({ type:'player', id:person.id, label:person.fullName || person.name || 'Player', secondary:person.team?.name || 'Player profile' });
     const mySeq = ++pickSeqRef.current;
     setResults([]);
+    setActiveResultIndex(-1);
     setSearchStatus('idle');
     setQuery(person.fullName);
     setLoading(true);
@@ -1789,25 +1795,43 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   }, []);
 
   const onSearchKeyDown = useCallback(event => {
+    if (event.key === 'ArrowDown' && results.length) {
+      event.preventDefault();
+      setActiveResultIndex(index => index >= results.length - 1 ? 0 : index + 1);
+      return;
+    }
+    if (event.key === 'ArrowUp' && results.length) {
+      event.preventDefault();
+      setActiveResultIndex(index => index <= 0 ? results.length - 1 : index - 1);
+      return;
+    }
     if (event.key === 'Escape') {
       clearTimeout(timerRef.current);
       setResults([]);
+      setActiveResultIndex(-1);
       setSearchStatus('idle');
       return;
     }
     if (event.key === 'Enter' && results.length) {
       event.preventDefault();
-      pickPlayer(results[0]);
+      pickPlayer(results[activeResultIndex >= 0 ? activeResultIndex : 0]);
     }
-  }, [pickPlayer, results]);
+  }, [activeResultIndex, pickPlayer, results]);
 
   const clearSearch = useCallback(() => {
     clearTimeout(timerRef.current);
     latestQueryRef.current = '';
     setQuery('');
     setResults([]);
+    setActiveResultIndex(-1);
     setSearchStatus('idle');
   }, []);
+
+  useEffect(() => {
+    if (activeResultIndex < 0) return;
+    resultListRef.current?.querySelector(`[data-player-search-index="${activeResultIndex}"]`)
+      ?.scrollIntoView({ block:'nearest' });
+  }, [activeResultIndex]);
 
   useEffect(() => {
     const onProviderRetry = event => {
@@ -1935,11 +1959,13 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
       <div style={{ position:'relative' }}>
         <div style={{ position:'relative' }}>
           <input value={query} onChange={onInput} onKeyDown={onSearchKeyDown}
+            role="combobox"
             aria-label="Search any MLB player by name"
             placeholder="Search any MLB player by name…"
             aria-autocomplete="list"
             aria-controls="skip-player-search-results"
             aria-expanded={results.length > 0}
+            aria-activedescendant={activeResultIndex >= 0 ? `skip-player-search-result-${results[activeResultIndex]?.id}-${activeResultIndex}` : undefined}
             onFocus={e => e.currentTarget.style.borderColor = C.amber}
             onBlur={e => e.currentTarget.style.borderColor = C.border}
             style={{ width:'100%', height:42, padding:'0 42px 0 16px', border:`1px solid ${C.border}`, borderRadius:8,
@@ -1948,21 +1974,20 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         </div>
         <div aria-live="polite" aria-atomic="true" style={{ minHeight:18, padding:'4px 2px 0', ...sans({ fontSize:10, color:C.text3 }) }}>
           {searchStatus === 'searching' && 'Searching verified MLB and MiLB player records…'}
-          {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — select a name to open the profile.`}
+          {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — use Up and Down arrows to navigate, then press Enter to open the profile.${activeResultIndex >= 0 ? ` ${activeResultIndex + 1} of ${results.length} selected.` : ''}`}
           {searchStatus === 'empty' && `No verified player matches found for “${query.trim()}”.`}
           {searchStatus === 'error' && 'Player search is temporarily unavailable. Please try again.'}
         </div>
         {results.length > 0 && (
-          <div id="skip-player-search-results" role="listbox" aria-label="Matching player profiles" style={{ position:'absolute', top:64, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
+          <div ref={resultListRef} id="skip-player-search-results" role="listbox" aria-label="Matching player profiles" onMouseLeave={() => setActiveResultIndex(-1)} style={{ position:'absolute', top:64, left:0, right:0, background:C.surface, border:`1px solid ${C.border}`,
             borderRadius:8, zIndex:50, boxShadow:'0 6px 24px rgba(0,0,0,.12)', maxHeight:280, overflowY:'auto' }}>
-            {results.map(r => (
-              <button key={r.id} type="button" onClick={() => pickPlayer(r)}
+            {results.map((r, index) => {
+              const active = index === activeResultIndex;
+              return <button key={r.id} id={`skip-player-search-result-${r.id}-${index}`} data-player-search-index={index} type="button" role="option" aria-selected={active} onClick={() => pickPlayer(r)}
                 aria-label={`Open ${r.fullName || r.name || 'player'} profile`}
-                style={{ width:'100%', padding:'10px 14px', cursor:'pointer', border:0, borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11, textAlign:'left', background:'transparent' }}
-                onMouseEnter={e => e.currentTarget.style.background = C.amberSoft}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                onFocus={e => e.currentTarget.style.background = C.amberSoft}
-                onBlur={e => e.currentTarget.style.background = 'transparent'}>
+                style={{ width:'100%', padding:'10px 14px', cursor:'pointer', border:0, borderBottom:`0.5px solid ${C.borderLight}`, display:'flex', alignItems:'center', gap:11, textAlign:'left', background:active ? C.amberSoft : 'transparent' }}
+                onMouseEnter={() => setActiveResultIndex(index)}
+                onFocus={() => setActiveResultIndex(index)}>
                 <img loading="lazy" src={`https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_96,q_auto:best/v1/people/${r.id}/headshot/67/current`}
                   onError={e => { e.currentTarget.style.display='none'; }}
                   style={{ width:34, height:34, borderRadius:7, objectFit:'cover', border:`0.5px solid ${C.border}`, flexShrink:0 }} alt=""/>
@@ -1971,7 +1996,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
                   <div style={px({ fontSize:10, color:C.text3 })}>{r.currentTeam?.name || 'Free Agent'} · {r.primaryPosition?.abbreviation || '—'}</div>
                 </div>
               </button>
-            ))}
+            })}
           </div>
         )}
       </div>

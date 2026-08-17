@@ -280,12 +280,40 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const input = screen.getByPlaceholderText(/Search any MLB player/i);
     await user.type(input, "Keyboard");
 
-    expect(await screen.findByText(/1 matching player.*select a name to open the profile/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Keyboard Player profile" })).toBeInTheDocument();
+    expect(await screen.findByText(/1 matching player.*Up and Down arrows.*Enter/i)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Open Keyboard Player profile" })).toBeInTheDocument();
     await user.keyboard("{Enter}");
 
     expect(await screen.findByRole("heading", { name: /Keyboard Player/ })).toBeInTheDocument();
     expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 44, fullName: "Keyboard Player" }), expect.anything(), expect.anything());
+  });
+
+  it("moves through player search results with arrow keys and opens the active result with Enter", async () => {
+    const user = userEvent.setup();
+    const matchingPlayers = [
+      { id: 101, fullName: "Alpha Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "SS" } },
+      { id: 102, fullName: "Bravo Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "CF" } },
+      { id: 103, fullName: "Charlie Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "RF" } },
+    ];
+    searchPlayers.mockResolvedValue(matchingPlayers);
+    loadFullPlayer.mockResolvedValue(mockPlayer(102, "Bravo Player"));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Player");
+
+    expect(await screen.findByRole("option", { name: "Open Alpha Player profile" })).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}");
+    expect(input).toHaveAttribute("aria-activedescendant", "skip-player-search-result-101-0");
+    expect(screen.getByRole("option", { name: "Open Alpha Player profile" })).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}");
+    expect(input).toHaveAttribute("aria-activedescendant", "skip-player-search-result-102-1");
+    expect(screen.getByRole("option", { name: "Open Bravo Player profile" })).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: /Bravo Player/ })).toBeInTheDocument();
+    expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 102, fullName: "Bravo Player" }), expect.anything(), expect.anything());
   });
 
   it("shows an honest no-match result and clears the player search", async () => {
