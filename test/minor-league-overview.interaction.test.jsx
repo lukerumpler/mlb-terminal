@@ -195,6 +195,36 @@ describe("Team Overview minor-league affiliate interaction", () => {
     ).toBeInTheDocument();
   });
 
+  it("sorts verified affiliate standings by win percentage, team name, and games back", async () => {
+    getMinorLeagueTeamStandings.mockResolvedValueOnce({
+      retrievedAt: "2026-08-14T02:00:00.000Z",
+      rows: [
+        { id: 6141, name: "Sacramento River Cats", w: 63, l: 49, pct: 0.563, gb: "4.0" },
+        { id: 7001, name: "Reno Aces", w: 68, l: 42, pct: 0.618, gb: "0.0" },
+        { id: 7002, name: "Arizona Complex League Giants", w: 55, l: 57, pct: 0.491, gb: "15.0" },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Select minor league affiliate" }), "6141");
+    await user.click(screen.getByRole("button", { name: "Standings" }));
+
+    await screen.findByText("Reno Aces");
+    expect(screen.getAllByTestId("affiliate-standings-row")[0]).toHaveTextContent("Reno Aces");
+
+    const sortControl = screen.getByRole("combobox", { name: "Sort affiliate standings" });
+    await user.selectOptions(sortControl, "name");
+    expect(screen.getAllByTestId("affiliate-standings-row")[0]).toHaveTextContent("Arizona Complex League Giants");
+
+    await user.selectOptions(sortControl, "gb");
+    expect(screen.getAllByTestId("affiliate-standings-row")[0]).toHaveTextContent("Reno Aces");
+    await user.click(screen.getByRole("button", { name: "Toggle affiliate standings sort direction" }));
+    expect(screen.getAllByTestId("affiliate-standings-row")[0]).toHaveTextContent("Arizona Complex League Giants");
+  });
+
   it("shows an explicit source-unavailable state without hiding the MLB parent overview", async () => {
     affiliateMode = "error";
     const user = userEvent.setup();

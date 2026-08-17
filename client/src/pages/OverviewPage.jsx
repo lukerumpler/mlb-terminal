@@ -579,6 +579,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [affiliateOverviewState, setAffiliateOverviewState] = useState('idle');
   const [affiliateTab, setAffiliateTab] = useState('overview');
   const [affiliateStandings, setAffiliateStandings] = useState(null);
+  const [affiliateStandingsSort, setAffiliateStandingsSort] = useState({ key:'pct', direction:'desc' });
   const [affiliateSchedule, setAffiliateSchedule] = useState(null);
   const [affiliateSavant, setAffiliateSavant] = useState(null);
   const [teamSavantData, setTeamSavantData] = useState(null);
@@ -732,6 +733,31 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       : affiliates.filter(affiliate => String(affiliate.levelId) === affiliateLevelFilter),
     [affiliates, affiliateLevelFilter]
   );
+  const sortedAffiliateStandings = useMemo(() => {
+    const rows = Array.isArray(affiliateStandings?.rows) ? affiliateStandings.rows.map((row, index) => ({ ...row, _index:index })) : [];
+    const numeric = value => Number.isFinite(Number(value)) ? Number(value) : null;
+    const gamesBack = value => value === '-' || value === '–' ? 0 : numeric(value);
+    const compareNumbers = (left, right, direction) => {
+      if (left == null && right == null) return 0;
+      if (left == null) return 1;
+      if (right == null) return -1;
+      return direction === 'asc' ? left - right : right - left;
+    };
+    return rows.sort((left, right) => {
+      let comparison = 0;
+      if (affiliateStandingsSort.key === 'record') {
+        comparison = compareNumbers(numeric(left.w), numeric(right.w), affiliateStandingsSort.direction);
+        if (comparison === 0) comparison = compareNumbers(numeric(left.l), numeric(right.l), affiliateStandingsSort.direction === 'asc' ? 'desc' : 'asc');
+      } else if (affiliateStandingsSort.key === 'gb') {
+        comparison = compareNumbers(gamesBack(left.gb), gamesBack(right.gb), affiliateStandingsSort.direction);
+      } else if (affiliateStandingsSort.key === 'name') {
+        comparison = String(left.name || '').localeCompare(String(right.name || '')) * (affiliateStandingsSort.direction === 'asc' ? 1 : -1);
+      } else {
+        comparison = compareNumbers(numeric(left.pct), numeric(right.pct), affiliateStandingsSort.direction);
+      }
+      return comparison || String(left.name || '').localeCompare(String(right.name || '')) || left._index - right._index;
+    });
+  }, [affiliateStandings?.rows, affiliateStandingsSort]);
 
   useEffect(() => {
     let alive = true;
@@ -1538,7 +1564,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={{padding:'0 14px 10px',...sans({fontSize:9,color:C.text3})}}>Baseball Savant · <SavantFreshnessText data={affiliateSavant} /></div>
           {affiliateOverviewState==='error' && <div style={{padding:'0 14px 12px',...sans({fontSize:10,color:C.rust})}}>The selected affiliate’s live overview is unavailable right now. The MLB parent overview remains available above.</div>}
         </>}
-        {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Triple-A standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateStandings?.status, 'Loading')}</div>{affiliateStandings?.rows?.length ? affiliateStandings.rows.slice(0,12).map((row,index)=><div key={row.id || row.name} style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
+        {affiliateTab==='standings' && <div style={{padding:'10px 14px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}><div style={sans({fontSize:9,color:C.text3})}>{affiliateOverview?.level || affiliates.find(row=>String(row.id)===String(affiliateId))?.level || 'Minor-league'} standings · {affiliateStandings?.retrievedAt ? `retrieved ${new Date(affiliateStandings.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateStandings?.status, 'Loading')}</div>{affiliateStandings?.rows?.length ? <div style={{display:'flex',alignItems:'center',gap:5}}><label style={sans({fontSize:8.5,color:C.text3})}>Sort</label><select aria-label="Sort affiliate standings" value={affiliateStandingsSort.key} onChange={e=>{ const key=e.target.value; setAffiliateStandingsSort(current=>({ key, direction:key==='gb'?'asc':key==='name'?'asc':current.direction })); }} style={{height:26,padding:'0 6px',border:`1px solid ${C.border}`,borderRadius:5,background:C.surface,color:C.text,...sans({fontSize:9})}}><option value="pct">Win %</option><option value="record">W–L</option><option value="gb">Games back</option><option value="name">Team</option></select><button type="button" aria-label="Toggle affiliate standings sort direction" onClick={()=>setAffiliateStandingsSort(current=>({ ...current, direction:current.direction==='asc'?'desc':'asc' }))} style={{height:26,minWidth:26,border:`1px solid ${C.border}`,borderRadius:5,background:C.surface2,color:C.text2,cursor:'pointer',...px({fontSize:12,fontWeight:800})}}>{affiliateStandingsSort.direction==='asc'?'↑':'↓'}</button></div> : null}</div>{sortedAffiliateStandings.length ? <><div aria-label="Affiliate standings column labels" style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'0 0 4px',borderBottom:`1px solid ${C.border}`,...px({fontSize:8,color:C.text4,letterSpacing:'.05em'})}}><span>RK</span><span>TEAM</span><span>W–L</span><span>WIN%</span><span>GB</span></div>{sortedAffiliateStandings.slice(0,12).map((row,index)=><div key={row.id || row.name} data-testid="affiliate-standings-row" style={{display:'grid',gridTemplateColumns:'28px minmax(0,1fr) 48px 48px 52px',gap:8,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:row.id===Number(affiliateId)?C.teal:C.text})}}><span>{row.rank || index+1}</span><span>{row.name}</span><span>{row.w}–{row.l}</span><span>{row.pct?.toFixed?.(3) || '—'}</span><span>{row.gb || '—'}</span></div>)}</> : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>Standings are unavailable from the current minor-league feed.</div>}</div>}
         {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.freshness === 'stale-cached' ? 'verified cached schedule · provider temporarily unavailable' : affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSchedule?.status, 'Loading')}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
       </Panel>}
 

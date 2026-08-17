@@ -11273,3 +11273,6 @@
 - [x] Add classification filters for Triple-A, Double-A, High-A, Single-A, and other verified affiliate levels.
 - [x] Preserve explicit affiliate selection and reset the filter safely on team changes.
 - [x] Add filtering regressions, validate responsive controls, and publish the release.
+- [x] Add sortable affiliate standings controls for record, winning percentage, games back, and team name.
+- [x] Optimize standings ordering and preserve verified/unavailable source states.
+- [x] Add sorting regressions, validate responsive controls, and publish the release.
