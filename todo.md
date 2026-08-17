@@ -11279,3 +11279,7 @@
 - [x] Exclude MLB parent club rows from the affiliate selector and level filters.
 - [x] Preserve explicit true-affiliate selection and add parent-exclusion regression coverage.
 - [x] Run release validation and publish the selector correction.
+- [x] Audit team selection, affiliate loading, filters, standings sorting, and source-failure behavior end to end.
+- [x] Implement high-impact correctness, resilience, and interaction-performance improvements.
+- [x] Refine responsive loading and unavailable feedback and add end-to-end regression coverage.
+- [x] Complete production validation and publish the optimized workflow.

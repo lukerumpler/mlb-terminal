@@ -566,6 +566,21 @@ export function buildHistoricalTaxTrendRows(results, seasons = [2024, 2025, 2026
   });
 }
 
+export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
+  const unique = new Map();
+  for (const affiliate of Array.isArray(rows) ? rows : []) {
+    const id = Number(affiliate?.id);
+    const levelId = Number(affiliate?.levelId);
+    const level = String(affiliate?.level || '');
+    if (!Number.isFinite(id) || id === Number(parentTeamId) || levelId === 1 || /major league baseball/i.test(level)) continue;
+    if (!unique.has(id)) unique.set(id, affiliate);
+  }
+  return [...unique.values()].sort((left, right) => {
+    const levelOrder = Number(left.levelId || 999) - Number(right.levelId || 999);
+    return levelOrder || String(left.name || '').localeCompare(String(right.name || ''));
+  });
+}
+
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [overviewView, setOverviewView] = useState('briefing');
@@ -663,6 +678,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         if (Number(detail.affiliateId) === Number(parentTeam.id) || Number(detail.levelId) === 1) {
           setPendingAffiliate(null);
           setAffiliateId('');
+          setAffiliateLevel('11');
+          setAffiliateLevelFilter('all');
+          setAffiliateTab('overview');
           setAffiliateControlsOpen(false);
           setSelTeam(foundKey);
           return;
@@ -708,7 +726,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setAffiliates([]);
     getTeamAffiliates(teamBase?.id).then(rows => {
       if (!alive) return;
-      setAffiliates(rows.filter(row => Number(row.id) !== Number(teamBase?.id) && Number(row.levelId) !== 1 && !/major league baseball/i.test(String(row.level || ''))));
+      setAffiliates(normalizeMinorLeagueAffiliates(rows, teamBase?.id));
       setAffiliatesState('ready');
     }).catch(() => { if (alive) setAffiliatesState('error'); });
     return () => { alive = false; };
@@ -796,24 +814,36 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
 
   useEffect(() => {
     let alive = true;
-    if (!affiliateId) { setAffiliateStandings(null); setAffiliateSchedule(null); setAffiliateSavant(null); return () => { alive = false; }; }
+    if (!affiliateId || affiliateTab !== 'standings') {
+      if (!affiliateId) setAffiliateStandings(null);
+      return () => { alive = false; };
+    }
+    setAffiliateStandings({ status:'loading', rows:[] });
+    getMinorLeagueTeamStandings(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON).then(standings => {
+      if (alive) setAffiliateStandings(standings);
+    }).catch(() => { if (alive) setAffiliateStandings({ status:'upstream-unavailable', rows:[] }); });
+    return () => { alive = false; };
+  }, [affiliateId, affiliateLevel, affiliateTab]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!affiliateId || affiliateTab !== 'schedule') {
+      if (!affiliateId) setAffiliateSchedule(null);
+      return () => { alive = false; };
+    }
+    setAffiliateSchedule({ status:'loading', games:[] });
+    getMinorLeagueTeamSchedule(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON, 14).then(schedule => {
+      if (alive) setAffiliateSchedule(schedule);
+    }).catch(() => { if (alive) setAffiliateSchedule({ status:'upstream-unavailable', games:[] }); });
+    return () => { alive = false; };
+  }, [affiliateId, affiliateLevel, affiliateTab]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!affiliateId) { setAffiliateSavant(null); return () => { alive = false; }; }
     const selectedAffiliate = affiliates.find(row => String(row.id) === String(affiliateId));
     const affiliateAbbr = String(selectedAffiliate?.abbr || '').trim();
-    setAffiliateStandings({ status:'loading', rows:[] });
-    setAffiliateSchedule({ status:'loading', games:[] });
     setAffiliateSavant({ status:'loading' });
-    Promise.all([
-      getMinorLeagueTeamStandings(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON),
-      getMinorLeagueTeamSchedule(Number(affiliateId), Number(affiliateLevel), CURRENT_SEASON, 14),
-    ]).then(([standings, schedule]) => {
-      if (!alive) return;
-      setAffiliateStandings(standings);
-      setAffiliateSchedule(schedule);
-    }).catch(() => {
-      if (!alive) return;
-      setAffiliateStandings({ status:'upstream-unavailable', rows:[] });
-      setAffiliateSchedule({ status:'upstream-unavailable', games:[] });
-    });
     if (!affiliateAbbr) {
       setAffiliateSavant({ status:'source-gap', source:'Baseball Savant', sampleSize:0, retrievedAt:new Date().toISOString() });
     } else {

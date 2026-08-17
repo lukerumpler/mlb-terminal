@@ -116,6 +116,8 @@ describe("Team Overview minor-league affiliate interaction", () => {
     resolveAffiliateOverview = null;
     getTeamAffiliates.mockClear();
     getMinorLeagueTeamOverview.mockClear();
+    getMinorLeagueTeamStandings.mockClear();
+    getMinorLeagueTeamSchedule.mockClear();
     getTeamSavantMetrics.mockClear();
   });
 
@@ -193,6 +195,44 @@ describe("Team Overview minor-league affiliate interaction", () => {
     expect(
       screen.getByText(/Sacramento River Cats @ Reno Aces/)
     ).toBeInTheDocument();
+  });
+
+  it("defers standings and schedule requests until their corresponding affiliate tab is opened", async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Select minor league affiliate" }), "6141");
+
+    await screen.findByText("Sacramento River Cats");
+    expect(getMinorLeagueTeamStandings).not.toHaveBeenCalled();
+    expect(getMinorLeagueTeamSchedule).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Standings" }));
+    await waitFor(() => expect(getMinorLeagueTeamStandings).toHaveBeenCalledWith(6141, 11, 2026));
+    expect(getMinorLeagueTeamSchedule).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Schedule" }));
+    await waitFor(() => expect(getMinorLeagueTeamSchedule).toHaveBeenCalledWith(6141, 11, 2026, 14));
+  });
+
+  it("ignores a late affiliate response after switching back to a different MLB parent team", async () => {
+    affiliateMode = "loading";
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "sf");
+    await user.click(screen.getByRole("button", { name: /minor league/i }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Select minor league affiliate" }), "6141");
+    await waitFor(() => expect(resolveAffiliateOverview).toBeTypeOf("function"));
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select team" }), "lad");
+    resolveAffiliateOverview();
+
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Select team" })).toHaveValue("lad"));
+    expect(screen.queryByText("Minor-League Affiliate Overview")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sacramento River Cats")).not.toBeInTheDocument();
   });
 
   it("sorts verified affiliate standings by win percentage, team name, and games back", async () => {
