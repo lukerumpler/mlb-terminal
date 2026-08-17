@@ -5,6 +5,8 @@ import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
+const ODDS_API_URL = dateEnd =>
+  `https://www.fangraphs.com/api/playoff-odds/odds?dateEnd=${encodeURIComponent(dateEnd)}&dateDelta=&projectionMode=2&standingsType=mlb`;
 const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
 const AGGREGATE_WAR_URL = (season, stats) =>
   `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
@@ -212,6 +214,28 @@ export function parseFanGraphsModelHtml(
   };
 }
 
+export function parseFanGraphsPlayoffOddsJson(rows, teamAbbr, season = DEFAULT_SEASON) {
+  const upper = String(teamAbbr || "").toUpperCase();
+  const aliases = new Set([upper, ...(upper === "CWS" ? ["CHW"] : []), ...(upper === "KC" ? ["KCR"] : [])]);
+  const row = Array.isArray(rows)
+    ? rows.find(candidate => aliases.has(String(candidate?.abbName || "").toUpperCase()))
+    : null;
+  const endData = row?.endData || {};
+  const probability = Number(endData.poffTitle);
+  const projectedWins = Number(endData.ExpW);
+  const projectedLosses = Number(endData.ExpL);
+  return {
+    found: Boolean(row),
+    season,
+    teamAbbr: upper,
+    playoffOdds: Number.isFinite(probability) ? Number((probability * 100).toFixed(1)) : null,
+    advancedMetrics: {
+      projectedWins: Number.isFinite(projectedWins) ? Number(projectedWins.toFixed(1)) : null,
+      projectedLosses: Number.isFinite(projectedLosses) ? Number(projectedLosses.toFixed(1)) : null,
+    },
+  };
+}
+
 export function parseFanGraphsAggregateWarHtml(
   { battingHtml, pitchingHtml },
   season = DEFAULT_SEASON
@@ -260,18 +284,14 @@ export function parseFanGraphsAggregateWarHtml(
   };
 }
 
-async function fetchHtml(url) {
+async function fetchFanGraphs(url, accept) {
   const response = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Accept: "text/html,application/xhtml+xml,*/*",
-    },
+    headers: { "User-Agent": UA, Accept: accept },
     redirect: "follow",
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    const retryAfterMs =
-      response.status === 429 ? parseRetryAfterMs(response) : 0;
+    const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response) : 0;
     let providerBlocked = false;
     if (response.status === 403) {
       const body = await response.text().catch(() => '');
@@ -282,7 +302,22 @@ async function fetchHtml(url) {
       { status: response.status, retryAfterMs, providerBlocked }
     );
   }
+  return response;
+}
+
+async function fetchHtml(url) {
+  const response = await fetchFanGraphs(url, "text/html,application/xhtml+xml,*/*");
   return response.text();
+}
+
+async function fetchJson(url) {
+  const response = await fetchFanGraphs(url, "application/json,text/plain,*/*");
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw Object.assign(new Error("FanGraphs returned invalid JSON"), { status: 502 });
+  }
 }
 
 async function loadAggregateWar(season) {
@@ -575,8 +610,12 @@ export default async function handler(req, res) {
   modelDailyAttemptDay.set(key, day);
   const upstreamRequest = (async () => {
     const retrievedAt = new Date().toISOString();
+    const today = new Date().toISOString().slice(0, 10);
+    const oddsDateEnd = new Date().getUTCFullYear() === season
+      ? today
+      : `${season}-12-31`;
     const [oddsResult, warResult] = await Promise.allSettled([
-      fetchHtml(ODDS_URL),
+      fetchJson(ODDS_API_URL(oddsDateEnd)),
       fetchHtml(WAR_URL),
     ]);
     const throttledResults = [oddsResult, warResult].filter(
@@ -594,14 +633,21 @@ export default async function handler(req, res) {
         Date.now() + cooldownMs
       );
     }
+    const odds = oddsResult.status === "fulfilled"
+      ? parseFanGraphsPlayoffOddsJson(oddsResult.value, teamAbbr, season)
+      : { found: false, playoffOdds: null, advancedMetrics: {} };
     const parsed = parseFanGraphsModelHtml(
       {
-        oddsHtml: oddsResult.status === "fulfilled" ? oddsResult.value : "",
+        oddsHtml: "",
         warHtml: warResult.status === "fulfilled" ? warResult.value : "",
       },
       teamAbbr,
       season
     );
+    const advancedMetrics = {
+      ...parsed.advancedMetrics,
+      ...odds.advancedMetrics,
+    };
     if (
       !parsed.found &&
       oddsResult.status === "rejected" &&
@@ -634,18 +680,18 @@ export default async function handler(req, res) {
       };
     }
     return {
-      found: parsed.playoffOdds != null || parsed.teamWar != null,
+      found: odds.playoffOdds != null || parsed.teamWar != null,
       retrievedAt,
       source: parsed.source,
       sourceUrls: parsed.sourceUrls,
       season,
       teamAbbr,
-      playoffOdds: parsed.playoffOdds,
+      playoffOdds: odds.playoffOdds,
       teamWar: parsed.teamWar,
-      advancedMetrics: parsed.advancedMetrics,
+      advancedMetrics,
       statuses: {
         playoffOdds:
-          parsed.playoffOdds != null
+          odds.playoffOdds != null
             ? "live"
             : oddsResult.status === "fulfilled"
               ? "unparsed"

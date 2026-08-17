@@ -55,6 +55,10 @@ function html(team: string, odds: string, war: string) {
   return `<table><tr><th>Team</th><th>Playoff Odds</th><th>Team WAR</th></tr><tr><td>${team}</td><td>${odds}</td><td>${war}</td></tr></table>`;
 }
 
+function oddsJson(team: string, odds: number) {
+  return JSON.stringify([{ abbName: team, endData: { poffTitle: odds / 100, ExpW: 90, ExpL: 72 } }]);
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -66,10 +70,12 @@ describe("FanGraphs provider cache", () => {
   it("coalesces identical model loads and serves the second read from cache", async () => {
     const fetchMock = vi.fn(
       async (url: string) =>
-        new Response(html("TST", "72.4%", "18.2"), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        })
+        new Response(
+          url.includes("/api/playoff-odds/odds")
+            ? oddsJson("TST", 72.4)
+            : html("TST", "72.4%", "18.2"),
+          { status: 200, headers: { "content-type": url.includes("/api/playoff-odds/odds") ? "application/json" : "text/html" } }
+        )
     );
     vi.stubGlobal("fetch", fetchMock);
     const first = response();
@@ -133,9 +139,9 @@ describe("FanGraphs provider cache", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-16T23:44:00.000Z"));
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(oddsJson("DAY", 55), { status: 200 }))
       .mockResolvedValueOnce(new Response(html("DAY", "55.0%", "9.1"), { status: 200 }))
-      .mockResolvedValueOnce(new Response(html("DAY", "55.0%", "9.1"), { status: 200 }))
-      .mockResolvedValueOnce(new Response(html("DAY", "56.0%", "9.4"), { status: 200 }))
+      .mockResolvedValueOnce(new Response(oddsJson("DAY", 56), { status: 200 }))
       .mockResolvedValueOnce(new Response(html("DAY", "56.0%", "9.4"), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -160,7 +166,7 @@ describe("FanGraphs provider cache", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(html("STA", "61.0%", "11.4"), { status: 200 })
+        new Response(oddsJson("STA", 61), { status: 200 })
       )
       .mockResolvedValueOnce(
         new Response(html("STA", "61.0%", "11.4"), { status: 200 })

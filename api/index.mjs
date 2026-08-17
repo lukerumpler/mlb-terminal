@@ -2938,7 +2938,8 @@ __export(fangraphs_models_exports, {
   default: () => handler9,
   isFanGraphsProviderBlockedResponse: () => isFanGraphsProviderBlockedResponse,
   parseFanGraphsAggregateWarHtml: () => parseFanGraphsAggregateWarHtml,
-  parseFanGraphsModelHtml: () => parseFanGraphsModelHtml
+  parseFanGraphsModelHtml: () => parseFanGraphsModelHtml,
+  parseFanGraphsPlayoffOddsJson: () => parseFanGraphsPlayoffOddsJson
 });
 function __seedFanGraphsModelCacheForTests(teamAbbr, season, data, { expiresAt, staleExpiresAt } = {}) {
   modelCache.set(modelKey(teamAbbr, season), {
@@ -3077,6 +3078,25 @@ function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season = DEFAU
     }
   };
 }
+function parseFanGraphsPlayoffOddsJson(rows, teamAbbr, season = DEFAULT_SEASON2) {
+  const upper = String(teamAbbr || "").toUpperCase();
+  const aliases = /* @__PURE__ */ new Set([upper, ...upper === "CWS" ? ["CHW"] : [], ...upper === "KC" ? ["KCR"] : []]);
+  const row = Array.isArray(rows) ? rows.find((candidate) => aliases.has(String(candidate?.abbName || "").toUpperCase())) : null;
+  const endData = row?.endData || {};
+  const probability = Number(endData.poffTitle);
+  const projectedWins = Number(endData.ExpW);
+  const projectedLosses = Number(endData.ExpL);
+  return {
+    found: Boolean(row),
+    season,
+    teamAbbr: upper,
+    playoffOdds: Number.isFinite(probability) ? Number((probability * 100).toFixed(1)) : null,
+    advancedMetrics: {
+      projectedWins: Number.isFinite(projectedWins) ? Number(projectedWins.toFixed(1)) : null,
+      projectedLosses: Number.isFinite(projectedLosses) ? Number(projectedLosses.toFixed(1)) : null
+    }
+  };
+}
 function parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, season = DEFAULT_SEASON2) {
   const parseRows = (html) => {
     const rows = /* @__PURE__ */ new Map();
@@ -3114,12 +3134,9 @@ function parseFanGraphsAggregateWarHtml({ battingHtml, pitchingHtml }, season = 
     }))
   };
 }
-async function fetchHtml4(url) {
+async function fetchFanGraphs(url, accept) {
   const response = await fetch(url, {
-    headers: {
-      "User-Agent": UA4,
-      Accept: "text/html,application/xhtml+xml,*/*"
-    },
+    headers: { "User-Agent": UA4, Accept: accept },
     redirect: "follow",
     signal: AbortSignal.timeout(1e4)
   });
@@ -3135,7 +3152,20 @@ async function fetchHtml4(url) {
       { status: response.status, retryAfterMs: retryAfterMs2, providerBlocked }
     );
   }
+  return response;
+}
+async function fetchHtml4(url) {
+  const response = await fetchFanGraphs(url, "text/html,application/xhtml+xml,*/*");
   return response.text();
+}
+async function fetchJson(url) {
+  const response = await fetchFanGraphs(url, "application/json,text/plain,*/*");
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw Object.assign(new Error("FanGraphs returned invalid JSON"), { status: 502 });
+  }
 }
 async function loadAggregateWar(season) {
   const cached = aggregateWarCache.get(String(season));
@@ -3379,8 +3409,10 @@ async function handler9(req, res) {
   modelDailyAttemptDay.set(key, day);
   const upstreamRequest = (async () => {
     const retrievedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const oddsDateEnd = (/* @__PURE__ */ new Date()).getUTCFullYear() === season ? today : `${season}-12-31`;
     const [oddsResult, warResult] = await Promise.allSettled([
-      fetchHtml4(ODDS_URL),
+      fetchJson(ODDS_API_URL(oddsDateEnd)),
       fetchHtml4(WAR_URL)
     ]);
     const throttledResults = [oddsResult, warResult].filter(
@@ -3398,14 +3430,19 @@ async function handler9(req, res) {
         Date.now() + cooldownMs
       );
     }
+    const odds = oddsResult.status === "fulfilled" ? parseFanGraphsPlayoffOddsJson(oddsResult.value, teamAbbr, season) : { found: false, playoffOdds: null, advancedMetrics: {} };
     const parsed = parseFanGraphsModelHtml(
       {
-        oddsHtml: oddsResult.status === "fulfilled" ? oddsResult.value : "",
+        oddsHtml: "",
         warHtml: warResult.status === "fulfilled" ? warResult.value : ""
       },
       teamAbbr,
       season
     );
+    const advancedMetrics = {
+      ...parsed.advancedMetrics,
+      ...odds.advancedMetrics
+    };
     if (!parsed.found && oddsResult.status === "rejected" && warResult.status === "rejected") {
       const retryAfter = rateLimited ? Math.ceil(
         Math.max(
@@ -3428,17 +3465,17 @@ async function handler9(req, res) {
       };
     }
     return {
-      found: parsed.playoffOdds != null || parsed.teamWar != null,
+      found: odds.playoffOdds != null || parsed.teamWar != null,
       retrievedAt,
       source: parsed.source,
       sourceUrls: parsed.sourceUrls,
       season,
       teamAbbr,
-      playoffOdds: parsed.playoffOdds,
+      playoffOdds: odds.playoffOdds,
       teamWar: parsed.teamWar,
-      advancedMetrics: parsed.advancedMetrics,
+      advancedMetrics,
       statuses: {
-        playoffOdds: parsed.playoffOdds != null ? "live" : oddsResult.status === "fulfilled" ? "unparsed" : "upstream-unavailable",
+        playoffOdds: odds.playoffOdds != null ? "live" : oddsResult.status === "fulfilled" ? "unparsed" : "upstream-unavailable",
         teamWar: parsed.teamWar != null ? "live" : warResult.status === "fulfilled" ? "unparsed" : "upstream-unavailable"
       },
       freshness: "live"
@@ -3488,7 +3525,7 @@ async function handler9(req, res) {
     if (modelInFlight.get(key) === upstreamRequest) modelInFlight.delete(key);
   }
 }
-var DEFAULT_SEASON2, TEAM_CODE2, ODDS_URL, WAR_URL, AGGREGATE_WAR_URL, UA4, CACHE_TTL_MS2, STALE_TTL_MS3, DEFAULT_COOLDOWN_MS, FANGRAPHS_FAILURE_COOLDOWN_MS, modelCache, modelInFlight, aggregateWarCache, aggregateWarInFlight, fanGraphsCooldownUntil, modelFailureCooldownUntil, modelDailyAttemptDay, aggregateDailyAttemptDay, TEAM_NAME_ALIASES;
+var DEFAULT_SEASON2, TEAM_CODE2, ODDS_URL, ODDS_API_URL, WAR_URL, AGGREGATE_WAR_URL, UA4, CACHE_TTL_MS2, STALE_TTL_MS3, DEFAULT_COOLDOWN_MS, FANGRAPHS_FAILURE_COOLDOWN_MS, modelCache, modelInFlight, aggregateWarCache, aggregateWarInFlight, fanGraphsCooldownUntil, modelFailureCooldownUntil, modelDailyAttemptDay, aggregateDailyAttemptDay, TEAM_NAME_ALIASES;
 var init_fangraphs_models = __esm({
   "server/api/fangraphs-models.js"() {
     "use strict";
@@ -3497,6 +3534,7 @@ var init_fangraphs_models = __esm({
     DEFAULT_SEASON2 = 2026;
     TEAM_CODE2 = /^[A-Z]{2,3}$/;
     ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
+    ODDS_API_URL = (dateEnd) => `https://www.fangraphs.com/api/playoff-odds/odds?dateEnd=${encodeURIComponent(dateEnd)}&dateDelta=&projectionMode=2&standingsType=mlb`;
     WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
     AGGREGATE_WAR_URL = (season, stats) => `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
     UA4 = "Mozilla/5.0 (compatible; SKIPBaseball/1.0)";
@@ -3741,7 +3779,7 @@ function calculateAllStandingsIntelligence(payload, season) {
     teams: teams.sort((left, right) => String(left.teamName || "").localeCompare(String(right.teamName || "")))
   };
 }
-async function fetchJson(url) {
+async function fetchJson2(url) {
   const response = await fetch(url, {
     headers: { "User-Agent": "SKIPBaseball/1.0", Accept: "application/json" },
     signal: AbortSignal.timeout(12e3)
@@ -3758,7 +3796,7 @@ async function loadAllCalculations(season) {
   const existing = allTeamInFlight.get(key);
   if (existing) return { data: await existing, cache: "COALESCED" };
   const request = (async () => {
-    const standings = await fetchJson(`${MLB_BASE3}/standings?leagueId=103,104&season=${encodeURIComponent(season)}&standingsTypes=regularSeason&hydrate=team,division,league`);
+    const standings = await fetchJson2(`${MLB_BASE3}/standings?leagueId=103,104&season=${encodeURIComponent(season)}&standingsTypes=regularSeason&hydrate=team,division,league`);
     const data = calculateAllStandingsIntelligence(standings, season);
     if (!data.calculatedTeams) {
       const error = new Error("MLB standings did not contain enough verified fields for calculation");

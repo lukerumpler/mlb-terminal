@@ -37,3 +37,19 @@ The current production endpoint `/api/fangraphs-models?team=LAD&season=2026` ret
 The live [FanGraphs 2026 MLB Playoff Odds table](https://www.fangraphs.com/standings/playoff-odds/fg/mlb) lists the Dodgers by nickname, not `LAD`, and exposes the headers `Proj W`, `Proj L`, and `Make Playoffs`. At the observed snapshot the Dodgers row showed 96.9 projected wins, 65.1 projected losses, and 100.0% make-playoffs probability. The endpoint parser previously recognized only abbreviation-style row matching and longer key names, explaining the `unparsed` response.
 
 The production Baseball Savant `pitch_arsenal` response was verified to expose `player_id`, `team_name_alt`, `pitch_type`, and `velocity`. This supports replacing up to 12 player-scoped pitch queries with one cached league pitch-arsenal query filtered to the current roster IDs, while retaining player-scoped requests only as an exact-data fallback.
+
+## Post-deployment parser verification
+
+The optimized Git-backed production deployment `dpl_QyXNDcuxYJDKeBuHZNGsNHhRhGbm` reached `READY` from commit `6582c5c`. A fresh public request to the FanGraphs model endpoint still returned a live-but-`unparsed` response. This confirms that nickname and header normalization are correct for the browser-rendered page but insufficient for the raw server-side upstream response; the remaining defect is now isolated to FanGraphs’ server-rendered versus client-rendered data boundary, not the application’s team identifier or field selection logic.
+
+## Browser-rendered versus server-rendered boundary
+
+The authenticated browser’s loaded FanGraphs DOM contains the complete MLB playoff-odds table, while the application’s server-side fetch produces a live response without parseable rows. The rendered DOM was captured at `/home/ubuntu/upload/www.fangraphs.com_standings_playoff-odds_fg_mlb_1786987670048.html` for passive structure analysis. The next safe remediation path is to identify the structured source embedded in or requested by that rendered application; no scraped browser session data will be sent into the production application.
+
+## FanGraphs client-bundle evidence
+
+The browser-loaded playoff-odds bundle exposes the projection-mode mapping `fg → 2`, `fg-war → 5`, `atc → 3`, `thebat → 4`, `oopsy → 6`, `season-to-date → 1`, and `coin-flip → 0`. The bundle is saved at `/home/ubuntu/upload/www.fangraphs.com__next_static_chunks_pages_standings_playoff-odds__5BprojectionMode_5D__5BdisplayMo_1786987730038.html`. The remaining investigation is limited to extracting the data request URL from this client code; no credentials, user session cookies, or browser-resolved data will be copied into application code.
+
+## Structured FanGraphs resolution
+
+The FanGraphs client bundle revealed and the browser confirmed the structured endpoint `/api/playoff-odds/odds?dateEnd=YYYY-MM-DD&dateDelta=&projectionMode=2&standingsType=mlb`. Its response contains MLB team abbreviation `abbName` and `endData` fields `ExpW`, `ExpL`, and `poffTitle`. The provider adapter now requests this public JSON endpoint using the same FanGraphs projection mode as the live page, maps `poffTitle` from its unit interval to percentage, and preserves the independent FanGraphs HTML WAR path. The original HTML parser remains a defensive capability for HTML-derived values but is no longer relied upon for playoff odds.
