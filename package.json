@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "lint": "prettier --check vitest.config.ts client/src/components/OverviewCharts.jsx server/api/routes.ts server/api/routes.test.ts server/api/shared.test.ts package.json",
     "test": "vitest run",
-    "test:e2e": "vitest run test/published-overview.e2e.test.js",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

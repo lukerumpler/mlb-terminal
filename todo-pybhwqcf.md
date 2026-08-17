@@ -354,10 +354,13 @@
 - [x] Audit and remediate critical/high production dependency advisories and the active pnpm override configuration
 - [x] Verify non-secret production configuration presence, CORS/OAuth behavior, and deployment-target provenance without exposing values
 - [x] Document any remaining platform-only or production-only release blockers with a safe closure path
-- [ ] Run complete release-gate validation, checkpoint safe changes, and report whether public promotion remains blocked
+- [x] Run complete release-gate validation, checkpoint safe changes, and report whether public promotion remains blocked
 
 - [x] Move ignored pnpm overrides and patched-dependency settings into pnpm 10 workspace configuration
 - [x] Upgrade directly vulnerable production dependencies and regenerate the lockfile
 - [x] Verify production audit findings after upgrades and document any advisories that remain only in development tooling
-- [ ] Correct the player-advanced proxy CORS invocation and add a production allowlist regression
-- [ ] Apply and validate compatible patch-level overrides for the remaining moderate Streamdown transitive advisories
+- [x] Correct the player-advanced proxy CORS invocation and add a production allowlist regression
+- [x] Apply and validate compatible patch-level overrides for the remaining moderate Streamdown transitive advisories
+- [x] Restore the published-Overview E2E script with a dedicated test configuration that includes E2E files
+- [ ] Merge the user-approved calculated MLB standings fallback proxies with this session’s readiness remediation
+- [ ] Validate the calculated proxy labels, full release gates, and managed checkpoint after the approved merge
