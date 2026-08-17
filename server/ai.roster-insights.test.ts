@@ -164,6 +164,40 @@ describe("ai.rosterInsights request protection", () => {
     });
   });
 
+  it("treats completely malformed team metrics as unavailable instead of coercing them into insights", async () => {
+    vi.mocked(invokeLLM).mockResolvedValue({
+      choices: [{
+        message: {
+          content: JSON.stringify({ strengths: [], weaknesses: [], source: "Empty test model" }),
+        },
+      }],
+    } as never);
+
+    const result = await appRouter.createCaller(context()).ai.rosterInsights({
+      team: {
+        name: "Malformed Metrics Club",
+        pct: "not-a-percentage",
+        ops: "Infinity",
+        era: "NaN",
+        diff: "not-a-difference",
+        rs: "unknown",
+        ra: "?",
+      },
+      roster: { hitting: [], pitching: [] },
+    });
+
+    expect(result).toEqual({
+      strengths: [],
+      weaknesses: [{
+        title: "Verified roster context is limited",
+        detail: "No supplied aggregate team metric was available for a safe local summary.",
+        evidence: "No verified team-level evidence supplied",
+      }],
+      source: "Local verified roster fallback",
+      fallback: true,
+    });
+  });
+
   it("classifies exact verified threshold values consistently", async () => {
     vi.mocked(invokeLLM).mockResolvedValue({
       choices: [{
