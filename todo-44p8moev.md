@@ -213,3 +213,9 @@
 - [x] Preserve an explicit unavailable state when no verified divisional WAR rows exist.
 - [x] Add regression tests for Favorites and verified/unavailable divisional WAR states.
 - [x] Run full validation, review responsive behavior, and publish the update.
+
+- [x] Calculate playoff odds from verified MLB standings when provider odds are unavailable, with an explicit calculated label.
+- [x] Calculate a projected WAR proxy from verified MLB team inputs when provider Team WAR is unavailable, with an explicit calculated label.
+- [x] Preserve provider-first values and explicit unavailable states when verified inputs are insufficient.
+- [x] Add regression coverage for provider, calculated, and unavailable metric paths.
+- [x] Run validation, review responsive Overview labels, and publish the update.

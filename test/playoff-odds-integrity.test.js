@@ -9,7 +9,7 @@ function readProjectFile(relativePath) {
 }
 
 describe("playoff odds integrity", () => {
-  it("does not expose an estimated or simulated playoff-odds source", () => {
+  it("keeps provider odds preferred and labels the verified-standings fallback as a calculated proxy", () => {
     const apiSource = readProjectFile("client/src/api/mlb.js");
     const overviewSource = readProjectFile("client/src/pages/OverviewPage.jsx");
 
@@ -21,6 +21,8 @@ describe("playoff odds integrity", () => {
     expect(overviewSource).toContain("MLB Stats API");
     expect(overviewSource).toContain("FanGraphs");
     expect(overviewSource).toContain("MLB Stats API · calculated");
-    expect(overviewSource).toContain("calculated from verified MLB standings; not official odds");
+    expect(overviewSource).toContain("calculated playoff proxy");
+    expect(overviewSource).toContain("not official or FanGraphs odds");
+    expect(overviewSource).toContain("pythagorean expected wins above a 48-win replacement baseline");
   });
 });

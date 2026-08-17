@@ -122,6 +122,11 @@ export function __resetFanGraphsLocalSnapshotForTests() {
   }
 }
 
+export function __resetProviderJsonCacheForTests() {
+  providerJsonCache.clear();
+  providerJsonInFlight.clear();
+}
+
 async function fetchProviderJson(url, {
   timeoutMs = 15_000,
   ttlMs = PROVIDER_JSON_TTL_MS,
