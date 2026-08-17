@@ -364,3 +364,4 @@
 - [x] Restore the published-Overview E2E script with a dedicated test configuration that includes E2E files
 - [x] Merge the user-approved calculated MLB standings fallback proxies with this session’s readiness remediation
 - [x] Validate the calculated proxy labels, full release gates, and managed checkpoint after the approved merge
+- [x] Validate the merged Front Office Evaluation calculation labels, full release gates, and managed checkpoint retry
