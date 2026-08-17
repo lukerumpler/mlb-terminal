@@ -14,7 +14,7 @@ The validated release was promoted from GitHub main to Vercel production as an i
 | Published browser smoke test | Passing | `2/2` tests passed against the protected public production alias. |
 | Production package audit | Passing | `pnpm audit --prod --json` completed with 0 critical, high, moderate, low, and info advisories across 502 production dependencies. |
 | Production environment variables | Blocking configuration gap | Vercel project settings show no project environment variables. |
-| `DEP0169` runtime warning | Mitigation prepared; redeployment verification pending | The application has no direct `url.parse()` call; a guarded adapter normalization and regression tests are ready for promotion. |
+| `DEP0169` runtime warning | Node 24 behavior isolated; Node 22 resolution pending deployment | The guarded adapter normalization was deployed but the warning persisted only on the Savant path; the project is now pinned to the locally validated Node 22 runtime line. |
 
 ## Immutable GitHub-to-production promotion
 
@@ -55,7 +55,7 @@ Production runtime logs show the Node 24 warning `DEP0169` during serverless req
 
 A defensive serverless-adapter normalization has been added in `server/vercel.ts`. When an upstream runtime supplies an absolute request target such as `https://host/api/health?x=1`, the adapter now safely converts it to `/api/health?x=1` with the WHATWG `URL` API before Express receives it. Standard relative request targets are unchanged; malformed values retain Express's normal error behavior. The adapter regression suite now verifies both cases, and an absolute-form local HTTP request returned the expected health response.
 
-> This is the narrowest application-controlled mitigation. If `DEP0169` persists after the follow-up deployment, the remaining warning is attributable to Vercel's Node 24 runtime or a platform-loaded component rather than an application source path or an outdated audited runtime package.
+> The adapter normalization is retained as a safe compatibility guard. It did not eliminate the Savant-path warning in Vercel Node 24. Node 24 documentation and current upstream issue reports establish that the warning can be emitted by legacy URL API usage in runtime or dependency contexts, including calls from `node_modules`.[1] [2] The Vercel project has therefore been pinned through `package.json` to its already validated Node 22 major line, which Vercel documents as the project-level runtime override.[3]
 
 ## Validation after the mitigation
 
@@ -71,4 +71,16 @@ A defensive serverless-adapter normalization has been added in `server/vercel.ts
 
 ## Remaining production action
 
-The serverless normalization change must be committed, pushed as a fast-forward, automatically deployed from GitHub main, and then checked in Vercel runtime logs to determine whether `DEP0169` is eliminated. The absent environment variables require values supplied through Vercel project settings before authentication- or database-dependent features can be treated as configured for public production use.
+The Node 22 runtime pin must be committed, pushed as a fast-forward, and automatically deployed from GitHub main. The final validation will rerun the public health and Savant routes and inspect Vercel runtime logs to confirm the absence of `DEP0169`. The absent environment variables require values supplied through Vercel project settings before authentication- or database-dependent features can be treated as configured for public production use.
+
+## References
+
+[1]: https://nodejs.org/api/deprecations.html "Node.js deprecated APIs"
+[2]: https://github.com/nodejs/node/issues/61724 "Node.js issue: DEP0169 warning under Node 24 and 25"
+[3]: https://vercel.com/docs/functions/runtimes/node-js/node-js-versions "Vercel Node.js runtime version configuration"
+
+## Follow-up immutable mitigation deployment
+
+The request-target normalization was committed as `f6096e27868be47fef3f5b30e16af4ab702af505` and pushed with a fast-forward update to GitHub main. Vercel created Git-backed production deployment `dpl_3KCxHpNgF46m7pzCTuNicwGHX3Po`, which reached `READY` and now owns the canonical production aliases. The public health route continued to return the expected healthy response after this deployment.
+
+A fresh production Savant request returned HTTP 200 but still emitted `DEP0169`; the subsequent Vercel runtime-error aggregation recorded the warning on `/api/index` with the final occurrence on this deployment. The compiled `api/index.mjs` contains no `url.parse`, `url.resolve`, or `parseurl` callsite, and the same bundled code does not emit `DEP0169` when exercised locally on Node 22. The remaining behavior is therefore isolated to the Vercel Node 24 runtime/dependency combination rather than an application source call.
