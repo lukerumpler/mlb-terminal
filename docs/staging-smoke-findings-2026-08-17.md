@@ -35,3 +35,21 @@ Preview `dpl_Xz9Cp6zndg68DmyciAmc2aVpS6oe` reached `READY`, but its `GET /api/he
 The remaining initialization error came from `server/_core/vite.ts`, whose static Vite and configuration imports still caused Lightning CSS to load when the bundled module was evaluated. Those imports are now variable-path dynamic imports inside `setupVite`, a branch that the Vercel API handler never invokes.
 
 A clean build regenerated `api/index.mjs`; TypeScript validation and the local HTTP health probe passed. The generated API artifact contains no static `vite` or `lightningcss` import reference, which is the required precondition for the next Vercel health-route retest.
+
+## Successful API initialization
+
+Preview `dpl_8AToLfbqrY1zHC2AATt7cQXAFL7q` is the first staging deployment whose API health route returns `200 {"ok":true,"service":"skip-baseball-api"}`. This confirms the Vercel rewrite, bundled entrypoint, and deferred frontend dependencies now permit API initialization. Live provider smoke checks may now proceed without treating application crashes as provider failures.
+
+## Initial live provider smoke results
+
+A serial seven-request final-preview smoke suite respected the application limiter and produced no `429` response. The direct Baseball-Reference identity path returned `200`, `found=true`, `confidence=exact-name`, and direct canonical-page provenance. The strict exact-name Baseball-Reference search path also returned `200`, `found=true`, `confidence=exact-name`, and exact-search provenance. Aggregate telemetry reported two resolver requests, one direct-ID request, one verified canonical page, one exact search match, zero direct rejections or errors, and no name, identifier, IP address, or payload retention.
+
+`/api/intelligence-calculations?mode=all&season=2026` returned `200` with exactly 30 team entries. The client-side calculated-status counter from this live response was zero for the present dataset; this does not change the endpoint’s availability or the required labeling behavior when fallback metrics are returned.
+
+The three attempted MLB proxy routes returned `400`, so their error payloads must be inspected before counting them as successful provider checks. This is not a rate-limit condition and did not affect the independently successful identity or intelligence routes.
+
+## MLB proxy query preservation correction
+
+The MLB proxy error payload was `Invalid path parameter`. The staging rewrite used the capture name `:path*`, and Vercel exposed that capture as a `path` query parameter, overwriting the proxy’s intended `path=/standings` (and equivalent) query input with the route segment `mlb`. The rewrite capture is now `:route*`, preserving the client-supplied MLB path query.
+
+A clean production build and TypeScript validation passed after this configuration-only correction. The next preview will repeat the serial live MLB smoke suite together with the already successful identity and intelligence routes.

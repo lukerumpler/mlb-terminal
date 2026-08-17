@@ -7,7 +7,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/:route*",
       "destination": "/api/index"
     }
   ],
