@@ -318,3 +318,10 @@
 - [x] Add focused regression coverage for the accepted request or loading improvement
 - [x] Run focused tests, full suite, type-check, production build, visual/runtime checks, and save the next checkpoint
 - [x] Deliver the verified debugging and optimization summary
+
+- [x] Verify current roster-insights fallback behavior for provider errors, missing content, and semantically empty responses
+- [x] Route empty strengths-and-weaknesses provider payloads to the verified local roster fallback
+- [x] Preserve request coalescing, short-lived result reuse, truthful source labels, and no-fabrication safeguards
+- [x] Add dedicated empty-response fallback and coalescing regression coverage
+- [x] Run focused tests, full suite, type-check, production build, runtime checks, and save the next checkpoint
+- [x] Report the verified roster-insights fallback behavior

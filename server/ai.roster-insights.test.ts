@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
 
 vi.mock("./_core/llm", () => ({ invokeLLM: vi.fn() }));
@@ -29,6 +29,10 @@ const input = {
 };
 
 describe("ai.rosterInsights request protection", () => {
+  beforeEach(() => {
+    vi.mocked(invokeLLM).mockReset();
+  });
+
   it("coalesces identical in-flight requests and caches the verified response", async () => {
     let resolveRequest!: (value: unknown) => void;
     const llm = vi.mocked(invokeLLM);
@@ -48,7 +52,11 @@ describe("ai.rosterInsights request protection", () => {
         {
           message: {
             content: JSON.stringify({
-              strengths: [],
+              strengths: [{
+                title: "Positive run differential",
+                detail: "Team is outscoring opponents.",
+                evidence: "Run differential: +18",
+              }],
               weaknesses: [],
               source: "Verified test model",
             }),
@@ -58,14 +66,75 @@ describe("ai.rosterInsights request protection", () => {
     });
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      { strengths: [], weaknesses: [], source: "Verified test model" },
-      { strengths: [], weaknesses: [], source: "Verified test model" },
+      {
+        strengths: [{
+          title: "Positive run differential",
+          detail: "Team is outscoring opponents.",
+          evidence: "Run differential: +18",
+        }],
+        weaknesses: [],
+        source: "Verified test model",
+      },
+      {
+        strengths: [{
+          title: "Positive run differential",
+          detail: "Team is outscoring opponents.",
+          evidence: "Run differential: +18",
+        }],
+        weaknesses: [],
+        source: "Verified test model",
+      },
     ]);
     await expect(caller.ai.rosterInsights(input)).resolves.toEqual({
-      strengths: [],
+      strengths: [{
+        title: "Positive run differential",
+        detail: "Team is outscoring opponents.",
+        evidence: "Run differential: +18",
+      }],
       weaknesses: [],
       source: "Verified test model",
     });
     expect(llm).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the verified local fallback when the provider returns schema-valid but empty insight arrays", async () => {
+    const llm = vi.mocked(invokeLLM);
+    llm.mockResolvedValue({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            strengths: [],
+            weaknesses: [],
+            source: "Empty test model",
+          }),
+        },
+      }],
+    } as never);
+
+    const caller = appRouter.createCaller(context());
+    const result = await caller.ai.rosterInsights({
+      ...input,
+      team: {
+        name: "Below Average Test Club",
+        pct: 0.4,
+        ops: 0.7,
+        era: 4.5,
+        diff: -20,
+      },
+    });
+
+    expect(result).toMatchObject({
+      source: "Local verified roster fallback",
+      fallback: true,
+      strengths: [],
+    });
+    expect(result.weaknesses.map(item => item.title)).toEqual(
+      expect.arrayContaining([
+        "Negative run differential",
+        "Offense needs support",
+        "Run prevention is a watch area",
+        "Record below .500",
+      ])
+    );
   });
 });
