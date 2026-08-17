@@ -341,3 +341,10 @@
 
 - [x] Simulate malformed roster-insights team metrics and verify transparent limited-context fallback output
 - [x] Inspect and confirm test-diff coverage for empty responses, blanks, invalid numbers, and threshold boundaries
+
+- [x] Export the malformed-metrics regression to the existing GitHub roster-insights review branch and verify the remote diff
+- [x] Audit Player Profile runtime request traces, core/important/optional staging, cancellation, cache reuse, and per-panel loading behavior
+- [x] Implement only evidence-backed Player Profile loading or request reductions while preserving source provenance and provider policy
+- [x] Add focused regressions for accepted Player Profile optimizations
+- [x] Run focused tests, full suite, type-check, build, visual/runtime checks, and save a verified checkpoint
+- [x] Report the GitHub export and completed Player Profile optimization work

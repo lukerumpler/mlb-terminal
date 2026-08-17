@@ -671,10 +671,12 @@ export async function getHandednessSplits(id, season, requestOptions = {}) {
       return normalizeHandednessSplits(grp?.splits);
     } catch { return []; }
   };
-  const currentRows = await fetchRows('season', season);
+  const currentRowsPromise = fetchRows('season', season);
+  const careerRowsPromise = fetchRows('yearByYear', season);
+  const currentRows = await currentRowsPromise;
   const usedSeason = currentRows.length ? season : season - 1;
   const rows = currentRows.length ? currentRows : await fetchRows('season', usedSeason);
-  const careerRows = await fetchRows('yearByYear', season);
+  const careerRows = await careerRowsPromise;
   return { rows, careerRows, season:usedSeason, isFallback:usedSeason !== season };
 }
 
@@ -991,16 +993,23 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     extrasLoading: true,
   };
   try { onCoreReady?.(coreSnapshot); } catch { /* UI callback is optional */ }
+  if (signal?.aborted) throw abortError();
 
   // Important and optional enrichment begins only after the verified core
   // snapshot is visible. This prevents slow contract, financial, career, and
   // boxscore work from competing with the request budget that establishes the
   // player identity and current-season statistics.
-  const importantRequest = { priority: 'important', stage: 'important', screen: 'player-profile' };
-  const careerHittingPromise = getCareerSplits(id, 'hitting', importantRequest);
-  const careerPitchingPromise = getCareerSplits(id, 'pitching', importantRequest);
+  const importantRequest = { priority: 'important', stage: 'important', screen: 'player-profile', signal };
+  const careerHittingPromise = isPitcher
+    ? Promise.resolve([])
+    : getCareerSplits(id, 'hitting', importantRequest);
+  const careerPitchingPromise = isPitcher
+    ? getCareerSplits(id, 'pitching', importantRequest)
+    : Promise.resolve([]);
   const contractPromise = fetchContractData(id, person.fullName, importantRequest);
-  const handednessPromise = getHandednessSplits(id, season, importantRequest);
+  const handednessPromise = isPitcher
+    ? Promise.resolve({ rows: [], careerRows: [], season, isFallback: false, status: 'unavailable' })
+    : getHandednessSplits(id, season, importantRequest);
   const teamFinancialsPromise = fetchTeamFinancials(currentTeamAbbreviation, season, importantRequest);
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
   const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season);
@@ -1033,7 +1042,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     optionalLoading: true,
     extrasLoading: true,
   };
+  if (signal?.aborted) throw abortError();
   try { onImportantReady?.(importantSnapshot); } catch { /* UI callback is optional */ }
+  if (signal?.aborted) throw abortError();
 
   // Optional enrichment begins only after the important snapshot has been
   // published. This lowers the immediate request burst after selection and
@@ -1043,6 +1054,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     priority: 'optional',
     stage: 'optional',
     screen: 'player-profile',
+    signal,
   });
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
