@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { __resetMlbClientStateForTests, fetchPlayerProviderIdentity } from '../client/src/api/mlb.js';
 import {
   __resetPlayerIdentityRegistryForTests,
   getStoredPlayerProviderIdentity,
@@ -24,7 +25,12 @@ const identity = {
   },
 };
 
-afterEach(() => __resetPlayerIdentityRegistryForTests());
+afterEach(() => {
+  __resetPlayerIdentityRegistryForTests();
+  __resetMlbClientStateForTests();
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 describe('persistent player provider ID registry', () => {
   it('persists and reuses a verified exact-name Baseball-Reference mapping', () => {
@@ -47,6 +53,35 @@ describe('persistent player provider ID registry', () => {
     };
     expect(isUsablePlayerProviderIdentity(malformed, { mlbId:'660271', fullName:'Shohei Ohtani' })).toBe(false);
     expect(storePlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani', identity:malformed })).toBe(false);
+  });
+
+  it('sends a persisted exact mapping as a direct Baseball-Reference ID request', async () => {
+    storePlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani', identity });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ found:true, identity }), {
+      status:200,
+      headers:{ 'content-type':'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchPlayerProviderIdentity({ id:'660271', fullName:'Shohei Ohtani' })).resolves.toEqual(identity);
+
+    const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]), 'https://skip.local');
+    expect(requestUrl.pathname).toBe('/api/player-identity');
+    expect(requestUrl.searchParams.get('mlbId')).toBe('660271');
+    expect(requestUrl.searchParams.get('baseballReferenceId')).toBe('ohtansh01');
+  });
+
+  it('invalidates a persisted mapping when direct canonical verification rejects it', async () => {
+    storePlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani', identity });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      found:false,
+      invalidateBaseballReferenceId:true,
+      identity:{ mlb:identity.mlb, baseballReference:null },
+    }), { status:200, headers:{ 'content-type':'application/json' } })));
+
+    await fetchPlayerProviderIdentity({ id:'660271', fullName:'Shohei Ohtani' });
+
+    expect(getStoredPlayerProviderIdentity({ mlbId:'660271', fullName:'Shohei Ohtani' })).toBeNull();
   });
 
   it('expires persisted mappings and supports explicit invalidation', () => {
