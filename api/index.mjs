@@ -306,9 +306,9 @@ __export(mlb_exports, {
   default: () => handler,
   getUpstreamTimeoutMs: () => getUpstreamTimeoutMs
 });
-function getUpstreamTimeoutMs(path3) {
+function getUpstreamTimeoutMs(path2) {
   for (const [prefix, timeoutMs] of Object.entries(UPSTREAM_TIMEOUT_MS)) {
-    if (prefix !== "default" && path3.startsWith(prefix)) return timeoutMs;
+    if (prefix !== "default" && path2.startsWith(prefix)) return timeoutMs;
   }
   return UPSTREAM_TIMEOUT_MS.default;
 }
@@ -317,8 +317,8 @@ function __resetMlbProxyStateForTests() {
   inFlightRequests.clear();
   upstreamFailureUntil.clear();
 }
-function responseCacheKey(path3, forwardedQs) {
-  return `${path3}?${forwardedQs}`;
+function responseCacheKey(path2, forwardedQs) {
+  return `${path2}?${forwardedQs}`;
 }
 function setProxyHeaders(res, rule, source2, cacheStatus, freshness = "live") {
   res.setHeader(
@@ -341,9 +341,9 @@ function serveStale(res, rule, entry, reason) {
   );
   return res.status(200).json(entry.data);
 }
-function getCacheRule(path3) {
+function getCacheRule(path2) {
   for (const [prefix, rule] of Object.entries(CACHE_RULES)) {
-    if (prefix !== "default" && path3.startsWith(prefix)) return rule;
+    if (prefix !== "default" && path2.startsWith(prefix)) return rule;
   }
   return CACHE_RULES.default;
 }
@@ -353,20 +353,20 @@ async function handler(req, res) {
   if (req.method !== "GET")
     return res.status(405).json({ error: "Method not allowed" });
   const urlObj = new URL(req.url, "https://placeholder.invalid");
-  const path3 = urlObj.searchParams.get("path");
-  if (!path3) {
+  const path2 = urlObj.searchParams.get("path");
+  if (!path2) {
     return res.status(400).json({
       error: "Missing required query param: path",
       example: "/api/mlb?path=/people/805299&hydrate=stats(type=season,group=hitting,season=2026)"
     });
   }
-  if (!path3.startsWith("/") || path3.includes("://")) {
+  if (!path2.startsWith("/") || path2.includes("://")) {
     return res.status(400).json({ error: "Invalid path parameter" });
   }
   const rawQuery = req.url.includes("?") ? req.url.split("?")[1] : "";
   const forwardedQs = rawQuery.split("&").filter((part) => !part.startsWith("path=")).join("&");
-  const rule = getCacheRule(path3);
-  const cacheKey2 = responseCacheKey(path3, forwardedQs);
+  const rule = getCacheRule(path2);
+  const cacheKey2 = responseCacheKey(path2, forwardedQs);
   const cached = responseCache.get(cacheKey2);
   if (cached && cached.expiresAt > Date.now()) {
     setProxyHeaders(res, rule, cached.source, "HIT", "fresh");
@@ -400,12 +400,12 @@ async function handler(req, res) {
     return res.status(503).json({
       error: "MLB resource temporary upstream cooldown active",
       retryAfter,
-      path: path3
+      path: path2
     });
   }
   if (failureUntil) upstreamFailureUntil.delete(cacheKey2);
   if (isRateLimited(req, "mlb")) return rateLimitResponse(res);
-  const mlbUrl = `${MLB_BASE}${path3}${forwardedQs ? "?" + forwardedQs : ""}`;
+  const mlbUrl = `${MLB_BASE}${path2}${forwardedQs ? "?" + forwardedQs : ""}`;
   const upstreamRequest = (async () => {
     let mlbRes;
     try {
@@ -414,7 +414,7 @@ async function handler(req, res) {
           "User-Agent": "Mozilla/5.0 (compatible; MLBDashboard/1.0)",
           Accept: "application/json"
         },
-        signal: AbortSignal.timeout(getUpstreamTimeoutMs(path3))
+        signal: AbortSignal.timeout(getUpstreamTimeoutMs(path2))
       });
     } catch (err) {
       const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
@@ -535,9 +535,9 @@ var ncaa_exports = {};
 __export(ncaa_exports, {
   default: () => handler2
 });
-function getCacheRule2(path3) {
+function getCacheRule2(path2) {
   for (const [prefix, rule] of Object.entries(CACHE_RULES2)) {
-    if (prefix !== "default" && path3.startsWith(prefix)) return rule;
+    if (prefix !== "default" && path2.startsWith(prefix)) return rule;
   }
   return CACHE_RULES2.default;
 }
@@ -547,21 +547,21 @@ async function handler2(req, res) {
   if (req.method !== "GET")
     return res.status(405).json({ error: "Method not allowed" });
   const urlObj = new URL(req.url, "https://placeholder.invalid");
-  const path3 = urlObj.searchParams.get("path");
-  if (!path3) {
+  const path2 = urlObj.searchParams.get("path");
+  if (!path2) {
     return res.status(400).json({
       error: "Missing required query param: path",
       example: "/api/ncaa?path=/scoreboard/baseball/d1/2026/05/all-conf"
     });
   }
-  if (!path3.startsWith("/") || path3.includes("://")) {
+  if (!path2.startsWith("/") || path2.includes("://")) {
     return res.status(400).json({ error: "Invalid path parameter" });
   }
   const rawQuery = req.url.includes("?") ? req.url.split("?")[1] : "";
   const forwardedQs = rawQuery.split("&").filter((p) => !p.startsWith("path=")).join("&");
-  const ncaaUrl = `${NCAA_BASE}${path3}${forwardedQs ? "?" + forwardedQs : ""}`;
-  const rule = getCacheRule2(path3);
-  const cacheKey2 = `${path3}?${forwardedQs}`;
+  const ncaaUrl = `${NCAA_BASE}${path2}${forwardedQs ? "?" + forwardedQs : ""}`;
+  const rule = getCacheRule2(path2);
+  const cacheKey2 = `${path2}?${forwardedQs}`;
   const cached = responseCache2.get(cacheKey2);
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader(
@@ -3790,182 +3790,6 @@ var init_intelligence_calculations = __esm({
   }
 });
 
-// vite.config.ts
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
-import fs from "node:fs";
-import path from "node:path";
-import { defineConfig } from "vite";
-import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-function ensureLogDir() {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-}
-function trimLogFile(logPath, maxSize) {
-  try {
-    if (!fs.existsSync(logPath) || fs.statSync(logPath).size <= maxSize) {
-      return;
-    }
-    const lines = fs.readFileSync(logPath, "utf-8").split("\n");
-    const keptLines = [];
-    let keptBytes = 0;
-    const targetSize = TRIM_TARGET_BYTES;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const lineBytes = Buffer.byteLength(`${lines[i]}
-`, "utf-8");
-      if (keptBytes + lineBytes > targetSize) break;
-      keptLines.unshift(lines[i]);
-      keptBytes += lineBytes;
-    }
-    fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
-  } catch {
-  }
-}
-function writeToLogFile(source2, entries) {
-  if (entries.length === 0) return;
-  ensureLogDir();
-  const logPath = path.join(LOG_DIR, `${source2}.log`);
-  const lines = entries.map((entry) => {
-    const ts = (/* @__PURE__ */ new Date()).toISOString();
-    return `[${ts}] ${JSON.stringify(entry)}`;
-  });
-  fs.appendFileSync(logPath, `${lines.join("\n")}
-`, "utf-8");
-  trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
-}
-function vitePluginManusDebugCollector() {
-  return {
-    name: "manus-debug-collector",
-    transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
-        return html;
-      }
-      return {
-        html,
-        tags: [
-          {
-            tag: "script",
-            attrs: {
-              src: "/__manus__/debug-collector.js",
-              defer: true
-            },
-            injectTo: "head"
-          }
-        ]
-      };
-    },
-    configureServer(server) {
-      server.middlewares.use("/__manus__/logs", (req, res, next) => {
-        if (req.method !== "POST") {
-          return next();
-        }
-        const handlePayload = (payload) => {
-          if (payload.consoleLogs?.length > 0) {
-            writeToLogFile("browserConsole", payload.consoleLogs);
-          }
-          if (payload.networkRequests?.length > 0) {
-            writeToLogFile("networkRequests", payload.networkRequests);
-          }
-          if (payload.sessionEvents?.length > 0) {
-            writeToLogFile("sessionReplay", payload.sessionEvents);
-          }
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true }));
-        };
-        const reqBody = req.body;
-        if (reqBody && typeof reqBody === "object") {
-          try {
-            handlePayload(reqBody);
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: String(e) }));
-          }
-          return;
-        }
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", () => {
-          try {
-            const payload = JSON.parse(body);
-            handlePayload(payload);
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: String(e) }));
-          }
-        });
-      });
-    }
-  };
-}
-var PROJECT_ROOT, LOG_DIR, MAX_LOG_SIZE_BYTES, TRIM_TARGET_BYTES, plugins, vite_config_default;
-var init_vite_config = __esm({
-  "vite.config.ts"() {
-    "use strict";
-    PROJECT_ROOT = import.meta.dirname;
-    LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
-    MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024;
-    TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6);
-    plugins = [
-      react(),
-      tailwindcss(),
-      jsxLocPlugin(),
-      vitePluginManusRuntime(),
-      vitePluginManusDebugCollector()
-    ];
-    vite_config_default = defineConfig({
-      plugins,
-      resolve: {
-        alias: {
-          "@": path.resolve(import.meta.dirname, "client", "src"),
-          "@shared": path.resolve(import.meta.dirname, "shared"),
-          "@assets": path.resolve(import.meta.dirname, "attached_assets")
-        }
-      },
-      envDir: path.resolve(import.meta.dirname),
-      root: path.resolve(import.meta.dirname, "client"),
-      publicDir: path.resolve(import.meta.dirname, "client", "public"),
-      build: {
-        outDir: path.resolve(import.meta.dirname, "dist/public"),
-        emptyOutDir: true,
-        rollupOptions: {
-          output: {
-            manualChunks(id) {
-              if (!id.includes("node_modules")) return void 0;
-              if (id.includes("/react/") || id.includes("/react-dom/") || id.includes("/scheduler/"))
-                return "react-vendor";
-              if (id.includes("/lucide-react/") || id.includes("/@radix-ui/"))
-                return "ui-vendor";
-              if (id.includes("/@tanstack/") || id.includes("/@trpc/"))
-                return "data-vendor";
-              return void 0;
-            }
-          }
-        }
-      },
-      server: {
-        host: true,
-        allowedHosts: [
-          ".manuspre.computer",
-          ".manus.computer",
-          ".manus-asia.computer",
-          ".manuscomputer.ai",
-          ".manusvm.computer",
-          "localhost",
-          "127.0.0.1"
-        ],
-        fs: {
-          strict: true,
-          deny: ["**/.*"]
-        }
-      }
-    });
-  }
-});
-
 // server/_core/vite.ts
 var vite_exports = {};
 __export(vite_exports, {
@@ -3973,18 +3797,23 @@ __export(vite_exports, {
   setupVite: () => setupVite
 });
 import express from "express";
-import fs2 from "fs";
+import fs from "fs";
 import { nanoid } from "nanoid";
-import path2 from "path";
-import { createServer as createViteServer } from "vite";
+import path from "path";
 async function setupVite(app, server) {
+  const viteModulePath = "vite";
+  const viteConfigModulePath = "../../vite.config";
+  const [{ createServer: createViteServer }, { default: viteConfig }] = await Promise.all([
+    import(viteModulePath),
+    import(viteConfigModulePath)
+  ]);
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
     allowedHosts: true
   };
   const vite = await createViteServer({
-    ...vite_config_default,
+    ...viteConfig,
     configFile: false,
     server: serverOptions,
     appType: "custom"
@@ -3993,13 +3822,13 @@ async function setupVite(app, server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path2.resolve(
+      const clientTemplate = path.resolve(
         import.meta.dirname,
         "../..",
         "client",
         "index.html"
       );
-      let template = await fs2.promises.readFile(clientTemplate, "utf-8");
+      let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
@@ -4013,21 +3842,20 @@ async function setupVite(app, server) {
   });
 }
 function serveStatic(app) {
-  const distPath = process.env.NODE_ENV === "development" ? path2.resolve(import.meta.dirname, "../..", "dist", "public") : path2.resolve(import.meta.dirname, "public");
-  if (!fs2.existsSync(distPath)) {
+  const distPath = process.env.NODE_ENV === "development" ? path.resolve(import.meta.dirname, "../..", "dist", "public") : path.resolve(import.meta.dirname, "public");
+  if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
   app.use(express.static(distPath));
   app.use("*", (_req, res) => {
-    res.sendFile(path2.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
 var init_vite = __esm({
   "server/_core/vite.ts"() {
     "use strict";
-    init_vite_config();
   }
 });
 
@@ -4927,8 +4755,8 @@ async function registerLegacyApiRoutes(app) {
     "/api/fangraphs-models",
     "/api/intelligence-calculations"
   ];
-  paths.forEach((path3, index) => {
-    app.all(path3, wrapLegacyHandler(modules[index].default));
+  paths.forEach((path2, index) => {
+    app.all(path2, wrapLegacyHandler(modules[index].default));
   });
 }
 var legacyApiErrorHandler = (error, _req, res, next) => {

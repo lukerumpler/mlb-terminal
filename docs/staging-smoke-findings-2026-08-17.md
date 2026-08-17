@@ -25,3 +25,13 @@ Preview `dpl_2FdFZikj3oRq8ChGxQ8GMy4zZjJS` reached `READY`, but `GET /api/health
 The final preview’s runtime logs showed that the health request eagerly loaded Vite, which attempted to load the unavailable optional native package `@rollup/rollup-linux-x64-gnu`. `server/app.ts` now imports the Vite/rollup frontend helper only inside the `serveFrontend` branch. The Vercel handler creates the app with `serveFrontend=false`, so this dependency is not loaded on API requests.
 
 A clean `pnpm build`, `pnpm check`, and the generated-bundle HTTP health probe all passed locally after the change. The remaining external verification is a replacement Vercel preview followed by the MLB, identity, intelligence, and UI smoke paths.
+
+## API-only retest result
+
+Preview `dpl_Xz9Cp6zndg68DmyciAmc2aVpS6oe` reached `READY`, but its `GET /api/health` smoke request still returned Vercel `500 FUNCTION_INVOCATION_FAILED`. This confirms that another eagerly imported runtime dependency remains in the generated API bundle. The UI’s loading state is therefore a consequence of serverless initialization failure; no live provider or rate-limit verification is valid until this health route succeeds.
+
+## Deferred Vite import correction
+
+The remaining initialization error came from `server/_core/vite.ts`, whose static Vite and configuration imports still caused Lightning CSS to load when the bundled module was evaluated. Those imports are now variable-path dynamic imports inside `setupVite`, a branch that the Vercel API handler never invokes.
+
+A clean build regenerated `api/index.mjs`; TypeScript validation and the local HTTP health probe passed. The generated API artifact contains no static `vite` or `lightningcss` import reference, which is the required precondition for the next Vercel health-route retest.
