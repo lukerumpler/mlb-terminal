@@ -53,3 +53,38 @@ The three attempted MLB proxy routes returned `400`, so their error payloads mus
 The MLB proxy error payload was `Invalid path parameter`. The staging rewrite used the capture name `:path*`, and Vercel exposed that capture as a `path` query parameter, overwriting the proxy’s intended `path=/standings` (and equivalent) query input with the route segment `mlb`. The rewrite capture is now `:route*`, preserving the client-supplied MLB path query.
 
 A clean production build and TypeScript validation passed after this configuration-only correction. The next preview will repeat the serial live MLB smoke suite together with the already successful identity and intelligence routes.
+
+## Final live smoke suite
+
+The final staging preview `dpl_4biY6PVjL8A9HJ2MxZZAxXK5hjab` passed a serial, rate-limit-respecting eight-request smoke suite after the UI hydration window had cleared. All responses were `200` and no `Retry-After` header or `429` response was observed.
+
+| Check | Result |
+| --- | --- |
+| API health | `ok=true` |
+| MLB standings proxy | Three league-division records returned |
+| MLB schedule proxy | One date returned |
+| MLB player search proxy | One matching player returned |
+| Baseball-Reference direct-ID resolver | Exact-name canonical page verified; `found=true` |
+| Baseball-Reference name-search resolver | Exact-name search result verified; `found=true` |
+| All-team intelligence fallback | Exactly 30 team entries; response retained calculation/status shape |
+| Resolver metrics | Two requests; direct verification and exact search each succeeded; no rejection or direct canonical error |
+
+The observed resolver telemetry contained only aggregate counters and latency summaries. It exposed no player name, player identifier, IP address, or request payload. Direct canonical resolution averaged 70 ms and exact-name search averaged 93 ms for this cold smoke instance. No rate-limit bypass was used.
+
+## Rendered UI verification
+
+The final desktop workspace completed hydration from `DATA 1/7` to `DATA 4/7` and displayed verified MLB standings, team aggregates, roster rows, Baseball Savant values, and the live schedule. The Overview clearly labeled fallback values with `∑ Calculated`: projected wins/losses, playoff estimate, and `WAR proxy`. Its explanatory copy states that the playoff estimate excludes schedule, roster, injury, and simulation inputs, and that the WAR proxy is pythagorean wins above a replacement baseline rather than FanGraphs Team WAR.
+
+The Players workspace loaded the quick-access cards, including Aaron Judge and other current MLB players. The next UI check is the Aaron Judge profile confidence strip, which should surface the strict exact-name Baseball-Reference provider identity source.
+
+## Player-profile confidence verification
+
+The final staging Player Profile for Aaron Judge fully hydrated with verified season and Statcast inputs. Its data-confidence strip explicitly displayed `B-Ref ID · Exact name` alongside the MLB, Baseball Savant, and Spotrac source indicators. This confirms that the browser-facing profile preserves the strict exact-name Baseball-Reference identity state verified by the live resolver rather than treating the mapping as an unqualified historical-stat attachment.
+
+## Live rate-limit verification
+
+After allowing the active limiter window to clear, the final staging preview received a serial 31-request burst of deliberately invalid `/api/player-identity` requests. These requests did not invoke MLB or Baseball-Reference. Requests 1–30 returned the expected validation `400`; request 31 returned `429` with `Retry-After: 10`. After 10.5 seconds, the same request returned `400` again with no retry header. This confirms the deployed 30-per-10-second rate limiter, its `Retry-After` contract, and post-window recovery without bypassing the limiter.
+
+## Alerting decision
+
+Automated email alerting is explicitly deferred at the user’s request. No Gmail, transactional-email, or other sending integration was enabled; no recipient workflow, background monitor, or scheduled health-summary job was created. The staging deployment remains available for manual review and the existing telemetry endpoints remain available for on-demand inspection.
