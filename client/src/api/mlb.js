@@ -1554,6 +1554,27 @@ export async function getTeamBattedBallsAgainst(teamAbbr, year = SEASON) {
   return Array.isArray(arr) ? arr : null;
 }
 
+export async function getTeamPitchArsenal(pitcherIds = [], year = SEASON) {
+  const requestedIds = new Set(
+    pitcherIds.map(id => String(id)).filter(Boolean)
+  );
+  if (!requestedIds.size) return [];
+  const rows = await fetchLeaderboard(
+    `/api/savant?endpoint=pitch_arsenal&year=${year}`,
+    { timeoutMs: 10_000 }
+  );
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter(row =>
+      requestedIds.has(String(row.player_id ?? row.pitcher_id ?? row.id ?? ""))
+    )
+    .map(row => ({
+      pitch_type: row.pitch_type,
+      release_speed: row.velocity ?? row.release_speed ?? null,
+    }))
+    .filter(row => row.pitch_type != null);
+}
+
 export async function getPlayerContactPoints(playerId, year = SEASON) {
   if (!playerId) return null;
   const arr = await fetchLeaderboard(`/api/savant?endpoint=contact_points&year=${year}&playerId=${encodeURIComponent(playerId)}`, { timeoutMs: 20_000 });

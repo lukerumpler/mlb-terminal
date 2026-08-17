@@ -9,6 +9,7 @@ const {
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
   getTeamSavantMetrics,
+  getTeamPitchArsenal,
   getTeamScheduleSplits,
   mlb,
   __resetMlbClientStateForTests,
@@ -39,6 +40,22 @@ describe("MLB request cache optimization", () => {
     __resetTeamVenueMetadataCacheForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("filters the cached pitch arsenal to requested roster pitchers and normalizes velocity", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => "live" },
+      json: async () => [
+        { player_id: 22, pitch_type: "FF", velocity: 96.4 },
+        { player_id: 99, pitch_type: "SL", velocity: 84.1 },
+      ],
+    });
+
+    await expect(getTeamPitchArsenal([22], 2098)).resolves.toEqual([
+      { pitch_type: "FF", release_speed: 96.4 },
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("keeps standings cached for repeated reads within the five-minute window", async () => {

@@ -213,6 +213,32 @@ describe("team data cache and freshness helpers", () => {
     expect(saveCacheFn).toHaveBeenCalledWith("LAD", 2026, result.snapshot);
   });
 
+  it("uses one roster-filtered pitch arsenal query before player-scoped fallbacks", async () => {
+    const getTeamPitchArsenalFn = vi.fn().mockResolvedValue([
+      { pitch_type: "FF", release_speed: 96 },
+      { pitch_type: "SL", release_speed: 85 },
+    ]);
+    const getPitcherPitchesFn = vi.fn();
+    const result = await resolveTeamSavantSnapshot({
+      teamAbbr: "LAD",
+      season: 2026,
+      cached: null,
+      hitters: [{ id: 11 }],
+      pitchers: [{ id: 22 }],
+      getTeamExitVelocityFn: vi.fn().mockResolvedValue([{ launch_speed: 101 }]),
+      getPlayerContactPointsFn: vi.fn(),
+      getTeamPitchArsenalFn,
+      getPitcherPitchesFn,
+    });
+
+    expect(getTeamPitchArsenalFn).toHaveBeenCalledWith([22], 2026);
+    expect(getPitcherPitchesFn).not.toHaveBeenCalled();
+    expect(result.snapshot.pitchRows).toEqual([
+      { pitch_type: "FF", release_speed: 96 },
+      { pitch_type: "SL", release_speed: 85 },
+    ]);
+  });
+
   it("falls back to verified player rows when the direct team query is empty", async () => {
     const getPlayerContactPointsFn = vi
       .fn()

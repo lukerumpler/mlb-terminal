@@ -3014,14 +3014,16 @@ function normalizeMetricKey(value) {
 }
 function findTeamRowDetails(html, teamAbbr) {
   const upper = String(teamAbbr).toUpperCase();
+  const aliases = [upper, ...TEAM_NAME_ALIASES[upper] || []];
+  const matchesTeam = (cell) => aliases.some(
+    (alias) => new RegExp(`(?:^|\\s)${alias.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?:\\s|$)`, "i").test(cell)
+  );
   for (const table of tablesFromHtml(html)) {
     const headerMatch = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
     const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (cells.some(
-        (cell) => new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
-      )) {
+      if (cells.some(matchesTeam)) {
         const metrics = {};
         cells.forEach((cell, index) => {
           const key = normalizeMetricKey(headers[index]);
@@ -3039,13 +3041,18 @@ function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season = DEFAU
   const warDetails = findTeamRowDetails(warHtml, teamAbbr);
   const oddsRow = oddsDetails?.cells || findTeamRow(oddsHtml, teamAbbr);
   const warRow = warDetails?.cells || findTeamRow(warHtml, teamAbbr);
-  const playoffOdds = oddsRow ? oddsRow.map(parsePercentage).find((value) => value != null) ?? null : null;
-  const teamWar = warRow ? warRow.map(numeric2).find((value) => value != null) ?? null : null;
   const metrics = {
     ...oddsDetails?.metrics || {},
     ...warDetails?.metrics || {}
   };
   const pick = (...keys) => keys.map((key) => metrics[key]).find((value) => value != null) ?? null;
+  const playoffOdds = pick(
+    "make_playoffs",
+    "playoff_odds",
+    "make_postseason",
+    "postseason_odds"
+  ) ?? (oddsRow ? oddsRow.map(parsePercentage).find((value) => value != null) ?? null : null);
+  const teamWar = pick("war", "team_war", "total_war") ?? (warRow ? warRow.map(numeric2).find((value) => value != null) ?? null : null);
   return {
     playoffOdds,
     teamWar,
@@ -3054,8 +3061,8 @@ function parseFanGraphsModelHtml({ oddsHtml, warHtml }, teamAbbr, season = DEFAU
     source: "FanGraphs",
     sourceUrls: { playoffOdds: ODDS_URL, teamWar: WAR_URL },
     advancedMetrics: {
-      projectedWins: pick("projected_wins", "wins", "w"),
-      projectedLosses: pick("projected_losses", "losses", "l"),
+      projectedWins: pick("projected_wins", "proj_w", "wins", "w"),
+      projectedLosses: pick("projected_losses", "proj_l", "losses", "l"),
       projectedRuns: pick("projected_runs", "runs", "r"),
       projectedRunsAllowed: pick(
         "projected_runs_allowed",
@@ -3481,7 +3488,7 @@ async function handler9(req, res) {
     if (modelInFlight.get(key) === upstreamRequest) modelInFlight.delete(key);
   }
 }
-var DEFAULT_SEASON2, TEAM_CODE2, ODDS_URL, WAR_URL, AGGREGATE_WAR_URL, UA4, CACHE_TTL_MS2, STALE_TTL_MS3, DEFAULT_COOLDOWN_MS, FANGRAPHS_FAILURE_COOLDOWN_MS, modelCache, modelInFlight, aggregateWarCache, aggregateWarInFlight, fanGraphsCooldownUntil, modelFailureCooldownUntil, modelDailyAttemptDay, aggregateDailyAttemptDay;
+var DEFAULT_SEASON2, TEAM_CODE2, ODDS_URL, WAR_URL, AGGREGATE_WAR_URL, UA4, CACHE_TTL_MS2, STALE_TTL_MS3, DEFAULT_COOLDOWN_MS, FANGRAPHS_FAILURE_COOLDOWN_MS, modelCache, modelInFlight, aggregateWarCache, aggregateWarInFlight, fanGraphsCooldownUntil, modelFailureCooldownUntil, modelDailyAttemptDay, aggregateDailyAttemptDay, TEAM_NAME_ALIASES;
 var init_fangraphs_models = __esm({
   "server/api/fangraphs-models.js"() {
     "use strict";
@@ -3505,6 +3512,40 @@ var init_fangraphs_models = __esm({
     modelFailureCooldownUntil = /* @__PURE__ */ new Map();
     modelDailyAttemptDay = /* @__PURE__ */ new Map();
     aggregateDailyAttemptDay = /* @__PURE__ */ new Map();
+    TEAM_NAME_ALIASES = {
+      ARI: ["Diamondbacks"],
+      ATH: ["Athletics"],
+      ATL: ["Braves"],
+      BAL: ["Orioles"],
+      BOS: ["Red Sox"],
+      CHC: ["Cubs"],
+      CIN: ["Reds"],
+      CLE: ["Guardians"],
+      COL: ["Rockies"],
+      CWS: ["White Sox"],
+      DET: ["Tigers"],
+      HOU: ["Astros"],
+      KC: ["Royals"],
+      KCR: ["Royals"],
+      LAA: ["Angels"],
+      LAD: ["Dodgers"],
+      MIA: ["Marlins"],
+      MIL: ["Brewers"],
+      MIN: ["Twins"],
+      NYM: ["Mets"],
+      NYY: ["Yankees"],
+      OAK: ["Athletics"],
+      PHI: ["Phillies"],
+      PIT: ["Pirates"],
+      SD: ["Padres"],
+      SEA: ["Mariners"],
+      SF: ["Giants"],
+      STL: ["Cardinals"],
+      TB: ["Rays"],
+      TEX: ["Rangers"],
+      TOR: ["Blue Jays"],
+      WSH: ["Nationals"]
+    };
   }
 });
 

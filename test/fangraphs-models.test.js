@@ -34,6 +34,22 @@ describe("FanGraphs model source adapter", () => {
     expect(result.advancedMetrics.defenseWar).toBe(8.4);
   });
 
+  it("parses current nickname rows and abbreviated FanGraphs projection headers", () => {
+    const oddsHtml = "<table><tr><th>Team</th><th>W</th><th>L</th><th>W%</th><th>Proj W</th><th>Proj L</th><th>Make Playoffs</th></tr><tr><td>Dodgers</td><td>74</td><td>51</td><td>.592</td><td>96.9</td><td>65.1</td><td>100.0%</td></tr></table>";
+    const warHtml = "<table><tr><th>Team</th><th>WAR</th><th>Off WAR</th><th>Def WAR</th></tr><tr><td>Dodgers</td><td>42.7</td><td>29.1</td><td>8.4</td></tr></table>";
+
+    const result = parseFanGraphsModelHtml({ oddsHtml, warHtml }, "LAD", 2026);
+
+    expect(result.playoffOdds).toBe(100);
+    expect(result.teamWar).toBe(42.7);
+    expect(result.advancedMetrics).toMatchObject({
+      projectedWins: 96.9,
+      projectedLosses: 65.1,
+      offenseWar: 29.1,
+      defenseWar: 8.4,
+    });
+  });
+
   it("parses aggregate batting and pitching WAR by header name and computes total WAR", () => {
     const battingHtml =
       "<table><tr><th>Team</th><th>WAR</th></tr><tr><td>Los Angeles Dodgers</td><td>24.3</td></tr><tr><td>New York Yankees</td><td>21.1</td></tr></table>";

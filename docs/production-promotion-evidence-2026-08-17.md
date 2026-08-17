@@ -14,7 +14,7 @@ The validated release was promoted from GitHub main to Vercel production as an i
 | Published browser smoke test | Passing | `2/2` tests passed against the protected public production alias. |
 | Production package audit | Passing | `pnpm audit --prod --json` completed with 0 critical, high, moderate, low, and info advisories across 502 production dependencies. |
 | Production environment variables | Blocking configuration gap | Vercel project settings show no project environment variables. |
-| `DEP0169` runtime warning | Node 24 behavior isolated; Node 22 resolution pending deployment | The guarded adapter normalization was deployed but the warning persisted only on the Savant path; the project is now pinned to the locally validated Node 22 runtime line. |
+| `DEP0169` runtime warning | Resolved | Vercel built the final production deployment on Node 22; a fresh Savant request returned 200 without the prior deprecation warning. |
 
 ## Immutable GitHub-to-production promotion
 
@@ -71,16 +71,20 @@ A defensive serverless-adapter normalization has been added in `server/vercel.ts
 
 ## Remaining production action
 
-The Node 22 runtime pin must be committed, pushed as a fast-forward, and automatically deployed from GitHub main. The final validation will rerun the public health and Savant routes and inspect Vercel runtime logs to confirm the absence of `DEP0169`. The absent environment variables require values supplied through Vercel project settings before authentication- or database-dependent features can be treated as configured for public production use.
-
-## References
-
-[1]: https://nodejs.org/api/deprecations.html "Node.js deprecated APIs"
-[2]: https://github.com/nodejs/node/issues/61724 "Node.js issue: DEP0169 warning under Node 24 and 25"
-[3]: https://vercel.com/docs/functions/runtimes/node-js/node-js-versions "Vercel Node.js runtime version configuration"
+The final production release is verified. The only outstanding deployment configuration work is to supply the required Vercel environment values before authentication- or database-dependent features can be treated as configured for public production use.
 
 ## Follow-up immutable mitigation deployment
 
 The request-target normalization was committed as `f6096e27868be47fef3f5b30e16af4ab702af505` and pushed with a fast-forward update to GitHub main. Vercel created Git-backed production deployment `dpl_3KCxHpNgF46m7pzCTuNicwGHX3Po`, which reached `READY` and now owns the canonical production aliases. The public health route continued to return the expected healthy response after this deployment.
 
 A fresh production Savant request returned HTTP 200 but still emitted `DEP0169`; the subsequent Vercel runtime-error aggregation recorded the warning on `/api/index` with the final occurrence on this deployment. The compiled `api/index.mjs` contains no `url.parse`, `url.resolve`, or `parseurl` callsite, and the same bundled code does not emit `DEP0169` when exercised locally on Node 22. The remaining behavior is therefore isolated to the Vercel Node 24 runtime/dependency combination rather than an application source call.
+
+## Final Node 22 production deployment
+
+The Node 22 runtime pin was committed as `9aeea29996ca681ffeec64df7beb789e2f79419b` and promoted to GitHub main by fast-forward. Vercel created Git-backed production deployment `dpl_83eDuiUoxiJrK5AM3nfotxoZpMLY`, state `READY`, target `production`, with the canonical aliases attached. Its build log states that Vercel skipped the prior Node 24 cache because the version changed to `22.x` and that the `package.json` engine override selected Node 22 over the project default. A fresh public Savant request returned HTTP 200; its runtime log contained the known missing-OAuth configuration message but no `DEP0169` warning. The final published browser smoke suite also passed 2/2 against `https://mlb-terminal.vercel.app`.
+
+## References
+
+[1]: https://nodejs.org/api/deprecations.html "Node.js deprecated APIs"
+[2]: https://github.com/nodejs/node/issues/61724 "Node.js issue: DEP0169 warning under Node 24 and 25"
+[3]: https://vercel.com/docs/functions/runtimes/node-js/node-js-versions "Vercel Node.js runtime version configuration"

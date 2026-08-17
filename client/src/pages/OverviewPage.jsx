@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getTeamPitchArsenal, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -317,20 +317,27 @@ export async function resolveTeamSavantSnapshot({
   getTeamExitVelocityFn = getTeamExitVelocity,
   getTeamBattedBallsFn = null,
   getPlayerContactPointsFn = getPlayerContactPoints,
+  getTeamPitchArsenalFn = null,
   getPitcherPitchesFn = getPitcherPitches,
   saveCacheFn = () => {},
 } = {}) {
   if (cached && now - Number(cached.updatedAt || 0) < cacheTtlMs) {
     return { snapshot: cached.data, source: 'Baseball Savant Statcast Search · cached verified roster rollup', cacheHit: true };
   }
-  const [directRows, directBattedRows] = await Promise.all([
+  const pitcherIds = pitchers.map(row => row?.id).filter(Boolean);
+  const [directRows, directBattedRows, consolidatedPitchRows] = await Promise.all([
     getTeamExitVelocityFn(teamAbbr, season).catch(() => null),
     typeof getTeamBattedBallsFn === 'function' ? getTeamBattedBallsFn(teamAbbr, season).catch(() => null) : Promise.resolve(null),
+    typeof getTeamPitchArsenalFn === 'function'
+      ? getTeamPitchArsenalFn(pitcherIds, season).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const contactRows = Array.isArray(directRows) && directRows.length
     ? directRows
     : (await Promise.all(hitters.filter(row => row?.id).map(row => getPlayerContactPointsFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
-  const pitchRows = (await Promise.all(pitchers.filter(row => row?.id).map(row => getPitcherPitchesFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
+  const pitchRows = Array.isArray(consolidatedPitchRows) && consolidatedPitchRows.length
+    ? consolidatedPitchRows
+    : (await Promise.all(pitchers.filter(row => row?.id).map(row => getPitcherPitchesFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
   const source = Array.isArray(directBattedRows) && directBattedRows.length
     ? 'Baseball Savant Statcast Search · verified team batted-ball query'
     : Array.isArray(directRows) && directRows.length
@@ -590,7 +597,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamBattedBallAgainstRows, setTeamBattedBallAgainstRows] = useState([]);
   const [teamPitchArsenalData, setTeamPitchArsenalData] = useState(null);
   const [teamSavantSource, setTeamSavantSource] = useState('');
-  const [teamSavantState, setTeamSavantState] = useState('idle');
+  const [teamSavantState, setTeamSavantState] = useState('loading');
   const [teamVenueMetadata, setTeamVenueMetadata] = useState(null);
   const [teamVenueState, setTeamVenueState] = useState('idle');
   const [liveTeamError,setLiveTeamError]=useState(false);
@@ -878,6 +885,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       hitters,
       pitchers,
       getTeamBattedBallsFn: getTeamBattedBalls,
+      getTeamPitchArsenalFn: getTeamPitchArsenal,
       saveCacheFn: saveTeamSavantCache,
     }).then(({ snapshot, source }) => {
       if (!alive) return;
@@ -945,6 +953,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     let alive = true;
     const cached = readTeamSavantSummaryCache(teamBase?.abbr, CURRENT_SEASON);
     if (cached?.data) setTeamSavantData(cached.data);
+    if (teamSavantState === 'loading' || teamBattedBallRows.length) {
+      return () => { alive = false; };
+    }
     if (cached && !shouldRefreshDailyCache(cached)) {
       return () => { alive = false; };
     }
@@ -955,7 +966,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive && !cached?.data) setTeamSavantData({ status:'upstream-unavailable', source:'Baseball Savant', retrievedAt:new Date().toISOString() });
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr]);
+  }, [teamBase?.abbr, teamSavantState, teamBattedBallRows.length]);
 
   const rosterInsightKey = useMemo(() => JSON.stringify({
     team: { name:team.name, abbr:team.abbr, w:team.w, l:team.l, pct:team.pct, rs:team.rs, ra:team.ra, ops:team.ops, hr:team.hr, era:team.era, whip:team.whip, k:team.k, sb:team.sb },
