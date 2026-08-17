@@ -206,3 +206,10 @@
 - [x] Add regression coverage for the new Players and Intelligence metadata states.
 - [x] Run the current 360-test suite with coverage reporting and review file/test distribution; after the shared merge, 101 files and 483 tests passed with V8 coverage.
 - [x] Verify metadata changes and publish a validated checkpoint if implementation is required and passes.
+
+- [x] Add persistent Players Favorites with save, remove, and quick-open profile actions.
+- [x] Add responsive Favorites presentation to the Players landing and selected-profile states.
+- [x] Trace the divisional WAR payload and fix verified division-row normalization/rendering.
+- [x] Preserve an explicit unavailable state when no verified divisional WAR rows exist.
+- [x] Add regression tests for Favorites and verified/unavailable divisional WAR states.
+- [x] Run full validation, review responsive behavior, and publish the update.

@@ -1008,3 +1008,22 @@
   .skip-overview-page .overview-team-metrics > div{min-width:0 !important;width:auto !important;flex:none !important;}
   .skip-overview-page .overview-team-metrics > div:nth-child(n+6){display:none;}
 }
+
+/* Players Favorites: browser-local quick access, responsive by design. */
+.skip-player-favorites { margin-bottom:18px; padding:12px; border:0.5px solid var(--border); border-radius:8px; background:var(--surface2); }
+.skip-player-favorites-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.skip-player-favorites-title { color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.skip-player-favorites-caption, .skip-player-favorites-empty { color:var(--text3); font-family:'Plus Jakarta Sans',sans-serif; font-size:10px; line-height:1.45; }
+.skip-player-favorites-count { color:var(--amber); font-family:'DM Mono',monospace; font-size:10px; font-weight:700; white-space:nowrap; }
+.skip-player-favorites-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:7px; }
+.skip-player-favorite-row { display:flex; align-items:center; min-width:0; gap:8px; padding:7px; border:0.5px solid var(--border-light); border-radius:7px; background:var(--surface); }
+.skip-player-favorite-open { display:flex; align-items:center; min-width:0; flex:1; gap:8px; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; text-align:left; }
+.skip-player-favorite-copy { display:flex; min-width:0; flex:1; flex-direction:column; gap:2px; }
+.skip-player-favorite-copy strong { overflow:hidden; color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; font-size:10.5px; text-overflow:ellipsis; white-space:nowrap; }
+.skip-player-favorite-copy small { color:var(--text3); font-family:'DM Mono',monospace; font-size:9px; }
+.skip-player-favorite-remove { flex-shrink:0; padding:4px 6px; border:0.5px solid var(--border); border-radius:4px; background:transparent; color:var(--text3); cursor:pointer; font-family:'DM Mono',monospace; font-size:8px; }
+.skip-player-favorite-remove:hover, .skip-player-favorite-remove:focus-visible { border-color:var(--rust); color:var(--rust); }
+@media (max-width:640px) {
+  .skip-player-favorites-list { grid-template-columns:1fr; }
+  .skip-player-favorite-row { padding:8px; }
+}

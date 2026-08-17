@@ -1966,6 +1966,19 @@ export async function getFirstRoundResults(year) {
   return { ...rest, picks: picks.filter(p => p.round === '1' || p.round === '1C') };
 }
 
+const TEAM_NAME_ALIASES = {
+  ath:'athletics', ari:'arizona diamondbacks', az:'arizona diamondbacks', atl:'atlanta braves', bal:'baltimore orioles', bos:'boston red sox', chc:'chicago cubs', cws:'chicago white sox',
+  cle:'cleveland guardians', col:'colorado rockies', det:'detroit tigers', hou:'houston astros', kc:'kansas city royals', laa:'los angeles angels', lad:'los angeles dodgers', mia:'miami marlins', mil:'milwaukee brewers', min:'minnesota twins',
+  nyy:'new york yankees', nym:'new york mets', oak:'athletics', phi:'philadelphia phillies', pit:'pittsburgh pirates', sd:'san diego padres', sdp:'san diego padres', sea:'seattle mariners', sf:'san francisco giants', sfg:'san francisco giants', stl:'st louis cardinals', tb:'tampa bay rays', tex:'texas rangers', tor:'toronto blue jays', wsh:'washington nationals', was:'washington nationals',
+};
+function canonicalTeamName(value) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[.'’]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  return TEAM_NAME_ALIASES[normalized] || normalized.replace(/^la dodgers$/, 'los angeles dodgers').replace(/^sf giants$/, 'san francisco giants').replace(/^ny mets$/, 'new york mets').replace(/^ny yankees$/, 'new york yankees').replace(/^sd padres$/, 'san diego padres');
+}
+export function normalizeFanGraphsTeamName(value) {
+  return canonicalTeamName(value);
+}
+
 export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
     const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
@@ -1973,11 +1986,12 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     const url = `/api/fangraphs-models?${params.toString()}`;
     const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
     const teams = data?.teams || [];
-    const selected = teams.find(row => String(row.team).toLowerCase() === String(teamName).toLowerCase());
+    const selected = teams.find(row => canonicalTeamName(row.team) === canonicalTeamName(teamName));
     let divisionAverageWAR = null;
     let divisionTeams = [];
     if (divisionTeamNames.length && teams.length) {
-      const divRows = teams.filter(row => divisionTeamNames.some(name => String(name).toLowerCase() === String(row.team).toLowerCase()) && row.totalWAR != null);
+      const divisionKeys = new Set(divisionTeamNames.map(canonicalTeamName));
+      const divRows = teams.filter(row => divisionKeys.has(canonicalTeamName(row.team)) && row.totalWAR != null);
       divisionTeams = divRows.map(row => ({
         team: row.team,
         totalWAR: row.totalWAR ?? null,

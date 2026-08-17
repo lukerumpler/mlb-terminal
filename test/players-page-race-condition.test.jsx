@@ -2,7 +2,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react';
 import userEvent from "@testing-library/user-event";
 import { apiUrl } from "../client/src/lib/apiOrigin.js";
 
@@ -268,6 +268,24 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(css).toContain(
       ".skip-player-page .skip-panel { border-radius:7px !important;"
     );
+  });
+
+  it("saves, restores, and removes a favorite player profile", async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem("skip-player-favorites:v1");
+    loadFullPlayer.mockResolvedValue(mockPlayer(592450, "Aaron Judge"));
+    render(<PlayersPage />);
+    await user.click(screen.getByRole("button", { name: /Aaron Judge/ }));
+    expect(await screen.findByRole("button", { name: /Add Aaron Judge to favorites/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Add Aaron Judge to favorites/i }));
+    expect(JSON.parse(localStorage.getItem("skip-player-favorites:v1"))).toEqual([expect.objectContaining({ id:592450, fullName:"Aaron Judge" })]);
+
+    cleanup();
+    render(<PlayersPage />);
+    const favorites = screen.getByRole("region", { name: "Favorite players" });
+    expect(favorites).toHaveTextContent("Aaron Judge");
+    await user.click(within(favorites).getByRole("button", { name: /Remove Aaron Judge from favorites/i }));
+    expect(favorites).toHaveTextContent("No favorite players yet");
   });
 
   it("shows a page-shaped Player Profile skeleton while the selected player is loading", async () => {
