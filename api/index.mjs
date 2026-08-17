@@ -4825,10 +4825,21 @@ async function createApp({
 
 // server/vercel.ts
 var appPromise = createApp();
+function normalizeServerlessRequestUrl(req) {
+  const rawUrl = req.url;
+  if (!/^https?:\/\//i.test(rawUrl)) return;
+  try {
+    const parsed = new URL(rawUrl);
+    req.url = `${parsed.pathname}${parsed.search}`;
+  } catch {
+  }
+}
 async function handler11(req, res) {
+  normalizeServerlessRequestUrl(req);
   const app = await appPromise;
   return app(req, res);
 }
 export {
-  handler11 as default
+  handler11 as default,
+  normalizeServerlessRequestUrl
 };

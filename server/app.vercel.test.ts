@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
+import { normalizeServerlessRequestUrl } from "./vercel";
 
 const servers: Server[] = [];
 
@@ -27,6 +28,24 @@ async function startTestServer() {
 }
 
 describe("Vercel-compatible API app", () => {
+  it("normalizes absolute serverless URLs before Express parses the request", () => {
+    const request = {
+      url: "https://mlb-terminal.vercel.app/api/health?source=serverless",
+    };
+
+    normalizeServerlessRequestUrl(request as never);
+
+    expect(request.url).toBe("/api/health?source=serverless");
+  });
+
+  it("leaves standard relative API URLs unchanged", () => {
+    const request = { url: "/api/health?source=browser" };
+
+    normalizeServerlessRequestUrl(request as never);
+
+    expect(request.url).toBe("/api/health?source=browser");
+  });
+
   it("serves a health response without starting a listener in the module", async () => {
     const baseUrl = await startTestServer();
     const response = await fetch(`${baseUrl}/api/health`);
