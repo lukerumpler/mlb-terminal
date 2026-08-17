@@ -15,3 +15,13 @@ After adding the `/api/:path*` rewrite to `/api/index` and redeploying preview `
 Vercel runtime logs identified `ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/server/app' imported from /var/task/api/index.js`. The original TypeScript function entry was emitted with an unresolved source import rather than a deployable bundle.
 
 The repair replaces that entry with a production-build step that bundles `server/vercel.ts` (an API-only Express entrypoint) into `api/index.mjs`. A local HTTP smoke harness imported the generated bundle and verified `GET /api/health` returned `200 {"ok":true,"service":"skip-baseball-api"}`. The OAuth initialization warning during this local probe reflects an intentionally absent OAuth environment variable and did not prevent API initialization or the successful health response.
+
+## Bundled-entry retest
+
+Preview `dpl_2FdFZikj3oRq8ChGxQ8GMy4zZjJS` reached `READY`, but `GET /api/health` returned Vercel `500 FUNCTION_INVOCATION_FAILED`. Because this lightweight endpoint does not contact a provider, the failure remains an application-function initialization defect rather than a data-provider, registry, or rate-limiter condition. Runtime logs for this deployment are required before further changes.
+
+## API-only bundle correction
+
+The final preview’s runtime logs showed that the health request eagerly loaded Vite, which attempted to load the unavailable optional native package `@rollup/rollup-linux-x64-gnu`. `server/app.ts` now imports the Vite/rollup frontend helper only inside the `serveFrontend` branch. The Vercel handler creates the app with `serveFrontend=false`, so this dependency is not loaded on API requests.
+
+A clean `pnpm build`, `pnpm check`, and the generated-bundle HTTP health probe all passed locally after the change. The remaining external verification is a replacement Vercel preview followed by the MLB, identity, intelligence, and UI smoke paths.

@@ -6,7 +6,6 @@ import { registerStorageProxy } from "./_core/storageProxy";
 import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerLegacyApiRoutes, legacyApiErrorHandler } from "./api/routes";
-import { serveStatic, setupVite } from "./_core/vite";
 import { scheduledSavantRefresh } from "./api/scheduled-savant-refresh";
 
 export type CreateAppOptions = {
@@ -53,6 +52,9 @@ export async function createApp({
         "A Vite HTTP server is required when serveFrontend is enabled"
       );
     }
+    // Keep Vite out of API-only serverless bundles. The Vercel handler calls
+    // createApp with serveFrontend=false and must not load Rollup at runtime.
+    const { serveStatic, setupVite } = await import("./_core/vite");
     if (process.env.NODE_ENV === "development") {
       await setupVite(app, viteServer);
     } else {
