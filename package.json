@@ -9,9 +9,12 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "lint": "prettier --check vitest.config.ts client/src/components/OverviewCharts.jsx server/api/routes.ts server/api/routes.test.ts server/api/shared.test.ts package.json",
+    "lint": "prettier --check vitest.config.ts client/src/components/OverviewCharts.jsx server/api/routes.ts server/api/routes.test.ts server/api/shared.test.ts scripts/release-shared-comparison.mjs scripts/provider-health-smoke.mjs test/release-gate-tools.test.js release/release-gate-baseline.json docs/RELEASE_WORKFLOW.md package.json",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "release:compare": "node scripts/release-shared-comparison.mjs",
+    "release:providers": "node scripts/provider-health-smoke.mjs",
+    "release:gate": "pnpm release:compare && pnpm release:providers && pnpm check && pnpm lint && pnpm test && pnpm build",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
