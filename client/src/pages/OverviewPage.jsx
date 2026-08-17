@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { TEAMS, SEASON as CURRENT_SEASON, sortTeamsByLeagueDivisionName } from '../constants/data.js';
+import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
+import { computeFV, fvBaselines } from '../engine/skip.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
@@ -219,6 +220,28 @@ export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
     activePlayers: hitters.length || pitchers.length ? hitters.length + pitchers.length : null,
     positions: [...byPosition.values()].sort((a, b) => b.players - a.players || a.position.localeCompare(b.position)),
   };
+}
+
+export function deriveFrontOfficeCoverageGrades({ players = { hitting:[], pitching:[] }, liveDataMode = 'unavailable', teamAbbr = '' } = {}) {
+  const rollups = deriveTeamPlayerRollups(players);
+  const verifiedRoster = (liveDataMode === 'live' || liveDataMode === 'cached') && rollups.activePlayers != null;
+  const positions = rollups.positions || [];
+  const fieldingPositions = [...new Set(positions.map(row => String(row.position || '').toUpperCase()).filter(position => position && !['P','SP','RP','DH','TWP'].includes(position)))];
+  const defensePct = verifiedRoster && fieldingPositions.length
+    ? Math.min(100, Math.round(fieldingPositions.length / 8 * 100))
+    : null;
+  const depthPct = verifiedRoster && positions.length
+    ? Math.min(100, Math.round(((Math.min(rollups.activePlayers, 26) / 26) * 65 + (Math.min(positions.length, 9) / 9) * 35) * 100))
+    : null;
+  const teamProspects = [
+    ...PROSPECT_BATTERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ prospect, isPitcher:false })),
+    ...PROSPECT_PITCHERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ prospect, isPitcher:true })),
+  ];
+  const hitterBaselines = fvBaselines(PROSPECT_BATTERS, false);
+  const pitcherBaselines = fvBaselines(PROSPECT_PITCHERS, true);
+  const prospectFvs = teamProspects.map(({ prospect, isPitcher }) => computeFV(prospect, isPitcher ? pitcherBaselines : hitterBaselines, isPitcher)).filter(value => value != null).sort((a,b) => b-a).slice(0, 5);
+  const futureValuePct = prospectFvs.length ? Math.round(((prospectFvs.reduce((sum, value) => sum + value, 0) / prospectFvs.length) - 35) / 35 * 100) : null;
+  return { defensePct, depthPct, futureValuePct, fieldingPositions:fieldingPositions.length, activePlayers:rollups.activePlayers, prospectCount:prospectFvs.length };
 }
 function rankAmong(teams, key, asc=false) {
   const vals=Object.values(teams).map(t=>t[key]).sort((a,b)=>asc?a-b:b-a);
@@ -1436,6 +1459,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const offPct = rankValue(team.ops, hittingRecords, ['ops']);
     const speedPct = rankValue(team.sb, hittingRecords, ['stolenBases']);
     const pitchingPct = rankValue(team.era, pitchingRecords, ['era'], false);
+    const frontOfficeCoverage = deriveFrontOfficeCoverageGrades({ players:liveTeamPlayers, liveDataMode:liveTeamDataMode, teamAbbr:team.abbr });
+    const { defensePct, depthPct, futureValuePct, fieldingPositions, activePlayers, prospectCount } = frontOfficeCoverage;
     const divName = team.div || 'League';
     const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
       const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
@@ -1448,23 +1473,24 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {label:'Team ERA',     rank:rankValue(team.era, pitchingRecords, ['era'], false), val:formatTeamMetric(team.era,2)},
       {label:'WHIP',         rank:rankValue(team.whip, pitchingRecords, ['whip'], false), val:formatTeamMetric(team.whip,3)},
       {label:'Strikeouts',   rank:rankValue(team.k, pitchingRecords, ['strikeOuts']), val:team.k},
-      {label:'Defense (OAA)',rank:null,val:'—'},
+      {label:'Defense coverage',rank:defensePct,val:defensePct == null ? '—' : `${defensePct}%`},
       {label:'Baserunning (BsR)',rank:null,val:'—'},
     ];
     const pctBars=[
       {lbl:'Offense', pct:offPct, color:C.amber},
       {lbl:'Pitching', pct:pitchingPct, color:C.rust},
-      {lbl:'Defense', pct:null, color:C.teal},
+      {lbl:'Defense', pct:defensePct, color:C.teal},
       {lbl:'Baserunning', pct:speedPct, color:C.navy},
     ];
-    const available = [offPct, pitchingPct, speedPct].filter(v => v != null);
+    const available = [offPct, pitchingPct, speedPct, defensePct, depthPct, futureValuePct].filter(v => v != null);
     const overallPct = available.length ? Math.round(available.reduce((sum, value) => sum + value, 0) / available.length) : null;
     return {
       offenseData:liveRadar.offenseData,strengthData:liveRadar.strengthData,radarSource:liveRadar.source,standings,leagueRanks,pctBars,divName,
-      og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:'—',bg:pctToGrade(speedPct),
+      og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:pctToGrade(defensePct),bg:pctToGrade(speedPct),depthGrade:pctToGrade(depthPct),futureValueGrade:pctToGrade(futureValuePct),
+      defensePct,depthPct,futureValuePct,fieldingPositions,activePlayers,prospectCount,
       overall:pctToGrade(overallPct),
     };
-  },[team, liveTeamData, rd]);
+  },[team, liveTeamData, liveTeamDataMode, teamRollups, rd]);
 
   // These only depend on `team`, but were previously called directly in the
   // render body — every unrelated state change on this page (e.g. clicking
@@ -1733,13 +1759,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
-                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth','—',C.slate],['Future Value','—',C.purple]].map(([lbl,val,color])=>(
+                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth',D.depthGrade,C.slate],['Future Value',D.futureValueGrade,C.purple]].map(([lbl,val,color])=>(
                   <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>
                     <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
                     <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
                   </div>
                 ))}
               </div>
+              <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Defense and Depth are calculated from verified active-roster position coverage. Future Value is calculated from the current SKIP prospect snapshot; neither substitutes for Statcast OAA or a live external prospect provider.</div>
             </div>
           </div>
         </Panel>
@@ -1954,7 +1981,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div style={px({fontSize:52,fontWeight:900,color:C.amber,lineHeight:1})}>{D.overall}</div>
               <div style={sans({fontSize:11,color:C.text2,marginTop:4,letterSpacing:'.04em'})}>Overall Team Rating</div>
               <div style={{marginTop:12,borderTop:`0.5px solid ${C.borderLight}`,paddingTop:10,display:'flex',flexDirection:'column',gap:4}}>
-                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,null],['Baserunning',D.bg,D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth','—',null],['Future Value','—',null]].map(([l,g,n])=>(
+                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,D.defensePct],['Baserunning',D.bg,D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth',D.depthGrade,D.depthPct],['Future Value',D.futureValueGrade,D.futureValuePct]].map(([l,g,n])=>(
                   <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px'}}>
                     <span style={sans({fontSize:11,color:C.text2})}>{l}</span>
                     <div style={{display:'flex',gap:8,alignItems:'center'}}>

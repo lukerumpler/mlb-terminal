@@ -219,3 +219,9 @@
 - [x] Preserve provider-first values and explicit unavailable states when verified inputs are insufficient.
 - [x] Add regression coverage for provider, calculated, and unavailable metric paths.
 - [x] Run validation, review responsive Overview labels, and publish the update.
+
+- [x] Inspect Front Office Evaluation grade inputs for Defense, Depth, and Future Value.
+- [x] Calculate and label Defense, Depth, and Future Value grades from verified team, roster, and prospect inputs where supported.
+- [x] Preserve explicit unavailable labels when a required verified input is absent.
+- [x] Add regression tests for populated and unavailable Front Office grades.
+- [x] Run validation, review the rating strip, and publish the repair.
