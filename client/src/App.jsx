@@ -27,6 +27,7 @@ const SettingsPage     = lazy(() => import('./pages/OtherPages.jsx').then(m => (
 const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
+const UptimeMonitorPage = lazy(() => import('./pages/UptimeMonitorPage.jsx'));
 
 function PageLoading() {
   return (
@@ -79,6 +80,7 @@ const TABS = [
   { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
   { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
   { key:'alerts',       icon:'🔔', label:'Alerts',         section:'System' },
+  { key:'uptime',       icon:'⌁', label:'Uptime Monitor', section:'System' },
 ];
 
 const WORKSPACE_GROUPS = [
@@ -127,6 +129,7 @@ const WORKSPACE_GROUPS = [
     tabs:[
       { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
       { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
+      { key:'uptime', label:'Uptime Monitor', description:'Production endpoint health and latency history' },
     ],
   },
 ];
@@ -465,10 +468,16 @@ export default function App() {
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
               {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
+<<<<<<< HEAD
               {tab === 'alerts'       && <AlertsWorkspacePanel />}
               </Suspense>
             </PageErrorBoundary>
           </div>
+=======
+              {tab === 'uptime'       && <UptimeMonitorPage />}
+            </Suspense>
+          </PageErrorBoundary>
+>>>>>>> 209b88e (Add durable uptime monitor feature branch)
         </div>
 
         <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />

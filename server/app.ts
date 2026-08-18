@@ -9,6 +9,7 @@ import { registerLegacyApiRoutes, legacyApiErrorHandler } from "./api/routes";
 import { serveStatic, setupVite } from "./_core/vite";
 import { scheduledSavantRefresh } from "./api/scheduled-savant-refresh";
 import { scheduledCacheTelemetryCleanup } from "./api/scheduled-cache-telemetry-cleanup";
+import { registerUptimeMonitorRoutes } from "./api/uptime-monitor";
 
 export type CreateAppOptions = {
   serveFrontend?: boolean;
@@ -35,6 +36,7 @@ export async function createApp({
 
   app.post("/api/scheduled/refresh-savant", scheduledSavantRefresh);
   app.post("/api/scheduled/cleanup-cache-telemetry", scheduledCacheTelemetryCleanup);
+  registerUptimeMonitorRoutes(app);
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);

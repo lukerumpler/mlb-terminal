@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUptimeMonitorCheck, InsertUser, UptimeMonitorCheck, uptimeMonitorChecks, uptimeMonitorSchedules, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -93,4 +93,23 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function recordUptimeMonitorCheck(check: InsertUptimeMonitorCheck): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable for uptime-monitor persistence");
+  await db.insert(uptimeMonitorChecks).values(check).onDuplicateKeyUpdate({
+    set: { statusCode: check.statusCode, latencyMs: check.latencyMs, passed: check.passed, checkedAt: check.checkedAt },
+  });
+}
+
+export async function listUptimeMonitorChecksSince(since: Date): Promise<UptimeMonitorCheck[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable for uptime-monitor queries");
+  return db.select().from(uptimeMonitorChecks).where(gte(uptimeMonitorChecks.checkedAt, since)).orderBy(desc(uptimeMonitorChecks.checkedAt));
+}
+
+export async function getUptimeMonitorScheduleByTaskUid(taskUid: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable for uptime-monitor schedule lookup");
+  const rows = await db.select().from(uptimeMonitorSchedules).where(eq(uptimeMonitorSchedules.scheduleCronTaskUid, taskUid)).limit(1);
+  return rows[0];
+}

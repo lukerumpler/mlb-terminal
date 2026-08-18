@@ -1,10 +1,13 @@
 import {
+  boolean,
+  index,
   int,
   mysqlEnum,
   mysqlTable,
   longtext,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
 
@@ -67,3 +70,38 @@ export const apiCacheTelemetry = mysqlTable("apiCacheTelemetry", {
 export type ApiCacheTelemetry = typeof apiCacheTelemetry.$inferSelect;
 export type InsertApiCacheTelemetry = typeof apiCacheTelemetry.$inferInsert;
 
+/** UTC-backed observations for the dedicated uptime-monitor feature branch. */
+export const uptimeMonitorChecks = mysqlTable(
+  "uptime_monitor_checks",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    endpoint: varchar("endpoint", { length: 512 }).notNull(),
+    statusCode: int("status_code").notNull(),
+    latencyMs: int("latency_ms").notNull(),
+    passed: boolean("passed").notNull(),
+    checkedAt: timestamp("checked_at").notNull(),
+    runKey: varchar("run_key", { length: 96 }).notNull(),
+  },
+  table => [
+    index("uptime_monitor_endpoint_checked_idx").on(table.endpoint, table.checkedAt),
+    uniqueIndex("uptime_monitor_endpoint_run_idx").on(table.endpoint, table.runKey),
+  ]
+);
+
+/** The scheduled callback is authorized exclusively by its platform task identity. */
+export const uptimeMonitorSchedules = mysqlTable(
+  "uptime_monitor_schedules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 96 }).notNull().unique(),
+    scheduleCronTaskUid: varchar("schedule_cron_task_uid", { length: 65 }),
+    cronExpression: varchar("cron_expression", { length: 64 }).notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("uptime_monitor_task_uid_idx").on(table.scheduleCronTaskUid)]
+);
+
+export type UptimeMonitorCheck = typeof uptimeMonitorChecks.$inferSelect;
+export type InsertUptimeMonitorCheck = typeof uptimeMonitorChecks.$inferInsert;

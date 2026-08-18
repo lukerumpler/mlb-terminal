@@ -1707,6 +1707,24 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
+      <Panel title="Uptime Monitor Configuration" badge="Dedicated branch" accent={C.teal}>
+        <div style={{ padding:'10px 14px 4px', ...sans({ fontSize:11, color:C.text3, lineHeight:1.5 }) }}>
+          Four fixed production targets are recorded with explicit pass/fail status, millisecond latency, and UTC timestamps. The project-owned daily job runs at 09:00 UTC after deployment and schedule activation.
+        </div>
+        {[
+          ['MLB API health','https://mlb-terminal.vercel.app/api/health'],
+          ['MLB Terminal','https://mlb-terminal.vercel.app/'],
+          ['SKIP platform','https://skipbasebal-mm6hz9ps.manus.space'],
+          ['lukerumpler.com','https://lukerumpler.com'],
+        ].map(([label, endpoint], index, rows) => <div key={endpoint} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'8px 14px', borderBottom:index < rows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none' }}>
+          <span style={sans({ fontSize:11, fontWeight:700, color:C.text2 })}>{label}</span>
+          <span style={px({ fontSize:9, color:C.text3, textAlign:'right', overflowWrap:'anywhere' })}>{endpoint}</span>
+        </div>)}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'10px 14px', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2 }}>
+          <span style={px({ fontSize:9.5, color:C.teal, fontWeight:800, letterSpacing:'.05em' })}>DAILY · 09:00 UTC · 2XX–3XX PASS</span>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'uptime' } }))} style={{ padding:'6px 9px', border:`1px solid ${C.tealMid}`, borderRadius:6, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9.5, fontWeight:800 }) }}>Open Monitor</button>
+        </div>
+      </Panel>
       <Panel title="Roster Insight Defaults" accent={C.teal}>
         <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>
