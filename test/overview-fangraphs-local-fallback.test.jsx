@@ -86,8 +86,7 @@ it('uses clearly labeled MLB standings odds and WAR proxies only when FanGraphs 
     expect(screen.getAllByText('91.2').length).toBeGreaterThan(0);
     expect(screen.getAllByText('70.8').length).toBeGreaterThan(0);
     expect(screen.getByText(/calculated playoff proxy/i)).toBeInTheDocument();
-    expect(screen.getByText(/pythagorean W–L uses runs scored and runs allowed/i)).toBeInTheDocument();
-    expect(screen.getByText(/not FanGraphs WAR/i)).toBeInTheDocument();
+    expect(screen.getByText(/MLB calculated · pace: record · pythag: RS\/RA · odds\/WAR: proxies/i)).toBeInTheDocument();
   });
 
   it('fills blank headline standings values from the verified backend official-standings response', async () => {
@@ -104,6 +103,6 @@ it('uses clearly labeled MLB standings odds and WAR proxies only when FanGraphs 
 
     expect(await screen.findByText('81–45')).toBeInTheDocument();
     expect(screen.getByText('700')).toBeInTheDocument();
-    expect(screen.getByTestId('calculated-standings-headline-note')).toHaveTextContent(/verified standings values, not projections/i);
+    expect(screen.getByTestId('calculated-standings-headline-note')).toHaveTextContent(/verified, not projected/i);
   });
 });

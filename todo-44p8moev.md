@@ -268,3 +268,8 @@
 - [x] Apply targeted dashboard reliability and performance optimizations without suppressing source-gap states.
 - [x] Add regression coverage for the comparison, request bounds, and optimized fallback behavior.
 - [x] Run full validation, review desktop/mobile dashboard performance, and publish.
+
+- [x] Inspect dashboard explanation blocks and identify redundant copy.
+- [x] Remove unnecessary explanations while preserving short source and calculation labels.
+- [x] Add or update concise-copy regressions and review responsive layout.
+- [x] Validate and publish the streamlined dashboard copy.

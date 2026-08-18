@@ -321,6 +321,6 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     expect(overviewSource).toContain('aria-label="Exact divisional WAR values"');
     expect(overviewSource).toContain("fanGraphsMetricStatus");
     expect(overviewSource).toContain("does not verify this missing metric");
-    expect(overviewSource).toContain("provider currently blocked");
+    expect(overviewSource).toContain("Provider blocked · no verified rows");
   });
 });

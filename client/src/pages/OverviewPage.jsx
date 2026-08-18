@@ -1751,7 +1751,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
           ))}
         </div>
-        {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>Official MLB standings fallback via SKIP backend · W–L, win percentage, runs, and run differential are verified standings values, not projections.</div>}
+        {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
       <nav className="skip-overview-view-rail" aria-label="Team Overview views">
@@ -1812,7 +1812,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
-          <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Verified cached divisional WAR snapshot · provider currently blocked' : 'FanGraphs provider blocked · no verified divisional rows') : 'Verified total WAR by division · select or hover a bar for the exact component breakdown'}</span>
+          <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Cached verified rows · provider blocked' : 'Provider blocked · no verified rows') : 'Verified WAR by division'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
         <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
@@ -1830,7 +1830,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </tr>)}</tbody>
           </table>
         </div>}
-        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? `FanGraphs is currently blocking automated requests. ${divisionWarData.length ? 'Shown rows are verified cached historical values, not live updates.' : 'No cached divisional rows are available, so this comparison remains unavailable.'}` : divisionWarData.length ? `Total WAR labels are visible on each bar; ${team.abbr} is highlighted. Offensive and pitching components are shown only when returned by FanGraphs.` : 'FanGraphs did not return verified division rows for this view. SKIP does not synthesize competing-team WAR from the selected team’s calculated proxy.'} Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Historical cache; not live.' : 'No cached divisional WAR available.') : divisionWarData.length ? `${team.abbr} highlighted · missing components shown as —.` : 'No verified divisional WAR available.'}</div>
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:8}}>
@@ -1840,7 +1840,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             return <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={metricStatus} title={metricTitle} /></div></div>;
           })}
         </div>
-        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || playoffOddsIsCalculated || teamWarIsCalculated) ? 'Verified MLB standings fallback: win pace W–L uses current record pace; pythagorean W–L uses runs scored and runs allowed with exponent 1.83; playoff odds are a calculated proxy, not official or FanGraphs odds; WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
+        <div title="Playoff odds are a calculated proxy, not official or FanGraphs odds. WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || playoffOddsIsCalculated || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · odds/WAR: proxies' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
       </Panel>
       </>}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>

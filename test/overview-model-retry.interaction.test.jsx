@@ -382,7 +382,7 @@ describe("Team Overview model source and retry interaction", () => {
 
     await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
-    expect(screen.getByText(/LAD is highlighted/i)).toBeInTheDocument();
+    expect(screen.getByText(/LAD highlighted/i)).toBeInTheDocument();
     const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
     expect(exactValuesTable).toHaveTextContent("LAD");
     expect(exactValuesTable).toHaveTextContent("+31.4");
