@@ -269,6 +269,37 @@ describe("Team Overview model source and retry interaction", () => {
     expect(sortSelect).toHaveValue("recentOps");
   });
 
+  it("filters the roster table by player name and reverses the active metric sort", async () => {
+    const user = userEvent.setup();
+    saveTeamPlayersCache(119, 2026, {
+      hitting: [
+        { id: 1, name: "Sample Hitter", position: "CF", stat: { ops: 0.912, plateAppearances: 180 } },
+        { id: 2, name: "Other Batter", position: "RF", stat: { ops: 0.801, plateAppearances: 150 } },
+      ],
+      pitching: [],
+    });
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+
+    const table = await screen.findByRole("table", {
+      name: "Roster insights sorted by OPS",
+    });
+    expect(table).toBeInTheDocument();
+
+    const search = screen.getByRole("textbox", {
+      name: "Filter roster insights by player name",
+    });
+    await user.type(search, "hitter");
+    expect(screen.getByRole("rowheader", { name: "Sample Hitter" })).toBeInTheDocument();
+
+    const direction = screen.getByRole("button", {
+      name: /Reverse roster insights sort direction; currently descending/i,
+    });
+    await user.click(direction);
+    expect(direction).toHaveTextContent("ASC ↑");
+    expect(direction).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);

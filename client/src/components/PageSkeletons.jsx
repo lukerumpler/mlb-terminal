@@ -67,6 +67,32 @@ export function TeamOverviewSkeleton() {
   );
 }
 
+export function RosterInsightsTableSkeleton() {
+  return (
+    <div className="skip-roster-insights-skeleton" role="status" aria-live="polite" aria-label="Loading roster insight table">
+      <div className="skip-roster-insights-skeleton-controls">
+        <SkeletonLine width={164} height={30} />
+        <SkeletonLine width={112} height={30} />
+        <SkeletonLine width={86} height={30} />
+      </div>
+      <div className="skip-roster-insights-skeleton-table">
+        <div className="skip-roster-insights-skeleton-row is-header">
+          {Array.from({ length: 4 }, (_, index) => <SkeletonLine key={index} width={index === 0 ? '54%' : '48%'} height={8} />)}
+        </div>
+        {Array.from({ length: 6 }, (_, index) => (
+          <div className="skip-roster-insights-skeleton-row" key={index}>
+            <SkeletonLine width={index % 2 ? '64%' : '72%'} height={11} />
+            <SkeletonLine width="34%" height={10} />
+            <SkeletonLine width="46%" height={10} />
+            <SkeletonLine width="42%" height={11} />
+          </div>
+        ))}
+      </div>
+      <span className="sr-only">Loading verified roster statistics and player metrics.</span>
+    </div>
+  );
+}
+
 export function PlayerProfileSkeleton() {
   return (
     <div className="skip-profile-skeleton" role="status" aria-live="polite" aria-label="Loading player profile" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

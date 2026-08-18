@@ -4,7 +4,7 @@ import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, M
 import { computeFV, fvBaselines } from '../engine/skip.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
-import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
+import { RosterInsightsTableSkeleton, TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -936,15 +936,18 @@ export function formatRosterSampleLabel(group, minimum) {
   return minimum > 0 ? `${minimum} ${unit}+` : `Any ${unit}`;
 }
 
-export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, minPitchingIp = 0) {
+export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, minPitchingIp = 0, sortDirection = null, playerQuery = '') {
   const option = ROSTER_SORT_OPTIONS.find(item => item.key === sortKey) || ROSTER_SORT_OPTIONS[0];
   const selectedPositions = positions === 'all' || !Array.isArray(positions) ? (positions === 'all' ? [] : [positions]) : positions;
+  const normalizedQuery = String(playerQuery || '').trim().toLowerCase();
+  const direction = sortDirection === 'asc' || sortDirection === 'desc' ? sortDirection : option.direction;
   return [
     ...(players?.hitting || []).map(row => ({ ...row, group:'hitting' })),
     ...(players?.pitching || []).map(row => ({ ...row, group:'pitching' })),
   ].filter(row => {
     if (!row?.stat || row.group !== option.group) return false;
     if (selectedPositions.length && !selectedPositions.includes(row.position)) return false;
+    if (normalizedQuery && !`${row.name || ''} ${row.position || ''}`.toLowerCase().includes(normalizedQuery)) return false;
     const sample = rosterStatValue(row, row.group === 'hitting' ? 'pa' : 'ip');
     const minimum = row.group === 'hitting' ? Number(minBattingPa) : Number(minPitchingIp);
     return minimum === 0 || (sample != null && sample >= minimum);
@@ -954,7 +957,7 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
       if (av == null && bv == null) return a.name.localeCompare(b.name);
       if (av == null) return 1;
       if (bv == null) return -1;
-      return option.direction === 'asc' ? av - bv : bv - av;
+      return direction === 'asc' ? av - bv : bv - av;
     });
 }
 
@@ -1069,6 +1072,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamPlayersError, setTeamPlayersError] = useState(false);
   const [selectedRosterPositions, setSelectedRosterPositions] = useState([]);
   const [rosterSort, setRosterSort] = useState('ops');
+  const [rosterSortDirection, setRosterSortDirection] = useState('desc');
+  const [rosterPlayerQuery, setRosterPlayerQuery] = useState('');
   const [minBattingPa, setMinBattingPa] = useState(() => Number(rosterDefaults.battingPa) || 0);
   const [minPitchingIp, setMinPitchingIp] = useState(() => Number(rosterDefaults.pitchingIp) || 0);
   const [activeRosterPreset, setActiveRosterPreset] = useState(null);
@@ -1686,11 +1691,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   ].filter(Boolean))].sort(), [liveTeamPlayers]);
   const rosterSortOption = ROSTER_SORT_OPTIONS.find(item => item.key === rosterSort) || ROSTER_SORT_OPTIONS[0];
   const activeMinimum = rosterSortOption.group === 'hitting' ? minBattingPa : minPitchingIp;
-  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp]);
+  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery]);
   const applyRosterPreset = preset => {
     setRosterQuickFilter(null);
     setSelectedRosterPositions(preset.positions);
     setRosterSort(preset.sort);
+    setRosterSortDirection(ROSTER_SORT_OPTIONS.find(option => option.key === preset.sort)?.direction || 'desc');
     setMinBattingPa(preset.minBattingPa);
     setMinPitchingIp(preset.minPitchingIp);
     setActiveRosterPreset(preset.id);
@@ -1700,6 +1706,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setActiveRosterPreset(null);
     setSelectedRosterPositions(filter.positions);
     setRosterSort(filter.sort);
+    setRosterSortDirection(ROSTER_SORT_OPTIONS.find(option => option.key === filter.sort)?.direction || 'desc');
     setMinBattingPa(filter.minBattingPa);
     setMinPitchingIp(filter.minPitchingIp);
   };
@@ -2445,10 +2452,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </fieldset>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Sort by</span>
-            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterSort(e.target.value)}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
+            <select aria-label="Sort roster insights by player statistic" value={rosterSort} onChange={e=>{const nextSort=e.target.value;setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterSort(nextSort);setRosterSortDirection(ROSTER_SORT_OPTIONS.find(option=>option.key===nextSort)?.direction || 'desc')}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
               {ROSTER_SORT_OPTIONS.map(option => <option key={option.key} value={option.key}>{option.label}{option.direction === 'asc' ? ' ↑' : ' ↓'}</option>)}
             </select>
           </label>
+          <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
+            <span>Player</span>
+            <input aria-label="Filter roster insights by player name" value={rosterPlayerQuery} onChange={event=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterPlayerQuery(event.target.value)}} placeholder="Search name or position" style={{height:30,width:152,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}} />
+          </label>
+          <button type="button" aria-label={`Reverse roster insights sort direction; currently ${rosterSortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-pressed={rosterSortDirection === 'asc'} onClick={()=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')}} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{rosterSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
           <label style={{display:'flex',alignItems:'center',gap:6,...sans({fontSize:10,color:C.text2,fontWeight:700})}}>
             <span>Min {rosterSortOption.group === 'hitting' ? 'PA' : 'IP'}</span>
             <select aria-label={`Minimum ${rosterSortOption.group === 'hitting' ? 'plate appearances' : 'innings pitched'}`} value={activeMinimum} onChange={e=>{setActiveRosterPreset(null);setRosterQuickFilter(null);rosterSortOption.group === 'hitting' ? setMinBattingPa(Number(e.target.value)) : setMinPitchingIp(Number(e.target.value))}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10,cursor:'pointer'}}>
@@ -2457,20 +2469,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </label>
           <span style={{marginLeft:'auto',...px({fontSize:9.5,color:C.text4})}}>{filteredRosterRows.length} {filteredRosterRows.length === 1 ? 'player' : 'players'} · {rosterSortOption.label}</span>
         </div>
-        <div className="roster-insight-leaders" style={{padding:'6px 14px 2px',display:'flex',gap:6,flexWrap:'wrap'}}>
-          {filteredRosterRows.slice(0,6).map(row => (
-            <div key={`${row.group}-${row.id}`} style={{minWidth:150,flex:'1 1 150px',padding:'7px 9px',borderRadius:6,background:C.surface2,border:`0.5px solid ${C.borderLight}`}}>
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={sans({fontSize:10.5,fontWeight:800,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})}>{row.name}</span>
-                <span style={{marginLeft:'auto',...px({fontSize:8.5,color:C.text3})}}>{row.position || '—'}</span>
-              </div>
-              <div style={{marginTop:3,...px({fontSize:10,color:C.teal,fontWeight:700})}}>{formatRosterStat(row, rosterSortOption)} {rosterSortOption.label}</div>
-              <div style={{marginTop:2,...px({fontSize:8.5,color:C.text4})}}>Sample: {formatRosterSampleLabel(rosterSortOption.group, activeMinimum)}</div>
-            </div>
-          ))}
-          {teamPlayersLoading && <div role="status" style={sans({fontSize:10,color:C.text3,fontStyle:'italic',padding:'5px 0'})}>Loading roster leaders…</div>}
+        <div className="roster-insight-leaders" style={{padding:'8px 14px 4px'}}>
+          {teamPlayersLoading && <RosterInsightsTableSkeleton />}
+          {!teamPlayersLoading && !teamPlayersError && filteredRosterRows.length > 0 && <div className="skip-roster-insights-table-wrap"><table className="skip-roster-insights-table" aria-label={`Roster insights sorted by ${rosterSortOption.label}`}><thead><tr><th scope="col">Player</th><th scope="col">Pos.</th><th scope="col">Sample</th><th scope="col"><button type="button" onClick={()=>{setActiveRosterPreset(null);setRosterQuickFilter(null);setRosterSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')}} aria-label={`Toggle ${rosterSortOption.label} sort direction`}>{rosterSortOption.label} {rosterSortDirection === 'asc' ? '↑' : '↓'}</button></th></tr></thead><tbody>{filteredRosterRows.map(row => <tr key={`${row.group}-${row.id}`}><th scope="row">{row.name}</th><td>{row.position || '—'}</td><td>{formatRosterSampleLabel(row.group, activeMinimum)}</td><td>{formatRosterStat(row, rosterSortOption)}</td></tr>)}</tbody></table></div>}
           {!teamPlayersLoading && teamPlayersError && <OverviewEmptyState status="Unavailable" message="Roster leader data" detail="The current MLB roster leader feed did not return verified rows." />}
-          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <OverviewEmptyState status="No matching rows" message="Roster leaders" detail="No roster players match the selected positions, stat, and sample threshold." />}
+          {!teamPlayersLoading && !teamPlayersError && !filteredRosterRows.length && <OverviewEmptyState status="No matching rows" message="Roster leaders" detail="No roster players match the selected positions, name search, stat, and sample threshold." />}
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:8}}>
           {[

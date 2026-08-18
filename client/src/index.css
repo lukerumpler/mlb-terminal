@@ -721,6 +721,21 @@
 .skip-overview-skeleton .skip-skeleton-panel,
 .skip-profile-skeleton .skip-skeleton-panel { min-width: 0; }
 .skip-profile-hydration-skeleton { min-width: 0; }
+.skip-roster-insights-skeleton { display:flex; flex-direction:column; gap:8px; min-width:0; padding:2px 0; }
+.skip-roster-insights-skeleton-controls { display:flex; gap:8px; flex-wrap:wrap; }
+.skip-roster-insights-skeleton-table { overflow:hidden; border:1px solid var(--border, #ded8ce); border-radius:8px; background:var(--surface, #fffdf8); }
+.skip-roster-insights-skeleton-row { display:grid; grid-template-columns:minmax(130px, 2fr) minmax(52px, .6fr) minmax(76px, .8fr) minmax(70px, .8fr); gap:10px; align-items:center; min-height:36px; padding:0 10px; border-top:1px solid var(--border-light, #eee9e0); }
+.skip-roster-insights-skeleton-row.is-header { min-height:30px; border-top:0; background:var(--surface2, #f8f4ec); }
+.skip-roster-insights-table-wrap { overflow-x:auto; border:1px solid var(--border, #ded8ce); border-radius:8px; background:var(--surface, #fffdf8); }
+.skip-roster-insights-table { width:100%; min-width:510px; border-collapse:collapse; font:10px/1.25 'Plus Jakarta Sans', sans-serif; color:var(--text, #27231e); }
+.skip-roster-insights-table th, .skip-roster-insights-table td { padding:9px 10px; border-bottom:1px solid var(--border-light, #eee9e0); text-align:left; white-space:nowrap; }
+.skip-roster-insights-table thead { background:var(--surface2, #f8f4ec); }
+.skip-roster-insights-table thead th { color:var(--text3, #777); font:800 8.5px/1 'DM Mono', monospace; letter-spacing:.06em; text-transform:uppercase; }
+.skip-roster-insights-table tbody th { font-weight:800; }
+.skip-roster-insights-table tbody tr:last-child th, .skip-roster-insights-table tbody tr:last-child td { border-bottom:0; }
+.skip-roster-insights-table tbody tr:hover { background:var(--teal-soft, #e9f7f3); }
+.skip-roster-insights-table thead button { border:0; padding:0; background:transparent; color:inherit; cursor:pointer; font:inherit; letter-spacing:inherit; text-transform:inherit; }
+.skip-roster-insights-table thead button:focus-visible { outline:2px solid var(--teal, #168c7a); outline-offset:3px; border-radius:2px; }
 
 @media (max-width: 900px) {
   .skip-overview-skeleton-strip { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
@@ -741,6 +756,7 @@
   .skip-profile-skeleton-grid,
   .skip-profile-skeleton-lower,
   .skip-profile-hydration-grid { grid-template-columns: 1fr !important; }
+  .skip-roster-insights-skeleton-row { grid-template-columns:minmax(104px, 1.7fr) minmax(44px, .6fr) minmax(58px, .7fr) minmax(54px, .7fr); gap:6px; padding:0 8px; }
   .skip-profile-skeleton-hero { align-items: flex-start !important; padding: 12px !important; }
   .skip-profile-skeleton-hero > div:last-child { min-width: 0; }
 }
@@ -748,6 +764,7 @@
 @media (prefers-reduced-motion: reduce) {
   .skip-overview-skeleton [style*="animation"],
   .skip-profile-skeleton [style*="animation"] { animation: none !important; }
+  .skip-roster-insights-skeleton [style*="animation"] { animation: none !important; }
 }
 
 /* Mobile navigation drawer: keep the desktop rail intact while giving small screens a full-label, thumb-friendly menu. */

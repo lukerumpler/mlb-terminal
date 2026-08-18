@@ -2055,7 +2055,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
           Loading verified profile data{switchingPlayerName ? ` for ${switchingPlayerName}` : ''}…
         </div>
       )}
-      {loading && !player && <PlayerProfileSkeleton />}
+      {loading && <PlayerProfileSkeleton />}
       {player?.extrasLoading && <PlayerProfileHydrationSkeleton />}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
@@ -2066,7 +2066,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} />
       )}
 
-      {player && derived && (
+      {player && derived && !loading && (
         <>
           <PlayerProfile player={player} derived={derived} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
