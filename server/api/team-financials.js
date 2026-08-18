@@ -6,7 +6,10 @@
  * parses only the requested club, labels the source, and returns explicit nulls
  * when the upstream page is unavailable or its markup changes.
  */
+import { createHash } from "node:crypto";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { readDurableCache, writeDurableCache } from "../durable-cache";
+import { recordCacheOutcome } from "../cache-health";
 import { getRepeaterTier, CBT_SOURCE_URL } from "../../shared/luxuryTax.js";
 
 const DEFAULT_SEASON = 2026;
@@ -29,6 +32,10 @@ export function __resetTeamFinancialsStateForTests() {
 
 function financialCacheKey(team, season) {
   return `${team}:${season}`;
+}
+
+function durableFinancialCacheKey(team, season) {
+  return `team-financials:${createHash("sha256").update(`${team}:${season}`).digest("hex")}`;
 }
 
 function setFinancialHeaders(res, freshness) {
@@ -260,10 +267,30 @@ export default async function handler(req, res) {
 
   const key = financialCacheKey(team, season);
   const now = Date.now();
-  const cached = financialCache.get(key);
+  let cached = financialCache.get(key);
   if (cached?.freshUntil > now) {
     setFinancialHeaders(res, cached.freshness);
     return res.status(200).json(cached.payload);
+  }
+
+  if (!process.env.VITEST && process.env.DATABASE_URL) {
+    const durable = await readDurableCache(durableFinancialCacheKey(team, season));
+    if (durable) {
+      cached = {
+        payload: durable.data,
+        freshness: durable.data?.freshness || "live",
+        freshUntil: new Date(durable.freshUntil).getTime(),
+        staleUntil: new Date(durable.staleUntil).getTime(),
+      };
+      financialCache.set(key, cached);
+      if (cached.freshUntil > now) {
+        recordCacheOutcome("team-financials", "durable-hit");
+        res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=3600");
+        res.setHeader("X-Provider-Cache", "DURABLE-HIT");
+        res.setHeader("X-Provider-Freshness", "cached");
+        return res.status(200).json(cached.payload);
+      }
+    }
   }
 
   const existing = financialInFlight.get(key);
@@ -289,6 +316,7 @@ export default async function handler(req, res) {
     const tax = taxResult.status === "fulfilled" ? taxResult.value : null;
     const stale = cached?.staleUntil > Date.now() ? cached : null;
     if (!payroll && !tax && stale) {
+      recordCacheOutcome("team-financials", "stale-hit");
       return {
         ...stale.payload,
         freshness: "stale-cached",
@@ -310,12 +338,24 @@ export default async function handler(req, res) {
           freshness: "live",
         }
       : { found: false, teamAbbr: team, season, freshness: "live" };
+    const freshUntil = Date.now() + FRESH_TTL_MS;
+    const staleUntil = freshUntil + STALE_TTL_MS;
     financialCache.set(key, {
       payload,
       freshness: payload.freshness,
-      freshUntil: Date.now() + FRESH_TTL_MS,
-      staleUntil: Date.now() + FRESH_TTL_MS + STALE_TTL_MS,
+      freshUntil,
+      staleUntil,
     });
+    recordCacheOutcome("team-financials", "upstream-miss");
+    if (!process.env.VITEST && process.env.DATABASE_URL) {
+      void writeDurableCache({
+        cacheKey: durableFinancialCacheKey(team, season),
+        source: "Spotrac",
+        data: payload,
+        freshUntil: new Date(freshUntil),
+        staleUntil: new Date(staleUntil),
+      });
+    }
     return payload;
   })();
   financialInFlight.set(key, request);

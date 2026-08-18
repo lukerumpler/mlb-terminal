@@ -208,7 +208,9 @@
 //                           actual statcast_pitcher() source directly, not
 //                           inferred) — see the ENDPOINTS entry below and
 //                           PitchShapePanel.jsx's own header comment.
+import { createHash } from "node:crypto";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { authorizeProviderFailureHook, failureInjectionResponse, isFailureInjectionRequested } from "./provider-failure-hook.js";
 
 const ENDPOINTS = {
@@ -358,6 +360,10 @@ export function __resetSavantStateForTests() {
 function savantCacheKey(url) {
   return url;
 }
+
+function durableSavantCacheKey(url) {
+  return `savant:${createHash("sha256").update(url).digest("hex")}`;
+}
 function parseSavantRetryAfterMs(response) {
   const value = response?.headers?.get?.("Retry-After");
   const seconds = Number(value);
@@ -446,7 +452,7 @@ export default async function handler(req, res) {
 
   const url = ENDPOINTS[endpoint](y, { playerId, team });
   const key = savantCacheKey(url);
-  const cached = savantCache.get(key);
+  let cached = savantCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader(
@@ -456,6 +462,25 @@ export default async function handler(req, res) {
     res.setHeader("X-Provider-Cache", "HIT");
     res.setHeader("X-Provider-Freshness", "cached");
     return res.status(200).json(cached.data);
+  }
+
+  if (!cached || cached.expiresAt <= Date.now()) {
+    const durable = await readDurableCache(durableSavantCacheKey(url));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      savantCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+        res.setHeader("X-Provider-Cache", "DURABLE-HIT");
+        res.setHeader("X-Provider-Freshness", "cached");
+        return res.status(200).json(cached.data);
+      }
+    }
   }
   const stale = staleSavant(cached);
   const existing = savantInFlight.get(key);
@@ -597,10 +622,19 @@ export default async function handler(req, res) {
   try {
     const data = await upstreamRequest;
     savantFailureCooldownUntil = 0;
+    const expiresAt = nextUtcMidnightMs();
+    const staleExpiresAt = expiresAt + SAVANT_STALE_TTL_MS;
     savantCache.set(key, {
       data,
-      expiresAt: nextUtcMidnightMs(),
-      staleExpiresAt: nextUtcMidnightMs() + SAVANT_STALE_TTL_MS,
+      expiresAt,
+      staleExpiresAt,
+    });
+    void writeDurableCache({
+      cacheKey: durableSavantCacheKey(url),
+      source: "Baseball Savant",
+      data,
+      freshUntil: new Date(expiresAt),
+      staleUntil: new Date(staleExpiresAt),
     });
     if (savantCache.size > 300)
       savantCache.delete(savantCache.keys().next().value);

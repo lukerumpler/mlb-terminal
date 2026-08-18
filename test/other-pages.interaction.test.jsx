@@ -17,10 +17,18 @@ beforeEach(() => {
 
 async function goToTab(user, label, waitForText) {
   render(<App />);
-  const navButton = await screen.findByRole("button", {
-    name: new RegExp(label),
-  });
+  const workspaceTargets = {
+    Draft: { workspace: "Talent", tab: "Draft Board" },
+    Knowledge: { workspace: "Intelligence", tab: "Knowledge" },
+    AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
+  };
+  const target = workspaceTargets[label];
+  const navButton = document.querySelector(
+    `.skip-sidebar button[title="${target?.workspace || label}"]`
+  );
+  expect(navButton).toBeTruthy();
   await user.click(navButton);
+  if (target) await user.click(await screen.findByRole("tab", { name: target.tab }));
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
 
@@ -80,8 +88,10 @@ describe("Knowledge page", () => {
   it("cycles through every knowledge tab without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", { name: /Knowledge/ });
+    const navButton = document.querySelector('.skip-sidebar button[title="Intelligence"]');
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(await screen.findByRole("tab", { name: "Knowledge" }));
     await screen.findByRole(
       "button",
       { name: /^Game Theory$/ },
@@ -112,6 +122,15 @@ describe("Knowledge page", () => {
 });
 
 describe("Intelligence page", () => {
+  it("exposes source, freshness, and model provenance metadata", async () => {
+    const user = userEvent.setup();
+    await goToTab(user, "Intelligence", /Player Comparison Engine/i);
+    const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
+    expect(provenance).toHaveTextContent("MLB Stats API comparison lookup");
+    expect(provenance).toHaveTextContent("Fetched when players are compared");
+    expect(provenance).toHaveTextContent("SKIP model snapshot; not a live provider feed");
+  });
+
   it("rejects comparing a player against themselves", async () => {
     const user = userEvent.setup();
     await goToTab(user, "Intelligence", /Player Comparison Engine/i);
@@ -227,10 +246,10 @@ describe("Follow List page", () => {
   it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", {
-      name: /Follow List/,
-    });
+    const navButton = document.querySelector('.skip-sidebar button[title="Intel Feed"]');
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(await screen.findByRole("tab", { name: "Follow List" }));
     await screen.findByPlaceholderText(
       /Search by name, handle, or bio/i,
       {},
@@ -280,6 +299,7 @@ describe("Settings roster defaults", () => {
 
     const overviewButton = screen.getByTitle("Overview");
     await user.click(overviewButton);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await screen.findByText("AI Scout Insights");
     expect(
       screen.getByRole("combobox", { name: "Minimum plate appearances" })

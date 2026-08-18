@@ -1,7 +1,7 @@
 # Branch Integration Audit and Selective Optimization
 
-**Repository:** `lukerumpler/mlb-terminal`  
-**Production baseline at review start:** `1265bf2`  
+**Repository:** `lukerumpler/mlb-terminal`
+**Production baseline at review start:** `1265bf2`
 **Reviewed:** 2026-08-18
 
 ## Decision standard

@@ -24,7 +24,8 @@ describe('Savant metric display and source badge separation', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok:true, status:200, headers:{ get:() => null }, json:async()=>({}), text:async()=>JSON.stringify({}) })));
 
     render(<OverviewPage />);
-    expect(await screen.findByText('cached 2h ago')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
+    expect((await screen.findAllByText('cached 2h ago')).length).toBeGreaterThan(0);
   });
 
   it('does not refetch Savant when the provider retry event occurs during the same UTC day', async () => {
@@ -36,7 +37,8 @@ describe('Savant metric display and source badge separation', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<OverviewPage />);
-    await screen.findByText('cached 2h ago');
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
+    expect((await screen.findAllByText('cached 2h ago')).length).toBeGreaterThan(0);
     const beforeRetry = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/savant')).length;
     fireEvent(window, new CustomEvent('skip-provider-retry', { detail:{ provider:'savant' } }));
     await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/savant')).length).toBe(beforeRetry));
@@ -55,9 +57,10 @@ describe('Savant metric display and source badge separation', () => {
     );
 
     render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     
-    const xwobaLabel = await screen.findByText(/xwOBA/i);
-    expect(xwobaLabel).toBeInTheDocument();
+    const xwobaLabels = await screen.findAllByText(/xwOBA/i);
+    expect(xwobaLabels.length).toBeGreaterThan(0);
     const badgeGroup = document.querySelector('.skip-overview-source-badges');
     expect(badgeGroup).toBeInTheDocument();
     expect(getComputedStyle(badgeGroup).gap).toBe('10px');

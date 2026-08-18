@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterAll, describe, it } from 'vitest';
 import { chromium } from 'playwright';
+import { resolvePublishedOverviewTarget } from './helpers/publishedOverviewTarget.js';
 
-const LIVE_URL = process.env.SKIP_LIVE_URL;
-const describePublished = LIVE_URL ? describe : describe.skip;
+const LIVE_URL = resolvePublishedOverviewTarget();
 let browser;
 
 async function openLivePage(url, setup) {
@@ -25,7 +25,7 @@ async function openLivePage(url, setup) {
   throw lastError;
 }
 
-describePublished('published Dodgers Overview', () => {
+describe('published Dodgers Overview', () => {
   it('keeps the MLB team selected first and separates source badges', async () => {
     browser = await chromium.launch({
       headless: true,

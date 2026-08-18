@@ -191,18 +191,13 @@ export const appRouter = router({
             if (typeof content !== "string") {
               throw new Error("AI insights response was empty");
             }
-            const parsed = JSON.parse(content) as {
-              strengths?: unknown[];
-              weaknesses?: unknown[];
-            };
-            if (
-              Array.isArray(parsed.strengths) &&
-              Array.isArray(parsed.weaknesses) &&
-              parsed.strengths.length === 0 &&
-              parsed.weaknesses.length === 0
-            ) {
-              throw new Error("AI insights response contained no usable evidence");
-            }
+            const parsed = JSON.parse(content);
+            const hasStrengths =
+              Array.isArray(parsed?.strengths) && parsed.strengths.length > 0;
+            const hasWeaknesses =
+              Array.isArray(parsed?.weaknesses) && parsed.weaknesses.length > 0;
+            if (!hasStrengths && !hasWeaknesses)
+              throw new Error("AI insights response had no usable insights");
             return parsed;
           } catch (error) {
             const message =

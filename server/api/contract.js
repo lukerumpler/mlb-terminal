@@ -27,7 +27,10 @@
  * product — that's a legal/business call, not something to decide in code.
  * Source 3 (MLB Stats API) is the only official, stable source here.
  */
+import { createHash } from "node:crypto";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { readDurableCache, writeDurableCache } from "../durable-cache";
+import { recordCacheOutcome } from "../cache-health";
 import { hasAttemptedProviderToday, utcDayKey } from "./daily-provider-policy.js";
 
 const SPOTRAC_CONTRACTS_URL = "https://www.spotrac.com/mlb/contracts/";
@@ -38,6 +41,9 @@ const MLB_BASE = "https://statsapi.mlb.com/api/v1";
 const brefDailyAttemptDay = new Map();
 const brefDailyCache = new Map();
 const brefDailyInFlight = new Map();
+const contractInFlight = new Map();
+const CONTRACT_FRESH_TTL_MS = 6 * 60 * 60_000;
+const CONTRACT_STALE_TTL_MS = 24 * 60 * 60_000;
 
 // Mirror the User-Agent approach from the Python script (env var or hardcoded fallback)
 const UA =
@@ -412,58 +418,100 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing required param: name" });
   }
 
-  // MLB Stats API always runs in parallel (fast, reliable, needed for service time regardless)
-  // Spotrac is tried first. Only if it fails or returns no match do we hit Baseball-Reference.
-  // This mirrors the Python script's sequential source priority while avoiding unnecessary fetches.
-  const [spotracResult, mlbData] = await Promise.all([
-    (async () => {
-      try {
-        const html = await fetchHtml(SPOTRAC_CONTRACTS_URL);
-        return parseSpotracTable(html, name);
-      } catch {
-        return null;
-      }
-    })(),
-    mlbId ? fetchMLBData(mlbId) : Promise.resolve(null),
-  ]);
-
-  let scraped = spotracResult;
-
-  // Only fall through to BRef if Spotrac produced nothing
-  if (!scraped) {
-    scraped = await fetchBRefOnceDaily(name);
+  const cacheKey = `${name.toLowerCase()}::${mlbId}`;
+  const durableKey = `contract:${createHash("sha256").update(cacheKey).digest("hex")}`;
+  const now = Date.now();
+  let durableStale = null;
+  if (!process.env.VITEST && process.env.DATABASE_URL) {
+    const durable = await readDurableCache(durableKey);
+    if (durable && new Date(durable.freshUntil).getTime() > now) {
+      recordCacheOutcome("contract", "durable-hit");
+      res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=3600");
+      res.setHeader("X-Provider-Cache", "DURABLE-HIT");
+      res.setHeader("X-Provider-Freshness", "cached");
+      return res.status(200).json(durable.data);
+    }
+    if (durable && new Date(durable.staleUntil).getTime() > now && durable.data?.found) {
+      durableStale = durable.data;
+    }
   }
 
-  // Merge MLB API service-time data with scraped contract data
-  const svcStatus = mlbData?.serviceStatus || null;
-  const expiry = scraped?.expiry || mlbData?.mlbExpiry || null;
-  const contractAvailable = hasVerifiedContractData(scraped, mlbData);
-
-  if (!scraped && !mlbData) {
-    return res.status(200).json({ found: false });
+  const existing = contractInFlight.get(cacheKey);
+  if (existing) {
+    const result = await existing;
+    res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=3600");
+    res.setHeader("X-Provider-Cache", "COALESCED");
+    res.setHeader("X-Provider-Freshness", "live");
+    return res.status(200).json(result);
   }
 
-  const result = {
-    found: true,
-    contractAvailable,
-    source: scraped?.source || "MLB Stats API",
-    player: scraped?.player || name,
-    team: scraped?.team || null,
-    years: scraped?.years || mlbData?.mlbYears || null,
-    total: scraped?.total || null,
-    aav: scraped?.aav || mlbData?.mlbAav || null,
-    salary: scraped?.salary || mlbData?.mlbSalary || null,
-    expiry,
-    status: deriveStatus(expiry, svcStatus),
-    serviceTime: mlbData?.serviceTime || null,
-    serviceStatus: svcStatus,
-    debutDate: mlbData?.debutDate || null,
-  };
+  const request = (async () => {
+    // MLB Stats API always runs in parallel; Spotrac remains the primary
+    // contract source and Baseball-Reference remains the once-daily fallback.
+    const [spotracResult, mlbData] = await Promise.all([
+      (async () => {
+        try {
+          const html = await fetchHtml(SPOTRAC_CONTRACTS_URL);
+          return parseSpotracTable(html, name);
+        } catch {
+          return null;
+        }
+      })(),
+      mlbId ? fetchMLBData(mlbId) : Promise.resolve(null),
+    ]);
 
-  // Cache 6 hours — contracts are slow-changing (mirrors Python's one-time CSV output)
-  res.setHeader(
-    "Cache-Control",
-    "public, s-maxage=21600, stale-while-revalidate=3600"
-  );
-  return res.status(200).json(result);
+    let scraped = spotracResult;
+    if (!scraped) scraped = await fetchBRefOnceDaily(name);
+
+    const svcStatus = mlbData?.serviceStatus || null;
+    const expiry = scraped?.expiry || mlbData?.mlbExpiry || null;
+    const contractAvailable = hasVerifiedContractData(scraped, mlbData);
+    if (!scraped && !mlbData) return { found: false };
+
+    return {
+      found: true,
+      contractAvailable,
+      source: scraped?.source || "MLB Stats API",
+      player: scraped?.player || name,
+      team: scraped?.team || null,
+      years: scraped?.years || mlbData?.mlbYears || null,
+      total: scraped?.total || null,
+      aav: scraped?.aav || mlbData?.mlbAav || null,
+      salary: scraped?.salary || mlbData?.mlbSalary || null,
+      expiry,
+      status: deriveStatus(expiry, svcStatus),
+      serviceTime: mlbData?.serviceTime || null,
+      serviceStatus: svcStatus,
+      debutDate: mlbData?.debutDate || null,
+    };
+  })();
+  contractInFlight.set(cacheKey, request);
+  try {
+    const result = await request;
+    if (!result?.found && durableStale) {
+      const staleResult = { ...durableStale, freshness: "stale-cached", staleReason: "Contract providers unavailable" };
+      recordCacheOutcome("contract", "stale-hit");
+      res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+      res.setHeader("X-Provider-Cache", "STALE");
+      res.setHeader("X-Provider-Freshness", "stale-cached");
+      return res.status(200).json(staleResult);
+    }
+    recordCacheOutcome("contract", "upstream-miss");
+    if (!process.env.VITEST && process.env.DATABASE_URL) {
+      const freshUntil = Date.now() + CONTRACT_FRESH_TTL_MS;
+      void writeDurableCache({
+        cacheKey: durableKey,
+        source: result.source || "MLB Stats API",
+        data: result,
+        freshUntil: new Date(freshUntil),
+        staleUntil: new Date(freshUntil + CONTRACT_STALE_TTL_MS),
+      });
+    }
+    res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=3600");
+    res.setHeader("X-Provider-Cache", "MISS");
+    res.setHeader("X-Provider-Freshness", "live");
+    return res.status(200).json(result);
+  } finally {
+    if (contractInFlight.get(cacheKey) === request) contractInFlight.delete(cacheKey);
+  }
 }

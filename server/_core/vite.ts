@@ -3,18 +3,10 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
+import { createServer as createViteServer } from "vite";
+import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
-  // Keep development-only Vite dependencies out of the API-only Vercel bundle.
-  // Variable-path dynamic imports are intentionally left for the local dev path.
-  const viteModulePath = "vite";
-  const viteConfigModulePath = "../../vite.config";
-  const [{ createServer: createViteServer }, { default: viteConfig }] =
-    await Promise.all([
-      import(viteModulePath),
-      import(viteConfigModulePath),
-    ]);
-
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

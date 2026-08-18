@@ -7,6 +7,7 @@ let feedAttempt = 0;
 let modelAttempt = 0;
 let savantMode = "pending";
 let modelMode = "fallback";
+let partialAggregate = false;
 
 vi.mock("../client/src/api/mlb.js", async () => {
   const actual = await vi.importActual("../client/src/api/mlb.js");
@@ -32,7 +33,21 @@ vi.mock("../client/src/api/mlb.js", async () => {
         : Promise.reject(new Error("MLB feed stalled"))
     ),
     getAllTeamStats: vi.fn(async group =>
-      feedAttempt > 0
+      partialAggregate && group === "hitting"
+        ? {
+            119: {
+              teamId: 119,
+              teamAbbr: "LAD",
+              teamName: "Los Angeles Dodgers",
+              ops: 0.802,
+              homeRuns: 98,
+              era: 2.98,
+              whip: 1.06,
+              strikeOuts: 628,
+              stolenBases: 54,
+            },
+          }
+        : feedAttempt > 0
         ? {
             119: {
               teamId: 119,
@@ -134,6 +149,7 @@ describe("Team Overview model source and retry interaction", () => {
     modelAttempt = 0;
     savantMode = "pending";
     modelMode = "fallback";
+    partialAggregate = false;
     localStorage.clear();
   });
 
@@ -199,9 +215,46 @@ describe("Team Overview model source and retry interaction", () => {
     expect(mlbApi.getTeamPlayerStats).not.toHaveBeenCalled();
   });
 
+  it("does not re-request the global daily schedule when the selected team changes", async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+    await waitFor(() => expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1));
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Select team" }),
+      "sf"
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Select team" })).toHaveValue(
+        "sf"
+      )
+    );
+    expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an explicit official-schedule panel visible when MLB returns no games", async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+
+    await user.click(screen.getByRole("button", { name: "Operations" }));
+    expect(await screen.findByText("Today's Schedule")).toBeInTheDocument();
+    expect(screen.getAllByText("No games today").length).toBeGreaterThan(0);
+    expect(screen.getByText(/official MLB schedule returned no games for today/i)).toBeInTheDocument();
+  });
+
+  it("commits available aggregate data when one provider fails instead of waiting for all feeds", async () => {
+    partialAggregate = true;
+    render(<OverviewPage />);
+    expect((await screen.findAllByText(".802", { exact: false })).length).toBeGreaterThan(0);
+    await waitFor(() => expect(mlbApi.getAllTeamStats).toHaveBeenCalledWith("pitching"));
+    expect(screen.queryByRole("status", { name: "Loading team overview" })).not.toBeInTheDocument();
+  });
+
   it("updates the roster sort when quick filters are clicked", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     const sortSelect = screen.getByRole("combobox", {
       name: "Sort roster insights by player statistic",
     });
@@ -217,7 +270,9 @@ describe("Team Overview model source and retry interaction", () => {
   });
 
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -228,7 +283,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("renders verified team spray and opponent contact-quality rollups when Savant returns rows", async () => {
     savantMode = "ready";
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByRole("img", {
         name: "Verified Baseball Savant batted-ball spray coordinates",
@@ -242,7 +299,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("shows explicit unavailable states when Savant returns no verified rows", async () => {
     savantMode = "empty";
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -253,7 +312,9 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("leaves model panels in explicit unavailable state after a FanGraphs 502", async () => {
     modelMode = "502";
+    const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
@@ -262,7 +323,7 @@ describe("Team Overview model source and retry interaction", () => {
     ].map(node => node.textContent);
     expect(providers).toContain("FanGraphs WAR");
     expect(providers).toContain("FanGraphs forecast");
-    expect(providers.filter(provider => provider.includes("FanGraphs")).length).toBeLessThan(7);
+    expect([...new Set(providers.filter(provider => provider.includes("FanGraphs")))]).toEqual(expect.arrayContaining(["FanGraphs WAR", "FanGraphs forecast"]));
     expect(providers.filter(provider => provider === "Savant").length).toBeGreaterThanOrEqual(1);
     expect(
       container.querySelector(".skip-status-unavailable")
@@ -290,13 +351,48 @@ describe("Team Overview model source and retry interaction", () => {
       retrievedAt: "2026-08-14T02:02:00.000Z",
       status: "live",
     });
+    const user = userEvent.setup();
     render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText(/div avg/)).toBeInTheDocument();
+  });
+
+  it("propagates verified division rows into a labeled Divisional WAR comparison", async () => {
+    vi.spyOn(mlbApi, "getTeamModelSources").mockResolvedValueOnce({
+      found: true,
+      retrievedAt: "2026-08-14T02:02:00.000Z",
+      source: "FanGraphs",
+      playoffOdds: 72.4,
+      teamWar: 31.4,
+      statuses: { playoffOdds: "live", teamWar: "live" },
+    });
+    vi.spyOn(mlbApi, "getTeamAggregateWar").mockResolvedValueOnce({
+      teamWar: 31.4,
+      divisionAverageWAR: 26.2,
+      source: "FanGraphs aggregate Team WAR",
+      freshness: "live",
+      status: "live",
+      divisionTeams: [
+        { team: "Los Angeles Dodgers", totalWAR: 31.4, offensiveWAR: 21.2, pitchingWAR: 10.2, defensiveWAR: null },
+        { team: "San Diego Padres", totalWAR: 21.0, offensiveWAR: 12.5, pitchingWAR: 8.5, defensiveWAR: null },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+
+    await user.click(screen.getByRole("button", { name: "Performance" }));
+    expect(await screen.findByText("2 teams")).toBeInTheDocument();
+    expect(screen.getByText(/LAD is highlighted/i)).toBeInTheDocument();
+    const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
+    expect(exactValuesTable).toHaveTextContent("LAD");
+    expect(exactValuesTable).toHaveTextContent("+31.4");
+    expect(exactValuesTable).toHaveTextContent("SD");
   });
 
   it("shows explicit unavailable model states, exposes retry, and recovers MLB data without refreshing FanGraphs", async () => {
     const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Performance" }));
 
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)

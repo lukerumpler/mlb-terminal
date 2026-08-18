@@ -39,7 +39,8 @@ describe('OverviewPage Savant retry helper policy', () => {
     }));
 
     render(<OverviewPage />);
-    await screen.findByText('cached 2h ago');
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
+    expect((await screen.findAllByText('cached 2h ago')).length).toBeGreaterThan(0);
     const before = {
       summary: savantHelpers.getTeamSavantMetrics.mock.calls.length,
       exit: savantHelpers.getTeamExitVelocity.mock.calls.length,

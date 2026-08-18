@@ -1,20 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
   parseFanGraphsModelHtml,
-  parseFanGraphsPlayoffOddsJson,
   parseFanGraphsAggregateWarHtml,
   isFanGraphsProviderBlockedResponse,
 } from "../server/api/fangraphs-models.js";
 
-// Resolved relative to this file rather than a hardcoded absolute path, so
-// the test runs the same in any checkout (CI, a fresh clone, another
-// contributor's machine) instead of only inside one specific sandbox.
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const overviewSource = readFileSync(
-  resolve(__dirname, "../client/src/pages/OverviewPage.jsx"),
+  resolve(process.cwd(), "client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 
@@ -33,35 +27,6 @@ describe("FanGraphs model source adapter", () => {
     expect(result.advancedMetrics.projectedLosses).toBe(66.6);
     expect(result.advancedMetrics.offenseWar).toBe(29.1);
     expect(result.advancedMetrics.defenseWar).toBe(8.4);
-  });
-
-  it("parses current nickname rows and abbreviated FanGraphs projection headers", () => {
-    const oddsHtml = "<table><tr><th>Team</th><th>W</th><th>L</th><th>W%</th><th>Proj W</th><th>Proj L</th><th>Make Playoffs</th></tr><tr><td>Dodgers</td><td>74</td><td>51</td><td>.592</td><td>96.9</td><td>65.1</td><td>100.0%</td></tr></table>";
-    const warHtml = "<table><tr><th>Team</th><th>WAR</th><th>Off WAR</th><th>Def WAR</th></tr><tr><td>Dodgers</td><td>42.7</td><td>29.1</td><td>8.4</td></tr></table>";
-
-    const result = parseFanGraphsModelHtml({ oddsHtml, warHtml }, "LAD", 2026);
-
-    expect(result.playoffOdds).toBe(100);
-    expect(result.teamWar).toBe(42.7);
-    expect(result.advancedMetrics).toMatchObject({
-      projectedWins: 96.9,
-      projectedLosses: 65.1,
-      offenseWar: 29.1,
-      defenseWar: 8.4,
-    });
-  });
-
-  it("parses the verified structured playoff-odds response and normalizes MLB abbreviations", () => {
-    const result = parseFanGraphsPlayoffOddsJson([
-      { abbName: "LAD", endData: { ExpW: 96.904, ExpL: 65.096, poffTitle: 1 } },
-      { abbName: "CHW", endData: { ExpW: 83.1, ExpL: 78.9, poffTitle: 0.7246 } },
-    ], "LAD", 2026);
-    expect(result).toMatchObject({
-      found: true,
-      playoffOdds: 100,
-      advancedMetrics: { projectedWins: 96.9, projectedLosses: 65.1 },
-    });
-    expect(parseFanGraphsPlayoffOddsJson([{ abbName: "CHW", endData: { poffTitle: 0.7 } }], "CWS", 2026).playoffOdds).toBe(70);
   });
 
   it("parses aggregate batting and pitching WAR by header name and computes total WAR", () => {

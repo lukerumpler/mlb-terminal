@@ -18,8 +18,9 @@ beforeEach(() => {
 
 async function goToProspects(user) {
   render(<App />);
-  const navButton = await screen.findByRole("button", { name: /Prospects/ });
+  const navButton = await screen.findByRole("button", { name: /Talent/ });
   await user.click(navButton);
+  await user.click(await screen.findByRole("tab", { name: "Prospects" }));
   // Wait for the actual batter table to render, not just the absence of the
   // error-boundary text — in this test environment (unbundled, on-the-fly
   // JSX transform) the first render of a heavy page can take a couple of

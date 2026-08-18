@@ -1,7 +1,7 @@
 # Master Analytic and Data Card Audit
 
-**Scope:** MLB Terminal frontend pages and shared card primitives.  
-**Baseline release:** `6cab522`  
+**Scope:** MLB Terminal frontend pages and shared card primitives.
+**Baseline release:** `6cab522`
 **Prepared:** 2026-08-18
 
 ## Inventory

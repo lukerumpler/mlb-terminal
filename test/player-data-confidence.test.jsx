@@ -1,7 +1,8 @@
 import React from "react";
 import { describe, expect, it } from "vitest";
 import { getPlayerDataConfidence } from "../client/src/lib/playerDataConfidence.js";
-import { getProviderIdConfidenceSourceCheck, PlayerDataConfidenceBadge } from "../client/src/pages/PlayersPage.jsx";
+import { PlayerDataConfidenceBadge, PlayerIdentityConfidenceBadge, getPlayerIdentityConfidence } from "../client/src/pages/PlayersPage.jsx";
+import { PlayerProfileHydrationSkeleton } from "../client/src/components/PageSkeletons.jsx";
 
 describe("player data confidence", () => {
   it("scores complete current-season source groups as high confidence", () => {
@@ -58,38 +59,27 @@ describe("player data confidence", () => {
     expect(element.props.title).toContain("source-completeness indicator");
   });
 
-  it("shows exact-name provider-ID confidence in the profile source strip", () => {
-    const check = getProviderIdConfidenceSourceCheck({
-      mlbId:'660271',
-      providerIdentity:{
-        mlb:{ id:'660271' },
-        baseballReference:{
-          id:'ohtansh01',
-          canonicalUrl:'https://www.baseball-reference.com/players/o/ohtansh01.shtml',
-          confidence:'exact-name',
-          matchedName:'Shohei Ohtani',
-          provenance:'Exact normalized-name verification',
-        },
-      },
-    }, { id:660271, fullName:'Shohei Ohtani' });
-    expect(check).toMatchObject({ label:'B-Ref ID', ready:true, source:'Exact name' });
-    expect(check.detail).toContain('ohtansh01');
+  it("labels only an exact canonical external identity match as verified", () => {
+    const confidence = getPlayerIdentityConfidence({
+      status: "verified",
+      baseballReference: { id: "ohtansh01", confidence: "exact-name" },
+    });
+    expect(confidence).toMatchObject({ tone: "teal", label: "IDENTITY VERIFIED" });
+    const element = PlayerIdentityConfidenceBadge({ identity: { status: "verified", baseballReference: { id: "ohtansh01", confidence: "exact-name" } }, compact: true });
+    expect(element.props["data-testid"]).toBe("player-identity-confidence");
+    expect(element.props["aria-label"]).toContain("IDENTITY VERIFIED");
+    expect(element.props.title).toContain("exact normalized name");
   });
 
-  it("keeps provider-ID confidence unavailable for a near-name mapping", () => {
-    const check = getProviderIdConfidenceSourceCheck({
-      mlbId:'660271',
-      providerIdentity:{
-        mlb:{ id:'660271' },
-        baseballReference:{
-          id:'ohtansh01',
-          canonicalUrl:'https://www.baseball-reference.com/players/o/ohtansh01.shtml',
-          confidence:'exact-name',
-          matchedName:'Shohei Ohtan',
-        },
-      },
-    }, { id:660271, fullName:'Shohei Ohtani' });
-    expect(check).toMatchObject({ label:'B-Ref ID', ready:false, source:'Unavailable' });
-    expect(check.detail).toContain('Near-name matches are intentionally rejected');
+  it("keeps in-progress and missing external identity states explicit", () => {
+    expect(getPlayerIdentityConfidence(null, { pending: true })).toMatchObject({ tone: "amber", label: "IDENTITY CHECKING" });
+    expect(getPlayerIdentityConfidence({ status: "not-found" })).toMatchObject({ tone: "slate", label: "IDENTITY UNAVAILABLE" });
+  });
+
+  it("provides an in-place supplemental hydration skeleton without hiding the core profile", () => {
+    const element = PlayerProfileHydrationSkeleton();
+    expect(element.props.role).toBe("status");
+    expect(element.props["aria-label"]).toBe("Loading supplemental player profile data");
+    expect(element.props.className).toBe("skip-profile-hydration-skeleton");
   });
 });

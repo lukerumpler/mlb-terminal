@@ -4,16 +4,21 @@ import {
   savantField,
   getLivePerformanceItems,
   metricPopulationPercentile,
+  buildSavantPercentileRow,
   buildSavantPercentileAxes,
   normalizeSprayPoint,
   buildRecentGameSeries,
+  buildAdvancedMetricTrendSeries,
   MetricSparkline,
 } from "../client/src/pages/PlayersPage.jsx";
 import { computeAMD } from "../client/src/engine/skip.js";
 import {
   selectSeasonSplit,
   normalizeSeasonAdvancedStat,
+  normalizeYearByYearAdvancedStats,
+  mergeAdvancedMetricSources,
 } from "../client/src/api/mlb.js";
+import { parseBaseballReferenceAdvanced, parseBaseballReferenceIdentity } from "../server/api/player-advanced.js";
 import { percentileLabel } from "../client/src/lib/percentile.js";
 import {
   comparisonAxes,
@@ -21,6 +26,76 @@ import {
 } from "../client/src/components/PlayerComparisonModal.jsx";
 
 describe("player profile data accuracy guards", () => {
+  it("normalizes the last five verified WAR and wRC+ seasons without filling gaps", () => {
+    expect(buildAdvancedMetricTrendSeries([
+      { season: 2021, stat: { war: 2.1, wRCPlus: 111 } },
+      { season: 2022, stat: { fWAR: 3.4 } },
+      { season: 2023, stat: { war: null, wrc_plus: 124 } },
+      { season: 2024, stat: { bWAR: 4.2, wRCPlus: 131 } },
+      { season: 2025, stat: { war: 5.1, wRCPlus: 142 } },
+      { season: 2026, stat: { rWAR: 6.0, wRCPlus: 150 } },
+    ])).toEqual([
+      { season: 2022, war: 3.4, wrcPlus: null },
+      { season: 2023, war: null, wrcPlus: 124 },
+      { season: 2024, war: 4.2, wrcPlus: 131 },
+      { season: 2025, war: 5.1, wrcPlus: 142 },
+      { season: 2026, war: 6.0, wrcPlus: 150 },
+    ]);
+  });
+
+  it("normalizes official yearByYearAdvanced rows without treating OPS+ as wRC+", () => {
+    const rows = normalizeYearByYearAdvancedStats({ stats: [{ group: { displayName: "hitting" }, splits: [
+      { season: "2024", stat: { war: 4.2, wRCPlus: 131 } },
+      { season: "2025", stat: { OPSPlus: 150 } },
+    ] }] });
+    expect(rows).toEqual([
+      { season: 2024, war: 4.2, wrcPlus: 131, source: "MLB Stats API yearByYearAdvanced", status: "live" },
+      { season: 2025, war: null, wrcPlus: null, source: "MLB Stats API yearByYearAdvanced", status: "unavailable" },
+    ]);
+  });
+
+  it("uses fallback values only for missing primary fields and records per-field provenance", () => {
+    expect(mergeAdvancedMetricSources(
+      { season: 2026, war: 2.8, wrcPlus: null, source: "MLB Stats API seasonAdvanced" },
+      { season: 2026, war: 4.1, wrcPlus: 131, source: "Baseball-Reference player summary" },
+    )).toMatchObject({
+      war: 2.8,
+      wrcPlus: 131,
+      provenance: {
+        war: "MLB Stats API seasonAdvanced",
+        wrcPlus: "Baseball-Reference player summary",
+      },
+      status: "live",
+    });
+  });
+
+  it("fills a missing primary WAR field from the verified fallback while keeping wRC+ unavailable", () => {
+    const merged = mergeAdvancedMetricSources(
+      { season: 2026, war: null, wrcPlus: null, source: "MLB Stats API seasonAdvanced" },
+      { season: 2026, war: 6.4, wrcPlus: null, source: "Baseball-Reference player summary" },
+    );
+    expect(merged).toMatchObject({
+      war: 6.4,
+      wrcPlus: null,
+      provenance: { war: "Baseball-Reference player summary", wrcPlus: null },
+      status: "live",
+    });
+  });
+
+  it("maps an exact Baseball-Reference identity and rejects a near-name mismatch", () => {
+    const html = '<a href="/players/o/ohtansh01.shtml">Shohei Ohtani</a><a href="/players/o/ohtansh02.shtml">Shohei Other</a>';
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani")).toMatchObject({ id: "ohtansh01", confidence: "exact" });
+    expect(parseBaseballReferenceIdentity(html, "Shohei Ohtani Jr.")).toBeNull();
+  });
+
+  it("parses only explicit Baseball-Reference WAR and wRC+ fields", () => {
+    const parsed = parseBaseballReferenceAdvanced(
+      '<main>SUMMARY 2026 Career WAR 6.4 57.7 OPS+ 156 160</main>',
+      2026,
+    );
+    expect(parsed).toMatchObject({ war: 6.4, wrcPlus: null, status: "live" });
+  });
+
   it("formats percentile labels with the correct ordinal suffix", () => {
     expect([92, 93, 98, 99, 100].map(percentileLabel)).toEqual([
       "92nd",
@@ -69,6 +144,22 @@ describe("player profile data accuracy guards", () => {
       barrel_percent: 9.4,
       ev95percent: 44.1,
     }).slice(2, 5).map(item => item.val)).toEqual(["31.2%", "9.4%", "44.1%"]);
+
+    expect(buildSavantPercentileRow({
+      label: "Sweet Spot %",
+      data: { anglesweetspotpercent: 0 },
+      aliases: ["sweet_spot_percent", "anglesweetspotpercent"],
+      population: [
+        { anglesweetspotpercent: 0 },
+        { anglesweetspotpercent: 10 },
+        { anglesweetspotpercent: 20 },
+      ],
+    })).toMatchObject({
+      lbl: "Sweet Spot %",
+      val: "0.0%",
+      raw: 0,
+      pct: 0,
+    });
   });
 
   it("normalizes Baseball Savant spray coordinates and preserves hover metrics", () => {
