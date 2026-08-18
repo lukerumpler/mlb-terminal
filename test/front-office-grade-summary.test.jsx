@@ -37,6 +37,8 @@ describe('Front Office Overall grade', () => {
   it('explains both the Overall calculation and a component limitation through keyboard-accessible controls', () => {
     const grades = [{ label: 'Defense', grade: 'A+', color: '#008080', detail: 'Calculated from verified active-roster position coverage; it is not Statcast OAA.' }];
     render(<FrontOfficeGradeCards grades={grades} overall={buildFrontOfficeGradeSummary(grades)} />);
+    expect(screen.getByRole('button', { name: /Overall.*4\.30/i })).toBeInTheDocument();
+    expect(screen.getByText('4.30')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /overall/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/Weighted current-performance score from defense/i);
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));

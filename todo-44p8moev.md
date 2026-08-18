@@ -291,3 +291,9 @@
 - [x] Present the validation findings and obtain approval for any necessary substitutions before integration.
 - [x] Integrate the approved scoring system with provenance, unavailable states, and regression coverage.
 - [x] Run full validation, review the overall-grade display, and publish.
+
+- [x] Inspect the Overall-grade display, dashboard request paths, recent errors, and accessibility/performance hotspots.
+- [x] Display the numeric weighted Overall score beside the letter grade with clear scale context.
+- [x] Apply targeted reliability and performance optimizations without weakening provider or unavailable states.
+- [x] Add regression coverage and validate desktop/mobile behavior.
+- [x] Run the full release gate and publish the numeric-score optimization update.

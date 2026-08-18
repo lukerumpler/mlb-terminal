@@ -161,16 +161,17 @@ export function buildFrontOfficeGradeSummary(grades = []) {
 
 export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades) }) {
   const [activeLabel, setActiveLabel] = useState(null);
-  const cards = [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades];
+  const cards = useMemo(() => [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades], [grades, overall]);
   const activeCard = cards.find(card => card.label === activeLabel) || null;
   return <div aria-label="Front Office grade details">
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
         const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
-        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
+        const numericScore = card.label === 'Overall' && Number.isFinite(overall?.points) ? overall.points.toFixed(2) : null;
+        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
           style={{minHeight:46,textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:6,padding:'5px 3px',cursor:'pointer',color:C.text}}>
-          <div style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</div>
+          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</span>{numericScore && <span style={px({fontSize:8.5,fontWeight:700,color:C.text3,lineHeight:1})}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}</div>
           <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
           <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:1})}>details</span>
         </button>;
