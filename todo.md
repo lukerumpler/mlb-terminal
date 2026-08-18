@@ -11314,3 +11314,6 @@
 - [x] Inspect the player profile’s verified identity payload, confidence presentation, and current loading skeleton.
 - [x] Add an honest identity-confidence indicator and a progressive player-profile loading skeleton.
 - [x] Add regression coverage, verify responsive loading behavior, and publish the player-profile improvement.
+- [x] Inspect the Team Overview’s initial viewport and identify card sections to defer.
+- [x] Reorder Team Overview content so card-based analysis appears later without hiding team controls or decision context.
+- [x] Add regression coverage, verify desktop and mobile layout order, and publish the refinement.

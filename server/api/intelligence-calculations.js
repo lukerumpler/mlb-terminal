@@ -43,6 +43,7 @@ function calculateFromStanding(standing, season) {
     ? (runsScored ** pythagoreanExponent) / ((runsScored ** pythagoreanExponent) + (runsAllowed ** pythagoreanExponent))
     : null;
   const pythagoreanProjectedWins = pythagoreanWinPct == null ? null : pythagoreanWinPct * seasonLength;
+  const pythagoreanProjectedLosses = pythagoreanProjectedWins == null ? null : seasonLength - pythagoreanProjectedWins;
   // This is deliberately a transparent deterministic proxy, not an official
   // playoff model. It turns current 162-game win pace into a bounded chance
   // centered on an 88-win benchmark, which is easier to audit than a hidden
@@ -67,6 +68,7 @@ function calculateFromStanding(standing, season) {
       projectedWins: "current verified win percentage multiplied by a 162-game season",
       projectedLosses: "162 minus calculated projected wins",
       pythagoreanWinPct: pythagoreanWinPct == null ? null : "runs scored and runs allowed with exponent 1.83",
+      pythagoreanProjectedLosses: pythagoreanProjectedLosses == null ? null : "162 minus pythagorean projected wins from verified runs scored and runs allowed",
       calculatedPlayoffOdds: "deterministic logistic transform of verified 162-game win pace, centered at 88 wins with a 3.5-win scale; a calculated proxy, not official or FanGraphs odds",
       calculatedWarProxy: calculatedWarProxy == null ? null : "pythagorean expected 162-game wins minus a 48-win replacement baseline; a team wins-above-replacement proxy, not FanGraphs WAR",
     },
@@ -82,6 +84,7 @@ function calculateFromStanding(standing, season) {
       runDifferential: runsScored != null && runsAllowed != null ? runsScored - runsAllowed : null,
       pythagoreanWinPct,
       pythagoreanProjectedWins,
+      pythagoreanProjectedLosses,
       calculatedPlayoffOdds,
       calculatedWarProxy,
     },
