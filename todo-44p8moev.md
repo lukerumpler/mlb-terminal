@@ -256,3 +256,9 @@
 - [x] Clarify provider-blocked, cached historical, and live FanGraphs states in the Divisional WAR panel.
 - [x] Complete the compact exact-value Divisional WAR table without manufacturing missing components.
 - [x] Add blocked/cached/unavailable presentation regressions, validate, and publish.
+
+- [x] Audit remaining unavailable Overview and model metrics against verified backend inputs.
+- [x] Define backend calculation fallbacks only for metrics with sufficient verified source fields.
+- [x] Implement calculated metrics with explicit method and provenance labels.
+- [x] Preserve unavailable states for unsupported provider-only metrics.
+- [x] Add calculation integrity regressions, validate responsive UI labels, and publish.

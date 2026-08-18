@@ -913,6 +913,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [affiliateId, affiliateLevel, affiliates]);
 
+  const calculatedMetrics = calculatedIntelligence?.metrics || {};
+  const calculatedStandingMetric = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const calculatedStandingFallback = useMemo(() => ({
+    w: calculatedStandingMetric(calculatedMetrics.wins),
+    l: calculatedStandingMetric(calculatedMetrics.losses),
+    pct: calculatedStandingMetric(calculatedMetrics.winPct),
+    rs: calculatedStandingMetric(calculatedMetrics.runsScored),
+    ra: calculatedStandingMetric(calculatedMetrics.runsAllowed),
+    diff: calculatedStandingMetric(calculatedMetrics.runDifferential),
+  }), [calculatedIntelligence]);
   const team=useMemo(() => {
     const live = liveTeamData?.byId?.[teamBase?.id] || liveTeamData?.byAbbr?.[teamBase?.abbr];
     const hitting = live?.hitting || {};
@@ -921,14 +931,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return {
       ...teamBase,
       ...(live?.standings || {}),
-      w: stat(live?.standings, 'w'), l: stat(live?.standings, 'l'), pct: stat(live?.standings, 'pct'),
-      rs: stat(live?.standings, 'rs'), ra: stat(live?.standings, 'ra'), diff: stat(live?.standings, 'diff'),
+      w: stat(live?.standings, 'w') ?? calculatedStandingFallback.w, l: stat(live?.standings, 'l') ?? calculatedStandingFallback.l, pct: stat(live?.standings, 'pct') ?? calculatedStandingFallback.pct,
+      rs: stat(live?.standings, 'rs') ?? calculatedStandingFallback.rs, ra: stat(live?.standings, 'ra') ?? calculatedStandingFallback.ra, diff: stat(live?.standings, 'diff') ?? calculatedStandingFallback.diff,
       ops: stat(hitting, 'ops'), obp: stat(hitting, 'obp'), slg: stat(hitting, 'slg'), avg: stat(hitting, 'avg'),
       hr: stat(hitting, 'homeRuns'), sb: stat(hitting, 'stolenBases'),
       era: stat(pitching, 'era'), whip: stat(pitching, 'whip'), k: stat(pitching, 'strikeOuts'),
       war: null, wrcPlus: null, fip: null, drs: null, bsr: null,
     };
-  }, [liveTeamData, teamBase]);
+  }, [liveTeamData, teamBase, calculatedStandingFallback]);
+  const liveStandings = liveTeamData?.byId?.[teamBase?.id]?.standings || liveTeamData?.byAbbr?.[teamBase?.abbr]?.standings || null;
+  const headlineUsesCalculatedStandings = Boolean(calculatedIntelligence && ['w', 'l', 'pct', 'rs', 'ra', 'diff'].some(key => (liveStandings?.[key] == null || liveStandings?.[key] === '') && calculatedStandingFallback[key] != null));
   // Team-brand accent used for decorative/structural elements (panel accent
   // strips, chart lines/bars, badges) throughout this page. Deliberately not
   // used for small body text — some team colors (e.g. the Padres' near-black
@@ -1212,7 +1224,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
-  const calculatedMetrics = calculatedIntelligence?.metrics || {};
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const providerPlayoffOdds = finiteMetric(teamModelData?.playoffOdds);
   const calculatedPlayoffOdds = finiteMetric(calculatedMetrics.calculatedPlayoffOdds);
@@ -1672,11 +1683,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',formatTeamMetric(team.pct,3)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
             <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center',minWidth:0}}>
-              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading'} width={i === 0 ? 54 : 38} /></div>
+              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
         </div>
+        {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>Official MLB standings fallback via SKIP backend · W–L, win percentage, runs, and run differential are verified standings values, not projections.</div>}
       </div>
 
       <nav className="skip-overview-view-rail" aria-label="Team Overview views">

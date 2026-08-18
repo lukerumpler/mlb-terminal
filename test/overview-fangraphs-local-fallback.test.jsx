@@ -84,4 +84,21 @@ describe('rendered FanGraphs local fallback', () => {
     expect(screen.getByText(/calculated playoff proxy/i)).toBeInTheDocument();
     expect(screen.getByText(/not FanGraphs WAR/i)).toBeInTheDocument();
   });
+
+  it('fills blank headline standings values from the verified backend official-standings response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async url => {
+      if (String(url).includes('/api/fangraphs-models')) return jsonResponse({ found:false, playoffOdds:null, teamWar:null, statuses:{ playoffOdds:'unavailable', teamWar:'unavailable' } });
+      if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
+        source:'MLB Stats API', provenance:'calculated-from-verified-standings', freshness:'calculated',
+        metrics:{ wins:81, losses:45, winPct:0.643, runsScored:700, runsAllowed:600, runDifferential:100, projectedWins:104.1, projectedLosses:57.9, pythagoreanProjectedWins:92.4, pythagoreanProjectedLosses:69.6, calculatedPlayoffOdds:99, calculatedWarProxy:44.4 },
+      });
+      return jsonResponse({});
+    }));
+
+    render(<OverviewPage />);
+
+    expect(await screen.findByText('81–45')).toBeInTheDocument();
+    expect(screen.getByText('700')).toBeInTheDocument();
+    expect(screen.getByTestId('calculated-standings-headline-note')).toHaveTextContent(/verified standings values, not projections/i);
+  });
 });
