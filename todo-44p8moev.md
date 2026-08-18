@@ -279,3 +279,9 @@
 - [x] Shorten the Executive Briefing subtitle and refine compact-label alignment on mobile.
 - [x] Add regression coverage and validate desktop/mobile presentation.
 - [x] Publish the panel-status and mobile-layout refinement.
+
+- [x] Inspect Batted Ball, Pitching, and dashboard empty-state component patterns.
+- [x] Consolidate Batted Ball and Pitching provider labels into panel-level status lines.
+- [x] Convert long empty-state details into concise expandable notes while preserving honest source context.
+- [x] Add regression coverage and validate desktop/mobile interactions.
+- [x] Publish the consolidated panels and expandable empty notes.

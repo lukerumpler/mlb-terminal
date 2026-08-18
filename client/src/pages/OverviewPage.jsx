@@ -61,6 +61,7 @@ const OVERVIEW_VIEW_OPTIONS = [
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
 export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
+  const detailIsLong = typeof detail === 'string' && detail.length > 62;
   return <div className="skip-overview-empty-state" role="status">
     <span className="skip-overview-empty-mark" aria-hidden="true">—</span>
     <div className="skip-overview-empty-copy">
@@ -69,7 +70,7 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
         <span className="skip-overview-empty-separator" aria-hidden="true">·</span>
         <span className="skip-overview-empty-message">{message}</span>
       </div>
-      {detail && <span className="skip-overview-empty-detail">{detail}</span>}
+      {detail && (detailIsLong ? <details className="skip-overview-empty-note"><summary>More detail</summary><span className="skip-overview-empty-detail">{detail}</span></details> : <span className="skip-overview-empty-detail">{detail}</span>)}
     </div>
   </div>;
 }
@@ -2224,7 +2225,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              panels) — fixing it now that a debug pass finally had room
              for it, since "lower priority" isn't the same as "not a real
              gap", and half this page turned out to share the pattern. */}
-        <Panel title="Batted Ball Profile" accent={OVERVIEW_ACCENTS.offense} badge={bb ? <OverviewSourceBadge status={teamSavantSource?.includes('rollup') ? 'estimated' : 'verified'} /> : teamSavantState === 'loading' ? 'Loading' : <OverviewSourceBadge status="coverage-gap" />}>
+        <Panel title="Batted Ball Profile" accent={OVERVIEW_ACCENTS.offense}>
+          <div className="skip-overview-panel-status" role="status" aria-label="Batted Ball Profile data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={bb ? (teamSavantSource?.includes('rollup') ? 'estimated' : 'verified') : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
           {bb ? (
           <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:0}}>
@@ -2261,7 +2263,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               ))}
             </div>
             <div style={sans({fontSize:9,color:C.text4,marginTop:8,lineHeight:1.4})}>
-              Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · {bb.sampleSize?.toLocaleString() || '—'} batted balls.
+              Sample: {bb.sampleSize?.toLocaleString() || '—'} batted balls.
             </div>
           </div>
           </div>
@@ -2282,7 +2284,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 {l}
               </button>
             ))}
-          </div> : <OverviewSourceBadge status="coverage-gap" />}>
+          </div> : null}>
+          <div className="skip-overview-panel-status" role="status" aria-label="Pitch Arsenal data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={arsenal ? 'verified' : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
           {arsenal ? (arsenalTab === 'usage' ? (
             <div style={{display:'flex',gap:0,alignItems:'stretch'}}>
               {/* Donut */}
@@ -2328,17 +2331,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <OverviewEmptyState status={teamSavantState === 'loading' ? 'Loading' : 'Unavailable'} message="Team pitch arsenal rows" detail={teamSavantState === 'loading' ? 'Checking the verified Baseball Savant roster pitch rollup.' : 'No verified Baseball Savant pitch rows were returned for this season.'} />
           )}
           <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
-            Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · usage is based on verified pitch rows; Stuff+ remains unavailable in this rollup.
+            Verified pitch rows · Stuff+ unavailable.
           </div>
         </Panel>
 
         {/* Contact Quality Allowed + Position OAA */}
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <Panel title="Contact Quality Allowed" accent={OVERVIEW_ACCENTS.pitching} badge={contactAllowed.sampleSize ? <OverviewSourceBadge status="verified" /> : <OverviewSourceBadge status="coverage-gap" />}>
+          <Panel title="Contact Quality Allowed" accent={OVERVIEW_ACCENTS.pitching}>
+            <div className="skip-overview-panel-status" role="status" aria-label="Contact Quality Allowed data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={contactAllowed.sampleSize ? 'verified' : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
             {contactAllowed.sampleSize ? (
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
                 {[['xwOBA', contactAllowed.xwoba == null ? '—' : contactAllowed.xwoba.toFixed(3)], ['Avg EV', contactAllowed.exitVelocity == null ? '—' : `${contactAllowed.exitVelocity.toFixed(1)} mph`], ['Hard-hit', contactAllowed.hardHitPct == null ? '—' : `${contactAllowed.hardHitPct.toFixed(1)}%`]].map(([label,value]) => <div key={label} style={{padding:'18px 10px',textAlign:'center',borderRight:`0.5px solid ${C.borderLight}`}}><div style={px({fontSize:17,fontWeight:800,color:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
-                <div style={sans({gridColumn:'1 / -1',padding:'7px 14px 10px',fontSize:9,color:C.text4})}>Source: Baseball Savant · {contactAllowed.sampleSize.toLocaleString()} verified opponent batted-ball rows.</div>
+                <div style={sans({gridColumn:'1 / -1',padding:'7px 14px 10px',fontSize:9,color:C.text4})}>Sample: {contactAllowed.sampleSize.toLocaleString()} opponent batted-ball rows.</div>
               </div>
             ) : <OverviewEmptyState message="Opponent contact quality" detail="Baseball Savant did not return verified opponent batted-ball rows for this season." />}
           </Panel>

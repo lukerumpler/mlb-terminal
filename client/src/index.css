@@ -834,6 +834,10 @@
 .skip-overview-empty-status { color:var(--text4, #888); font:800 9px/1.1 'DM Mono', monospace; letter-spacing:.1em; text-transform:uppercase; }
 .skip-overview-empty-message { color:var(--text2, #555); font:700 11px/1.3 'Plus Jakarta Sans', sans-serif; overflow-wrap:anywhere; }
 .skip-overview-empty-detail { color:var(--text4, #888); font:10px/1.45 'Plus Jakarta Sans', sans-serif; overflow-wrap:anywhere; }
+.skip-overview-empty-note { margin-top:1px; }
+.skip-overview-empty-note summary { width:max-content; max-width:100%; color:var(--teal,#157a6e); cursor:pointer; font:800 8px/1.35 'DM Mono',monospace; letter-spacing:.05em; text-transform:uppercase; }
+.skip-overview-empty-note summary:focus-visible { outline:2px solid color-mix(in srgb,var(--teal,#157a6e) 42%,transparent); outline-offset:2px; border-radius:2px; }
+.skip-overview-empty-note[open] summary { margin-bottom:4px; }
 .skip-overview-page .overview-responsive-grid > *, .skip-overview-page .overview-command-header, .skip-overview-page .overview-team-context { min-width:0; max-width:100%; }
 .skip-overview-page table { width:100%; table-layout:fixed; }
 .skip-overview-page th, .skip-overview-page td { overflow-wrap:anywhere; }
