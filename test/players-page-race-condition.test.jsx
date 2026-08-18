@@ -898,12 +898,13 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await waitFor(() => expect(screen.getByText("Core First Player")).toBeInTheDocument());
     await user.click(screen.getByText("Core First Player"));
 
-    expect(await screen.findByText(/Core MLB profile loaded/)).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: "Loading supplemental player profile data" })).toBeInTheDocument();
+    expect(screen.getByText("Hydrating optional context")).toBeInTheDocument();
     expect(screen.getByText("Career Batting")).toBeInTheDocument();
     expect(screen.getAllByText("Core First Player").length).toBeGreaterThanOrEqual(1);
 
     resolveExtras();
-    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading supplemental player profile data" })).not.toBeInTheDocument());
   });
 
   it("publishes verified contract data before optional profile enrichment finishes", async () => {
@@ -955,11 +956,11 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await waitFor(() => expect(publishImportant).toEqual(expect.any(Function)));
     publishImportant();
     expect(await screen.findByText("Under Contract")).toBeInTheDocument();
-    expect(screen.getByText(/Core MLB profile loaded/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading supplemental player profile data" })).toBeInTheDocument();
 
     await waitFor(() => expect(publishOptional).toEqual(expect.any(Function)));
     publishOptional();
-    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading supplemental player profile data" })).not.toBeInTheDocument());
   });
 
   it("keeps the faster, later-clicked player instead of an older, slower response clobbering it", async () => {
