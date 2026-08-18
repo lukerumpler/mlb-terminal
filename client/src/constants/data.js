@@ -2,6 +2,27 @@ import { C } from './colors.js';
 
 export const SEASON = 2026;
 
+// Official MLB Pipeline in-season Farm System Rankings, published Aug. 16,
+// 2026. This is a dated editorial ranking snapshot, not a live stat feed.
+// Baseball America's public 2026 Top 100 methodology is retained as context
+// only; no Baseball America subscription-only rank values are imported.
+export const MLB_PIPELINE_FARM_SYSTEM_RANKINGS = Object.freeze({
+  season: 2026,
+  publishedAt: '2026-08-16',
+  source: 'MLB Pipeline',
+  sourceUrl: 'https://www.mlb.com/news/in-season-farm-system-rankings-2026',
+  methodologyReference: {
+    source: 'Baseball America',
+    sourceUrl: 'https://www.baseballamerica.com/rankings/2026-top-100-prospects/',
+    use: 'Public methodology reference only; subscription-only ranking values are not imported.',
+  },
+  ranks: Object.freeze({
+    LAD:1, TB:2, MIL:3, STL:4, SF:5, WSH:6, BAL:7, DET:8, SEA:9, MIA:10,
+    MIN:11, CLE:12, PIT:13, ATH:14, CWS:15, COL:16, LAA:17, NYM:18, KC:19, TEX:20,
+    ATL:21, TOR:22, CIN:23, BOS:24, ARI:25, PHI:26, NYY:27, CHC:28, HOU:29, SD:30,
+  }),
+});
+
 export const TEAMS = {
   lad: { name:'Los Angeles Dodgers',  abbr:'LAD', color:'#005A9C', id:119,  w: 73, l: 48, pct: 0.603, rs: 606, ra: 464, era:2.98, ops:.802, hr:98,  avg:.268, obp:.352, slg:.450, whip:1.06, k:628, sb:54, wrcPlus:124, fip:3.11, drs:18, bsr:14.2, war:22.1, div:'NL West' },
   nyy: { name:'New York Yankees',     abbr:'NYY', color:'#003087', id:147,  w: 68, l: 52, pct: 0.567, rs: 545, ra: 455, era:3.21, ops:.778, hr:104, avg:.249, obp:.336, slg:.442, whip:1.12, k:598, sb:34, wrcPlus:116, fip:3.34, drs:12, bsr:9.8,  war:19.4, div:'AL East' },

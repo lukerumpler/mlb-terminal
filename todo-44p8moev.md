@@ -309,3 +309,9 @@
 - [x] Recalculate or improve supported facet grades from validated inputs, preserving explicit calculated and unavailable provenance.
 - [x] Add regression coverage and validate the upgraded grade cards on desktop and mobile.
 - [x] Publish the Overall hierarchy and facet-grade evaluation upgrade.
+
+- [x] Verify licit, stable Baseball America and official MLB farm-ranking sources and their usable access level.
+- [x] Audit the current Depth calculation against validated organization-ranking inputs and the Playoff Odds source contract.
+- [x] Implement only source-approved Depth or Playoff Odds improvements, with explicit freshness and unavailable states.
+- [x] Add source-integrity regressions, run the full release gate, and validate responsive presentation.
+- [x] Publish the verified farm-ranking and playoff-odds update.

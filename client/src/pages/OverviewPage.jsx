@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
+import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, MLB_PIPELINE_FARM_SYSTEM_RANKINGS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines } from '../engine/skip.js';
 import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
@@ -211,6 +211,11 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
 
 export function resolveMetricProviderStatus(value, providerStatus) {
   return value == null ? (providerStatus === 'loading' ? 'loading' : 'coverage-gap') : providerStatus;
+}
+export function resolveVerifiedPlayoffOdds(value) {
+  if (value == null || value === '') return null;
+  const odds = Number(value);
+  return Number.isFinite(odds) && odds >= 0 && odds <= 100 ? odds : null;
 }
 function ord(n) {
   if (n == null || n === '' || !Number.isFinite(Number(n))) return '—';
@@ -453,15 +458,25 @@ export function deriveFrontOfficeCoverageGrades({ players = { hitting:[], pitchi
     : validOaaPercentile != null
       ? Math.round(defenseCoveragePct * 0.45 + validOaaPercentile * 0.55)
       : defenseCoveragePct;
-  const depthPct = verifiedRoster && positions.length
+  const rosterDepthPct = verifiedRoster && positions.length
     ? Math.min(100, Math.round(((Math.min(rollups.activePlayers, 26) / 26) * 0.5 + (coveragePct / 100) * 0.25 + (Math.min(pitcherCount, 13) / 13) * 0.25) * 100))
     : null;
+  const farmSystemRank = Number(MLB_PIPELINE_FARM_SYSTEM_RANKINGS.ranks[String(teamAbbr).toUpperCase()]);
+  const farmSystemPct = Number.isFinite(farmSystemRank) && farmSystemRank >= 1 && farmSystemRank <= 30
+    ? Math.round(((31 - farmSystemRank) / 30) * 100)
+    : null;
+  const depthPct = rosterDepthPct != null && farmSystemPct != null
+    ? Math.round(rosterDepthPct * 0.6 + farmSystemPct * 0.4)
+    : rosterDepthPct ?? farmSystemPct;
   const futureValue = deriveOrganizationFutureValue(teamAbbr);
   return {
     defensePct,
     defenseCoveragePct,
     oaaPercentile:Number.isFinite(validOaaPercentile) ? validOaaPercentile : null,
     depthPct,
+    rosterDepthPct,
+    farmSystemRank:Number.isFinite(farmSystemRank) ? farmSystemRank : null,
+    farmSystemPct,
     futureValuePct:futureValue.futureValuePct,
     fieldingPositions:fieldingPositions.length,
     fieldingPlayerCount,
@@ -1476,7 +1491,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
-  const providerPlayoffOdds = finiteMetric(teamModelData?.playoffOdds);
+  const providerPlayoffOdds = resolveVerifiedPlayoffOdds(teamModelData?.playoffOdds);
   const hasProviderPlayoffOdds = providerPlayoffOdds != null;
   const secondaryPlayoffOddsDisplay = secondaryPlayoffOddsData?.found ? secondaryPlayoffOddsData.playoffOddsDisplay : null;
   const hasSecondaryPlayoffOdds = Boolean(secondaryPlayoffOddsDisplay);
@@ -1797,7 +1812,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       teamAbbr:team.abbr,
       oaaPercentile:teamOaaData?.oaaPercentile,
     });
-    const { defensePct, defenseCoveragePct, oaaPercentile, depthPct, futureValuePct, fieldingPositions, fieldingPlayerCount, pitcherCount, activePlayers, prospectCount, prospectTopFiveAverage, prospectOrganizationCount } = frontOfficeCoverage;
+    const { defensePct, defenseCoveragePct, oaaPercentile, depthPct, rosterDepthPct, farmSystemRank, farmSystemPct, futureValuePct, fieldingPositions, fieldingPlayerCount, pitcherCount, activePlayers, prospectCount, prospectTopFiveAverage, prospectOrganizationCount } = frontOfficeCoverage;
     const divName = team.div || 'League';
     const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
       const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
@@ -1824,14 +1839,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       { label:'Pitching', grade:pctToGrade(pitchingPct), color:C.rust, detail:pitchingPct == null ? 'Unavailable: verified team ERA and comparable MLB aggregate data are not both available.' : `Calculated from verified team ERA relative to the available MLB team aggregate set (${Math.round(pitchingPct)}th percentile).` },
       { label:'Defense', grade:pctToGrade(defensePct), color:C.teal, detail:defensePct == null ? 'Unavailable: verified roster coverage is not available.' : oaaPercentile == null ? `Calculated from verified roster fielding coverage (${fieldingPositions} positions, ${fieldingPlayerCount} fielders); OAA was unavailable, so it is not included.` : `Calculated from Baseball Savant team OAA (${Math.round(oaaPercentile)}th percentile) at 55% and verified roster fielding coverage (${Math.round(defenseCoveragePct)}%) at 45%.` },
       { label:'Baserunning', grade:pctToGrade(speedPct), color:C.teal, detail:speedPct == null ? 'Unavailable: verified stolen-base and caught-stealing totals plus comparable MLB aggregate data are required.' : `Calculated from stolen-base volume (${Math.round(baserunning.volumePercentile)}th percentile) and steal success rate (${(baserunning.successRate * 100).toFixed(1)}%; ${Math.round(baserunning.efficiencyPercentile)}th percentile) across ${baserunning.attempts} attempts.` },
-      { label:'Depth', grade:pctToGrade(depthPct), color:C.slate, detail:depthPct == null ? 'Unavailable: verified season roster coverage is not available.' : `Calculated from ${activePlayers} verified season roster rows, ${fieldingPositions} fielding positions, and ${pitcherCount} pitcher rows. It measures available roster coverage, not provider WAR.` },
+      { label:'Depth', grade:pctToGrade(depthPct), color:C.slate, detail:depthPct == null ? 'Unavailable: neither verified roster coverage nor an official MLB Pipeline farm-system rank is available.' : rosterDepthPct != null && farmSystemPct != null ? `Calculated 60% from ${activePlayers} verified season roster rows, ${fieldingPositions} fielding positions, and ${pitcherCount} pitcher rows; 40% from MLB Pipeline’s No. ${farmSystemRank} farm-system rank (published Aug. 16, 2026). Baseball America is a public methodology reference only; subscription-only ranks are not imported.` : farmSystemPct != null ? `Calculated from MLB Pipeline’s No. ${farmSystemRank} farm-system rank (published Aug. 16, 2026) because verified roster coverage is unavailable. Baseball America is a methodology reference only; subscription-only ranks are not imported.` : `Calculated from ${activePlayers} verified season roster rows, ${fieldingPositions} fielding positions, and ${pitcherCount} pitcher rows. MLB Pipeline’s dated farm-system rank is unavailable.` },
       { label:'Future Value', grade:pctToGrade(futureValuePct), color:C.purple, detail:futureValuePct == null ? 'Unavailable: no team-scoped SKIP prospect snapshot is available.' : `Calculated from this organization’s top-five SKIP prospect FV average (${prospectTopFiveAverage.toFixed(1)}) relative to ${prospectOrganizationCount} organizations in the current snapshot (${Math.round(futureValuePct)}th percentile; ${prospectCount} graded prospect${prospectCount === 1 ? '' : 's'}).` },
     ];
     const frontOfficeOverall = buildFrontOfficeGradeSummary(frontOfficeGradeRows);
     return {
       offenseData:liveRadar.offenseData,strengthData:liveRadar.strengthData,radarSource:liveRadar.source,standings,leagueRanks,pctBars,divName,
       og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:pctToGrade(defensePct),bg:pctToGrade(speedPct),depthGrade:pctToGrade(depthPct),futureValueGrade:pctToGrade(futureValuePct),
-      defensePct,defenseCoveragePct,oaaPercentile,depthPct,futureValuePct,fieldingPositions,fieldingPlayerCount,pitcherCount,activePlayers,prospectCount,prospectTopFiveAverage,prospectOrganizationCount,
+      defensePct,defenseCoveragePct,oaaPercentile,depthPct,rosterDepthPct,farmSystemRank,farmSystemPct,futureValuePct,fieldingPositions,fieldingPlayerCount,pitcherCount,activePlayers,prospectCount,prospectTopFiveAverage,prospectOrganizationCount,
       frontOfficeGradeRows,frontOfficeOverall,overall:frontOfficeOverall.grade,
     };
   },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, rd]);
@@ -2201,7 +2216,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 teamKey={team.abbr}
               />
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
-                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense uses roster coverage and, when available, Statcast OAA (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Baserunning uses steals and success rate; Depth uses roster coverage; Future Value ranks the SKIP prospect snapshot.</div>
+                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense uses roster coverage and, when available, Statcast OAA (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Baserunning uses steals and success rate; Depth blends roster coverage with a dated MLB Pipeline farm rank. Baseball America is a methodology reference; its subscription-only ranks are not imported.</div>
                 <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>
               </div>
             </div>
