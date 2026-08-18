@@ -126,21 +126,21 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
   const cards = [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades];
   const activeCard = cards.find(card => card.label === activeLabel) || null;
   return <div aria-label="Front Office grade details">
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(72px,1fr))',gap:6}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
         const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
         return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
-          style={{textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:7,padding:'7px 3px',cursor:'pointer',color:C.text}}>
+          style={{minHeight:46,textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:6,padding:'5px 3px',cursor:'pointer',color:C.text}}>
           <div style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</div>
-          <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{card.label}</div>
-          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:2})}>details</span>
+          <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
+          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:1})}>details</span>
         </button>;
       })}
     </div>
     {activeCard
-      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.4,marginTop:7,padding:'6px 8px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
-      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Select a grade for its calculation, data source, and limitations.</div>}
+      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.35,marginTop:6,padding:'5px 7px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
+      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.3,marginTop:6})}>Select a grade for its calculation, data source, and limitations.</div>}
   </div>;
 }
 
@@ -1686,6 +1686,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'VERIFIED ROSTER ROWS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
   const showInitialSkeleton = liveTeamDataMode === 'loading' && !liveTeamData && !liveTeamError;
   const mlbParentReadyForAffiliate = liveTeamDataMode !== 'loading' || Boolean(liveTeamData);
+  const openExecutiveDestination = (view, targetId) => {
+    setOverviewView(view);
+    if (!targetId || typeof document === 'undefined') return;
+    const scrollToTarget = () => document.getElementById(targetId)?.scrollIntoView?.({ behavior:'smooth', block:'start' });
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(scrollToTarget));
+    } else {
+      setTimeout(scrollToTarget, 0);
+    }
+  };
 
   return (
     <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
@@ -1815,9 +1825,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Cached verified rows · provider blocked' : 'Provider blocked · no verified rows') : 'Verified WAR by division'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
-        <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
+        {divisionWarData.length ? <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
           <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} />
-        </Suspense>
+        </Suspense> : <OverviewEmptyState status={teamModelData?.providerBlocked ? 'Provider blocked' : 'Unavailable'} message="Divisional WAR rows" detail="No verified FanGraphs divisional WAR rows are available for this view, so SKIP does not reserve chart-sized space for an empty comparison." />}
         {divisionWarData.length > 0 && <div className="skip-divisional-war-table-wrap">
           <table className="skip-divisional-war-table" aria-label="Exact divisional WAR values">
             <thead><tr><th scope="col">Team</th><th scope="col">Total</th><th scope="col">Off</th><th scope="col">Pitch</th><th scope="col">Def</th></tr></thead>
@@ -1871,17 +1881,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
         <div className="skip-overview-executive-grid">
           {[
-            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy},
-            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
+            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, destination:'Organization depth', action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
           ].map((item, i) => (
-            <div key={item.label} className="skip-overview-executive-item" style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
+            <button key={item.label} type="button" className="skip-overview-executive-item" onClick={item.action} aria-label={`Open ${item.destination}: ${item.label}`} style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
               <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
               <div style={sans({fontSize:15,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
-              {item.action ? (
-                <button onClick={item.action} style={{marginTop:6,padding:0,border:'none',background:'transparent',fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:10,color:C.purple,cursor:'pointer',textAlign:'left',textDecoration:'underline',textUnderlineOffset:2}}>{item.detail} →</button>
-              ) : <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>}
-            </div>
+              <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>
+              <span className="skip-overview-executive-item-link">Open {item.destination} →</span>
+            </button>
           ))}
         </div>
         <a className="skip-overview-analysis-link" href="#team-overview-detailed-analysis">Continue to detailed team cards ↓</a>
@@ -1895,10 +1904,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <p>Leaders, team evaluation, and strength context.</p>
         </div>
-        <div id="team-overview-detailed-analysis" className="overview-responsive-grid overview-decision-row skip-overview-deferred-analysis" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr)',minHeight:'100%',gap:14,alignItems:'start'}}>
+        <div id="team-overview-detailed-analysis" className="overview-responsive-grid overview-decision-row skip-overview-deferred-analysis" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr)',minHeight:'100%',gap:10,alignItems:'start'}}>
         <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
-          <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
+          <div style={{padding:'7px 10px 5px',borderBottom:`0.5px solid ${C.borderLight}`}}>
+            <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:5})}>Batting</div>
             {leaders.batting.slice(0,2).map((row,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
@@ -1909,8 +1918,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
             ))}
           </div>
-          <div style={{padding:'10px 14px 6px'}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:8})}>Pitching</div>
+          <div style={{padding:'7px 10px 5px'}}>
+            <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:5})}>Pitching</div>
             {leaders.pitching.slice(0,1).map((row,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
@@ -1924,8 +1933,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </Panel>
 
         <Panel title="Front Office Evaluation" accent={OVERVIEW_ACCENTS.context} badge="Decision Lens">
-          <div style={{padding:'10px 14px 0'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div style={{padding:'8px 10px 0'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
               <div>
                 <div style={sans({fontSize:9.5,fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Strengths</div>
                 {fo.strengths.map(s=>(

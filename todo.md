@@ -11317,3 +11317,6 @@
 - [x] Inspect the Team Overview’s initial viewport and identify card sections to defer.
 - [x] Reorder Team Overview content so card-based analysis appears later without hiding team controls or decision context.
 - [x] Add regression coverage, verify desktop and mobile layout order, and publish the refinement.
+- [x] Inspect Executive Briefing shortcut destinations and current Team Overview data-card spacing.
+- [x] Add accessible Executive Briefing workspace shortcuts and compact the detailed data-card layout without reducing readability.
+- [x] Add regression coverage, verify desktop and mobile behavior, and publish the shortcut and spacing refinement.

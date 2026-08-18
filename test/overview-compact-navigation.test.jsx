@@ -65,6 +65,25 @@ describe('Team Overview compact navigation', () => {
     expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('uses all Executive Briefing items as direct workspace shortcuts', async () => {
+    const onNavigate = vi.fn();
+    window.addEventListener('skip-navigate', onNavigate);
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: current posture/i }));
+    expect(screen.getByText('Offensive Profile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
+    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: best signal/i }));
+    expect(screen.getByText('Run Differential — 2026')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
+    fireEvent.click(screen.getByRole('button', { name: /open organization depth: next question/i }));
+    expect(onNavigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { tab: 'prospects' } }));
+    window.removeEventListener('skip-navigate', onNavigate);
+  });
+
   it('defers FanGraphs model requests until Performance is explicitly opened', async () => {
     render(<OverviewPage />);
 
