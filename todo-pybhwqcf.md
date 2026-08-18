@@ -384,3 +384,8 @@
 - [x] Combine Follow List with Intel Feed while retaining direct access to followed-player activity
 - [x] Combine Alerts with Settings and provide an accessible bell indicator with the current alert count
 - [x] Add navigation regression coverage, run validation, and verify the desktop and mobile workspace layouts
+- [x] Audit PR #3 for residual data-loading, cache, runtime, and release-gate gaps before merging
+- [x] Apply and validate only evidence-based pre-merge fixes, if any are found
+- [x] Re-run the final full merge gate and update PR #3 with its current validation status
+- [x] Merge the user-approved PR #3 into GitHub main and verify the resulting main commit
+- [x] Reconcile the completed Talent, Intel Feed, and Settings navigation work into the protected PR #3 branch before final merge validation

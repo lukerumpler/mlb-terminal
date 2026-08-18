@@ -12,6 +12,16 @@ function response(data) {
   };
 }
 
+function failedResponse(status = 503) {
+  return {
+    ok: false,
+    status,
+    headers: { get: () => null },
+    json: async () => ({}),
+    text: async () => '',
+  };
+}
+
 function seasonStats(group, stat = {}) {
   return {
     stats: [{
@@ -187,4 +197,44 @@ describe('Player Profile pitcher request budget', () => {
       careerRows: [{ side: 'LHP' }, { side: 'RHP' }],
     });
   });
+
+  it('does not double a player-scoped Savant request into the prior season after an upstream failure', async () => {
+    const urls = [];
+    vi.stubGlobal('fetch', vi.fn(async input => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes('/api/contract')) return response({ found: false });
+      if (url.includes('/api/team-financials')) return response({ found: false });
+      if (url.includes('/api/player-advanced')) return response({});
+      if (url.includes('/api/savant')) {
+        if (url.includes('endpoint=contact_points')) return failedResponse(503);
+        return response([]);
+      }
+
+      const parsed = new URL(url, 'https://skipbasebal-mm6hz9ps.manus.space');
+      const path = parsed.searchParams.get('path');
+      if (path === '/people/407') {
+        return response({ people: [{
+          id: 407,
+          fullName: 'Budget Batter',
+          primaryPosition: { type: 'Infielder', abbreviation: 'SS' },
+          currentTeam: { id: 119, abbreviation: 'LAD', sport: { id: 1 } },
+        }] });
+      }
+      if (path === '/schedule') return response({ dates: [] });
+      if (path === '/people/407/stats') {
+        const group = parsed.searchParams.get('group');
+        return response(seasonStats(group || 'hitting', group === 'hitting' ? { atBats: 12, ops: '.800' } : {}));
+      }
+      return response({});
+    }));
+
+    const player = await loadFullPlayer({ id: 407, fullName: 'Budget Batter', team: 'LAD' }, 2026);
+    const contactRequests = urls.filter(url => url.includes('endpoint=contact_points'));
+
+    expect(player.isPitcher).toBe(false);
+    expect(contactRequests).toHaveLength(1);
+    expect(contactRequests[0]).toContain('year=2026');
+    expect(contactRequests.some(url => url.includes('year=2025'))).toBe(false);
+  }, 15_000);
 });
