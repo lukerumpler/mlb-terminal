@@ -7,4 +7,4 @@
 - [x] Add or update focused automated tests for every production-code change made in this session. No production code was changed in this session; the current branch’s concurrent production change is covered by its focused regression and the full gate.
 - [x] Run type checking, the relevant test suites, a production build, and browser-level release checks; resolve material failures. The latest full gate passed 113 test files / 535 tests, while MLB, Savant, news, and FanGraphs provider contracts all passed; public Overview, Talent, and player-profile smoke checks completed without a visible application failure.
 - [x] Commit and push the validated main-branch release, checkpoint it for publication, and verify the production site. Managed checkpoints 45450c5e and 00376784 are live; external GitHub PR #4 merged cleanly to main at 576d127 after the Vercel check passed, and the custom domain was refreshed successfully.
-- [ ] Produce a concise integration decision record and release summary.
+- [x] Produce a concise integration decision record and release summary.
