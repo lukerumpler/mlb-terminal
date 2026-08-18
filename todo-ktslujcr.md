@@ -12,4 +12,4 @@
 - [x] Add accessible roster-insights controls for metric sorting, sort direction, player search, and position filtering without mutating source data.
 - [x] Add responsive, reduced-motion-safe skeleton loading states for player statistics and team overview content while preserving transparent source and unavailable-data states. Desktop review confirmed the table controls and the initial overview skeleton render correctly.
 - [x] Add focused Vitest coverage for roster sorting/filtering and skeleton-loading behavior, then run the relevant full validation suite and visual checks. Focused coverage passed 38 assertions; the full suite passed 114 files / 538 tests after explicit test cleanup; TypeScript and production build passed; desktop and mobile previews verified the table, controls, and overview skeleton layout.
-- [ ] Publish the validated roster-table and skeleton-loading enhancement.
+- [x] Publish the validated roster-table and skeleton-loading enhancement. Checkpoint 2446d7ff is live.
