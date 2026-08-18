@@ -244,3 +244,15 @@
 - [x] Improve the Divisional WAR Comparison visual and its provider/fallback labels.
 - [x] Add regressions for schedule readiness and comparative WAR rendering states.
 - [x] Run validation, visually review the repaired Overview panels, and publish the update.
+
+- [x] Inspect the current Divisional WAR comparison panel and verified component fields.
+- [x] Add a compact exact-value divisional WAR table beneath the chart.
+- [x] Preserve selected-team emphasis and explicit unavailable component fields.
+- [x] Add regression coverage and validate the compact comparison table.
+- [x] Review and publish the Divisional WAR table update.
+
+- [x] Inspect the interrupted compact-table patch and current FanGraphs provider status signals.
+- [x] Remove verified-status badges from unavailable Off WAR and Def WAR values.
+- [x] Clarify provider-blocked, cached historical, and live FanGraphs states in the Divisional WAR panel.
+- [x] Complete the compact exact-value Divisional WAR table without manufacturing missing components.
+- [x] Add blocked/cached/unavailable presentation regressions, validate, and publish.

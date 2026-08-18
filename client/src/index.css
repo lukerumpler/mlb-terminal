@@ -1051,6 +1051,14 @@
 .skip-player-favorite-copy small { color:var(--text3); font-family:'DM Mono',monospace; font-size:9px; }
 .skip-player-favorite-remove { flex-shrink:0; padding:4px 6px; border:0.5px solid var(--border); border-radius:4px; background:transparent; color:var(--text3); cursor:pointer; font-family:'DM Mono',monospace; font-size:8px; }
 .skip-player-favorite-remove:hover, .skip-player-favorite-remove:focus-visible { border-color:var(--rust); color:var(--rust); }
+.skip-divisional-war-table-wrap { margin:2px 14px 8px; overflow-x:auto; border:1px solid var(--border-light); border-radius:7px; background:var(--surface2); }
+.skip-divisional-war-table { width:100%; min-width:360px; border-collapse:collapse; color:var(--text2); font:800 9px/1.25 'DM Mono',monospace; font-variant-numeric:tabular-nums; }
+.skip-divisional-war-table th, .skip-divisional-war-table td { padding:6px 8px; border-bottom:1px solid var(--border-light); text-align:right; white-space:nowrap; }
+.skip-divisional-war-table thead th { color:var(--text4); font-size:8px; letter-spacing:.06em; text-transform:uppercase; }
+.skip-divisional-war-table th:first-child, .skip-divisional-war-table tbody th { text-align:left; }
+.skip-divisional-war-table tbody tr:last-child th, .skip-divisional-war-table tbody tr:last-child td { border-bottom:0; }
+.skip-divisional-war-table tbody tr[data-selected='true'] { background:color-mix(in srgb,var(--teal-soft,#e7f5f0) 80%,var(--surface2)); }
+.skip-divisional-war-table tbody tr[data-selected='true'] th { color:var(--teal); }
 @media (max-width:640px) {
   .skip-player-favorites-list { grid-template-columns:1fr; }
   .skip-player-favorite-row { padding:8px; }
