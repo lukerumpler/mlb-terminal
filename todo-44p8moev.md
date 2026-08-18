@@ -262,3 +262,9 @@
 - [x] Implement calculated metrics with explicit method and provenance labels.
 - [x] Preserve unavailable states for unsupported provider-only metrics.
 - [x] Add calculation integrity regressions, validate responsive UI labels, and publish.
+
+- [x] Inspect current win-pace projection presentation, request lifecycle, cache boundaries, and recent dashboard errors.
+- [x] Add a compact pythagorean W–L comparison beside the existing win-pace projections with clear calculated provenance.
+- [x] Apply targeted dashboard reliability and performance optimizations without suppressing source-gap states.
+- [x] Add regression coverage for the comparison, request bounds, and optimized fallback behavior.
+- [x] Run full validation, review desktop/mobile dashboard performance, and publish.
