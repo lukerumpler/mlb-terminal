@@ -65,12 +65,12 @@ describe('rendered FanGraphs local fallback', () => {
     expect(screen.getAllByText('FanGraphs').length).toBeGreaterThan(0);
   });
 
-it('uses clearly labeled MLB standings odds and WAR proxies only when FanGraphs values are unavailable', async () => {
+it('does not fabricate playoff odds when FanGraphs is unavailable while retaining clearly labeled MLB pace and WAR proxies', async () => {
     vi.stubGlobal('fetch', vi.fn(async url => {
       if (String(url).includes('/api/fangraphs-models')) return jsonResponse({ found:false, playoffOdds:null, teamWar:null, statuses:{ playoffOdds:'unavailable', teamWar:'unavailable' } });
       if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
         source:'MLB Stats API', provenance:'calculated-from-verified-standings', freshness:'calculated',
-        metrics:{ projectedWins:95.9, projectedLosses:66.1, pythagoreanProjectedWins:91.2, pythagoreanProjectedLosses:70.8, calculatedPlayoffOdds:90.6, calculatedWarProxy:51.2 },
+        metrics:{ projectedWins:95.9, projectedLosses:66.1, pythagoreanProjectedWins:91.2, pythagoreanProjectedLosses:70.8, calculatedWarProxy:51.2 },
       });
       return jsonResponse({});
     }));
@@ -78,15 +78,15 @@ it('uses clearly labeled MLB standings odds and WAR proxies only when FanGraphs 
     render(<OverviewPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
-    expect(await screen.findByText('90.6%')).toBeInTheDocument();
+    expect((await screen.findAllByText('Unavailable')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('51.2').length).toBeGreaterThan(0);
     expect(screen.getByText('WAR Proxy')).toBeInTheDocument();
     expect(screen.getByText('Pythag W')).toBeInTheDocument();
     expect(screen.getByText('Pythag L')).toBeInTheDocument();
     expect(screen.getAllByText('91.2').length).toBeGreaterThan(0);
     expect(screen.getAllByText('70.8').length).toBeGreaterThan(0);
-    expect(screen.getByText(/calculated playoff proxy/i)).toBeInTheDocument();
-    expect(screen.getByText(/MLB calculated · pace: record · pythag: RS\/RA · odds\/WAR: proxies/i)).toBeInTheDocument();
+    expect(screen.getByText(/Playoff odds: Provider unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/MLB calculated · pace: record · pythag: RS\/RA · WAR: proxy · playoff odds: FanGraphs only/i)).toBeInTheDocument();
   });
 
   it('fills blank headline standings values from the verified backend official-standings response', async () => {

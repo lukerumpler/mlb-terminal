@@ -11327,3 +11327,6 @@
 - [x] Combine Prospects with Draft and combine AMD/IMD with Intelligence and Knowledge using horizontal sub-tabs.
 - [x] Replace the visible LIVE 2026 treatment with Search and move theme switching into Settings.
 - [x] Add navigation regression coverage, verify desktop and mobile workflows, and publish the workspace reorganization.
+- [x] Trace the Team Overview playoff-odds data source, calculation, fallback, and display states.
+- [x] Validate representative team odds against current standings inputs and source provenance.
+- [x] Correct any playoff-odds accuracy or transparency issue, add regression coverage, and publish the verified result.

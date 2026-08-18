@@ -1318,14 +1318,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const displayedInsights = aiInsights || rosterInsights;
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const providerPlayoffOdds = finiteMetric(teamModelData?.playoffOdds);
-  const calculatedPlayoffOdds = finiteMetric(calculatedMetrics.calculatedPlayoffOdds);
   const hasProviderPlayoffOdds = providerPlayoffOdds != null;
-  const hasCalculatedPlayoffOdds = calculatedPlayoffOdds != null;
-  const playoffOddsIsCalculated = !hasProviderPlayoffOdds && hasCalculatedPlayoffOdds;
   const playoffOddsValue = hasProviderPlayoffOdds
     ? `${providerPlayoffOdds.toFixed(1)}%`
-    : hasCalculatedPlayoffOdds ? `${calculatedPlayoffOdds.toFixed(1)}%` : 'Unavailable';
-  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : playoffOddsIsCalculated ? 'MLB Stats API · calculated playoff proxy' : 'Provider unavailable';
+    : 'Unavailable';
+  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : 'Provider unavailable';
   const providerTeamWar = finiteMetric(teamModelData?.teamWar);
   const calculatedWarProxy = finiteMetric(calculatedMetrics.calculatedWarProxy);
   const hasProviderTeamWar = providerTeamWar != null;
@@ -1857,7 +1854,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {overviewView === 'performance' && <>
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
-        <span>Model source: <strong style={{color:C.text2}}>{(playoffOddsIsCalculated || teamWarIsCalculated) ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
+        <span>Model source: <strong style={{color:C.text2}}>{teamWarIsCalculated ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource} · {teamWarIsCalculated ? 'WAR: MLB Stats API · calculated proxy' : `Team WAR: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`}</span>
       </div>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
@@ -1896,7 +1893,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             return <div key={label} title={metricTitle} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span>{value == null && <span style={px({fontSize:8,color:C.text4,letterSpacing:'.04em'})}>—</span>}</div></div>;
           })}
         </div>
-        <div title="Playoff odds are a calculated proxy, not official or FanGraphs odds. WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || playoffOddsIsCalculated || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · odds/WAR: proxies' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
+        <div title="Playoff odds are shown only when FanGraphs returns a team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately. WAR proxy is Pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · WAR: proxy · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
       </>}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
