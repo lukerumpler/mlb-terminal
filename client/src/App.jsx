@@ -468,16 +468,11 @@ export default function App() {
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
               {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
-<<<<<<< HEAD
               {tab === 'alerts'       && <AlertsWorkspacePanel />}
+              {tab === 'uptime'       && <UptimeMonitorPage />}
               </Suspense>
             </PageErrorBoundary>
           </div>
-=======
-              {tab === 'uptime'       && <UptimeMonitorPage />}
-            </Suspense>
-          </PageErrorBoundary>
->>>>>>> 209b88e (Add durable uptime monitor feature branch)
         </div>
 
         <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />
