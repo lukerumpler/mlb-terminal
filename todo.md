@@ -11339,3 +11339,17 @@
 - [x] Implement any compatible player-profile request-cancellation and core-loading improvements without weakening existing sequence safeguards.
 - [x] Add a reversible, data-provenance-safe ScoreRing preview to the existing Front Office Evaluation only if the current data contract supports it.
 - [x] Add regression coverage, validate desktop and mobile states, and publish the selective optimization release.
+
+- [x] Establish a current release baseline with runtime, network, data-source, and build-health evidence.
+- [x] Audit and prioritize verified reliability, loading, caching, accessibility, and responsive UX issues across the application.
+- [x] Implement only evidence-backed optimization and defect fixes while preserving explicit source provenance and unavailable states.
+- [x] Add regression coverage, complete release validation, and publish the optimization pass.
+- [x] Record the already documented GitHub-main synchronization commit in the release-gate baseline after compatibility review.
+- [x] Defer official ballpark metadata loading until the Operations workspace is opened, with an explicit idle state before that request begins.
+- [x] Defer heavyweight team Statcast rollups until the Performance workspace is opened, preserving source-aware loading and cached states.
+- [x] Reset Performance-only team Statcast state on a team change so one club’s values cannot remain visible while another club loads.
+- [x] Compare the supplied canonical ScoreRing guide with the active canonical grade model and retain only non-conflicting accessibility or integrity improvements.
+- [x] Audit the supplied uptime-monitor branch guidance without applying migrations, schedules, or branch merges unless separately planned and verified.
+- [x] Replace the conflicting Performance-workspace legacy SKIP Grade grid with a keyboard-accessible route to the canonical Front Office Evaluation.
+- [x] Defer optional AI roster insights until the Roster workspace opens while retaining immediate verified local roster analysis.
+- [x] Defer redundant calculated-intelligence standings work until Performance opens, while retaining it as a source-labeled fallback there.

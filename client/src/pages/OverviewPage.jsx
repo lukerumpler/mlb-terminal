@@ -1384,6 +1384,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [mlbRetryToken]);
   useEffect(() => {
+    if (overviewView !== 'operations') return undefined;
     let alive = true;
     setTeamVenueState('loading');
     setTeamVenueMetadata(null);
@@ -1397,7 +1398,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamVenueState('unavailable');
     });
     return () => { alive = false; };
-  }, [teamBase?.id, mlbRetryToken]);
+  }, [overviewView, teamBase?.id, mlbRetryToken]);
   useEffect(() => {
     if (overviewView !== 'operations') return undefined;
     let alive = true;
@@ -1416,6 +1417,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, [overviewView, teamBase?.id, mlbRetryToken]);
   const rosterSavantKey = useMemo(() => buildRosterSavantKey(liveTeamPlayers), [liveTeamPlayers]);
   useEffect(() => {
+    if (overviewView !== 'performance') return undefined;
     let alive = true;
     const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
     const applySnapshot = (snapshot, source) => {
@@ -1431,8 +1433,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       setTeamSavantSource(source);
       setTeamSavantState(exitRows.length || batted.length || pitches.length ? 'ready' : 'unavailable');
     };
+    if (cached?.data) applySnapshot(cached.data, 'Baseball Savant Statcast Search · cached verified roster rollup');
     if (cached && !shouldRefreshDailyCache(cached)) {
-      applySnapshot(cached.data, 'Baseball Savant Statcast Search · cached verified roster rollup');
       return () => { alive = false; };
     }
     setTeamExitVelocityRows([]);
@@ -1466,7 +1468,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr, savantRetryToken, rosterSavantKey]);
+  }, [overviewView, teamBase?.abbr, savantRetryToken, rosterSavantKey]);
   useEffect(() => {
     if (overviewView !== 'performance') return undefined;
     let alive = true;
@@ -1530,6 +1532,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
   useEffect(() => {
+    const selectedStanding = liveTeamData?.byId?.[teamBase?.id]?.standings || liveTeamData?.byAbbr?.[teamBase?.abbr]?.standings;
+    const hasVerifiedSelectedStanding = Number.isFinite(Number(selectedStanding?.w)) && Number.isFinite(Number(selectedStanding?.l));
+    if (overviewView !== 'performance' && hasVerifiedSelectedStanding) return undefined;
     let alive = true;
     setCalculatedIntelligence(null);
     setCalculatedIntelligenceState(teamBase?.id ? 'loading' : 'idle');
@@ -1541,12 +1546,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive) setCalculatedIntelligenceState('unavailable');
     });
     return () => { alive = false; };
-  }, [teamBase?.id, mlbRetryToken]);
+  }, [overviewView, liveTeamData, teamBase?.id, teamBase?.abbr, mlbRetryToken]);
 
   useEffect(() => {
+    if (overviewView !== 'performance') return undefined;
     let alive = true;
     const cached = readTeamSavantSummaryCache(teamBase?.abbr, CURRENT_SEASON);
-    if (cached?.data) setTeamSavantData(cached.data);
+    setTeamSavantData(cached?.data || null);
     if (cached && !shouldRefreshDailyCache(cached)) {
       return () => { alive = false; };
     }
@@ -1557,7 +1563,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive && !cached?.data) setTeamSavantData({ status:'upstream-unavailable', source:'Baseball Savant', retrievedAt:new Date().toISOString() });
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr]);
+  }, [overviewView, teamBase?.abbr]);
 
   useEffect(() => {
     let alive = true;
@@ -1576,6 +1582,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }), [team.name, team.abbr, team.w, team.l, team.pct, team.rs, team.ra, team.ops, team.hr, team.era, team.whip, team.k, team.sb, liveTeamPlayers]);
 
   useEffect(() => {
+    if (overviewView !== 'roster') return undefined;
     const requestKey = `${teamBase?.abbr || ''}:${rosterInsightsRetryToken}`;
     if (!shouldStartRosterInsightsRequest({
       hasLiveData: Boolean(liveTeamData),
@@ -1610,7 +1617,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(error => { if (alive && error?.name !== 'AbortError') setAiInsightsState('error'); });
     return () => { alive = false; controller.abort(); };
-  }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
+  }, [overviewView, liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const providerPlayoffOdds = resolveVerifiedPlayoffOdds(teamModelData?.playoffOdds);
@@ -2310,6 +2317,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
         </Panel>
 
+        <div id="team-overview-front-office-evaluation">
         <Panel title="Front Office Evaluation" accent={OVERVIEW_ACCENTS.context} badge="Decision Lens">
           <div style={{padding:'8px 10px 0'}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -2344,6 +2352,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
           </div>
         </Panel>
+        </div>
 
         {futureValueModalOpen && <div className="skip-future-value-modal-backdrop" role="presentation" onMouseDown={() => setFutureValueModalOpen(false)}>
           <section className="skip-future-value-modal" role="dialog" aria-modal="true" aria-labelledby="future-value-depth-title" onMouseDown={event => event.stopPropagation()}>
@@ -2557,21 +2566,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </tbody>
             </table>
           </Panel>
-          <Panel title="SKIP Grade" accent={OVERVIEW_ACCENTS.context}>
-            <div style={{padding:'14px 14px 10px',textAlign:'center'}}>
-              <div style={px({fontSize:52,fontWeight:900,color:C.amber,lineHeight:1})}>{D.overall}</div>
-              <div style={sans({fontSize:11,color:C.text2,marginTop:4,letterSpacing:'.04em'})}>Overall Team Rating</div>
-              <div style={{marginTop:12,borderTop:`0.5px solid ${C.borderLight}`,paddingTop:10,display:'flex',flexDirection:'column',gap:4}}>
-                {[['Offense',D.og,D.pctBars.find(x=>x.lbl==='Offense')?.pct],['Pitching',D.pg,D.pctBars.find(x=>x.lbl==='Pitching')?.pct],['Defense',D.dg,D.defensePct],['Baserunning',D.bg,D.pctBars.find(x=>x.lbl==='Baserunning')?.pct],['Depth',D.depthGrade,D.depthPct],['Future Value',D.futureValueGrade,D.futureValuePct]].map(([l,g,n])=>(
-                  <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px'}}>
-                    <span style={sans({fontSize:11,color:C.text2})}>{l}</span>
-                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <span style={px({fontSize:11,color:C.text3})}>{percentileLabel(n)}</span>
-                      <span style={px({fontSize:12,fontWeight:700,color:C.amber,minWidth:24,textAlign:'right'})}>{g}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <Panel title="Evaluation Context" accent={OVERVIEW_ACCENTS.context} badge="Canonical">
+            <div style={{padding:'12px 14px'}}>
+              <div style={sans({fontSize:11,fontWeight:800,color:C.text})}>One authoritative team evaluation</div>
+              <div style={sans({fontSize:9.5,color:C.text3,lineHeight:1.45,marginTop:5})}>The overall team rating, its 4.30 scale, source coverage, and calculation details are maintained only in Front Office Evaluation. This avoids competing rating formulas across workspaces.</div>
+              <button type="button" onClick={() => {
+                setOverviewView('briefing');
+                window.setTimeout(() => document.getElementById('team-overview-front-office-evaluation')?.scrollIntoView?.({ behavior:'smooth', block:'center' }), 0);
+              }} aria-label="Open canonical Front Office Evaluation" style={{marginTop:10,padding:'6px 8px',border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,cursor:'pointer',...sans({fontSize:9,fontWeight:800})}}>OPEN FRONT OFFICE EVALUATION →</button>
             </div>
           </Panel>
         </div>
