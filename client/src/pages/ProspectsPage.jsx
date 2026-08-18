@@ -288,12 +288,12 @@ function FarmSystemSummaryCard({ summary }) {
             Derived from {summary.trackedCount || 'no'} tracked prospects across {summary.representedOrgs || 'no'} represented organizations.
           </div>
         </div>
-        <div className="skip-farm-summary-rankings" style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
+        <div className="skip-farm-summary-rankings skip-data-list" role="list" aria-label="Top farm-system rankings" style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
           {topRows.length ? topRows.map((row, index) => {
             const teamInfo = TEAMS[row.team.toLowerCase()];
             const bar = row.metrics.score == null ? 0 : row.metrics.score;
             return (
-              <div key={row.team} style={{ padding:'8px 9px', border:`1px solid ${C.borderLight}`, borderRadius:7, background:C.surface2, minWidth:0 }}>
+              <div key={row.team} role="listitem" style={{ padding:'8px 9px', border:`1px solid ${C.borderLight}`, borderRadius:7, background:C.surface2, minWidth:0 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
                   <span style={px({ fontSize:9, color:C.text4, width:14, flexShrink:0 })}>#{index + 1}</span>
                   <TeamLogo abbr={row.team} size={16} />
@@ -322,11 +322,11 @@ function FarmSystemSummaryCard({ summary }) {
 function FarmRankingsPanel({ rankings }) {
   return (
     <Panel title="Farm System Depth" accent={C.slate} badge={`${rankings.length} orgs represented`}>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:0 }}>
+      <div className="skip-data-list" role="list" aria-label="Farm-system depth rankings" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(210px, 1fr))', gap:0 }}>
         {rankings.map((r, i) => {
           const teamInfo = TEAMS[r.team.toLowerCase()];
           return (
-            <div key={r.team} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', borderBottom:`0.5px solid ${C.borderLight}` }}>
+            <div key={r.team} role="listitem" style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', borderBottom:`0.5px solid ${C.borderLight}` }}>
               <span style={{ ...px({ fontSize:9.5, color:C.text4, width:16, flexShrink:0 }) }}>{i + 1}</span>
               <TeamLogo abbr={r.team} size={16} />
               <span style={sans({ fontSize:11.5, fontWeight:600, color:C.text, flex:1 })}>{teamInfo?.name ?? r.team}</span>

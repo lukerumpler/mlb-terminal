@@ -21,13 +21,14 @@ import {
 } from "../client/src/api/mlb.js";
 import { SEARCH_ANALYTICS_STORAGE_KEY } from "../client/src/lib/searchAnalytics.js";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const chartSource = readFileSync(
-  "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
+  resolve(process.cwd(), "client/src/components/OverviewCharts.jsx"),
   "utf8"
 );
 const overviewSource = readFileSync(
-  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
+  resolve(process.cwd(), "client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 

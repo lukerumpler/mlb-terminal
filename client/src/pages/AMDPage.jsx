@@ -230,10 +230,10 @@ function AMDPage() {
   };
 
   return (
-    <div style={{ padding:'0 0 40px' }}>
+    <div className="skip-amd-page" style={{ padding:'0 0 40px' }}>
 
       {/* ── strip ── */}
-      <StatStrip items={[
+      <StatStrip label="Illustrative AMD and IMD model metrics" items={[
         { val:'AMD+',   lbl:'Metric',           sub:'Avg Miss Distance' },
         { val:'0.50',   lbl:'League Avg AMD',   sub:'2026 baseline' },
         { val:'0.28',   lbl:'Best AMD',         sub:'Luis Arraez' },
@@ -244,18 +244,15 @@ function AMDPage() {
 
       <div style={{ height:4 }} />
       <div style={sans({ fontSize:9.5, color:C.text4, padding:'0 2px 12px', lineHeight:1.4 })}>
-        The leaderboard, scatter plot, spotlight, and pitch-type breakdown below use fixed
-        illustrative example values (marked "Illustrative") to explain how AMD/IMD work — they
-        are not computed from live per-player Statcast data. Real per-player AMD, seeded from a
-        given player's own actual batted-ball profile, is computed live on the Players tab.
+        The leaderboard, scatter plot, spotlight, and pitch-type breakdown below use fixed illustrative example values. They explain how AMD/IMD work and are not computed from live per-player Statcast data. Real per-player AMD, seeded from a given player’s actual batted-ball profile, is computed live on the Players tab.
       </div>
 
       {/* ── formula + concept ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+      <div className="skip-amd-concept-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
         <div>
           <FormulaDisplay />
         </div>
-        <Panel title="Metric Overview" accent={C.amber} badge="SKIP Model">
+        <Panel title="Metric Overview" accent={C.amber} badge="Illustrative SKIP model">
           <div style={{ padding:'10px 0 4px' }}>
             <KVRow label="What it measures"   value="3D swing deviation from ideal contact point" />
             <KVRow label="Data source"        value="Baseball Savant bat tracking distributions" />
@@ -271,7 +268,7 @@ function AMDPage() {
       </div>
 
       {/* ── main layout ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:12 }}>
+      <div className="skip-amd-main-grid" style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:12 }}>
 
         {/* LEFT */}
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -296,6 +293,7 @@ function AMDPage() {
               </div>
             }
           >
+            <div className="skip-amd-leaderboard">
             {/* header */}
             <div style={{
               display:'grid',
@@ -340,6 +338,7 @@ function AMDPage() {
             })}
             <div style={sans({ fontSize:9, color:C.text4, padding:'8px 14px', lineHeight:1.4 })}>
               Illustrative — fixed example values for these named players, not a live leaderboard.
+            </div>
             </div>
           </Panel>
 
@@ -524,7 +523,7 @@ function AMDPage() {
           )}
 
           {/* Swing Error Map */}
-          <Panel title="2D Swing Error Map" accent={C.slate} badge="Timing × Vertical">
+          <Panel title="2D Swing Error Map" accent={C.slate} badge="Illustrative · Timing × Vertical">
             <div style={{ padding:'10px 14px 12px' }}>
               <SwingMap />
               <div style={{ display:'flex', justifyContent:'center', gap:14, marginTop:10 }}>
@@ -540,7 +539,7 @@ function AMDPage() {
           </Panel>
 
           {/* Interpretation guide */}
-          <Panel title="Reading AMD+" accent={C.amber}>
+          <Panel title="Reading AMD+" accent={C.amber} badge="Illustrative methodology">
             {[
               { range:'< 70',     label:'Elite',   desc:'Exceptional swing precision — elite contact tool',   col:C.teal },
               { range:'70–85',    label:'Plus',    desc:'Above-average swing control, strong contact profile', col:C.amber },

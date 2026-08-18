@@ -111,7 +111,7 @@ const PostCard = memo(function PostCard({ item, highlight }) {
   const meta  = HANDLE_META[item.handle.toLowerCase()] ?? {};
   const color = meta.groupColor ?? 'var(--amber)';
   return (
-    <div style={{
+    <div role="listitem" style={{
       padding: '11px 14px',
       borderBottom: `0.5px solid ${C.borderLight}`,
       background: highlight ? `color-mix(in srgb, ${color} 6%, var(--surface))` : 'transparent',
@@ -368,7 +368,7 @@ export default memo(function FeedPage() {
       )}
 
       {/* ── Main feed ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:14, alignItems:'start' }}>
+      <div className="skip-feed-main-grid" style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:14, alignItems:'start' }}>
 
         {/* Timeline */}
         <Panel title="Timeline" accent={C.amber}
@@ -380,9 +380,11 @@ export default memo(function FeedPage() {
               {search ? `No posts matching "${search}"` : 'No posts available right now.'}
             </div>
           ) : (
-            filtered.map(item => (
-              <PostCard key={`${item.handle}:${item.id}`} item={item} highlight={false} />
-            ))
+            <div className="skip-data-list" role="list" aria-label="Intel Feed posts">
+              {filtered.map(item => (
+                <PostCard key={`${item.handle}:${item.id}`} item={item} highlight={false} />
+              ))}
+            </div>
           )}
         </Panel>
 
@@ -391,8 +393,9 @@ export default memo(function FeedPage() {
 
           {/* Three-tier source chain */}
           <Panel title="Source Chain" accent={C.teal} badge={`${liveCount}/${totalAccounts || '—'}`}>
+            <div className="skip-data-list" role="list" aria-label="Feed-source chain">
             {(sourceStatuses.length ? sourceStatuses : [{ tier:1, key:'pending', label:'Waiting for configured sources', ok:false, reason:'loading' }]).map(source => (
-              <div key={`${source.key}:${source.tier}`} style={{
+              <div key={`${source.key}:${source.tier}`} role="listitem" style={{
                 display:'flex', alignItems:'center', gap:8,
                 padding:'8px 14px',
                 borderBottom:`0.5px solid ${C.borderLight}`,
@@ -409,6 +412,7 @@ export default memo(function FeedPage() {
                 </div>
               </div>
             ))}
+            </div>
           </Panel>
 
           {/* How it works */}

@@ -21,8 +21,9 @@ function buildRosterInsightsFallback(input: {
   };
 }) {
   const finiteMetric = (value: unknown) => {
-    if (value == null || (typeof value === "string" && value.trim() === ""))
+    if (value == null || (typeof value === "string" && value.trim() === "")) {
       return NaN;
+    }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : NaN;
   };
@@ -187,8 +188,9 @@ export const appRouter = router({
               },
             });
             const content = response.choices[0]?.message?.content;
-            if (typeof content !== "string")
+            if (typeof content !== "string") {
               throw new Error("AI insights response was empty");
+            }
             const parsed = JSON.parse(content);
             const hasStrengths =
               Array.isArray(parsed?.strengths) && parsed.strengths.length > 0;
