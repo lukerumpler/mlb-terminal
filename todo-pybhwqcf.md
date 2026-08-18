@@ -369,8 +369,8 @@
 - [x] Add accessible interactive Front Office calculation tooltips and unavailable-state explanations
 - [x] Apply the attached Off WAR and Def WAR coverage-gap status correction
 - [x] Verify the manually saved Vercel production API-base configuration and the managed CORS allowlist
-- [ ] Run full validation, checkpoint the restored changes, and request final deployment confirmation
-- [ ] Trigger and verify the confirmed Vercel production deployment
+- [x] Run full validation, checkpoint the restored changes, and request final deployment confirmation
+- [x] Trigger and verify the confirmed Vercel production deployment
 - [x] Reconcile the reviewed shared workspace with the GitHub source currently linked to Vercel before promotion
 - [x] Resolve the duplicate Savant cache-age and xwOBA test assertions introduced by the Forecast context
 - [x] Integrate the current GitHub main branch into PR #2 without changing GitHub main or enabling Vercel API hosting
