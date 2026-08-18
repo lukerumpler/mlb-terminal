@@ -2310,8 +2310,19 @@ export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
         oaa: Number.isFinite(oaa) ? oaa : null,
       };
     }).filter(row => row.oaa != null);
+    const oaaByTeam = new Map();
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      const oaa = Number(row?.oaa ?? row?.outs_above_average);
+      const team = String(row?.team_abbr || row?.team_code || row?.team_name || row?.team_full_name || row?.team || '').toUpperCase();
+      if (!team || !Number.isFinite(oaa)) return;
+      oaaByTeam.set(team, (oaaByTeam.get(team) || 0) + oaa);
+    });
     const freshness = providerMeta?.freshness || 'live';
     const oaa = playerRows.length ? playerRows.reduce((sum, row) => sum + row.oaa, 0) : null;
+    const teamOaaValues = [...oaaByTeam.values()];
+    const oaaPercentile = oaa != null && teamOaaValues.length
+      ? Math.round((teamOaaValues.filter(value => value < oaa).length / teamOaaValues.length) * 100)
+      : null;
     return {
       status: oaa == null ? 'source-gap' : (freshness === 'stale-cached' ? 'cached' : 'live'),
       source: 'Baseball Savant Statcast OAA leaderboard',
@@ -2319,10 +2330,12 @@ export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
       cache: providerMeta?.cache || null,
       retrievedAt: new Date().toISOString(),
       oaa,
+      oaaPercentile,
+      leagueTeamCount:teamOaaValues.length,
       playerCount: playerRows.length,
       playerRows: playerRows.sort((a, b) => b.oaa - a.oaa),
     };
   } catch {
-    return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, playerCount: 0, playerRows: [] };
+    return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, oaaPercentile:null, leagueTeamCount:0, playerCount:0, playerRows:[] };
   }
 }

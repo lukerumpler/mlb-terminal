@@ -303,3 +303,9 @@
 - [x] Add green/red Overall score direction only when a comparable prior score exists; otherwise show no implied trend.
 - [x] Add regression coverage and validate desktop/mobile score-card interactions.
 - [x] Publish the Overall-score tooltip and change indicator update.
+
+- [x] Audit the current Overall presentation and Depth, Defense, Baserunning, and Future Value grade inputs/formulas.
+- [x] Make the Overall letter grade the primary visual signal while keeping the numeric score, weighting tooltip, and honest change indicator secondary.
+- [x] Recalculate or improve supported facet grades from validated inputs, preserving explicit calculated and unavailable provenance.
+- [x] Add regression coverage and validate the upgraded grade cards on desktop and mobile.
+- [x] Publish the Overall hierarchy and facet-grade evaluation upgrade.
