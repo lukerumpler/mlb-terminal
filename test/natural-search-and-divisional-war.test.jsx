@@ -26,6 +26,10 @@ const chartSource = readFileSync(
   "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
   "utf8"
 );
+const overviewSource = readFileSync(
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
+  "utf8"
+);
 
 afterEach(() => {
   cleanup();
@@ -311,5 +315,12 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     expect(chartSource).toContain("LabelList");
     expect(chartSource).toContain("selectedTeam");
     expect(chartSource).toContain("formatter={formatWarValue}");
+  });
+
+  it("contains the exact-value table and an explicit unavailable FanGraphs metric contract", () => {
+    expect(overviewSource).toContain('aria-label="Exact divisional WAR values"');
+    expect(overviewSource).toContain("fanGraphsMetricStatus");
+    expect(overviewSource).toContain("does not verify this missing metric");
+    expect(overviewSource).toContain("provider currently blocked");
   });
 });

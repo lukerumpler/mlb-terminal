@@ -145,7 +145,7 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
 }
 
 export function resolveMetricProviderStatus(value, providerStatus) {
-  return value == null ? 'coverage-gap' : providerStatus;
+  return value == null ? (providerStatus === 'loading' ? 'loading' : 'coverage-gap') : providerStatus;
 }
 function ord(n) {
   if (n == null || n === '' || !Number.isFinite(Number(n))) return '—';
@@ -1290,6 +1290,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       pitchingWAR: row.pitchingWAR == null ? null : Number(row.pitchingWAR),
     }))
     .sort((a, b) => b.totalWAR - a.totalWAR), [teamModelData?.divisionTeams]);
+  const formatDivisionWar = value => value == null || !Number.isFinite(Number(value)) ? '—' : `${Number(value) >= 0 ? '+' : ''}${Number(value).toFixed(1)}`;
   const fanGraphsHealthStatus = teamModelState === 'loading'
     ? 'loading'
     : teamModelData?.providerBlocked
@@ -1305,6 +1306,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const projectedLossesValue = teamModelData?.advancedMetrics?.projectedLosses ?? calculatedMetrics.projectedLosses;
   const calculatedModelSource = teamModelData?.advancedMetrics?.projectedWins != null ? 'FanGraphs' : projectedWinsValue != null ? 'MLB Stats API · calculated' : 'FanGraphs';
   const calculatedModelStatus = teamModelData?.advancedMetrics?.projectedWins != null ? fanGraphsHealthStatus : projectedWinsValue != null ? 'calculated' : fanGraphsHealthStatus;
+  const fanGraphsMetricStatus = value => resolveMetricProviderStatus(value, fanGraphsHealthStatus);
+  const fanGraphsMetricTitle = (label, value) => value == null
+    ? `FanGraphs did not return a verified ${label} value; the provider status badge does not verify this missing metric.`
+    : `FanGraphs ${label} source health`;
   const affiliateSavantHealthStatus = affiliateSavant?.status === 'loading'
     ? 'loading'
     : affiliateSavant?.freshness === 'stale-cached'
@@ -1789,17 +1794,33 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
-          <span style={sans({ fontSize:9.5, color:C.text3 })}>Verified total WAR by division · select or hover a bar for the exact component breakdown</span>
+          <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Verified cached divisional WAR snapshot · provider currently blocked' : 'FanGraphs provider blocked · no verified divisional rows') : 'Verified total WAR by division · select or hover a bar for the exact component breakdown'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
         <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
           <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} />
         </Suspense>
-        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{divisionWarData.length ? `Total WAR labels are visible on each bar; ${team.abbr} is highlighted. Offensive and pitching components are shown only when returned by FanGraphs.` : 'FanGraphs did not return verified division rows for this view. SKIP does not synthesize competing-team WAR from the selected team’s calculated proxy.'} Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
+        {divisionWarData.length > 0 && <div className="skip-divisional-war-table-wrap">
+          <table className="skip-divisional-war-table" aria-label="Exact divisional WAR values">
+            <thead><tr><th scope="col">Team</th><th scope="col">Total</th><th scope="col">Off</th><th scope="col">Pitch</th><th scope="col">Def</th></tr></thead>
+            <tbody>{divisionWarData.map(row => <tr key={row.team} data-selected={row.team === team.abbr ? 'true' : 'false'}>
+              <th scope="row">{row.team}</th>
+              <td>{formatDivisionWar(row.totalWAR)}</td>
+              <td>{formatDivisionWar(row.offensiveWAR)}</td>
+              <td>{formatDivisionWar(row.pitchingWAR)}</td>
+              <td>{formatDivisionWar(row.defensiveWAR)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? `FanGraphs is currently blocking automated requests. ${divisionWarData.length ? 'Shown rows are verified cached historical values, not live updates.' : 'No cached divisional rows are available, so this comparison remains unavailable.'}` : divisionWarData.length ? `Total WAR labels are visible on each bar; ${team.abbr} is highlighted. Offensive and pitching components are shown only when returned by FanGraphs.` : 'FanGraphs did not return verified division rows for this view. SKIP does not synthesize competing-team WAR from the selected team’s calculated proxy.'} Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
-          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',resolveMetricProviderStatus(teamModelData?.advancedMetrics?.offenseWar,fanGraphsHealthStatus)],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',resolveMetricProviderStatus(teamModelData?.advancedMetrics?.defenseWar,fanGraphsHealthStatus)],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value.toFixed(digits))}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
+          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=>{
+            const metricStatus = provider === 'FanGraphs' ? fanGraphsMetricStatus(value) : status;
+            const metricTitle = provider === 'FanGraphs' ? fanGraphsMetricTitle(label, value) : `${provider} metric source health`;
+            return <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={metricStatus} title={metricTitle} /></div></div>;
+          })}
         </div>
         <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || playoffOddsIsCalculated || teamWarIsCalculated) ? 'Verified MLB standings fallback: projected wins/losses use current 162-game pace; playoff odds are a calculated proxy, not official or FanGraphs odds; WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
       </Panel>
