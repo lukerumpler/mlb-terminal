@@ -4,21 +4,41 @@ import { describe, expect, it } from 'vitest';
 import { buildFrontOfficeGradeSummary, FrontOfficeGradeCards, resolveMetricProviderStatus } from '../client/src/pages/OverviewPage.jsx';
 
 describe('Front Office Overall grade', () => {
-  it('averages only available component grades and never invents a neutral score for unavailable components', () => {
+  it('weights current performance and applies the approved capped organization-outlook nudge', () => {
     const summary = buildFrontOfficeGradeSummary([
+      { label: 'Offense', grade: 'C' },
+      { label: 'Pitching', grade: 'B' },
+      { label: 'Defense', grade: 'A+' },
+      { label: 'Baserunning', grade: 'A' },
+      { label: 'Depth', grade: 'A+' },
+      { label: 'Future Value', grade: 'B' },
+    ]);
+    expect(summary).toMatchObject({ grade: 'B', points: 2.87, corePoints: 2.73, outlookPoints: 3.65, componentCount: 6 });
+    expect(summary.detail).toMatch(/moves it 15% toward the organization outlook average/i);
+  });
+
+  it('rebalances only available core facets and never lets outlook create an Overall grade by itself', () => {
+    const partialCore = buildFrontOfficeGradeSummary([
       { label: 'Offense', grade: 'A+' },
       { label: 'Pitching', grade: 'A-' },
       { label: 'Depth', grade: '—' },
     ]);
-    expect(summary).toMatchObject({ grade: 'A', componentCount: 2, averagePoints: 7 });
-    expect(summary.detail).toMatch(/Unavailable components are excluded/i);
+    expect(partialCore).toMatchObject({ grade: 'A', points: 4.02, corePoints: 4.02, outlookPoints: null, componentCount: 2 });
+    expect(partialCore.detail).toMatch(/reweighted to 100%/i);
+
+    const noCore = buildFrontOfficeGradeSummary([
+      { label: 'Depth', grade: 'A+' },
+      { label: 'Future Value', grade: 'A' },
+    ]);
+    expect(noCore).toMatchObject({ grade: '—', componentCount: 0, corePoints: null, outlookPoints: null });
+    expect(noCore.detail).toMatch(/no verified current-performance grades/i);
   });
 
   it('explains both the Overall calculation and a component limitation through keyboard-accessible controls', () => {
     const grades = [{ label: 'Defense', grade: 'A+', color: '#008080', detail: 'Calculated from verified active-roster position coverage; it is not Statcast OAA.' }];
     render(<FrontOfficeGradeCards grades={grades} overall={buildFrontOfficeGradeSummary(grades)} />);
     fireEvent.click(screen.getByRole('button', { name: /overall/i }));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/Arithmetic average of 1 available component grade/i);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Weighted current-performance score from defense/i);
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/not Statcast OAA/i);
   });

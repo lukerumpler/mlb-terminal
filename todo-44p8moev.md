@@ -285,3 +285,9 @@
 - [x] Convert long empty-state details into concise expandable notes while preserving honest source context.
 - [x] Add regression coverage and validate desktop/mobile interactions.
 - [x] Publish the consolidated panels and expandable empty notes.
+
+- [x] Review the supplied overall-grade scoring system and map each formula input to verified platform data.
+- [x] Identify unsupported metrics, hidden assumptions, availability rules, and differences from the current Front Office grade.
+- [x] Present the validation findings and obtain approval for any necessary substitutions before integration.
+- [x] Integrate the approved scoring system with provenance, unavailable states, and regression coverage.
+- [x] Run full validation, review the overall-grade display, and publish.

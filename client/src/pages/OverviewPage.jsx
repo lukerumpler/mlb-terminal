@@ -99,26 +99,63 @@ function pctToGrade(p) {
   if (p >= 30) return 'C+'; return 'C';
 }
 
-const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
-  'A+': 8, A: 7, 'A-': 6, 'B+': 5, B: 4, 'B-': 3, 'C+': 2, C: 1,
+export const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
+  'A+': 4.3, A: 4.0, 'A-': 3.7, 'B+': 3.3, B: 3.0, 'B-': 2.7,
+  'C+': 2.3, C: 2.0, 'C-': 1.7, 'D+': 1.3, D: 1.0, 'D-': 0.7, F: 0,
 });
-const FRONT_OFFICE_GRADES_BY_POINT = ['C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+export const FRONT_OFFICE_CORE_WEIGHTS = Object.freeze({
+  offense: 0.45, pitching: 0.40, defense: 0.10, baserunning: 0.05,
+});
+export const FRONT_OFFICE_OUTLOOK_NUDGE = 0.15;
+const FRONT_OFFICE_GRADE_BANDS = Object.freeze([
+  [4.15, 'A+'], [3.85, 'A'], [3.5, 'A-'], [3.15, 'B+'], [2.85, 'B'], [2.5, 'B-'],
+  [2.15, 'C+'], [1.85, 'C'], [1.5, 'C-'], [1.15, 'D+'], [0.85, 'D'], [0.5, 'D-'], [-Infinity, 'F'],
+]);
+
+function frontOfficePointsToGrade(points) {
+  return FRONT_OFFICE_GRADE_BANDS.find(([minimum]) => points >= minimum)?.[1] || '—';
+}
 
 export function buildFrontOfficeGradeSummary(grades = []) {
-  const available = grades.filter(grade => Object.prototype.hasOwnProperty.call(FRONT_OFFICE_GRADE_POINTS, grade?.grade));
-  if (!available.length) return {
+  const byFacet = new Map(grades.map(row => [String(row?.label || '').toLowerCase(), row?.grade]));
+  const availableCore = Object.entries(FRONT_OFFICE_CORE_WEIGHTS)
+    .map(([facet, weight]) => ({ facet, weight, points: FRONT_OFFICE_GRADE_POINTS[byFacet.get(facet)] }))
+    .filter(row => Number.isFinite(row.points));
+  const availableOutlook = ['depth', 'future value']
+    .map(facet => ({ facet, points: FRONT_OFFICE_GRADE_POINTS[byFacet.get(facet)] }))
+    .filter(row => Number.isFinite(row.points));
+
+  if (!availableCore.length) return {
     grade: '—',
     averagePoints: null,
     componentCount: 0,
-    detail: 'Unavailable: no verified component grades are available. Missing components are never assigned a neutral score.',
+    corePoints: null,
+    outlookPoints: null,
+    detail: 'Unavailable: no verified current-performance grades are available. Missing facets are never assigned a neutral score.',
   };
 
-  const averagePoints = available.reduce((sum, grade) => sum + FRONT_OFFICE_GRADE_POINTS[grade.grade], 0) / available.length;
+  const totalCoreWeight = availableCore.reduce((sum, row) => sum + row.weight, 0);
+  const corePoints = availableCore.reduce((sum, row) => sum + row.weight * row.points, 0) / totalCoreWeight;
+  const outlookPoints = availableOutlook.length
+    ? availableOutlook.reduce((sum, row) => sum + row.points, 0) / availableOutlook.length
+    : null;
+  const overallPoints = outlookPoints == null
+    ? corePoints
+    : corePoints + FRONT_OFFICE_OUTLOOK_NUDGE * (outlookPoints - corePoints);
+  const facetNames = availableCore.map(row => row.facet).join(', ');
+  const outlookNames = availableOutlook.map(row => row.facet).join(' and ');
   return {
-    grade: FRONT_OFFICE_GRADES_BY_POINT[Math.round(averagePoints) - 1] || '—',
-    averagePoints,
-    componentCount: available.length,
-    detail: `Arithmetic average of ${available.length} available component grade${available.length === 1 ? '' : 's'} on SKIP’s A+ through C scale. Unavailable components are excluded; this is an internal summary, not provider WAR, odds, or a projection.`,
+    grade: frontOfficePointsToGrade(overallPoints),
+    averagePoints: Number(overallPoints.toFixed(2)),
+    points: Number(overallPoints.toFixed(2)),
+    corePoints: Number(corePoints.toFixed(2)),
+    outlookPoints: outlookPoints == null ? null : Number(outlookPoints.toFixed(2)),
+    componentCount: availableCore.length + availableOutlook.length,
+    coreComponentCount: availableCore.length,
+    outlookComponentCount: availableOutlook.length,
+    detail: outlookPoints == null
+      ? `Weighted current-performance score from ${facetNames}; available core facets are reweighted to 100%. Outlook facets are unavailable and do not affect this internal grade.`
+      : `Weighted core score from ${facetNames}; ${outlookNames} moves it 15% toward the organization outlook average. Missing facets are excluded and remaining core weights are rebalanced.`,
   };
 }
 
