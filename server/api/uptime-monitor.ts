@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import type { UptimeMonitorCheck } from "../../drizzle/schema";
 import { getUptimeMonitorScheduleByTaskUid, listUptimeMonitorChecksSince, recordUptimeMonitorCheck } from "../db";
 import { sdk } from "../_core/sdk";
+import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
 export const UPTIME_MONITOR_ENDPOINTS = [
   { key: "mlbApi", label: "MLB API health", url: "https://mlb-terminal.vercel.app/api/health" },
@@ -85,15 +86,22 @@ export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
   }
 }
 
-export function registerUptimeMonitorRoutes(app: Express) {
+export function registerUptimeMonitorRoutes(
+  app: Express,
+  loadDashboard: typeof getUptimeMonitorDashboard = getUptimeMonitorDashboard
+) {
   app.get("/api/uptime-monitor", async (req, res) => {
+    applyCors(req, res);
+    if (isRateLimited(req, "uptime-monitor")) return rateLimitResponse(res);
     try {
       const requestedDays = Number(req.query.days);
       const days: 7 | 30 = requestedDays === 30 ? 30 : 7;
-      res.json(await getUptimeMonitorDashboard(days));
+      res.setHeader("Cache-Control", "private, max-age=15");
+      res.json(await loadDashboard(days));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      res.status(503).json({ error: "uptime-monitor-unavailable", message });
+      console.error("[uptime-monitor] dashboard query failed", message);
+      res.status(503).json({ error: "uptime-monitor-unavailable" });
     }
   });
   app.post("/api/scheduled/daily-uptime-monitor", scheduledDailyUptimeMonitor);
