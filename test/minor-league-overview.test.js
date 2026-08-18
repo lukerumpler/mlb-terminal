@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   MILB_STANDINGS_LEAGUES,
   getTeamAffiliates,
@@ -12,11 +11,11 @@ import {
 } from "../client/src/constants/data.js";
 
 const overviewSource = readFileSync(
-  resolve(process.cwd(), "client/src/pages/OverviewPage.jsx"),
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
   "utf8"
 );
 const mlbSource = readFileSync(
-  resolve(process.cwd(), "client/src/api/mlb.js"),
+  "/home/ubuntu/skip-baseball/client/src/api/mlb.js",
   "utf8"
 );
 

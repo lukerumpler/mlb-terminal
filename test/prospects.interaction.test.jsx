@@ -18,7 +18,7 @@ beforeEach(() => {
 
 async function goToProspects(user) {
   render(<App />);
-  const navButton = await screen.findByRole("button", { name: /Talent/ });
+  const navButton = await screen.findByTitle("Talent");
   await user.click(navButton);
   await user.click(await screen.findByRole("tab", { name: "Prospects" }));
   // Wait for the actual batter table to render, not just the absence of the

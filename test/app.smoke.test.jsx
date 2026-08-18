@@ -49,7 +49,10 @@ describe("SKIP app — mobile navigation", () => {
     expect(document.querySelector(".skip-topbar")?.textContent).toContain(
       "Talent"
     );
-    expect(screen.getByRole("tab", { name: "Players" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Players" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
   });
 
   it("supports touch-safe Escape dismissal and focus restoration for the mobile drawer", async () => {

@@ -14,7 +14,7 @@ describe('Overview page section reordering for unavailable data', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps the core season briefing concise while preserving forecast, advanced models, and divisional WAR in the Performance view', async () => {
+  it('keeps the core season briefing concise while preserving advanced models and divisional WAR in the Performance view', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -33,12 +33,10 @@ describe('Overview page section reordering for unavailable data', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     const advancedModelsPanel = screen.getByText(/Advanced Models & Savant/i);
     const divisionalWarPanel = screen.getByText(/Divisional WAR Comparison/i);
-    const forecastPanel = screen.getByText(/Forecast & Team Context/i);
 
     expect(seasonOverviewHeading).toBeInTheDocument();
     expect(advancedModelsPanel).toBeInTheDocument();
     expect(divisionalWarPanel).toBeInTheDocument();
-    expect(forecastPanel).toBeInTheDocument();
 
     const seasonPosition = seasonOverviewHeading.compareDocumentPosition(advancedModelsPanel);
     expect(seasonPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

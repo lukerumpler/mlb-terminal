@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
-import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
+import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, MLB_PIPELINE_FARM_SYSTEM_RANKINGS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines } from '../engine/skip.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -61,6 +61,7 @@ const OVERVIEW_VIEW_OPTIONS = [
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
 export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
+  const detailIsLong = typeof detail === 'string' && detail.length > 62;
   return <div className="skip-overview-empty-state" role="status">
     <span className="skip-overview-empty-mark" aria-hidden="true">—</span>
     <div className="skip-overview-empty-copy">
@@ -69,7 +70,7 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
         <span className="skip-overview-empty-separator" aria-hidden="true">·</span>
         <span className="skip-overview-empty-message">{message}</span>
       </div>
-      {detail && <span className="skip-overview-empty-detail">{detail}</span>}
+      {detail && (detailIsLong ? <details className="skip-overview-empty-note"><summary>More detail</summary><span className="skip-overview-empty-detail">{detail}</span></details> : <span className="skip-overview-empty-detail">{detail}</span>)}
     </div>
   </div>;
 }
@@ -91,19 +92,6 @@ function ChartFallback({ height }) {
   );
 }
 
-function SourceMetricCard({ label, value, digits = 1, suffix = '', provider, status, description, accent = C.purple }) {
-  const numeric = Number(value);
-  const available = value != null && value !== '' && Number.isFinite(numeric);
-  return <div style={{ minWidth:0, padding:'10px 11px', border:`1px solid ${C.borderLight}`, borderRadius:8, background:C.surface2, borderTop:`2px solid ${available ? accent : C.border}` }}>
-    <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'flex-start' }}>
-      <div style={sans({ fontSize:9, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em', lineHeight:1.25 })}>{label}</div>
-      <OverviewSourceBadge provider={provider} status={status} title={description || `${label} source status`} />
-    </div>
-    <div style={px({ fontSize:22, fontWeight:800, color:available ? C.text : C.text4, letterSpacing:'-.04em', marginTop:8, lineHeight:1 })}>{available ? `${numeric.toFixed(digits)}${suffix}` : '—'}</div>
-    {description && <div style={sans({ fontSize:8.5, color:C.text4, marginTop:7, lineHeight:1.35 })}>{description}</div>}
-  </div>;
-}
-
 function pctToGrade(p) {
   if (!Number.isFinite(Number(p))) return '—';
   if (p >= 90) return 'A+'; if (p >= 80) return 'A'; if (p >= 70) return 'A-';
@@ -111,54 +99,235 @@ function pctToGrade(p) {
   if (p >= 30) return 'C+'; return 'C';
 }
 
-const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
-  'A+': 8, A: 7, 'A-': 6, 'B+': 5, B: 4, 'B-': 3, 'C+': 2, C: 1,
+export const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
+  'A+': 4.3, A: 4.0, 'A-': 3.7, 'B+': 3.3, B: 3.0, 'B-': 2.7,
+  'C+': 2.3, C: 2.0, 'C-': 1.7, 'D+': 1.3, D: 1.0, 'D-': 0.7, F: 0,
 });
-const FRONT_OFFICE_GRADES_BY_POINT = ['C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+export const FRONT_OFFICE_CORE_WEIGHTS = Object.freeze({
+  offense: 0.45, pitching: 0.40, defense: 0.10, baserunning: 0.05,
+});
+export const FRONT_OFFICE_OUTLOOK_NUDGE = 0.15;
+const FRONT_OFFICE_GRADE_BANDS = Object.freeze([
+  [4.15, 'A+'], [3.85, 'A'], [3.5, 'A-'], [3.15, 'B+'], [2.85, 'B'], [2.5, 'B-'],
+  [2.15, 'C+'], [1.85, 'C'], [1.5, 'C-'], [1.15, 'D+'], [0.85, 'D'], [0.5, 'D-'], [-Infinity, 'F'],
+]);
+
+function frontOfficePointsToGrade(points) {
+  return FRONT_OFFICE_GRADE_BANDS.find(([minimum]) => points >= minimum)?.[1] || '—';
+}
 
 export function buildFrontOfficeGradeSummary(grades = []) {
-  const available = grades.filter(grade => Object.prototype.hasOwnProperty.call(FRONT_OFFICE_GRADE_POINTS, grade?.grade));
-  if (!available.length) return {
+  const byFacet = new Map(grades.map(row => [String(row?.label || '').toLowerCase(), row?.grade]));
+  const availableCore = Object.entries(FRONT_OFFICE_CORE_WEIGHTS)
+    .map(([facet, weight]) => ({ facet, weight, points: FRONT_OFFICE_GRADE_POINTS[byFacet.get(facet)] }))
+    .filter(row => Number.isFinite(row.points));
+  const availableOutlook = ['depth', 'future value']
+    .map(facet => ({ facet, points: FRONT_OFFICE_GRADE_POINTS[byFacet.get(facet)] }))
+    .filter(row => Number.isFinite(row.points));
+
+  if (!availableCore.length) return {
     grade: '—',
     averagePoints: null,
     componentCount: 0,
-    detail: 'Unavailable: no verified component grades are available. Missing components are never assigned a neutral score.',
+    corePoints: null,
+    outlookPoints: null,
+    detail: 'Unavailable: no verified current-performance grades are available. Missing facets are never assigned a neutral score.',
   };
 
-  const averagePoints = available.reduce((sum, grade) => sum + FRONT_OFFICE_GRADE_POINTS[grade.grade], 0) / available.length;
+  const totalCoreWeight = availableCore.reduce((sum, row) => sum + row.weight, 0);
+  const corePoints = availableCore.reduce((sum, row) => sum + row.weight * row.points, 0) / totalCoreWeight;
+  const outlookPoints = availableOutlook.length
+    ? availableOutlook.reduce((sum, row) => sum + row.points, 0) / availableOutlook.length
+    : null;
+  const overallPoints = outlookPoints == null
+    ? corePoints
+    : corePoints + FRONT_OFFICE_OUTLOOK_NUDGE * (outlookPoints - corePoints);
+  const facetNames = availableCore.map(row => row.facet).join(', ');
+  const outlookNames = availableOutlook.map(row => row.facet).join(' and ');
   return {
-    grade: FRONT_OFFICE_GRADES_BY_POINT[Math.round(averagePoints) - 1] || '—',
-    averagePoints,
-    componentCount: available.length,
-    detail: `Arithmetic average of ${available.length} available component grade${available.length === 1 ? '' : 's'} on SKIP’s A+ through C scale. Unavailable components are excluded; this is an internal summary, not provider WAR, odds, or a projection.`,
+    grade: frontOfficePointsToGrade(overallPoints),
+    averagePoints: Number(overallPoints.toFixed(2)),
+    points: Number(overallPoints.toFixed(2)),
+    corePoints: Number(corePoints.toFixed(2)),
+    outlookPoints: outlookPoints == null ? null : Number(outlookPoints.toFixed(2)),
+    componentCount: availableCore.length + availableOutlook.length,
+    coreComponentCount: availableCore.length,
+    outlookComponentCount: availableOutlook.length,
+    detail: outlookPoints == null
+      ? `Weighted current-performance score from ${facetNames}; available core facets are reweighted to 100%. Outlook facets are unavailable and do not affect this internal grade.`
+      : `Weighted core score from ${facetNames}; ${outlookNames} moves it 15% toward the organization outlook average. Missing facets are excluded and remaining core weights are rebalanced.`,
   };
 }
 
-export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades) }) {
-  const [activeLabel, setActiveLabel] = useState(null);
-  const cards = [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades];
-  const activeCard = cards.find(card => card.label === activeLabel) || null;
-  return <div aria-label="Front Office grade details">
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(72px,1fr))',gap:6}}>
+export function getEvaluationPresentation(search = typeof window === 'undefined' ? '' : window.location.search) {
+  return new URLSearchParams(search || '').get('evaluationView') === 'score-ring' ? 'score-ring' : 'baseline';
+}
+
+export function buildFrontOfficeEvaluationViewModel({ teamName = 'Team', grades = [], overall = buildFrontOfficeGradeSummary(grades) } = {}) {
+  const hasGradePoints = grade => Number.isFinite(FRONT_OFFICE_GRADE_POINTS[grade]);
+  const missingDrivers = grades.filter(driver => !hasGradePoints(driver?.grade));
+  const ratingScaleMax = FRONT_OFFICE_GRADE_POINTS['A+'];
+  const overallRating = Number(overall?.points);
+  const hasDefensibleOverall = overall?.grade && overall.grade !== '—'
+    && Number.isFinite(overallRating)
+    && overallRating >= 0
+    && overallRating <= ratingScaleMax;
+  const status = !hasDefensibleOverall ? 'unavailable' : missingDrivers.length ? 'partial' : 'available';
+  const missingLabels = missingDrivers.map(driver => driver?.label).filter(Boolean);
+  return {
+    teamName,
+    overallGrade: hasDefensibleOverall ? overall.grade : '—',
+    overallRating: hasDefensibleOverall ? overallRating : null,
+    ratingScaleMax,
+    normalizedScore: hasDefensibleOverall ? Math.max(0, Math.min(100, Math.round(overallRating / ratingScaleMax * 100))) : null,
+    status,
+    statusLabel: status === 'available'
+      ? 'Available grade inputs'
+      : status === 'partial'
+        ? `Partial coverage — ${missingLabels.join(', ') || 'some category inputs are unavailable'}`
+        : 'Evaluation unavailable — no defensible overall grade',
+    sourceLabel: 'SKIP evaluation · verified team, roster, Savant, and prospect inputs where available',
+  };
+}
+
+const SCORE_RING_RADIUS = 48;
+const SCORE_RING_CIRCUMFERENCE = 2 * Math.PI * SCORE_RING_RADIUS;
+
+export function EvaluationScoreRing({ model, decorative = false }) {
+  const score = model?.status === 'available' || model?.status === 'partial' ? model.normalizedScore : null;
+  const visibleScore = Number.isFinite(Number(score)) ? Math.max(0, Math.min(100, Number(score))) : null;
+  const dashOffset = visibleScore == null ? SCORE_RING_CIRCUMFERENCE : SCORE_RING_CIRCUMFERENCE * (1 - visibleScore / 100);
+  const accessibleLabel = visibleScore == null
+    ? `${model?.teamName || 'Team'}: team evaluation unavailable. ${model?.statusLabel || 'Required inputs are missing.'} ${model?.sourceLabel || ''}`
+    : `${model?.teamName || 'Team'}: overall team evaluation ${model?.overallGrade || 'unavailable'}, ${visibleScore} out of 100 normalized from ${model?.overallRating?.toFixed?.(2) || model?.overallRating} out of ${model?.ratingScaleMax}. ${model?.statusLabel || ''} ${model?.sourceLabel || ''}`;
+  const progressColor = model?.status === 'partial' ? C.amber : model?.status === 'unavailable' ? C.text4 : C.purple;
+  return (
+    <div className="skip-evaluation-score-ring" data-status={model?.status || 'unavailable'} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined} aria-label={decorative ? undefined : accessibleLabel}>
+      <svg className="skip-evaluation-score-ring-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+        <circle className="skip-evaluation-score-ring-track" cx="60" cy="60" r={SCORE_RING_RADIUS} fill="none" />
+        <circle className="skip-evaluation-score-ring-progress" cx="60" cy="60" r={SCORE_RING_RADIUS} fill="none" stroke={progressColor} strokeLinecap="round" strokeDasharray={SCORE_RING_CIRCUMFERENCE} strokeDashoffset={dashOffset} />
+      </svg>
+      <div className="skip-evaluation-score-ring-value" aria-hidden="true">
+        <strong>{visibleScore == null ? '—' : visibleScore}</strong>
+        <span>{visibleScore == null ? 'unavailable' : 'normalized'}</span>
+      </div>
+    </div>
+  );
+}
+
+const OVERALL_SCORE_TOOLTIP = 'Overall score: Offense 45%, Pitching 40%, Defense 10%, Baserunning 5%. Available core facets are reweighted. Available Depth and Future Value move the core score only 15% toward organization outlook.';
+
+function useOverallScoreDelta(teamKey, points) {
+  const [delta, setDelta] = useState(null);
+  const numericPoints = Number(points);
+  useEffect(() => {
+    setDelta(null);
+    if (!teamKey || !Number.isFinite(numericPoints) || typeof window === 'undefined') return;
+    const storageKey = `skip-front-office-overall-score:${CURRENT_SEASON}:${teamKey}`;
+    try {
+      const prior = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+      if (Number.isFinite(Number(prior?.points))) {
+        const nextDelta = Number((numericPoints - Number(prior.points)).toFixed(2));
+        if (Math.abs(nextDelta) >= 0.01) setDelta(nextDelta);
+      }
+      window.localStorage.setItem(storageKey, JSON.stringify({ points:numericPoints, savedAt:Date.now() }));
+    } catch {
+      // Local history is optional; never hide a verified current score if storage is unavailable.
+    }
+  }, [teamKey, numericPoints]);
+  return delta;
+}
+
+export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '', includeOverall = true, extraDetails = [], activeLabel: controlledActiveLabel, onActiveLabelChange }) {
+  const [internalActiveLabel, setInternalActiveLabel] = useState(null);
+  const buttonRefs = useRef(new Map());
+  const isControlled = typeof onActiveLabelChange === 'function';
+  const activeLabel = isControlled ? controlledActiveLabel : internalActiveLabel;
+  const setActiveLabel = useCallback((next) => {
+    if (isControlled) onActiveLabelChange(next);
+    else setInternalActiveLabel(next);
+  }, [isControlled, onActiveLabelChange]);
+  useEffect(() => {
+    if (!isControlled) setInternalActiveLabel(null);
+  }, [teamKey, isControlled]);
+  const overallCard = useMemo(() => ({ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }), [overall]);
+  const cards = useMemo(() => [
+    ...(includeOverall ? [overallCard] : []),
+    ...grades,
+  ], [grades, includeOverall, overallCard]);
+  const activeCard = [...cards, ...extraDetails].find(card => card.label === activeLabel) || null;
+  const overallDelta = useOverallScoreDelta(teamKey, overall?.points);
+  const closeActiveCard = useCallback(() => {
+    if (!activeLabel) return;
+    const previousLabel = activeLabel;
+    setActiveLabel(null);
+    buttonRefs.current.get(previousLabel)?.focus();
+  }, [activeLabel, setActiveLabel]);
+  return <div aria-label="Front Office grade details" onKeyDown={event => {
+    if (event.key === 'Escape' && activeLabel) {
+      event.preventDefault();
+      closeActiveCard();
+    }
+  }}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
         const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
-        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
-          style={{textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:7,padding:'7px 3px',cursor:'pointer',color:C.text}}>
-          <div style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</div>
-          <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{card.label}</div>
-          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:2})}>details</span>
+        const numericScore = card.label === 'Overall' && Number.isFinite(overall?.points) ? overall.points.toFixed(2) : null;
+        const trendLabel = card.label === 'Overall' && overallDelta != null ? ` Overall score ${overallDelta > 0 ? 'increased' : 'decreased'} by ${Math.abs(overallDelta).toFixed(2)} from the prior comparable score.` : '';
+        const isOverall = card.label === 'Overall';
+        return <button key={card.label} ref={node => { if (node) buttonRefs.current.set(card.label, node); else buttonRefs.current.delete(card.label); }} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30.${trendLabel}` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(activeLabel === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
+          style={{minHeight:isOverall ? 62 : 46,textAlign:'center',background:isOverall ? C.surface3 : C.surface2,border:`1px solid ${isActive ? card.color : isOverall ? C.navy : C.borderLight}`,borderRadius:6,padding:isOverall ? '6px 3px 5px' : '5px 3px',cursor:'pointer',color:C.text,boxShadow:isOverall ? `inset 0 2px 0 ${C.navy}` : 'none'}}>
+          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:isOverall ? 5 : 4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:isOverall ? 29 : 17,fontWeight:800,color:card.color,lineHeight:isOverall ? .88 : 1,letterSpacing:isOverall ? '-.06em' : 0})}>{card.grade}</span>{numericScore && <span title={OVERALL_SCORE_TOOLTIP} aria-label={`Weighted Overall score ${numericScore} out of 4.30. ${OVERALL_SCORE_TOOLTIP}`} style={{...px({fontSize:isOverall ? 8 : 8.5,fontWeight:700,color:C.text3,lineHeight:1}),cursor:'help',textDecoration:'underline dotted',textUnderlineOffset:2}}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}{isOverall && overallDelta != null && <span aria-hidden="true" title={`Prior comparable score: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)}`} style={px({fontSize:10,fontWeight:800,color:overallDelta > 0 ? C.teal : C.rust,lineHeight:1})}>{overallDelta > 0 ? '↑' : '↓'}</span>}</div>
+          <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
+          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:1})}>details</span>
         </button>;
       })}
     </div>
     {activeCard
-      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.4,marginTop:7,padding:'6px 8px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
-      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Select a grade for its calculation, data source, and limitations.</div>}
+      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.35,marginTop:6,padding:'5px 7px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
+      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.3,marginTop:6})}>Select a grade for its calculation, data source, and limitations.</div>}
   </div>;
+}
+
+export function FrontOfficeScoreRingPreview({ teamName, grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '', activeLabel, onActiveLabelChange }) {
+  const model = useMemo(() => buildFrontOfficeEvaluationViewModel({ teamName, grades, overall }), [teamName, grades, overall]);
+  const scoreButtonRef = useRef(null);
+  const overallId = 'front-office-grade-overall';
+  const overallExpanded = activeLabel === 'Overall';
+  const toggleOverallDetails = useCallback(() => {
+    onActiveLabelChange?.(overallExpanded ? null : 'Overall');
+  }, [onActiveLabelChange, overallExpanded]);
+  return (
+    <div className="skip-front-office-score-ring-layout" data-status={model.status}>
+      <button ref={scoreButtonRef} type="button" className="skip-front-office-score-ring-summary" aria-expanded={overallExpanded} aria-controls={overallId} aria-label={`Show Overall calculation details: ${model.overallGrade}, ${model.overallRating == null ? 'unavailable' : `${model.overallRating.toFixed(2)} out of ${model.ratingScaleMax.toFixed(2)}`}. ${model.statusLabel}.`} onClick={toggleOverallDetails} onKeyDown={event => {
+        if (event.key === 'Escape' && overallExpanded) {
+          event.preventDefault();
+          onActiveLabelChange?.(null);
+          scoreButtonRef.current?.focus();
+        }
+      }}>
+        <EvaluationScoreRing model={model} decorative />
+        <div className="skip-front-office-score-ring-copy">
+          <div className="skip-front-office-score-ring-grade">{model.overallGrade}</div>
+          <div className="skip-front-office-score-ring-scale">{model.overallRating == null ? '—' : model.overallRating.toFixed(2)} <span>/ {model.ratingScaleMax.toFixed(2)}</span></div>
+          <div className="skip-front-office-score-ring-status">{model.statusLabel}</div>
+          <div className="skip-front-office-score-ring-source">{model.sourceLabel}</div>
+          <span className="skip-front-office-score-ring-details" aria-hidden="true">details</span>
+        </div>
+      </button>
+      <FrontOfficeGradeCards grades={grades} overall={overall} teamKey={teamKey} includeOverall={false} extraDetails={[{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }]} activeLabel={activeLabel} onActiveLabelChange={onActiveLabelChange} />
+    </div>
+  );
 }
 
 export function resolveMetricProviderStatus(value, providerStatus) {
   return value == null ? (providerStatus === 'loading' ? 'loading' : 'coverage-gap') : providerStatus;
+}
+export function resolveVerifiedPlayoffOdds(value) {
+  if (value == null || value === '') return null;
+  const odds = Number(value);
+  return Number.isFinite(odds) && odds >= 0 && odds <= 100 ? odds : null;
 }
 function ord(n) {
   if (n == null || n === '' || !Number.isFinite(Number(n))) return '—';
@@ -199,6 +368,44 @@ export function formatDataAge(timestamp, now = Date.now()) {
   if (age < 3_600_000) return `${Math.max(1, Math.floor(age / 60_000))}m ago`;
   if (age < 86_400_000) return `${Math.max(1, Math.floor(age / 3_600_000))}h ago`;
   return `${Math.max(1, Math.floor(age / 86_400_000))}d ago`;
+}
+
+export function formatVerifiedTimestamp(value) {
+  if (!value) return 'timestamp unavailable';
+  const timestamp = Number.isFinite(Number(value)) ? Number(value) : Date.parse(value);
+  if (!Number.isFinite(timestamp)) return 'timestamp unavailable';
+  return new Date(timestamp).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+export function buildPostseasonStandingsContext(liveTeamData, team) {
+  const formatRank = value => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return '—';
+    const rounded = Math.round(numeric);
+    const mod100 = rounded % 100;
+    const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : ({ 1:'st', 2:'nd', 3:'rd' }[rounded % 10] || 'th');
+    return `${rounded}${suffix}`;
+  };
+  const rows = Object.values(liveTeamData?.byAbbr || {})
+    .map(record => record?.standings)
+    .filter(Boolean);
+  const selected = rows.find(row => Number(row.id) === Number(team?.id) || row.abbr === team?.abbr);
+  if (!selected) return null;
+  const divisionRows = rows
+    .filter(row => row.divisionName && row.divisionName === selected.divisionName)
+    .sort((left, right) => Number(right.pct || 0) - Number(left.pct || 0));
+  const divisionLeader = divisionRows[0] || null;
+  return {
+    record: selected.w != null && selected.l != null ? `${selected.w}–${selected.l}` : '—',
+    divisionName: selected.divisionName || team?.div || 'Division',
+    divisionRank: formatRank(selected.divRank),
+    gamesBack: selected.gb == null || selected.gb === '' ? '—' : selected.gb,
+    wildCardRank: formatRank(selected.wildRank),
+    lastTen: selected.l10 || '—',
+    streak: selected.streak || '—',
+    divisionLeader: divisionLeader?.abbr || divisionLeader?.name || '—',
+    divisionLeaderRecord: divisionLeader?.w != null && divisionLeader?.l != null ? `${divisionLeader.w}–${divisionLeader.l}` : '—',
+  };
 }
 
 function MetricValue({ value, loading, width = 42 }) {
@@ -285,26 +492,114 @@ export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
   };
 }
 
-export function deriveFrontOfficeCoverageGrades({ players = { hitting:[], pitching:[] }, liveDataMode = 'unavailable', teamAbbr = '' } = {}) {
+export function deriveBaserunningGrade({ stolenBases, caughtStealing, comparisonRows = [] } = {}) {
+  const sb = Number(stolenBases);
+  const cs = Number(caughtStealing);
+  if (!Number.isFinite(sb) || !Number.isFinite(cs) || sb < 0 || cs < 0 || sb + cs <= 0) {
+    return { percentile:null, volumePercentile:null, efficiencyPercentile:null, attempts:null, successRate:null };
+  }
+  const attempts = sb + cs;
+  const leagueRows = comparisonRows.map(row => {
+    const rowSb = Number(row?.stolenBases ?? row?.sb);
+    const rowCs = Number(row?.caughtStealing ?? row?.cs);
+    return Number.isFinite(rowSb) && Number.isFinite(rowCs) && rowSb >= 0 && rowCs >= 0 && rowSb + rowCs > 0
+      ? { stolenBases:rowSb, successRate:rowSb / (rowSb + rowCs) }
+      : null;
+  }).filter(Boolean);
+  if (!leagueRows.length) return { percentile:null, volumePercentile:null, efficiencyPercentile:null, attempts, successRate:sb / attempts };
+  const volumePercentile = percentile(sb, leagueRows.map(row => row.stolenBases), true);
+  const efficiencyPercentile = percentile(sb / attempts, leagueRows.map(row => row.successRate), true);
+  if (volumePercentile == null || efficiencyPercentile == null) return { percentile:null, volumePercentile, efficiencyPercentile, attempts, successRate:sb / attempts };
+  return {
+    percentile: Math.round((volumePercentile + efficiencyPercentile) / 2),
+    volumePercentile,
+    efficiencyPercentile,
+    attempts,
+    successRate:sb / attempts,
+  };
+}
+
+export function deriveOrganizationFutureValue(teamAbbr = '') {
+  const hitterBaselines = fvBaselines(PROSPECT_BATTERS, false);
+  const pitcherBaselines = fvBaselines(PROSPECT_PITCHERS, true);
+  const byTeam = new Map();
+  [
+    ...PROSPECT_BATTERS.map(prospect => ({ prospect, isPitcher:false })),
+    ...PROSPECT_PITCHERS.map(prospect => ({ prospect, isPitcher:true })),
+  ].forEach(({ prospect, isPitcher }) => {
+    const futureValue = computeFV(prospect, isPitcher ? pitcherBaselines : hitterBaselines, isPitcher);
+    const key = String(prospect?.team || '').toUpperCase();
+    if (!key || futureValue == null) return;
+    const current = byTeam.get(key) || [];
+    current.push(futureValue);
+    byTeam.set(key, current);
+  });
+  const organizationScores = [...byTeam.entries()].map(([team, values]) => ({
+    team,
+    prospectCount:values.length,
+    topFiveAverage:values.sort((a, b) => b - a).slice(0, 5).reduce((sum, value, index, rows) => sum + value / rows.length, 0),
+  }));
+  const target = organizationScores.find(row => row.team === String(teamAbbr).toUpperCase());
+  if (!target) return { futureValuePct:null, prospectCount:0, topFiveAverage:null, organizationCount:organizationScores.length };
+  return {
+    futureValuePct: percentile(target.topFiveAverage, organizationScores.map(row => row.topFiveAverage), true),
+    prospectCount:target.prospectCount,
+    topFiveAverage:Number(target.topFiveAverage.toFixed(1)),
+    organizationCount:organizationScores.length,
+  };
+}
+
+export function deriveFrontOfficeCoverageGrades({ players = { hitting:[], pitching:[] }, liveDataMode = 'unavailable', teamAbbr = '', oaaPercentile = null } = {}) {
   const rollups = deriveTeamPlayerRollups(players);
   const verifiedRoster = (liveDataMode === 'live' || liveDataMode === 'cached') && rollups.activePlayers != null;
   const positions = rollups.positions || [];
-  const fieldingPositions = [...new Set(positions.map(row => String(row.position || '').toUpperCase()).filter(position => position && !['P','SP','RP','DH','TWP'].includes(position)))];
-  const defensePct = verifiedRoster && fieldingPositions.length
-    ? Math.min(100, Math.round(fieldingPositions.length / 8 * 100))
+  const fieldingRows = positions.filter(row => !['P','SP','RP','DH','TWP'].includes(String(row.position || '').toUpperCase()));
+  const fieldingPositions = [...new Set(fieldingRows.map(row => String(row.position || '').toUpperCase()).filter(Boolean))];
+  const fieldingPlayerCount = fieldingRows.reduce((sum, row) => sum + Number(row.players || 0), 0);
+  const pitcherCount = positions.filter(row => ['P','SP','RP','TWP'].includes(String(row.position || '').toUpperCase())).reduce((sum, row) => sum + Number(row.players || 0), 0);
+  const coveragePct = Math.min(100, Math.round(fieldingPositions.length / 8 * 100));
+  const redundancyPct = fieldingPositions.length
+    ? Math.min(100, Math.round(Math.max(0, fieldingPlayerCount - fieldingPositions.length) / 6 * 100))
     : null;
-  const depthPct = verifiedRoster && positions.length
-    ? Math.min(100, Math.round(((Math.min(rollups.activePlayers, 26) / 26) * 65 + (Math.min(positions.length, 9) / 9) * 35) * 100))
+  const defenseCoveragePct = verifiedRoster && fieldingPositions.length && redundancyPct != null
+    ? Math.round(coveragePct * 0.8 + redundancyPct * 0.2)
     : null;
-  const teamProspects = [
-    ...PROSPECT_BATTERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ prospect, isPitcher:false })),
-    ...PROSPECT_PITCHERS.filter(prospect => String(prospect.team).toUpperCase() === String(teamAbbr).toUpperCase()).map(prospect => ({ prospect, isPitcher:true })),
-  ];
-  const hitterBaselines = fvBaselines(PROSPECT_BATTERS, false);
-  const pitcherBaselines = fvBaselines(PROSPECT_PITCHERS, true);
-  const prospectFvs = teamProspects.map(({ prospect, isPitcher }) => computeFV(prospect, isPitcher ? pitcherBaselines : hitterBaselines, isPitcher)).filter(value => value != null).sort((a,b) => b-a).slice(0, 5);
-  const futureValuePct = prospectFvs.length ? Math.round(((prospectFvs.reduce((sum, value) => sum + value, 0) / prospectFvs.length) - 35) / 35 * 100) : null;
-  return { defensePct, depthPct, futureValuePct, fieldingPositions:fieldingPositions.length, activePlayers:rollups.activePlayers, prospectCount:prospectFvs.length };
+  const validOaaPercentile = oaaPercentile != null && Number.isFinite(Number(oaaPercentile)) ? Number(oaaPercentile) : null;
+  const defensePct = defenseCoveragePct == null
+    ? null
+    : validOaaPercentile != null
+      ? Math.round(defenseCoveragePct * 0.45 + validOaaPercentile * 0.55)
+      : defenseCoveragePct;
+  const rosterDepthPct = verifiedRoster && positions.length
+    ? Math.min(100, Math.round(((Math.min(rollups.activePlayers, 26) / 26) * 0.5 + (coveragePct / 100) * 0.25 + (Math.min(pitcherCount, 13) / 13) * 0.25) * 100))
+    : null;
+  const farmSystemRank = Number(MLB_PIPELINE_FARM_SYSTEM_RANKINGS.ranks[String(teamAbbr).toUpperCase()]);
+  const farmSystemPct = Number.isFinite(farmSystemRank) && farmSystemRank >= 1 && farmSystemRank <= 30
+    ? Math.round(((31 - farmSystemRank) / 30) * 100)
+    : null;
+  const depthPct = rosterDepthPct != null && farmSystemPct != null
+    ? Math.round(rosterDepthPct * 0.6 + farmSystemPct * 0.4)
+    : rosterDepthPct ?? farmSystemPct;
+  const futureValue = deriveOrganizationFutureValue(teamAbbr);
+  return {
+    defensePct,
+    defenseCoveragePct,
+    oaaPercentile:Number.isFinite(validOaaPercentile) ? validOaaPercentile : null,
+    depthPct,
+    rosterDepthPct,
+    farmSystemRank:Number.isFinite(farmSystemRank) ? farmSystemRank : null,
+    farmSystemPct,
+    futureValuePct:futureValue.futureValuePct,
+    fieldingPositions:fieldingPositions.length,
+    fieldingPlayerCount,
+    pitcherCount,
+    coveragePct,
+    redundancyPct,
+    activePlayers:rollups.activePlayers,
+    prospectCount:futureValue.prospectCount,
+    prospectTopFiveAverage:futureValue.topFiveAverage,
+    prospectOrganizationCount:futureValue.organizationCount,
+  };
 }
 
 export function buildOrganizationProspectDepthChart(teamAbbr = '') {
@@ -695,6 +990,8 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [overviewView, setOverviewView] = useState('briefing');
+  const [evaluationActiveLabel, setEvaluationActiveLabel] = useState(null);
+  const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
   const [affiliateId, setAffiliateId] = useState('');
   const [affiliates, setAffiliates] = useState([]);
@@ -764,6 +1061,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
+  const [secondaryPlayoffOddsData, setSecondaryPlayoffOddsData] = useState(null);
+  const [secondaryPlayoffOddsState, setSecondaryPlayoffOddsState] = useState('idle');
   const [calculatedIntelligence, setCalculatedIntelligence] = useState(null);
   const [calculatedIntelligenceState, setCalculatedIntelligenceState] = useState('idle');
   const [teamPlayersLoading, setTeamPlayersLoading] = useState(true);
@@ -976,29 +1275,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [affiliateId, affiliateLevel, affiliates]);
 
-  useEffect(() => {
-    let alive = true;
-    if (!teamBase?.id) {
-      setCalculatedIntelligence(null);
-      setCalculatedIntelligenceState('idle');
-      return () => { alive = false; };
-    }
-    setCalculatedIntelligence(null);
-    setCalculatedIntelligenceState('loading');
-    getTeamCalculatedIntelligence(teamBase.id, CURRENT_SEASON)
-      .then(data => {
-        if (!alive) return;
-        setCalculatedIntelligence(data || null);
-        setCalculatedIntelligenceState(data?.metrics ? 'ready' : 'unavailable');
-      })
-      .catch(() => {
-        if (!alive) return;
-        setCalculatedIntelligence(null);
-        setCalculatedIntelligenceState('unavailable');
-      });
-    return () => { alive = false; };
-  }, [teamBase?.id]);
-
   const calculatedMetrics = calculatedIntelligence?.metrics || {};
   const calculatedStandingMetric = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   const calculatedStandingFallback = useMemo(() => ({
@@ -1025,6 +1301,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       war: null, wrcPlus: null, fip: null, drs: null, bsr: null,
     };
   }, [liveTeamData, teamBase, calculatedStandingFallback]);
+  useEffect(() => {
+    setEvaluationActiveLabel(null);
+  }, [team?.abbr]);
   const liveStandings = liveTeamData?.byId?.[teamBase?.id]?.standings || liveTeamData?.byAbbr?.[teamBase?.abbr]?.standings || null;
   const headlineUsesCalculatedStandings = Boolean(calculatedIntelligence && ['w', 'l', 'pct', 'rs', 'ra', 'diff'].some(key => (liveStandings?.[key] == null || liveStandings?.[key] === '') && calculatedStandingFallback[key] != null));
   // Team-brand accent used for decorative/structural elements (panel accent
@@ -1182,8 +1461,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
-    }, [teamBase?.abbr, savantRetryToken, rosterSavantKey]);
+  }, [teamBase?.abbr, savantRetryToken, rosterSavantKey]);
   useEffect(() => {
+    if (overviewView !== 'performance') return undefined;
     let alive = true;
     const cached = readTeamSavantAgainstCache(teamBase?.abbr, CURRENT_SEASON);
     const cachedRows = Array.isArray(cached?.data) ? cached.data : [];
@@ -1197,7 +1477,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive) setTeamBattedBallAgainstRows(normalized);
     }).catch(() => { if (alive && !cached) setTeamBattedBallAgainstRows([]); });
     return () => { alive = false; };
-  }, [teamBase?.abbr, savantRetryToken]);
+  }, [overviewView, teamBase?.abbr, savantRetryToken]);
   useEffect(() => {
     if (overviewView !== 'performance') return undefined;
     let alive = true;
@@ -1226,6 +1506,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (!alive) return;
       setTeamModelData(data);
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
+      if (data?.playoffOdds != null && data.playoffOdds !== '' && Number.isFinite(Number(data.playoffOdds))) {
+        setSecondaryPlayoffOddsData(null);
+        setSecondaryPlayoffOddsState('idle');
+        return;
+      }
+      setSecondaryPlayoffOddsState('loading');
+      getSecondaryPlayoffOdds(teamBase?.abbr).then(secondary => {
+        if (!alive) return;
+        setSecondaryPlayoffOddsData(secondary);
+        setSecondaryPlayoffOddsState(secondary?.found ? 'ready' : 'unavailable');
+      }).catch(() => {
+        if (!alive) return;
+        setSecondaryPlayoffOddsData(null);
+        setSecondaryPlayoffOddsState('unavailable');
+      });
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
   }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
@@ -1299,27 +1594,36 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       },
     };
     setAiInsightsState('loading');
+    const controller = new AbortController();
     fetch(apiUrl('/api/trpc/ai.rosterInsights?batch=1'), {
       method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({0:{json:input}}),
+      signal:controller.signal,
     }).then(response => response.json().then(payload => ({ ok:response.ok, payload })))
       .then(({ ok, payload }) => {
         const data = payload?.[0]?.result?.data?.json;
         if (!ok || !data) throw new Error('AI insights unavailable');
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
-      }).catch(() => { if (alive) setAiInsightsState('error'); });
-    return () => { alive = false; };
+      }).catch(error => { if (alive && error?.name !== 'AbortError') setAiInsightsState('error'); });
+    return () => { alive = false; controller.abort(); };
   }, [liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
-  const providerPlayoffOdds = finiteMetric(teamModelData?.playoffOdds);
-  const calculatedPlayoffOdds = finiteMetric(calculatedMetrics.calculatedPlayoffOdds);
+  const providerPlayoffOdds = resolveVerifiedPlayoffOdds(teamModelData?.playoffOdds);
   const hasProviderPlayoffOdds = providerPlayoffOdds != null;
-  const hasCalculatedPlayoffOdds = calculatedPlayoffOdds != null;
-  const playoffOddsIsCalculated = !hasProviderPlayoffOdds && hasCalculatedPlayoffOdds;
+  const secondaryPlayoffOddsDisplay = secondaryPlayoffOddsData?.found ? secondaryPlayoffOddsData.playoffOddsDisplay : null;
+  const hasSecondaryPlayoffOdds = Boolean(secondaryPlayoffOddsDisplay);
   const playoffOddsValue = hasProviderPlayoffOdds
     ? `${providerPlayoffOdds.toFixed(1)}%`
-    : hasCalculatedPlayoffOdds ? `${calculatedPlayoffOdds.toFixed(1)}%` : 'Unavailable';
-  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : playoffOddsIsCalculated ? 'MLB Stats API · calculated playoff proxy' : 'Provider unavailable';
+    : hasSecondaryPlayoffOdds ? secondaryPlayoffOddsDisplay : 'Unavailable';
+  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : hasSecondaryPlayoffOdds ? 'PlayoffStatus · secondary' : 'Provider unavailable';
+  const playoffOddsVerifiedAt = hasProviderPlayoffOdds
+    ? teamModelData?.providerUpdatedAt || teamModelData?.retrievedAt
+    : hasSecondaryPlayoffOdds ? secondaryPlayoffOddsData?.lastVerifiedAt || secondaryPlayoffOddsData?.retrievedAt : null;
+  const playoffOddsVerificationLabel = hasProviderPlayoffOdds
+    ? `FanGraphs playoff odds · last verified ${formatVerifiedTimestamp(playoffOddsVerifiedAt)}${teamModelData?.providerUpdatedText ? ` · provider updated ${teamModelData.providerUpdatedText}` : ''}`
+    : hasSecondaryPlayoffOdds
+      ? `PlayoffStatus secondary odds · last verified ${formatVerifiedTimestamp(playoffOddsVerifiedAt)}`
+      : secondaryPlayoffOddsState === 'loading' ? 'Checking secondary postseason probability source…' : 'No verified postseason probability source is currently available.';
   const providerTeamWar = finiteMetric(teamModelData?.teamWar);
   const calculatedWarProxy = finiteMetric(calculatedMetrics.calculatedWarProxy);
   const hasProviderTeamWar = providerTeamWar != null;
@@ -1349,24 +1653,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         : teamModelData?.found || teamModelData?.statuses?.teamWar === 'live' || teamModelData?.statuses?.playoffOdds === 'live'
           ? 'verified'
           : teamModelState === 'source-gap' ? 'coverage-gap' : 'unavailable';
-  const hasVerifiedPlayoffOdds = hasProviderPlayoffOdds;
-  const hasVerifiedTeamWar = hasProviderTeamWar;
-  const calculatedTeamWarProxy = calculatedWarProxy;
-  const playoffOddsRaw = providerPlayoffOdds ?? calculatedPlayoffOdds;
-  const teamWarRaw = providerTeamWar ?? calculatedWarProxy;
-  const teamWarLabel = teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR';
   const projectedWinsValue = teamModelData?.advancedMetrics?.projectedWins ?? calculatedMetrics.projectedWins;
   const projectedLossesValue = teamModelData?.advancedMetrics?.projectedLosses ?? calculatedMetrics.projectedLosses;
+  const pythagoreanWinsValue = finiteMetric(calculatedMetrics.pythagoreanProjectedWins);
+  const pythagoreanLossesValue = finiteMetric(calculatedMetrics.pythagoreanProjectedLosses);
   const calculatedModelSource = teamModelData?.advancedMetrics?.projectedWins != null ? 'FanGraphs' : projectedWinsValue != null ? 'MLB Stats API · calculated' : 'FanGraphs';
   const calculatedModelStatus = teamModelData?.advancedMetrics?.projectedWins != null ? fanGraphsHealthStatus : projectedWinsValue != null ? 'calculated' : fanGraphsHealthStatus;
+  const pythagoreanModelStatus = pythagoreanWinsValue != null && pythagoreanLossesValue != null ? 'calculated' : calculatedIntelligenceState === 'loading' ? 'loading' : 'unavailable';
+  const calculationProviderStatus = calculatedIntelligenceState === 'loading' ? 'loading' : calculatedIntelligence ? (calculatedIntelligence.freshness === 'stale-cached' ? 'cached-fallback' : 'calculated') : 'unavailable';
   const fanGraphsMetricStatus = value => resolveMetricProviderStatus(value, fanGraphsHealthStatus);
   const fanGraphsMetricTitle = (label, value) => value == null
     ? `FanGraphs did not return a verified ${label} value; the provider status badge does not verify this missing metric.`
     : `FanGraphs ${label} source health`;
-  const playoffOddsStatus = hasVerifiedPlayoffOdds ? fanGraphsHealthStatus : calculatedPlayoffOdds != null ? 'calculated' : fanGraphsHealthStatus;
-  const teamWarStatus = hasVerifiedTeamWar ? fanGraphsHealthStatus : calculatedTeamWarProxy != null ? 'calculated' : fanGraphsHealthStatus;
-  const fanGraphsWarStatus = teamModelData?.statuses?.teamWar === 'live' ? fanGraphsHealthStatus : 'coverage-gap';
-  const divisionWarStatus = divisionWarData.length ? fanGraphsHealthStatus : fanGraphsWarStatus;
+  const standingsContext = useMemo(() => buildPostseasonStandingsContext(liveTeamData, team), [liveTeamData, team]);
   const affiliateSavantHealthStatus = affiliateSavant?.status === 'loading'
     ? 'loading'
     : affiliateSavant?.freshness === 'stale-cached'
@@ -1617,10 +1916,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       return values.length ? percentile(current, values, higher) : null;
     };
     const offPct = rankValue(team.ops, hittingRecords, ['ops']);
-    const speedPct = rankValue(team.sb, hittingRecords, ['stolenBases']);
     const pitchingPct = rankValue(team.era, pitchingRecords, ['era'], false);
-    const frontOfficeCoverage = deriveFrontOfficeCoverageGrades({ players:liveTeamPlayers, liveDataMode:liveTeamDataMode, teamAbbr:team.abbr });
-    const { defensePct, depthPct, futureValuePct, fieldingPositions, activePlayers, prospectCount } = frontOfficeCoverage;
+    const baserunning = deriveBaserunningGrade({
+      stolenBases:teamRollups.stolenBases ?? team.sb,
+      caughtStealing:teamRollups.caughtStealing,
+      comparisonRows:hittingRecords,
+    });
+    const speedPct = baserunning.percentile;
+    const frontOfficeCoverage = deriveFrontOfficeCoverageGrades({
+      players:liveTeamPlayers,
+      liveDataMode:liveTeamDataMode,
+      teamAbbr:team.abbr,
+      oaaPercentile:teamOaaData?.oaaPercentile,
+    });
+    const { defensePct, defenseCoveragePct, oaaPercentile, depthPct, rosterDepthPct, farmSystemRank, farmSystemPct, futureValuePct, fieldingPositions, fieldingPlayerCount, pitcherCount, activePlayers, prospectCount, prospectTopFiveAverage, prospectOrganizationCount } = frontOfficeCoverage;
     const divName = team.div || 'League';
     const standings=Object.values(TEAMS).filter(t=>t.div===team.div).map(t=>{
       const live = liveTeamData?.byAbbr?.[t.abbr]?.standings;
@@ -1633,8 +1942,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {label:'Team ERA',     rank:rankValue(team.era, pitchingRecords, ['era'], false), val:formatTeamMetric(team.era,2)},
       {label:'WHIP',         rank:rankValue(team.whip, pitchingRecords, ['whip'], false), val:formatTeamMetric(team.whip,3)},
       {label:'Strikeouts',   rank:rankValue(team.k, pitchingRecords, ['strikeOuts']), val:team.k},
-      {label:'Defense coverage',rank:defensePct,val:defensePct == null ? '—' : `${defensePct}%`},
-      {label:'Baserunning (BsR)',rank:null,val:'—'},
+      {label:'Defense index',rank:defensePct,val:defensePct == null ? '—' : `${defensePct}%`},
+      {label:'Baserunning index',rank:speedPct,val:speedPct == null ? '—' : `${speedPct}%`},
     ];
     const pctBars=[
       {lbl:'Offense', pct:offPct, color:C.amber},
@@ -1645,19 +1954,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const frontOfficeGradeRows = [
       { label:'Offense', grade:pctToGrade(offPct), color:C.amber, detail:offPct == null ? 'Unavailable: verified team OPS and comparable MLB aggregate data are not both available.' : `Calculated from verified team OPS relative to the available MLB team aggregate set (${Math.round(offPct)}th percentile).` },
       { label:'Pitching', grade:pctToGrade(pitchingPct), color:C.rust, detail:pitchingPct == null ? 'Unavailable: verified team ERA and comparable MLB aggregate data are not both available.' : `Calculated from verified team ERA relative to the available MLB team aggregate set (${Math.round(pitchingPct)}th percentile).` },
-      { label:'Defense', grade:pctToGrade(defensePct), color:C.teal, detail:defensePct == null ? 'Unavailable: verified active-roster position coverage is not available.' : `Calculated from verified active-roster non-pitcher position coverage (${fieldingPositions.length} positions); it is not Statcast OAA.` },
-      { label:'Baserunning', grade:pctToGrade(speedPct), color:C.teal, detail:speedPct == null ? 'Unavailable: verified stolen-base totals and comparable MLB aggregate data are not both available.' : `Calculated from verified stolen-base totals relative to the available MLB team aggregate set (${Math.round(speedPct)}th percentile); it is not a proprietary baserunning metric.` },
-      { label:'Depth', grade:pctToGrade(depthPct), color:C.slate, detail:depthPct == null ? 'Unavailable: verified active-roster coverage is not available.' : `Calculated from verified active-roster size (${activePlayers}) and listed position coverage; it is not provider WAR.` },
-      { label:'Future Value', grade:pctToGrade(futureValuePct), color:C.purple, detail:futureValuePct == null ? 'Unavailable: no team-scoped SKIP prospect snapshot is available.' : `Calculated from ${prospectCount} player${prospectCount === 1 ? '' : 's'} in the current team-scoped SKIP prospect snapshot; it is not a live external prospect grade.` },
+      { label:'Defense', grade:pctToGrade(defensePct), color:C.teal, detail:defensePct == null ? 'Unavailable: verified roster coverage is not available.' : oaaPercentile == null ? `Calculated from verified roster fielding coverage (${fieldingPositions} positions, ${fieldingPlayerCount} fielders); OAA was unavailable, so it is not included.` : `Calculated from Baseball Savant team OAA (${Math.round(oaaPercentile)}th percentile) at 55% and verified roster fielding coverage (${Math.round(defenseCoveragePct)}%) at 45%.` },
+      { label:'Baserunning', grade:pctToGrade(speedPct), color:C.teal, detail:speedPct == null ? 'Unavailable: verified stolen-base and caught-stealing totals plus comparable MLB aggregate data are required.' : `Calculated from stolen-base volume (${Math.round(baserunning.volumePercentile)}th percentile) and steal success rate (${(baserunning.successRate * 100).toFixed(1)}%; ${Math.round(baserunning.efficiencyPercentile)}th percentile) across ${baserunning.attempts} attempts.` },
+      { label:'Depth', grade:pctToGrade(depthPct), color:C.slate, detail:depthPct == null ? 'Unavailable: neither verified roster coverage nor an official MLB Pipeline farm-system rank is available.' : rosterDepthPct != null && farmSystemPct != null ? `Calculated 60% from ${activePlayers} verified season roster rows, ${fieldingPositions} fielding positions, and ${pitcherCount} pitcher rows; 40% from MLB Pipeline’s No. ${farmSystemRank} farm-system rank (published Aug. 16, 2026). Baseball America is a public methodology reference only; subscription-only ranks are not imported.` : farmSystemPct != null ? `Calculated from MLB Pipeline’s No. ${farmSystemRank} farm-system rank (published Aug. 16, 2026) because verified roster coverage is unavailable. Baseball America is a methodology reference only; subscription-only ranks are not imported.` : `Calculated from ${activePlayers} verified season roster rows, ${fieldingPositions} fielding positions, and ${pitcherCount} pitcher rows. MLB Pipeline’s dated farm-system rank is unavailable.` },
+      { label:'Future Value', grade:pctToGrade(futureValuePct), color:C.purple, detail:futureValuePct == null ? 'Unavailable: no team-scoped SKIP prospect snapshot is available.' : `Calculated from this organization’s top-five SKIP prospect FV average (${prospectTopFiveAverage.toFixed(1)}) relative to ${prospectOrganizationCount} organizations in the current snapshot (${Math.round(futureValuePct)}th percentile; ${prospectCount} graded prospect${prospectCount === 1 ? '' : 's'}).` },
     ];
     const frontOfficeOverall = buildFrontOfficeGradeSummary(frontOfficeGradeRows);
     return {
       offenseData:liveRadar.offenseData,strengthData:liveRadar.strengthData,radarSource:liveRadar.source,standings,leagueRanks,pctBars,divName,
       og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:pctToGrade(defensePct),bg:pctToGrade(speedPct),depthGrade:pctToGrade(depthPct),futureValueGrade:pctToGrade(futureValuePct),
-      defensePct,depthPct,futureValuePct,fieldingPositions,activePlayers,prospectCount,
+      defensePct,defenseCoveragePct,oaaPercentile,depthPct,rosterDepthPct,farmSystemRank,farmSystemPct,futureValuePct,fieldingPositions,fieldingPlayerCount,pitcherCount,activePlayers,prospectCount,prospectTopFiveAverage,prospectOrganizationCount,
       frontOfficeGradeRows,frontOfficeOverall,overall:frontOfficeOverall.grade,
     };
-  },[team, liveTeamData, liveTeamDataMode, teamRollups, rd]);
+  },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, rd]);
 
   // These only depend on `team`, but were previously called directly in the
   // render body — every unrelated state change on this page (e.g. clicking
@@ -1726,6 +2035,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'VERIFIED ROSTER ROWS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
   const showInitialSkeleton = liveTeamDataMode === 'loading' && !liveTeamData && !liveTeamError;
   const mlbParentReadyForAffiliate = liveTeamDataMode !== 'loading' || Boolean(liveTeamData);
+  const openExecutiveDestination = (view, targetId) => {
+    setOverviewView(view);
+    if (!targetId || typeof document === 'undefined') return;
+    const scrollToTarget = () => document.getElementById(targetId)?.scrollIntoView?.({ behavior:'smooth', block:'start' });
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(scrollToTarget));
+    } else {
+      setTimeout(scrollToTarget, 0);
+    }
+  };
 
   return (
     <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
@@ -1791,7 +2110,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
           ))}
         </div>
-        {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>Official MLB standings fallback via SKIP backend · W–L, win percentage, runs, and run differential are verified standings values, not projections.</div>}
+        <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
+        {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
       <nav className="skip-overview-view-rail" aria-label="Team Overview views">
@@ -1847,17 +2167,32 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {overviewView === 'performance' && <>
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
-        <span>Model source: <strong style={{color:C.text2}}>{(playoffOddsIsCalculated || teamWarIsCalculated) ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
+        <span>Model source: <strong style={{color:C.text2}}>{teamWarIsCalculated ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource} · {teamWarIsCalculated ? 'WAR: MLB Stats API · calculated proxy' : `Team WAR: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`}</span>
       </div>
-      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs WAR" status={divisionWarStatus} /></span>}>
+      <Panel title="Postseason Standing Context" accent={C.teal} badge="MLB Stats API">
+        {standingsContext ? <>
+          <div data-testid="postseason-standings-context" className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(106px,1fr))',gap:8}}>
+            {[
+              ['Record', standingsContext.record],
+              ['Division place', standingsContext.divisionRank],
+              ['Games back', standingsContext.gamesBack],
+              ['Wild-card place', standingsContext.wildCardRank],
+              ['Last 10', standingsContext.lastTen],
+              ['Streak', standingsContext.streak],
+            ].map(([label,value]) => <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==='—'?C.text3:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
+          </div>
+          <div style={sans({padding:'0 14px 10px',fontSize:9,color:C.text3,lineHeight:1.4})}>{standingsContext.divisionName} leader: <strong style={{color:C.text2}}>{standingsContext.divisionLeader} ({standingsContext.divisionLeaderRecord})</strong> · verified MLB standings context, not a projected probability.</div>
+        </> : <OverviewEmptyState status={liveTeamDataMode === 'loading' ? 'Loading' : 'Unavailable'} message="Postseason standings context" detail="Verified division and Wild Card position will appear when the current MLB standings snapshot is available." />}
+      </Panel>
+      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
-          <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Verified cached divisional WAR snapshot · provider currently blocked' : 'FanGraphs provider blocked · no verified divisional rows') : 'Verified total WAR by division · select or hover a bar for the exact component breakdown'}</span>
+          <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Cached verified rows · provider blocked' : 'Provider blocked · no verified rows') : 'Verified WAR by division'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
-        <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
+        {divisionWarData.length ? <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
           <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} />
-        </Suspense>
+        </Suspense> : <OverviewEmptyState status={teamModelData?.providerBlocked ? 'Provider blocked' : 'Unavailable'} message="Divisional WAR rows" detail="No verified FanGraphs divisional WAR rows are available for this view, so SKIP does not reserve chart-sized space for an empty comparison." />}
         {divisionWarData.length > 0 && <div className="skip-divisional-war-table-wrap">
           <table className="skip-divisional-war-table" aria-label="Exact divisional WAR values">
             <thead><tr><th scope="col">Team</th><th scope="col">Total</th><th scope="col">Off</th><th scope="col">Pitch</th><th scope="col">Def</th></tr></thead>
@@ -1870,47 +2205,23 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </tr>)}</tbody>
           </table>
         </div>}
-        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? `FanGraphs is currently blocking automated requests. ${divisionWarData.length ? 'Shown rows are verified cached historical values, not live updates.' : 'No cached divisional rows are available, so this comparison remains unavailable.'}` : divisionWarData.length ? `Total WAR labels are visible on each bar; ${team.abbr} is highlighted. Offensive and pitching components are shown only when returned by FanGraphs.` : 'FanGraphs did not return verified division rows for this view. SKIP does not synthesize competing-team WAR from the selected team’s calculated proxy.'} Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Historical cache; not live.' : 'No cached divisional WAR available.') : divisionWarData.length ? `${team.abbr} highlighted · missing components shown as —.` : 'No verified divisional WAR available.'}</div>
       </Panel>
-      <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
-        <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
-          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=>{
+      <Panel title="Advanced Models & Savant" accent={C.purple}>
+        <div className="skip-overview-panel-status" role="status" aria-label="Advanced models data sources">
+          <span>Sources</span>
+          <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} />
+          <OverviewSourceBadge provider="MLB Stats API" status={calculationProviderStatus} />
+          <OverviewSourceBadge provider="Savant" status={savantHealthStatus} />
+        </div>
+        <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:8}}>
+          {[['Win pace W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Win pace L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Pythag W',pythagoreanWinsValue,1,'MLB Stats API',pythagoreanModelStatus],['Pythag L',pythagoreanLossesValue,1,'MLB Stats API',pythagoreanModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=>{
             const metricStatus = provider === 'FanGraphs' ? fanGraphsMetricStatus(value) : status;
             const metricTitle = provider === 'FanGraphs' ? fanGraphsMetricTitle(label, value) : `${provider} metric source health`;
-            return <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={metricStatus} title={metricTitle} /></div></div>;
+            return <div key={label} title={metricTitle} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span>{value == null && <span style={px({fontSize:8,color:C.text4,letterSpacing:'.04em'})}>—</span>}</div></div>;
           })}
         </div>
-        <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || playoffOddsIsCalculated || teamWarIsCalculated) ? 'Verified MLB standings fallback: projected wins/losses use current 162-game pace; playoff odds are a calculated proxy, not official or FanGraphs odds; WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
-      </Panel>
-      <Panel title="Forecast & Team Context" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs forecast" status={calculatedModelStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
-        <div style={{ padding:'12px 14px 10px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, flexWrap:'wrap', marginBottom:8 }}>
-            <div style={px({ fontSize:9.5, fontWeight:800, color:C.purple, letterSpacing:'.07em', textTransform:'uppercase' })}>Forecast</div>
-            <div style={sans({ fontSize:9, color:C.text4 })}>{calculatedModelSource === 'FanGraphs' ? `Live FanGraphs projection · ${modelFreshness}` : 'Calculated from verified MLB standings'}</div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))', gap:8 }}>
-            <SourceMetricCard label="Projected wins" value={projectedWinsValue} provider={calculatedModelSource === 'FanGraphs' ? 'FanGraphs' : 'MLB calculation'} status={calculatedModelStatus} description={calculatedModelSource === 'FanGraphs' ? 'Live FanGraphs projection' : 'calculated from verified MLB standings; not official odds.'} accent={C.purple} />
-            <SourceMetricCard label="Projected losses" value={projectedLossesValue} provider={calculatedModelSource === 'FanGraphs' ? 'FanGraphs' : 'MLB calculation'} status={calculatedModelStatus} description={calculatedModelSource === 'FanGraphs' ? 'Live FanGraphs projection' : 'calculated from verified MLB standings; not official odds.'} accent={C.purple} />
-            <SourceMetricCard label={hasVerifiedPlayoffOdds ? 'Playoff odds' : 'Playoff estimate'} value={playoffOddsRaw} suffix="%" provider={hasVerifiedPlayoffOdds ? 'FanGraphs' : 'MLB calculation'} status={playoffOddsStatus} description={hasVerifiedPlayoffOdds ? 'Live FanGraphs model probability.' : 'Standings-pace estimate; excludes schedule, roster, injury, and simulation inputs.'} accent={hasVerifiedPlayoffOdds ? C.purple : C.amber} />
-          </div>
-        </div>
-        <div style={{ padding:'11px 14px 13px', borderTop:`1px solid ${C.borderLight}`, background:C.surface }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, flexWrap:'wrap', marginBottom:8 }}>
-            <div style={px({ fontSize:9.5, fontWeight:800, color:C.teal, letterSpacing:'.07em', textTransform:'uppercase' })}>Performance context</div>
-            <div style={sans({ fontSize:9, color:C.text4 })}>Verified batted-ball data and transparent derived context</div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))', gap:8 }}>
-            <SourceMetricCard label={teamWarLabel} value={teamWarRaw} provider={hasVerifiedTeamWar ? 'FanGraphs' : 'MLB calculation'} status={teamWarStatus} description={hasVerifiedTeamWar ? 'Verified FanGraphs Team WAR.' : 'Pythagorean wins above a 48-win replacement baseline; not FanGraphs Team WAR.'} accent={hasVerifiedTeamWar ? C.purple : C.amber} />
-            <SourceMetricCard label="xwOBA" value={teamSavantDisplayData?.expectedWOBA} digits={3} provider="Savant" status={savantHealthStatus} description="Verified team batted-ball query." accent={C.teal} />
-            <SourceMetricCard label="Exit velocity" value={teamSavantDisplayData?.exitVelocity} suffix=" mph" provider="Savant" status={savantHealthStatus} description="Verified team batted-ball query." accent={C.teal} />
-            {teamModelData?.advancedMetrics?.offenseWar != null && <SourceMetricCard label="Offensive WAR" value={teamModelData.advancedMetrics.offenseWar} provider="FanGraphs" status={fanGraphsHealthStatus} description="Verified only when returned by FanGraphs." accent={C.purple} />}
-            {teamModelData?.advancedMetrics?.defenseWar != null && <SourceMetricCard label="Defensive WAR" value={teamModelData.advancedMetrics.defenseWar} provider="FanGraphs" status={fanGraphsHealthStatus} description="Verified only when returned by FanGraphs." accent={C.purple} />}
-          </div>
-        </div>
-        <div style={{ padding:'9px 14px 11px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', borderTop:`1px solid ${C.borderLight}`, ...sans({ fontSize:9, color:C.text4, lineHeight:1.4 }) }}>
-          <span>{teamSavantDisplayData?.source || 'Baseball Savant'}</span><span aria-hidden="true">·</span><SavantFreshnessText data={teamSavantDisplayData} />
-          {!hasVerifiedTeamWar && teamWarRaw != null && <><span aria-hidden="true">·</span><span>WAR proxy is clearly labelled because verified FanGraphs Team WAR is unavailable.</span></>}
-        </div>
+        <div title="Playoff odds are shown only when FanGraphs returns a team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately. WAR proxy is Pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · WAR: proxy · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
       </>}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
@@ -1937,21 +2248,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <span>Executive briefing</span>
             <h2 id="team-overview-briefing-title">Front Office Read</h2>
           </div>
-          <p>Decision context is prioritized before the detailed card workspace.</p>
+          <p>Decision-ready summary.</p>
         </div>
         <div className="skip-overview-executive-grid">
           {[
-            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy},
-            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
+            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, destination:'Organization depth', action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
           ].map((item, i) => (
-            <div key={item.label} className="skip-overview-executive-item" style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
+            <button key={item.label} type="button" className="skip-overview-executive-item" onClick={item.action} aria-label={`Open ${item.destination}: ${item.label}`} style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
               <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
               <div style={sans({fontSize:15,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
-              {item.action ? (
-                <button onClick={item.action} style={{marginTop:6,padding:0,border:'none',background:'transparent',fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:10,color:C.purple,cursor:'pointer',textAlign:'left',textDecoration:'underline',textUnderlineOffset:2}}>{item.detail} →</button>
-              ) : <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>}
-            </div>
+              <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>
+              <span className="skip-overview-executive-item-link">Open {item.destination} →</span>
+            </button>
           ))}
         </div>
         <a className="skip-overview-analysis-link" href="#team-overview-detailed-analysis">Continue to detailed team cards ↓</a>
@@ -1965,10 +2275,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <p>Leaders, team evaluation, and strength context.</p>
         </div>
-        <div id="team-overview-detailed-analysis" className="overview-responsive-grid overview-decision-row skip-overview-deferred-analysis" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr)',minHeight:'100%',gap:14,alignItems:'start'}}>
+        <div id="team-overview-detailed-analysis" className="overview-responsive-grid overview-decision-row skip-overview-deferred-analysis" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr)',minHeight:'100%',gap:10,alignItems:'start'}}>
         <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
-          <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:8})}>Batting</div>
+          <div style={{padding:'7px 10px 5px',borderBottom:`0.5px solid ${C.borderLight}`}}>
+            <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:5})}>Batting</div>
             {leaders.batting.slice(0,2).map((row,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
@@ -1979,8 +2289,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
             ))}
           </div>
-          <div style={{padding:'10px 14px 6px'}}>
-            <div style={sans({fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:8})}>Pitching</div>
+          <div style={{padding:'7px 10px 5px'}}>
+            <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:5})}>Pitching</div>
             {leaders.pitching.slice(0,1).map((row,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
@@ -1994,8 +2304,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </Panel>
 
         <Panel title="Front Office Evaluation" accent={OVERVIEW_ACCENTS.context} badge="Decision Lens">
-          <div style={{padding:'10px 14px 0'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div style={{padding:'8px 10px 0'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
               <div>
                 <div style={sans({fontSize:9.5,fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Strengths</div>
                 {fo.strengths.map(s=>(
@@ -2015,16 +2325,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 ))}
               </div>
             </div>
-            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
+            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}} data-evaluation-presentation={evaluationPresentation}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
-              <FrontOfficeGradeCards
-                grades={D.frontOfficeGradeRows.map(grade => grade.label === 'Defense'
-                  ? { ...grade, detail: `${grade.detail} Separate OAA context: ${formatOaa(teamOaaData?.oaa)} from Baseball Savant (${teamOaaData?.playerCount || 0} verified player row${teamOaaData?.playerCount === 1 ? '' : 's'}; ${oaaHealthStatus}).` }
-                  : grade)}
-                overall={D.frontOfficeOverall}
-              />
+              {evaluationPresentation === 'score-ring'
+                ? <FrontOfficeScoreRingPreview teamName={team.name} grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />
+                : <FrontOfficeGradeCards grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
-                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense and Depth use verified active-roster coverage. Statcast OAA remains a separate Baseball Savant fielding signal (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Future Value uses the current SKIP prospect snapshot and does not replace a live external prospect provider.</div>
+                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense uses roster coverage and, when available, Statcast OAA (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Baserunning uses steals and success rate; Depth blends roster coverage with a dated MLB Pipeline farm rank. Baseball America is a methodology reference; its subscription-only ranks are not imported.</div>
                 <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>
               </div>
             </div>
@@ -2278,7 +2585,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
              panels) — fixing it now that a debug pass finally had room
              for it, since "lower priority" isn't the same as "not a real
              gap", and half this page turned out to share the pattern. */}
-        <Panel title="Batted Ball Profile" accent={OVERVIEW_ACCENTS.offense} badge={bb ? <OverviewSourceBadge status={teamSavantSource?.includes('rollup') ? 'estimated' : 'verified'} /> : teamSavantState === 'loading' ? 'Loading' : <OverviewSourceBadge status="coverage-gap" />}>
+        <Panel title="Batted Ball Profile" accent={OVERVIEW_ACCENTS.offense}>
+          <div className="skip-overview-panel-status" role="status" aria-label="Batted Ball Profile data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={bb ? (teamSavantSource?.includes('rollup') ? 'estimated' : 'verified') : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
           {bb ? (
           <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:0}}>
@@ -2315,7 +2623,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               ))}
             </div>
             <div style={sans({fontSize:9,color:C.text4,marginTop:8,lineHeight:1.4})}>
-              Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · {bb.sampleSize?.toLocaleString() || '—'} batted balls.
+              Sample: {bb.sampleSize?.toLocaleString() || '—'} batted balls.
             </div>
           </div>
           </div>
@@ -2336,7 +2644,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 {l}
               </button>
             ))}
-          </div> : <OverviewSourceBadge status="coverage-gap" />}>
+          </div> : null}>
+          <div className="skip-overview-panel-status" role="status" aria-label="Pitch Arsenal data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={arsenal ? 'verified' : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
           {arsenal ? (arsenalTab === 'usage' ? (
             <div style={{display:'flex',gap:0,alignItems:'stretch'}}>
               {/* Donut */}
@@ -2382,17 +2691,18 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <OverviewEmptyState status={teamSavantState === 'loading' ? 'Loading' : 'Unavailable'} message="Team pitch arsenal rows" detail={teamSavantState === 'loading' ? 'Checking the verified Baseball Savant roster pitch rollup.' : 'No verified Baseball Savant pitch rows were returned for this season.'} />
           )}
           <div style={sans({fontSize:9,color:C.text4,padding:'0 14px 8px',lineHeight:1.4})}>
-            Source: {teamSavantSource || 'Baseball Savant Statcast Search'} · usage is based on verified pitch rows; Stuff+ remains unavailable in this rollup.
+            Verified pitch rows · Stuff+ unavailable.
           </div>
         </Panel>
 
         {/* Contact Quality Allowed + Position OAA */}
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <Panel title="Contact Quality Allowed" accent={OVERVIEW_ACCENTS.pitching} badge={contactAllowed.sampleSize ? <OverviewSourceBadge status="verified" /> : <OverviewSourceBadge status="coverage-gap" />}>
+          <Panel title="Contact Quality Allowed" accent={OVERVIEW_ACCENTS.pitching}>
+            <div className="skip-overview-panel-status" role="status" aria-label="Contact Quality Allowed data source"><span>Source</span><OverviewSourceBadge provider="Savant" status={contactAllowed.sampleSize ? 'verified' : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} /></div>
             {contactAllowed.sampleSize ? (
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
                 {[['xwOBA', contactAllowed.xwoba == null ? '—' : contactAllowed.xwoba.toFixed(3)], ['Avg EV', contactAllowed.exitVelocity == null ? '—' : `${contactAllowed.exitVelocity.toFixed(1)} mph`], ['Hard-hit', contactAllowed.hardHitPct == null ? '—' : `${contactAllowed.hardHitPct.toFixed(1)}%`]].map(([label,value]) => <div key={label} style={{padding:'18px 10px',textAlign:'center',borderRight:`0.5px solid ${C.borderLight}`}}><div style={px({fontSize:17,fontWeight:800,color:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
-                <div style={sans({gridColumn:'1 / -1',padding:'7px 14px 10px',fontSize:9,color:C.text4})}>Source: Baseball Savant · {contactAllowed.sampleSize.toLocaleString()} verified opponent batted-ball rows.</div>
+                <div style={sans({gridColumn:'1 / -1',padding:'7px 14px 10px',fontSize:9,color:C.text4})}>Sample: {contactAllowed.sampleSize.toLocaleString()} opponent batted-ball rows.</div>
               </div>
             ) : <OverviewEmptyState message="Opponent contact quality" detail="Baseball Savant did not return verified opponent batted-ball rows for this season." />}
           </Panel>

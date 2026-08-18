@@ -166,6 +166,12 @@ function findTeamRowDetails(html, teamAbbr) {
   return null;
 }
 
+export function parseFanGraphsProviderUpdatedText(html) {
+  const text = stripTags(html);
+  const match = text.match(/\bUpdated:\s*([^\n]+?\b(?:ET|EST|EDT))\b/i);
+  return match ? match[1].trim() : null;
+}
+
 export function parseFanGraphsModelHtml(
   { oddsHtml, warHtml },
   teamAbbr,
@@ -199,6 +205,7 @@ export function parseFanGraphsModelHtml(
     teamAbbr,
     source: "FanGraphs",
     sourceUrls: { playoffOdds: ODDS_URL, teamWar: WAR_URL },
+    providerUpdatedText: parseFanGraphsProviderUpdatedText(oddsHtml),
     advancedMetrics: {
       projectedWins: pick("projected_wins", "proj_w", "wins", "w"),
       projectedLosses: pick("projected_losses", "proj_l", "losses", "l"),

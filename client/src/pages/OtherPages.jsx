@@ -242,7 +242,7 @@ function DraftMoversPanel() {
 
   return (
     <Panel title="Draft Day Movers" accent={C.teal} badge={`${drafted.length} picks tracked`}>
-      <div className="skip-draft-movers-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
         <div style={{ borderRight:`0.5px solid ${C.border}` }}>
           <div style={{ padding:'8px 14px 4px', ...sans({ fontSize:9.5, fontWeight:700, color:C.teal, textTransform:'uppercase', letterSpacing:'.05em' }) }}>
             Beat SKIP&rsquo;s Rank
@@ -1512,10 +1512,9 @@ function IntelligencePage() {
         </Panel>
 
         {/* Injury risk — FIX: bar transition added, consistent layout */}
-        <Panel title="Injury Risk Model" accent={C.rust} badge="Illustrative SKIP model">
-          <div className="skip-data-list" role="list" aria-label="Illustrative injury-risk assessments">
+        <Panel title="Injury Risk Model" accent={C.rust} badge="SKIP Model">
           {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
-            <div key={n} role="listitem" style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none', padding:'7px 14px' }}>
+            <div key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none', padding:'7px 14px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <span style={sans({ fontSize:10.5, fontWeight:600, color:C.text })}>{n}</span>
                 <span style={px({ fontSize:11, fontWeight:700, color:c })}>{pct}%</span>
@@ -1529,11 +1528,10 @@ function IntelligencePage() {
               <div style={sans({ fontSize:11, color:C.text2, marginTop:3 })}>{note}</div>
             </div>
           ))}
-          </div>
         </Panel>
 
         {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Illustrative SKIP model">
+        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="SKIP Model">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
               <thead>
@@ -1560,7 +1558,7 @@ function IntelligencePage() {
         </Panel>
 
         {/* Pitcher projections */}
-        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="Illustrative SKIP model">
+        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="SKIP Model">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:340 }}>
               <thead>
@@ -1587,8 +1585,8 @@ function IntelligencePage() {
         </Panel>
       </div>
       {/* ── Trade Value Simulator ── */}
-      <Panel title="Trade Value Simulator" accent={C.purple} badge="Illustrative SKIP model">
-        <div className="skip-trade-simulator-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
+      <Panel title="Trade Value Simulator" accent={C.purple} badge="SKIP Model">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
           {/* Side A */}
           <div style={{ padding:'14px', borderRight:`0.5px solid ${C.border}` }}>
             <div style={sans({ fontSize:10,fontWeight:700,color:C.amber,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10 })}>Team A Offers</div>
@@ -1679,7 +1677,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
           <div>
             <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
             <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
-              Switch between light and dark theme. This is also always one click away from the sidebar.
+              Switch between light and dark theme for the entire terminal.
             </div>
           </div>
           {toggleTheme && (

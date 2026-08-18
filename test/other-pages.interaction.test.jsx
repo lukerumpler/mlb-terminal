@@ -17,18 +17,20 @@ beforeEach(() => {
 
 async function goToTab(user, label, waitForText) {
   render(<App />);
-  const workspaceTargets = {
+  const groupedTabs = {
     Draft: { workspace: "Talent", tab: "Draft Board" },
-    Knowledge: { workspace: "Intelligence", tab: "Knowledge" },
     AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
   };
-  const target = workspaceTargets[label];
-  const navButton = document.querySelector(
-    `.skip-sidebar button[title="${target?.workspace || label}"]`
-  );
-  expect(navButton).toBeTruthy();
-  await user.click(navButton);
-  if (target) await user.click(await screen.findByRole("tab", { name: target.tab }));
+  const grouped = groupedTabs[label];
+  if (grouped) {
+    await user.click(await screen.findByTitle(grouped.workspace));
+    await user.click(await screen.findByRole("tab", { name: grouped.tab }));
+  } else {
+    const navButton = await screen.findByRole("button", {
+      name: new RegExp(label),
+    });
+    await user.click(navButton);
+  }
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
 
@@ -88,8 +90,7 @@ describe("Knowledge page", () => {
   it("cycles through every knowledge tab without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = document.querySelector('.skip-sidebar button[title="Intelligence"]');
-    expect(navButton).toBeTruthy();
+    const navButton = await screen.findByTitle("Intelligence");
     await user.click(navButton);
     await user.click(await screen.findByRole("tab", { name: "Knowledge" }));
     await screen.findByRole(
@@ -246,10 +247,14 @@ describe("Follow List page", () => {
   it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = document.querySelector('.skip-sidebar button[title="Intel Feed"]');
+    const navButton = document.querySelector(
+      '.skip-sidebar button[title="Intel Feed"]'
+    );
     expect(navButton).toBeTruthy();
     await user.click(navButton);
-    await user.click(await screen.findByRole("tab", { name: "Follow List" }));
+    await user.click(
+      await screen.findByRole("tab", { name: "Follow List" })
+    );
     await screen.findByPlaceholderText(
       /Search by name, handle, or bio/i,
       {},

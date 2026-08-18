@@ -1810,12 +1810,12 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
     setQuery(person.fullName);
     setLoading(true);
     setSwitchingPlayerName(person.fullName || person.name || 'selected player');
-      setError(null);
-      try {
-        const data = await loadFullPlayer(person, SEASON, {
-          signal: controller.signal,
-          onCoreReady: core => {
-            if (mountedRef.current && pickSeqRef.current === mySeq) {
+    setError(null);
+    try {
+      const data = await loadFullPlayer(person, SEASON, {
+        signal: controller.signal,
+        onCoreReady: core => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
             setPlayer(core);
             setLoading(false);
             setSwitchingPlayerName(null);
@@ -1823,10 +1823,10 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         },
         onImportantReady: important => {
           if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
-          },
-          onOptionalReady: optional => {
-            if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
-          },
+        },
+        onOptionalReady: optional => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
+        },
       });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
@@ -2057,11 +2057,6 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
       )}
       {loading && !player && <PlayerProfileSkeleton />}
       {player?.extrasLoading && <PlayerProfileHydrationSkeleton />}
-      {player?.extrasLoading && (
-        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10, lineHeight:1.45 }}>
-          Official profile and season data are ready. Optional Savant and game-by-game boxscore enrichment is still loading; blank values are not interpreted as unavailable or estimated.
-        </div>
-      )}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,

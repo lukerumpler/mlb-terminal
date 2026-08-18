@@ -65,6 +65,25 @@ describe('Team Overview compact navigation', () => {
     expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('uses all Executive Briefing items as direct workspace shortcuts', async () => {
+    const onNavigate = vi.fn();
+    window.addEventListener('skip-navigate', onNavigate);
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: current posture/i }));
+    expect(screen.getByText('Offensive Profile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
+    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: best signal/i }));
+    expect(screen.getByText('Run Differential — 2026')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
+    fireEvent.click(screen.getByRole('button', { name: /open organization depth: next question/i }));
+    expect(onNavigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { tab: 'prospects' } }));
+    window.removeEventListener('skip-navigate', onNavigate);
+  });
+
   it('defers FanGraphs model requests until Performance is explicitly opened', async () => {
     render(<OverviewPage />);
 
@@ -93,13 +112,13 @@ describe('Team Overview compact navigation', () => {
     });
   });
 
-  it('keeps Statcast OAA distinct from calculated Defense and opens a closable Future Value depth modal', async () => {
+  it('uses Statcast OAA only when available and opens a closable Future Value depth modal', async () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Separate OAA context: — from Baseball Savant/i);
-    expect(screen.getByText(/Statcast OAA remains a separate Baseball Savant fielding signal/i)).toBeInTheDocument();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Unavailable: verified roster coverage is not available/i);
+    expect(screen.getByText(/Defense uses roster coverage and, when available, Statcast OAA/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
     const dialog = screen.getByRole('dialog', { name: /organization depth/i });
