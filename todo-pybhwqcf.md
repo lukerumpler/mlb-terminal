@@ -368,7 +368,7 @@
 - [x] Reapply the requested transparent Overall Front Office grade from available component grades
 - [x] Add accessible interactive Front Office calculation tooltips and unavailable-state explanations
 - [x] Apply the attached Off WAR and Def WAR coverage-gap status correction
-- [ ] Verify the manually saved Vercel production API-base configuration and the managed CORS allowlist
+- [x] Verify the manually saved Vercel production API-base configuration and the managed CORS allowlist
 - [ ] Run full validation, checkpoint the restored changes, and request final deployment confirmation
 - [ ] Trigger and verify the confirmed Vercel production deployment
 - [ ] Reconcile the reviewed shared workspace with the GitHub source currently linked to Vercel before promotion
