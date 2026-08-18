@@ -17,10 +17,18 @@ beforeEach(() => {
 
 async function goToTab(user, label, waitForText) {
   render(<App />);
-  const navButton = await screen.findByRole("button", {
-    name: new RegExp(label),
-  });
+  const workspaceTargets = {
+    Draft: { workspace: "Talent", tab: "Draft Board" },
+    Knowledge: { workspace: "Intelligence", tab: "Knowledge" },
+    AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
+  };
+  const target = workspaceTargets[label];
+  const navButton = document.querySelector(
+    `.skip-sidebar button[title="${target?.workspace || label}"]`
+  );
+  expect(navButton).toBeTruthy();
   await user.click(navButton);
+  if (target) await user.click(await screen.findByRole("tab", { name: target.tab }));
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
 
@@ -80,8 +88,10 @@ describe("Knowledge page", () => {
   it("cycles through every knowledge tab without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", { name: /Knowledge/ });
+    const navButton = document.querySelector('.skip-sidebar button[title="Intelligence"]');
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(await screen.findByRole("tab", { name: "Knowledge" }));
     await screen.findByRole(
       "button",
       { name: /^Game Theory$/ },
@@ -236,10 +246,10 @@ describe("Follow List page", () => {
   it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", {
-      name: /Follow List/,
-    });
+    const navButton = document.querySelector('.skip-sidebar button[title="Intel Feed"]');
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(await screen.findByRole("tab", { name: "Follow List" }));
     await screen.findByPlaceholderText(
       /Search by name, handle, or bio/i,
       {},

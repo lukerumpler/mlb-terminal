@@ -1236,7 +1236,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
       { timeoutMs: 20_000 },
     ).catch(() => null);
     const cur = await tryYearCP(season);
-    if (Array.isArray(cur) && cur.length) return cur;
+    if (!Array.isArray(cur)) return null;
+    if (cur.length) return cur;
     const prev = await tryYearCP(season - 1);
     return Array.isArray(prev) && prev.length ? prev : null;
   })();
@@ -1259,7 +1260,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
       { timeoutMs: 20_000 },
     ).catch(() => null);
     const cur = await tryYearPP(season);
-    if (Array.isArray(cur) && cur.length) return cur;
+    if (!Array.isArray(cur)) return null;
+    if (cur.length) return cur;
     const prev = await tryYearPP(season - 1);
     return Array.isArray(prev) && prev.length ? prev : null;
   })();
