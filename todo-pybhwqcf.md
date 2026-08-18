@@ -371,4 +371,9 @@
 - [x] Verify the manually saved Vercel production API-base configuration and the managed CORS allowlist
 - [ ] Run full validation, checkpoint the restored changes, and request final deployment confirmation
 - [ ] Trigger and verify the confirmed Vercel production deployment
-- [ ] Reconcile the reviewed shared workspace with the GitHub source currently linked to Vercel before promotion
+- [x] Reconcile the reviewed shared workspace with the GitHub source currently linked to Vercel before promotion
+- [x] Resolve the duplicate Savant cache-age and xwOBA test assertions introduced by the Forecast context
+- [x] Integrate the current GitHub main branch into PR #2 without changing GitHub main or enabling Vercel API hosting
+- [x] Preserve the verified three-stage Player Profile loader, malformed-metric roster fallback, daily cache safeguards, and external-Manus API architecture during integration
+- [x] Repair source-contract tests so they inspect the active review checkout rather than a separate Manus workspace
+- [x] Validate PR #2 branch `8b15663` with 109 test files and 522 tests, lint, TypeScript, production build, and production dependency audit
