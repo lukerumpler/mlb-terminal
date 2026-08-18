@@ -7,12 +7,9 @@ import App from "../client/src/App.jsx";
 const TABS = [
   "Overview",
   "Players",
-  "Prospects",
-  "Draft",
+  "Talent",
   "League",
   "Intelligence",
-  "AMD / IMD",
-  "Knowledge",
   "Scouting Notes",
   "Intel Feed",
   "Follow List",

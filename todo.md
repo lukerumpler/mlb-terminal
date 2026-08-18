@@ -11323,3 +11323,7 @@
 - [x] Inventory available branch histories, current shared release state, and pending changes.
 - [x] Compare candidate branch changes for compatibility, user value, and optimization impact.
 - [x] Implement selected compatible optimizations with regression coverage and managed publication.
+- [x] Inspect current primary navigation, workspace routing, search placement, and Settings theme controls.
+- [x] Combine Prospects with Draft and combine AMD/IMD with Intelligence and Knowledge using horizontal sub-tabs.
+- [x] Replace the visible LIVE 2026 treatment with Search and move theme switching into Settings.
+- [x] Add navigation regression coverage, verify desktop and mobile workflows, and publish the workspace reorganization.

@@ -1677,7 +1677,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
           <div>
             <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
             <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
-              Switch between light and dark theme. This is also always one click away from the sidebar.
+              Switch between light and dark theme for the entire terminal.
             </div>
           </div>
           {toggleTheme && (

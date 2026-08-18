@@ -60,7 +60,8 @@ describe("SKIP preserved interactions and persistence", () => {
     await waitFor(() =>
       expect(document.documentElement.dataset.theme).toBe("light")
     );
-    await user.click(screen.getByTitle("Toggle light / dark theme"));
+    await user.click(screen.getByTitle("Settings"));
+    await user.click(await screen.findByTitle("Toggle light / dark theme"));
 
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("skip-theme")).toBe("dark");
