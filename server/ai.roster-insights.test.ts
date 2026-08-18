@@ -65,7 +65,27 @@ describe("ai.rosterInsights request protection", () => {
       ],
     });
 
-    const expected = {
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      {
+        strengths: [{
+          title: "Positive run differential",
+          detail: "Team is outscoring opponents.",
+          evidence: "Run differential: +18",
+        }],
+        weaknesses: [],
+        source: "Verified test model",
+      },
+      {
+        strengths: [{
+          title: "Positive run differential",
+          detail: "Team is outscoring opponents.",
+          evidence: "Run differential: +18",
+        }],
+        weaknesses: [],
+        source: "Verified test model",
+      },
+    ]);
+    await expect(caller.ai.rosterInsights(input)).resolves.toEqual({
       strengths: [{
         title: "Positive run differential",
         detail: "Team is outscoring opponents.",
@@ -73,14 +93,13 @@ describe("ai.rosterInsights request protection", () => {
       }],
       weaknesses: [],
       source: "Verified test model",
-    };
-    await expect(Promise.all([first, second])).resolves.toEqual([expected, expected]);
-    await expect(caller.ai.rosterInsights(input)).resolves.toEqual(expected);
+    });
     expect(llm).toHaveBeenCalledTimes(1);
   });
 
   it("uses the verified local fallback when the provider returns schema-valid but empty insight arrays", async () => {
-    vi.mocked(invokeLLM).mockResolvedValue({
+    const llm = vi.mocked(invokeLLM);
+    llm.mockResolvedValue({
       choices: [{
         message: {
           content: JSON.stringify({
@@ -92,7 +111,8 @@ describe("ai.rosterInsights request protection", () => {
       }],
     } as never);
 
-    const result = await appRouter.createCaller(context()).ai.rosterInsights({
+    const caller = appRouter.createCaller(context());
+    const result = await caller.ai.rosterInsights({
       ...input,
       team: {
         name: "Below Average Test Club",

@@ -13,7 +13,9 @@ import {
   buildLiveRadarData,
   buildLiveRunDiffData,
   buildOrganizationProspectDepthChart,
+  deriveBaserunningGrade,
   deriveFrontOfficeCoverageGrades,
+  deriveOrganizationFutureValue,
   formatDataAge,
   resolveTeamSavantSnapshot,
 } from "../client/src/pages/OverviewPage.jsx";
@@ -105,13 +107,45 @@ describe("team data cache and freshness helpers", () => {
         pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
       },
     });
-    expect(populated.defensePct).toBe(100);
+    expect(populated.coveragePct).toBe(100);
+    expect(populated.redundancyPct).toBe(0);
+    expect(populated.defensePct).toBe(80);
     expect(populated.depthPct).toBe(100);
     expect(populated.futureValuePct).not.toBeNull();
     expect(populated.prospectCount).toBeGreaterThan(0);
 
+    const withVerifiedOaa = deriveFrontOfficeCoverageGrades({
+      liveDataMode: "live",
+      teamAbbr: "LAD",
+      oaaPercentile: 100,
+      players: {
+        hitting: Array.from({ length: 2 }, (_, index) => ({ position: ["C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"][index % 8], stat: { plateAppearances: 100 } })),
+        pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
+      },
+    });
+    expect(withVerifiedOaa.defensePct).toBeGreaterThan(withVerifiedOaa.defenseCoveragePct);
+
     const unavailable = deriveFrontOfficeCoverageGrades({ liveDataMode: "unavailable", teamAbbr: "ZZZ", players: { hitting: [], pitching: [] } });
     expect(unavailable).toMatchObject({ defensePct: null, depthPct: null, futureValuePct: null, prospectCount: 0 });
+  });
+
+  it("uses both stolen-base volume and efficiency, and ranks Future Value only inside the current SKIP snapshot", () => {
+    const baserunning = deriveBaserunningGrade({
+      stolenBases: 20,
+      caughtStealing: 5,
+      comparisonRows: [
+        { stolenBases: 10, caughtStealing: 5 },
+        { stolenBases: 20, caughtStealing: 20 },
+        { stolenBases: 30, caughtStealing: 0 },
+      ],
+    });
+    expect(baserunning).toMatchObject({ attempts: 25, volumePercentile: 33, efficiencyPercentile: 67, percentile: 50 });
+    expect(deriveBaserunningGrade({ stolenBases: 20, caughtStealing: null, comparisonRows: [] }).percentile).toBeNull();
+
+    const futureValue = deriveOrganizationFutureValue("LAD");
+    expect(futureValue.futureValuePct).not.toBeNull();
+    expect(futureValue.prospectCount).toBeGreaterThan(0);
+    expect(futureValue.organizationCount).toBeGreaterThan(1);
   });
 
   it("builds an organization depth chart from only the current SKIP prospect snapshot", () => {

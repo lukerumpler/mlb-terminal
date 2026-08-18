@@ -21,14 +21,13 @@ import {
 } from "../client/src/api/mlb.js";
 import { SEARCH_ANALYTICS_STORAGE_KEY } from "../client/src/lib/searchAnalytics.js";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 const chartSource = readFileSync(
-  resolve(process.cwd(), "client/src/components/OverviewCharts.jsx"),
+  "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
   "utf8"
 );
 const overviewSource = readFileSync(
-  resolve(process.cwd(), "client/src/pages/OverviewPage.jsx"),
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
   "utf8"
 );
 
@@ -322,6 +321,6 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     expect(overviewSource).toContain('aria-label="Exact divisional WAR values"');
     expect(overviewSource).toContain("fanGraphsMetricStatus");
     expect(overviewSource).toContain("does not verify this missing metric");
-    expect(overviewSource).toContain("provider currently blocked");
+    expect(overviewSource).toContain("Provider blocked · no verified rows");
   });
 });

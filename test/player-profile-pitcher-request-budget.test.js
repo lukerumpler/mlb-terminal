@@ -168,6 +168,56 @@ describe('Player Profile pitcher request budget', () => {
     expect(urls.some(url => url.includes(encodeURIComponent('/schedule')))).toBe(false);
   });
 
+  it('propagates cancellation into active optional Savant work before an optional profile snapshot can publish', async () => {
+    let sprintSpeedSignal;
+    const onOptionalReady = vi.fn();
+    vi.stubGlobal('fetch', vi.fn((input, init = {}) => {
+      const url = String(input);
+      if (url.includes('/api/savant?endpoint=sprint_speed')) {
+        sprintSpeedSignal = init.signal;
+        return new Promise((resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' })), { once: true });
+        });
+      }
+      if (url.includes('/api/savant')) return Promise.resolve(response([]));
+      if (url.includes('/api/contract')) return Promise.resolve(response({ found: false }));
+      if (url.includes('/api/team-financials')) return Promise.resolve(response({ found: false }));
+      if (url.includes('/api/player-advanced')) return Promise.resolve(response({}));
+
+      const parsed = new URL(url, 'https://skipbasebal-mm6hz9ps.manus.space');
+      const path = parsed.searchParams.get('path');
+      const group = parsed.searchParams.get('group');
+      const stats = parsed.searchParams.get('stats');
+      if (path === '/people/409') {
+        return Promise.resolve(response({ people: [{
+          id: 409,
+          fullName: 'Optional Canceled Batter',
+          primaryPosition: { type: 'Outfielder', abbreviation: 'CF' },
+          currentTeam: { id: 119, abbreviation: 'LAD', sport: { id: 1 } },
+        }] }));
+      }
+      if (path === '/schedule') return Promise.resolve(response({ dates: [] }));
+      if (path === '/people/409/stats') {
+        if (stats === 'yearByYear' || stats === 'career') return Promise.resolve(response({ stats: [] }));
+        return Promise.resolve(response(seasonStats(group || 'hitting', group === 'hitting' ? { atBats: 10, ops: '.800' } : {})));
+      }
+      return Promise.resolve(response({}));
+    }));
+
+    const controller = new AbortController();
+    const operation = loadFullPlayer(
+      { id: 409, fullName: 'Optional Canceled Batter', team: 'LAD' },
+      2026,
+      { signal: controller.signal, onOptionalReady },
+    );
+    await vi.waitFor(() => expect(sprintSpeedSignal).toBeDefined());
+    controller.abort();
+
+    await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sprintSpeedSignal.aborted).toBe(true);
+    expect(onOptionalReady).not.toHaveBeenCalled();
+  });
+
   it('starts current-season and career handedness split reads in parallel for batters', async () => {
     const releases = {};
     vi.stubGlobal('fetch', vi.fn(input => {

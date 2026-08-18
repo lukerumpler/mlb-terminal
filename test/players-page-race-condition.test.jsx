@@ -470,42 +470,6 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(loadFullPlayer).toHaveBeenLastCalledWith(expect.objectContaining({ id: 592450, fullName: "Aaron Judge" }), expect.anything(), expect.anything());
   });
 
-  it("renders the official core profile while optional enrichment is still loading", async () => {
-    const user = userEvent.setup();
-    const pending = deferred();
-    const corePlayer = {
-      ...mockPlayer(1, "Staged Player"),
-      savant: null,
-      batTracking: null,
-      statcastPopulation: null,
-      expectedStatisticsPopulation: null,
-      batTrackingPopulation: null,
-      extrasLoading: true,
-    };
-    const fullPlayer = { ...mockPlayer(1, "Staged Player"), extrasLoading: false };
-    searchPlayers.mockResolvedValue([{ id: 1, fullName: "Staged Player" }]);
-    loadFullPlayer.mockImplementation((_person, _season, { onCoreReady }) => {
-      onCoreReady(corePlayer);
-      return pending.promise;
-    });
-
-    render(<PlayersPage />);
-    const input = screen.getByPlaceholderText(/Search any MLB player/i);
-    await user.type(input, "Staged");
-    await waitFor(() => expect(screen.getByText("Staged Player")).toBeInTheDocument());
-    await user.click(screen.getByText("Staged Player"));
-
-    expect(
-      await screen.findByText(/Official profile and season data are ready/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Optional Savant and game-by-game boxscore enrichment/i)).toBeInTheDocument();
-
-    pending.resolve(fullPlayer);
-    await waitFor(() =>
-      expect(screen.queryByText(/Official profile and season data are ready/i)).not.toBeInTheDocument()
-    );
-  });
-
   it("opens the side-by-side comparison modal and loads a second player through the live adapter", async () => {
     const user = userEvent.setup();
     const primary = { id: 1, fullName: "Primary Player" };

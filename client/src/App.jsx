@@ -83,7 +83,11 @@ const TABS = [
 
 const WORKSPACE_GROUPS = [
   {
-    key:'talent', icon:'↑', label:'Talent', section:'Evaluation', defaultTab:'players',
+    key:'talent',
+    icon:'↑',
+    label:'Talent',
+    section:'Evaluation',
+    defaultTab:'players',
     tabs:[
       { key:'players', label:'Players', description:'Player profiles, evaluation, and comparison' },
       { key:'prospects', label:'Prospects', description:'Farm, ranking, and development context' },
@@ -91,7 +95,11 @@ const WORKSPACE_GROUPS = [
     ],
   },
   {
-    key:'intelligence-workspace', icon:'◆', label:'Intelligence', section:'Monitor', defaultTab:'intelligence',
+    key:'intelligence-workspace',
+    icon:'◆',
+    label:'Intelligence',
+    section:'Monitor',
+    defaultTab:'intelligence',
     tabs:[
       { key:'intelligence', label:'Intelligence', description:'Team and market intelligence' },
       { key:'amd', label:'AMD / IMD', description:'Analytical model development' },
@@ -99,14 +107,23 @@ const WORKSPACE_GROUPS = [
     ],
   },
   {
-    key:'feed-workspace', icon:'▤', label:'Intel Feed', section:'Monitor', defaultTab:'feed',
+    key:'feed-workspace',
+    icon:'▤',
+    label:'Intel Feed',
+    section:'Monitor',
+    defaultTab:'feed',
     tabs:[
       { key:'feed', label:'Intel Feed', description:'Source-aware league and team intelligence' },
       { key:'follows', label:'Follow List', description:'Tracked players and follow-up activity' },
     ],
   },
   {
-    key:'settings-workspace', icon:'⚙', label:'Settings', section:'System', defaultTab:'settings', alertCount: ALERTS.length,
+    key:'settings-workspace',
+    icon:'⚙',
+    label:'Settings',
+    section:'System',
+    defaultTab:'settings',
+    alertCount: ALERTS.length,
     tabs:[
       { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
       { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
@@ -131,7 +148,11 @@ function AlertsWorkspacePanel() {
         Illustrative examples — not a live feed yet.
       </div>
       {ALERTS.map((a, i) => (
-        <div key={i} style={{ padding:'10px 14px', borderBottom:i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none', background:a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft }}>
+        <div key={i} style={{
+          padding:'10px 14px',
+          borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
+          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
+        }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
             <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
             <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
@@ -341,10 +362,12 @@ export default function App() {
             <text x="122" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">P</text>
             <line x1="4" y1="67" x2="178" y2="67" stroke="#CC2222" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
-          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 8px', borderRadius:20, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, width:'fit-content' }}>
-            <div style={{ width:5, height:5, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
-            <span style={px({ fontSize:10, color:C.teal, letterSpacing:'.06em', fontWeight:600 })}>LIVE · 2026</span>
-          </div>
+          <button type="button" onClick={() => setShowPalette(true)} title="Search everything" aria-label="Search everything"
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, cursor:'pointer', width:'100%', textAlign:'left' }}>
+            <span aria-hidden="true" style={{ fontSize:14, lineHeight:1 }}>⌕</span>
+            <span style={sans({ fontSize:10.5, fontWeight:800, flex:1 })}>Search</span>
+            <span className="skip-nav-shortcut" style={px({ fontSize:8.5, color:C.teal, border:`0.5px solid ${C.tealMid}`, borderRadius:4, padding:'1px 4px' })}>⌘K</span>
+          </button>
         </div>
 
         {/* Nav */}
@@ -358,24 +381,17 @@ export default function App() {
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
-              {t.alertCount > 0 && <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}><span role="img" aria-label={`${t.alertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span><span aria-hidden="true">{t.alertCount}</span></span>}
+              {t.alertCount > 0 && (
+                <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
+                  <span role="img" aria-label={`${t.alertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
+                  <span aria-hidden="true">{t.alertCount}</span>
+                </span>
+              )}
               {activePrimaryKey === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
           ))}
 
-          <button onClick={() => setShowPalette(true)} title="Search everything"
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>⌕</span>
-            <span className="skip-nav-label" style={sans({ fontSize:12, fontWeight:600, flex:1 })}>Search</span>
-            <span className="skip-nav-shortcut" style={px({ fontSize:9.5, color:C.text4, border:`0.5px solid ${C.border}`, borderRadius:4, padding:'1px 5px' })}>⌘K</span>
-          </button>
-
-          <button onClick={toggleTheme} title="Toggle light / dark theme"
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{theme === 'dark' ? '☀' : '☾'}</span>
-            <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-          </button>
         </nav>
 
         <div className="skip-sidebar-insight" style={{ padding:'8px 10px', borderTop:`1px solid ${C.border}` }}>
@@ -420,16 +436,23 @@ export default function App() {
 
           {activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
-              <div className="skip-workspace-subtabs-copy"><span>{activeWorkspace.label} workspace</span><strong>{activeWorkspace.tabs.find(item => item.key === tab)?.description}</strong></div>
+              <div className="skip-workspace-subtabs-copy">
+                <span>{activeWorkspace.label} workspace</span>
+                <strong>{activeWorkspace.tabs.find(item => item.key === tab)?.description}</strong>
+              </div>
               <div className="skip-workspace-subtabs-controls">
-                {activeWorkspace.tabs.map(item => <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`skip-workspace-panel-${item.key}`} onClick={() => setTab(item.key)}>{item.label}</button>)}
+                {activeWorkspace.tabs.map(item => (
+                  <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`skip-workspace-panel-${item.key}`} onClick={() => setTab(item.key)}>
+                    {item.label}
+                  </button>
+                ))}
               </div>
             </nav>
           )}
 
           <div id={`skip-workspace-panel-${tab}`} role={activeWorkspace ? 'tabpanel' : undefined} aria-label={activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
-          <PageErrorBoundary resetKey={tab}>
-            <Suspense fallback={<PageLoading />}>
+            <PageErrorBoundary resetKey={tab}>
+              <Suspense fallback={<PageLoading />}>
               {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
               {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
@@ -443,8 +466,8 @@ export default function App() {
               {tab === 'follows'      && <FollowListPage />}
               {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
               {tab === 'alerts'       && <AlertsWorkspacePanel />}
-            </Suspense>
-          </PageErrorBoundary>
+              </Suspense>
+            </PageErrorBoundary>
           </div>
         </div>
 

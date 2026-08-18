@@ -72,6 +72,7 @@ describe("attached SKIP UI recommendation contracts", () => {
     expect(screen.getByText("Coverage Gap")).toBeInTheDocument();
     expect(screen.getByText("·")).toBeInTheDocument();
     expect(screen.getByText("Opponent contact quality")).toBeInTheDocument();
+    expect(screen.getByText("More detail")).toBeInTheDocument();
     expect(OVERVIEW_ACCENTS).toMatchObject({
       offense: expect.any(String),
       pitching: expect.any(String),
@@ -88,7 +89,11 @@ describe("attached SKIP UI recommendation contracts", () => {
     expect(overviewSource).toContain(
       "import StatusBadge from '../components/StatusBadge.jsx';"
     );
-    expect(overviewSource).toContain('status="coverage-gap"');
+    expect(overviewSource).toContain("coverage-gap");
+    expect(overviewSource).toContain('aria-label="Batted Ball Profile data source"');
+    expect(overviewSource).toContain('aria-label="Pitch Arsenal data source"');
+    expect(overviewSource).toContain('aria-label="Contact Quality Allowed data source"');
+    expect(indexSource).toContain(".skip-overview-empty-note summary");
     expect(indexSource).toContain(
       "white-space:nowrap;overflow:visible;text-overflow:clip;"
     );

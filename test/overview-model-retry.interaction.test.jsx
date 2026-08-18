@@ -318,17 +318,14 @@ describe("Team Overview model source and retry interaction", () => {
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
-    const providers = [
-      ...container.querySelectorAll(".skip-overview-source-name"),
-    ].map(node => node.textContent);
-    expect(providers).toContain("FanGraphs WAR");
-    expect(providers).toContain("FanGraphs forecast");
-    expect([...new Set(providers.filter(provider => provider.includes("FanGraphs")))]).toEqual(expect.arrayContaining(["FanGraphs WAR", "FanGraphs forecast"]));
-    expect(providers.filter(provider => provider === "Savant").length).toBeGreaterThanOrEqual(1);
+    const sourceLine = container.querySelector('[aria-label="Advanced models data sources"]');
+    expect(sourceLine).toBeInTheDocument();
+    const providers = [...sourceLine.querySelectorAll(".skip-overview-source-name")].map(node => node.textContent);
+    expect(providers).toEqual(["FanGraphs", "MLB Stats API", "Savant"]);
     expect(
       container.querySelector(".skip-status-unavailable")
     ).toBeInTheDocument();
-    expect(document.body.textContent).toContain("Live FanGraphs projection · not retrieved");
+    expect(document.body.textContent).toContain("FanGraphs · not retrieved");
     expect(document.body.textContent).toContain("Unavailable");
     expect(document.body.textContent).not.toMatch(/Playoff odds:\s*Loading/);
     expect(document.body.textContent).not.toMatch(/Team WAR:\s*Loading/);
@@ -382,7 +379,7 @@ describe("Team Overview model source and retry interaction", () => {
 
     await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
-    expect(screen.getByText(/LAD is highlighted/i)).toBeInTheDocument();
+    expect(screen.getByText(/LAD highlighted/i)).toBeInTheDocument();
     const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
     expect(exactValuesTable).toHaveTextContent("LAD");
     expect(exactValuesTable).toHaveTextContent("+31.4");
