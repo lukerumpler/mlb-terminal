@@ -4595,13 +4595,23 @@ var AI_ROSTER_INSIGHTS_CACHE_TTL_MS = 3e4;
 var aiRosterInsightsCache = /* @__PURE__ */ new Map();
 var aiRosterInsightsInFlight = /* @__PURE__ */ new Map();
 function buildRosterInsightsFallback(input) {
+  const finiteMetric = (value) => {
+    if (value == null || typeof value === "string" && value.trim() === "") {
+      return NaN;
+    }
+    const numeric4 = Number(value);
+    return Number.isFinite(numeric4) ? numeric4 : NaN;
+  };
   const team = input.team || {};
   const strengths = [];
   const weaknesses = [];
-  const pct = Number(team.pct);
-  const runDiff = Number(team.diff ?? Number(team.rs) - Number(team.ra));
-  const ops = Number(team.ops);
-  const era = team.era != null && team.era !== "" && Number.isFinite(Number(team.era)) ? Number(team.era) : NaN;
+  const pct = finiteMetric(team.pct);
+  const directRunDiff = finiteMetric(team.diff);
+  const runsScored = finiteMetric(team.rs);
+  const runsAllowed = finiteMetric(team.ra);
+  const runDiff = Number.isFinite(directRunDiff) ? directRunDiff : Number.isFinite(runsScored) && Number.isFinite(runsAllowed) ? runsScored - runsAllowed : NaN;
+  const ops = finiteMetric(team.ops);
+  const era = finiteMetric(team.era);
   if (Number.isFinite(runDiff)) {
     (runDiff >= 0 ? strengths : weaknesses).push({
       title: runDiff >= 0 ? "Positive run differential" : "Negative run differential",
@@ -4729,9 +4739,14 @@ var appRouter = router({
             }
           });
           const content = response.choices[0]?.message?.content;
-          if (typeof content !== "string")
+          if (typeof content !== "string") {
             throw new Error("AI insights response was empty");
-          return JSON.parse(content);
+          }
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed.strengths) && Array.isArray(parsed.weaknesses) && parsed.strengths.length === 0 && parsed.weaknesses.length === 0) {
+            throw new Error("AI insights response contained no usable evidence");
+          }
+          return parsed;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (/usage exhausted|412 precondition/i.test(message))

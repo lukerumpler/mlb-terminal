@@ -1647,7 +1647,11 @@ function PlayersPage() {
     setPlayer(null);
     setError(null);
     try {
-      const data = await loadFullPlayer(person, SEASON);
+      const data = await loadFullPlayer(person, SEASON, {
+        onCoreReady: core => {
+          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(core);
+        },
+      });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
       if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
@@ -1830,7 +1834,12 @@ function PlayersPage() {
         )}
       </div>
 
-      {loading && <PlayerProfileSkeleton />}
+      {loading && !player && <PlayerProfileSkeleton />}
+      {player?.extrasLoading && (
+        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10, lineHeight:1.45 }}>
+          Official profile and season data are ready. Optional Savant and game-by-game boxscore enrichment is still loading; blank values are not interpreted as unavailable or estimated.
+        </div>
+      )}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,

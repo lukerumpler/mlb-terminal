@@ -815,7 +815,7 @@ export function createInitialBoxscoreSplits(teamId, season = SEASON) {
   };
 }
 
-export async function loadFullPlayer(person, season = SEASON) {
+export async function loadFullPlayer(person, season = SEASON, { onCoreReady } = {}) {
   const id = person.id;
 
   // All 6 requests run in parallel — contract never blocks stats
@@ -864,6 +864,45 @@ export async function loadFullPlayer(person, season = SEASON) {
 
   let isPitcher = posType === 'Pitcher' || posAbbr === 'SP' || posAbbr === 'RP' || posAbbr === 'P';
   if (isPitcher && hasHitStats && !hasPitchStats) isPitcher = false; // two-way override
+
+  // Publish the official-profile snapshot before optional Savant leaderboards and
+  // game-by-game boxscores settle. The profile remains explicit that enrichment
+  // is in progress, so a temporary absence cannot be read as unavailable data.
+  const statResult = isPitcher ? pitchingResult : hittingResult;
+  const coreSnapshot = {
+    id,
+    mlbId: String(id),
+    baseballReferenceId: providerIdentity?.baseballReference?.id || null,
+    baseballReferenceUrl: providerIdentity?.baseballReference?.canonicalUrl || null,
+    providerIdentity,
+    profile,
+    savant: null,
+    batTracking: null,
+    statcastPopulation: null,
+    expectedStatisticsPopulation: null,
+    batTrackingPopulation: null,
+    isPitcher,
+    pitchArsenal: null,
+    pitchArsenalPopulation: null,
+    contactPoints: null,
+    pitcherPitches: null,
+    stats: statResult?.stat || {},
+    advancedMetrics,
+    statSeason: statResult?.season || season,
+    isFallback: statResult?.isFallback || false,
+    career: careerHitting,
+    careerPitching,
+    hittingStats: hittingResult?.stat || {},
+    pitchingStats: pitchingResult?.stat || {},
+    contractData: contractRaw,
+    handednessSplits: handednessResult,
+    teamFinancials,
+    aggregateSource: 'MLB Stats API season stats',
+    aggregateRetrievedAt: new Date().toISOString(),
+    boxscoreSplits,
+    extrasLoading: true,
+  };
+  try { onCoreReady?.(coreSnapshot); } catch { /* optional UI callback */ }
 
   // Fired off now, not after the tryYear() round trip(s) below — these two
   // don't depend on expected_statistics/bat-tracking/statcast_leaderboard in
@@ -1035,8 +1074,6 @@ export async function loadFullPlayer(person, season = SEASON) {
   const contactPoints = await contactPointsPromise.catch(() => null);
   const pitcherPitches = await pitcherPitchesPromise.catch(() => null);
 
-  const statResult = isPitcher ? pitchingResult : hittingResult;
-
   return {
     id,
     mlbId: String(id),
@@ -1060,6 +1097,7 @@ export async function loadFullPlayer(person, season = SEASON) {
     aggregateSource: 'MLB Stats API season stats',
     aggregateRetrievedAt: new Date().toISOString(),
     boxscoreSplits,
+    extrasLoading: false,
   };
 }
 
