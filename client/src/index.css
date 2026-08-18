@@ -968,3 +968,75 @@
   .skip-boxscore-presets input, .skip-boxscore-presets select { flex:1 1 100%; min-width:0; }
   .skip-boxscore-presets button { flex:1 1 auto; }
 }
+
+
+/* Cross-page analytic-card system: shared Panel and StatStrip primitives are
+   used by the Overview, Player, Prospect, AMD, feed, and operations pages. */
+.skip-panel { min-width:0; }
+.skip-panel-header > div:first-child { min-width:0; }
+.skip-panel-badge { display:inline-flex; align-items:center; min-width:0; max-width:100%; }
+.skip-panel-badge .skip-overview-source-badges { max-width:100%; }
+.skip-data-list > [role="listitem"] { min-width:0; }
+.skip-data-list time { overflow-wrap:anywhere; }
+
+@media (max-width:720px) {
+  .skip-panel-header { align-items:flex-start !important; padding:9px 11px !important; }
+  .skip-panel-badge { width:100%; justify-content:flex-start; }
+  .skip-panel-badge .skip-overview-source-badges { justify-content:flex-start; gap:6px; }
+  .skip-stat-strip { grid-template-columns:repeat(auto-fit,minmax(112px,1fr)) !important; }
+  .skip-stat-strip-item { min-height:82px; padding:11px 8px !important; border-right:0 !important; border-bottom:0.5px solid var(--border-light) !important; }
+  .skip-stat-strip-value { font-size:18px !important; }
+  .skip-stat-strip-label { font-size:8.5px !important; }
+  .skip-stat-strip-sub { font-size:9px !important; }
+  .skip-data-list > [role="listitem"] { align-items:flex-start !important; }
+  .skip-data-list time { max-width:104px; white-space:normal !important; line-height:1.3 !important; }
+}
+
+@media (max-width:420px) {
+  .skip-stat-strip { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  .skip-panel-badge .skip-overview-source-name { max-width:92px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .skip-panel *, .skip-stat-strip * { transition:none !important; }
+}
+
+
+/* Advanced-model card layouts retain their analytical hierarchy on small screens. */
+.skip-amd-page { min-width:0; }
+.skip-amd-concept-grid > *, .skip-amd-main-grid > * { min-width:0; }
+@media (max-width:960px) {
+  .skip-amd-main-grid { grid-template-columns:minmax(0,1fr) !important; }
+}
+@media (max-width:720px) {
+  .skip-amd-concept-grid { grid-template-columns:minmax(0,1fr) !important; }
+  .skip-amd-leaderboard { overflow-x:auto; }
+  .skip-amd-leaderboard > * { min-width:560px; }
+}
+
+
+/* Prospect data cards: preserve table and ranking readability as the workspace narrows. */
+.skip-prospect-workspace-grid > *, .skip-farm-summary-main > *, .skip-farm-summary-rankings > * { min-width:0; }
+@media (max-width:960px) {
+  .skip-prospect-workspace-grid { grid-template-columns:minmax(0,1fr) !important; }
+}
+@media (max-width:560px) {
+  .skip-farm-summary-main { grid-template-columns:minmax(0,1fr) !important; gap:10px !important; }
+  .skip-farm-summary-rankings { grid-template-columns:minmax(0,1fr) !important; }
+}
+
+
+/* Operational analytics: stacked comparison cards protect figures and labels on phones. */
+.skip-trade-simulator-grid > *, .skip-draft-movers-grid > * { min-width:0; }
+@media (max-width:600px) {
+  .skip-trade-simulator-grid, .skip-draft-movers-grid { grid-template-columns:minmax(0,1fr) !important; }
+  .skip-trade-simulator-grid > *, .skip-draft-movers-grid > * { border-right:0 !important; border-bottom:1px solid var(--border-light, #eee9e0); }
+  .skip-trade-simulator-grid > *:last-child, .skip-draft-movers-grid > *:last-child { border-bottom:0; }
+}
+
+
+/* Intel Feed: maintain an uncluttered timeline and source-status sidebar on narrow terminals. */
+.skip-feed-main-grid > * { min-width:0; }
+@media (max-width:840px) {
+  .skip-feed-main-grid { grid-template-columns:minmax(0,1fr) !important; }
+}

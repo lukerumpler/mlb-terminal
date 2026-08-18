@@ -110,53 +110,54 @@ export function VerdictBadge({ verdict }) {
 
 export function Panel({ title, accent = C.amber, badge, children, style = {} }) {
   return (
-    <div className="skip-panel" style={{
+    <section className="skip-panel" aria-label={typeof title === 'string' ? title : undefined} style={{
       background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
       overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`, ...style,
     }}>
-      <div style={{
+      <div className="skip-panel-header" style={{
         padding:'10px 14px', borderBottom:`1px solid ${C.borderLight}`, background:`linear-gradient(180deg, ${C.surface2}, ${C.surface})`,
-        display:'flex', alignItems:'center', justifyContent:'space-between',
+        display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap',
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
           <div style={{ width:3, height:13, borderRadius:2, background:accent, flexShrink:0 }} />
-          <span style={sans({ fontSize:11, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:C.text })}>
+          <span style={sans({ fontSize:11, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:C.text, overflowWrap:'anywhere' })}>
             {title}
           </span>
         </div>
-        {badge != null && (
+        {badge != null && <div className="skip-panel-badge">{
           typeof badge === 'string'
             ? <Badge>{badge}</Badge>
             : badge
-        )}
+        }</div>}
       </div>
       <div>{children}</div>
-    </div>
+    </section>
   );
 }
 
-export function StatStrip({ items }) {
+export function StatStrip({ items, label = 'Key metrics' }) {
   return (
-    <div className="skip-stat-strip" style={{
+    <section className="skip-stat-strip" aria-label={label} style={{
       display:'grid',
       gridTemplateColumns:`repeat(${Math.min(items.length, 8)}, minmax(64px, 1fr))`,
+      '--skip-stat-count': Math.min(items.length, 8),
       background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
       overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`,
     }}>
       {items.map((it, i) => (
-        <div key={i} style={{
-          padding:'13px 10px', textAlign:'center',
+        <div className="skip-stat-strip-item" key={i} aria-label={`${it.lbl}: ${typeof it.val === 'string' || typeof it.val === 'number' ? it.val : 'available'}`} style={{
+          padding:'13px 10px', textAlign:'center', minWidth:0,
           borderRight: i < items.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
           display:'flex', flexDirection:'column', gap:3,
         }}>
-          <div style={px({ fontSize:19, fontWeight:800, color:C.text, lineHeight:1, letterSpacing:'-.02em' })}>
+          <div className="skip-stat-strip-value" style={px({ fontSize:19, fontWeight:800, color:C.text, lineHeight:1, letterSpacing:'-.02em', overflowWrap:'anywhere' })}>
             {it.val}
           </div>
-          <div style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:it.color || C.text2 })}>
+          <div className="skip-stat-strip-label" style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:it.color || C.text2, overflowWrap:'anywhere' })}>
             {it.lbl}
           </div>
           {it.sub && (
-            <div style={sans({ fontSize:10, color:C.text3 })}>{it.sub}</div>
+            <div className="skip-stat-strip-sub" style={sans({ fontSize:10, color:C.text3, overflowWrap:'anywhere' })}>{it.sub}</div>
           )}
           {it.trend?.status === 'verified' && it.trend.direction && (
             <div aria-label={`${it.lbl} trend ${it.trend.direction}`} style={px({ fontSize:9, fontWeight:800, color:it.trend.direction === 'up' ? C.teal : it.trend.direction === 'down' ? C.rust : C.text3 })}>
@@ -165,7 +166,7 @@ export function StatStrip({ items }) {
           )}
         </div>
       ))}
-    </div>
+    </section>
   );
 }
 
