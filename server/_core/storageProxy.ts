@@ -3,7 +3,8 @@ import { ENV } from "./env";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*key", async (req, res) => {
-    const key = req.params.key?.join("/");
+    const rawKey = (req.params as Record<string, string | string[] | undefined>).key;
+    const key = Array.isArray(rawKey) ? rawKey.join("/") : rawKey;
     if (!key) {
       res.status(400).send("Missing storage key");
       return;
