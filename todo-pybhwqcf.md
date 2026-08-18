@@ -377,3 +377,6 @@
 - [x] Preserve the verified three-stage Player Profile loader, malformed-metric roster fallback, daily cache safeguards, and external-Manus API architecture during integration
 - [x] Repair source-contract tests so they inspect the active review checkout rather than a separate Manus workspace
 - [x] Validate PR #2 branch `8b15663` with 109 test files and 522 tests, lint, TypeScript, production build, and production dependency audit
+- [x] Recreate the protected GitHub review branch at validated commit `8b15663` after the prior PR branch was closed and deleted
+- [x] Re-run the full automated release gate on `manus/validated-skip-release-8b15663` before opening a replacement pull request
+- [x] Open and verify a new non-draft GitHub pull request from the validated branch into `main` without merging it
