@@ -380,3 +380,7 @@
 - [x] Recreate the protected GitHub review branch at validated commit `8b15663` after the prior PR branch was closed and deleted
 - [x] Re-run the full automated release gate on `manus/validated-skip-release-8b15663` before opening a replacement pull request
 - [x] Open and verify a new non-draft GitHub pull request from the validated branch into `main` without merging it
+- [x] Combine Players, Prospects, and Draft beneath one accessible Talent workspace
+- [x] Combine Follow List with Intel Feed while retaining direct access to followed-player activity
+- [x] Combine Alerts with Settings and provide an accessible bell indicator with the current alert count
+- [x] Add navigation regression coverage, run validation, and verify the desktop and mobile workspace layouts

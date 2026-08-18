@@ -247,10 +247,14 @@ describe("Follow List page", () => {
   it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", {
-      name: /Follow List/,
-    });
+    const navButton = document.querySelector(
+      '.skip-sidebar button[title="Intel Feed"]'
+    );
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(
+      await screen.findByRole("tab", { name: "Follow List" })
+    );
     await screen.findByPlaceholderText(
       /Search by name, handle, or bio/i,
       {},

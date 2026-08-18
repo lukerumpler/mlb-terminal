@@ -78,6 +78,7 @@ const TABS = [
   { key:'notes',        icon:'✎', label:'Scouting Notes', section:'Workflow' },
   { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
   { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
+  { key:'alerts',       icon:'🔔', label:'Alerts',         section:'System' },
 ];
 
 const WORKSPACE_GROUPS = [
@@ -86,8 +87,9 @@ const WORKSPACE_GROUPS = [
     icon:'↑',
     label:'Talent',
     section:'Evaluation',
-    defaultTab:'prospects',
+    defaultTab:'players',
     tabs:[
+      { key:'players', label:'Players', description:'Player profiles, evaluation, and comparison' },
       { key:'prospects', label:'Prospects', description:'Farm, ranking, and development context' },
       { key:'draft', label:'Draft Board', description:'Amateur scouting and board organization' },
     ],
@@ -104,24 +106,68 @@ const WORKSPACE_GROUPS = [
       { key:'knowledge', label:'Knowledge', description:'Methods, concepts, and reference material' },
     ],
   },
+  {
+    key:'feed-workspace',
+    icon:'▤',
+    label:'Intel Feed',
+    section:'Monitor',
+    defaultTab:'feed',
+    tabs:[
+      { key:'feed', label:'Intel Feed', description:'Source-aware league and team intelligence' },
+      { key:'follows', label:'Follow List', description:'Tracked players and follow-up activity' },
+    ],
+  },
+  {
+    key:'settings-workspace',
+    icon:'⚙',
+    label:'Settings',
+    section:'System',
+    defaultTab:'settings',
+    alertCount: ALERTS.length,
+    tabs:[
+      { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
+      { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
+    ],
+  },
 ];
 
 const PRIMARY_TABS = [
   { key:'overview', icon:'⊞', label:'Overview', section:'Overview' },
-  { key:'players', icon:'◷', label:'Players', section:'Evaluation' },
-  ...WORKSPACE_GROUPS,
+  WORKSPACE_GROUPS[0],
   { key:'league', icon:'◎', label:'League', section:'Monitor' },
-  { key:'feed', icon:'▤', label:'Intel Feed', section:'Monitor' },
-  { key:'follows', icon:'⤴', label:'Follow List', section:'Workflow' },
+  WORKSPACE_GROUPS[1],
+  WORKSPACE_GROUPS[2],
   { key:'notes', icon:'✎', label:'Scouting Notes', section:'Workflow' },
-  { key:'settings', icon:'⚙', label:'Settings', section:'System' },
+  WORKSPACE_GROUPS[3],
 ];
+
+function AlertsWorkspacePanel() {
+  return (
+    <Panel title="Active Alerts" accent={C.rust} badge="Illustrative examples">
+      <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
+        Illustrative examples — not a live feed yet.
+      </div>
+      {ALERTS.map((a, i) => (
+        <div key={i} style={{
+          padding:'10px 14px',
+          borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
+          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
+        }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
+            <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
+          </div>
+          <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
+        </div>
+      ))}
+    </Panel>
+  );
+}
 
 export default function App() {
   const [tab, setTab]               = useState('overview');
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
@@ -331,25 +377,20 @@ export default function App() {
             {(i === 0 || PRIMARY_TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
+            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.alertCount ? `${t.label}: ${t.alertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
+              {t.alertCount > 0 && (
+                <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
+                  <span role="img" aria-label={`${t.alertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
+                  <span aria-hidden="true">{t.alertCount}</span>
+                </span>
+              )}
               {activePrimaryKey === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
           ))}
-
-          <div style={{ height:1, background:C.border, margin:'6px 2px' }} />
-          <div className="skip-nav-section skip-utility-section" aria-hidden="true">Workspace</div>
-
-          <button onClick={() => setShowAlerts(s => !s)} title="View alerts" aria-expanded={showAlerts}
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>Alerts</span>
-            <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:C.rust, borderRadius:10, padding:'1px 7px' }}>
-              {ALERTS.length}
-            </span>
-          </button>
 
         </nav>
 
@@ -393,29 +434,6 @@ export default function App() {
         {/* Scrollable content */}
         <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
-          {showAlerts && (
-            <div style={{ marginBottom:16 }}>
-              <Panel title="Active Alerts" accent={C.rust} badge="Sample feed">
-                <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
-                  Illustrative examples — not a live feed yet.
-                </div>
-                {ALERTS.map((a, i) => (
-                  <div key={i} style={{
-                    padding:'10px 14px',
-                    borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
-                    background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
-                  }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
-                      <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
-                    </div>
-                    <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
-                  </div>
-                ))}
-              </Panel>
-            </div>
-          )}
-
           {activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
               <div className="skip-workspace-subtabs-copy">
@@ -447,6 +465,7 @@ export default function App() {
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
               {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
+              {tab === 'alerts'       && <AlertsWorkspacePanel />}
               </Suspense>
             </PageErrorBoundary>
           </div>

@@ -10,28 +10,47 @@ describe('consolidated workspace navigation', () => {
     localStorage.clear();
   });
 
-  it('replaces separate sidebar entries with Talent and Intelligence workspace controls', async () => {
+  it('replaces separate sidebar entries with Talent, Intelligence, Intel Feed, and Settings workspace controls', async () => {
     render(<App />);
 
     expect(await screen.findByTitle('Talent')).toBeInTheDocument();
     expect(screen.getByTitle('Intelligence')).toBeInTheDocument();
+    expect(screen.getByTitle('Intel Feed')).toBeInTheDocument();
     expect(document.querySelector('.skip-sidebar button[title="Prospects"]')).toBeNull();
+    expect(document.querySelector('.skip-sidebar button[title="Players"]')).toBeNull();
     expect(document.querySelector('.skip-sidebar button[title="Draft"]')).toBeNull();
     expect(document.querySelector('.skip-sidebar button[title="AMD / IMD"]')).toBeNull();
     expect(document.querySelector('.skip-sidebar button[title="Knowledge"]')).toBeNull();
+    expect(document.querySelector('.skip-sidebar button[title="Follow List"]')).toBeNull();
+    expect(screen.getByLabelText(/Settings: \d+ active alerts/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /active alerts/i })).toBeInTheDocument();
   });
 
-  it('uses horizontal Talent sub-tabs to switch between Prospects and Draft Board', async () => {
+  it('uses horizontal Talent sub-tabs to switch between Players, Prospects, and Draft Board', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(await screen.findByTitle('Talent'));
     const workspaceTabs = await screen.findByRole('tablist', { name: 'Talent workspace sections' });
-    expect(screen.getByRole('tab', { name: 'Prospects' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Players' })).toHaveAttribute('aria-selected', 'true');
+    expect(workspaceTabs).toHaveTextContent('Prospects');
     expect(workspaceTabs).toHaveTextContent('Draft Board');
 
     await user.click(screen.getByRole('tab', { name: 'Draft Board' }));
     expect(screen.getByRole('tab', { name: 'Draft Board' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(document.body.textContent).not.toMatch(/This tab failed to load/));
+  });
+
+  it('uses Intel Feed sub-tabs to switch between the feed and followed-player activity', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByTitle('Intel Feed'));
+    await screen.findByRole('tablist', { name: 'Intel Feed workspace sections' });
+    expect(screen.getByRole('tab', { name: 'Intel Feed' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('tab', { name: 'Follow List' }));
+    expect(screen.getByRole('tab', { name: 'Follow List' })).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => expect(document.body.textContent).not.toMatch(/This tab failed to load/));
   });
 
@@ -50,7 +69,7 @@ describe('consolidated workspace navigation', () => {
     await waitFor(() => expect(document.body.textContent).not.toMatch(/This tab failed to load/));
   });
 
-  it('foregrounds Search and leaves theme selection in Settings', async () => {
+  it('keeps theme selection and alerts together in Settings, with a bell indicator for alerts', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -58,7 +77,12 @@ describe('consolidated workspace navigation', () => {
     expect(document.querySelector('.skip-sidebar button[title="Toggle light / dark theme"]')).toBeNull();
 
     await user.click(screen.getByTitle('Settings'));
+    await screen.findByRole('tablist', { name: 'Settings workspace sections' });
     expect(await screen.findByText('Appearance')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /dark mode|light mode/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Alerts' }));
+    expect(screen.getByRole('tab', { name: 'Alerts' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('Active Alerts')).toBeInTheDocument();
   });
 });

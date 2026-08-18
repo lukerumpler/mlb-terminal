@@ -135,7 +135,7 @@ describe("SKIP motion and responsive UI hooks", () => {
     );
     expect(playersSource).toContain("import MetricInfo from");
     expect(indexSource).toContain(".skip-metric-info-popover");
-    expect(appSource).toContain("skip-utility-section");
+    expect(appSource).toContain("skip-settings-alert-indicator");
     expect(tickerSource).toContain('className="skip-ticker-message"');
     expect(tickerSource).toContain('className="skip-ticker-shell"');
     expect(indexSource).toContain("-webkit-overflow-scrolling:touch");
