@@ -14,7 +14,7 @@ describe('Overview page section reordering for unavailable data', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders core season overview metrics above the Advanced Models and Divisional WAR panels', async () => {
+  it('renders core season overview metrics above the compact forecast and division WAR panels', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -29,8 +29,8 @@ describe('Overview page section reordering for unavailable data', () => {
     render(<OverviewPage />);
     
     const seasonOverviewHeading = await screen.findByText(/Season overview/i);
-    const advancedModelsPanel = screen.getByText(/Advanced Models & Savant/i);
-    const divisionalWarPanel = screen.getByText(/Divisional WAR Comparison/i);
+    const advancedModelsPanel = screen.getByText(/Forecast & Team Context/i);
+    const divisionalWarPanel = screen.getByText(/^Division WAR$/i);
 
     expect(seasonOverviewHeading).toBeInTheDocument();
     expect(advancedModelsPanel).toBeInTheDocument();

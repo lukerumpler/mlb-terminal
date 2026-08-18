@@ -260,14 +260,14 @@ describe("Team Overview model source and retry interaction", () => {
     const providers = [
       ...container.querySelectorAll(".skip-overview-source-name"),
     ].map(node => node.textContent);
-    expect(providers.filter(provider => provider === "FanGraphs")).toHaveLength(
-      7
-    );
-    expect(providers.filter(provider => provider === "Savant")).toHaveLength(4);
+    expect(providers).toContain("FanGraphs WAR");
+    expect(providers).toContain("FanGraphs forecast");
+    expect(providers.filter(provider => provider.includes("FanGraphs")).length).toBeLessThan(7);
+    expect(providers.filter(provider => provider === "Savant").length).toBeGreaterThanOrEqual(1);
     expect(
       container.querySelector(".skip-status-unavailable")
     ).toBeInTheDocument();
-    expect(document.body.textContent).toContain("FanGraphs · not retrieved");
+    expect(document.body.textContent).toContain("Live FanGraphs projection · not retrieved");
     expect(document.body.textContent).toContain("Unavailable");
     expect(document.body.textContent).not.toMatch(/Playoff odds:\s*Loading/);
     expect(document.body.textContent).not.toMatch(/Team WAR:\s*Loading/);

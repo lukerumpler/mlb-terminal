@@ -53,3 +53,9 @@ The browser-loaded playoff-odds bundle exposes the projection-mode mapping `fg â
 ## Structured FanGraphs resolution
 
 The FanGraphs client bundle revealed and the browser confirmed the structured endpoint `/api/playoff-odds/odds?dateEnd=YYYY-MM-DD&dateDelta=&projectionMode=2&standingsType=mlb`. Its response contains MLB team abbreviation `abbName` and `endData` fields `ExpW`, `ExpL`, and `poffTitle`. The provider adapter now requests this public JSON endpoint using the same FanGraphs projection mode as the live page, maps `poffTitle` from its unit interval to percentage, and preserves the independent FanGraphs HTML WAR path. The original HTML parser remains a defensive capability for HTML-derived values but is no longer relied upon for playoff odds.
+
+## Final corrected production verification
+
+Git-backed production deployment `dpl_BDZECKmpCzQUJkmRc1VtBdBwobwm` reached `READY` from immutable commit `ec4dcf5b5ccc1d168e99da958e813b0ebe85a66d`. Its public FanGraphs model request for `LAD` returned `found: true`, `playoffOdds: 100`, `projectedWins: 97.2`, `projectedLosses: 64.8`, and `statuses.playoffOdds: live`. This confirms that the structured-provider correction removed the prior browser-to-server playoff-odds population defect. Team WAR remains independently marked `unparsed` when FanGraphsâ€™ legacy WAR table cannot be safely parsed; the application consequently retains its explicitly labelled calculated WAR fallback rather than misrepresenting the source.
+
+The published Overview smoke suite was then run directly against `https://mlb-terminal.vercel.app` after the corrected deployment and passed **2/2**. It verified that the Dodgers Overview remains selected on initial load, source badges retain their required visual separation, and neither fresh-load mode dispatches a spurious affiliate-selection event.
