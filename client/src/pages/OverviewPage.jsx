@@ -1323,6 +1323,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const calculatedModelSource = teamModelData?.advancedMetrics?.projectedWins != null ? 'FanGraphs' : projectedWinsValue != null ? 'MLB Stats API · calculated' : 'FanGraphs';
   const calculatedModelStatus = teamModelData?.advancedMetrics?.projectedWins != null ? fanGraphsHealthStatus : projectedWinsValue != null ? 'calculated' : fanGraphsHealthStatus;
   const pythagoreanModelStatus = pythagoreanWinsValue != null && pythagoreanLossesValue != null ? 'calculated' : calculatedIntelligenceState === 'loading' ? 'loading' : 'unavailable';
+  const calculationProviderStatus = calculatedIntelligenceState === 'loading' ? 'loading' : calculatedIntelligence ? (calculatedIntelligence.freshness === 'stale-cached' ? 'cached-fallback' : 'calculated') : 'unavailable';
   const fanGraphsMetricStatus = value => resolveMetricProviderStatus(value, fanGraphsHealthStatus);
   const fanGraphsMetricTitle = (label, value) => value == null
     ? `FanGraphs did not return a verified ${label} value; the provider status badge does not verify this missing metric.`
@@ -1842,15 +1843,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>}
         <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Historical cache; not live.' : 'No cached divisional WAR available.') : divisionWarData.length ? `${team.abbr} highlighted · missing components shown as —.` : 'No verified divisional WAR available.'}</div>
       </Panel>
-      <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
+      <Panel title="Advanced Models & Savant" accent={C.purple}>
+        <div className="skip-overview-panel-status" role="status" aria-label="Advanced models data sources">
+          <span>Sources</span>
+          <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} />
+          <OverviewSourceBadge provider="MLB Stats API" status={calculationProviderStatus} />
+          <OverviewSourceBadge provider="Savant" status={savantHealthStatus} />
+        </div>
         <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(90px,1fr))',gap:8}}>
           {[['Win pace W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Win pace L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Pythag W',pythagoreanWinsValue,1,'MLB Stats API',pythagoreanModelStatus],['Pythag L',pythagoreanLossesValue,1,'MLB Stats API',pythagoreanModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=>{
             const metricStatus = provider === 'FanGraphs' ? fanGraphsMetricStatus(value) : status;
             const metricTitle = provider === 'FanGraphs' ? fanGraphsMetricTitle(label, value) : `${provider} metric source health`;
-            return <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={metricStatus} title={metricTitle} /></div></div>;
+            return <div key={label} title={metricTitle} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span>{value == null && <span style={px({fontSize:8,color:C.text4,letterSpacing:'.04em'})}>—</span>}</div></div>;
           })}
         </div>
-        <div title="Playoff odds are a calculated proxy, not official or FanGraphs odds. WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || playoffOddsIsCalculated || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · odds/WAR: proxies' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
+        <div title="Playoff odds are a calculated proxy, not official or FanGraphs odds. WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || playoffOddsIsCalculated || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · odds/WAR: proxies' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
       </>}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
@@ -1877,7 +1884,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <span>Executive briefing</span>
             <h2 id="team-overview-briefing-title">Front Office Read</h2>
           </div>
-          <p>Decision context is prioritized before the detailed card workspace.</p>
+          <p>Decision-ready summary.</p>
         </div>
         <div className="skip-overview-executive-grid">
           {[

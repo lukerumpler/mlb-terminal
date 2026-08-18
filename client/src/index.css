@@ -920,6 +920,8 @@
 .skip-overview-source-status{display:inline-flex;align-items:center;min-width:0;padding-inline-start:10px;border-inline-start:1px solid var(--border-light);white-space:nowrap}
 .skip-overview-source-name{color:var(--text4,#9c8570);font:700 7px/1 'DM Mono',monospace;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .skip-overview-source-badges{display:inline-flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.skip-overview-panel-status{display:flex;align-items:center;gap:8px;min-width:0;padding:7px 14px 0;color:var(--text3);font:700 8px/1 'DM Mono',monospace;letter-spacing:.05em;text-transform:uppercase}
+.skip-overview-panel-status .skip-overview-source-badge{margin-inline-start:0}
 .skip-stat-strip .skip-overview-source-badge{margin-top:1px}
 
 .skip-metric-info{display:inline-flex;align-items:center;gap:4px;position:relative;min-width:0}
@@ -939,6 +941,10 @@
 @media (max-width:720px) {
   .skip-overview-source-badges{justify-content:flex-start}
   .skip-overview-source-name{max-width:68px}
+  .skip-overview-panel-status{align-items:flex-start;gap:6px;flex-wrap:wrap;line-height:1.25}
+  .skip-overview-panel-status > span:first-child{padding-top:2px}
+  .skip-overview-panel-status .skip-overview-source-badge{justify-content:flex-start}
+  .skip-overview-panel-status .skip-overview-source-name{max-width:none}
   .skip-overview-page .overview-team-context { overflow:visible; flex-wrap:wrap !important; gap:10px !important; }
   .skip-overview-page .overview-team-context > label { flex:1 1 100%; min-width:0; }
   .skip-overview-page .overview-team-context > label select { width:calc(100% - 30px); max-width:none; }

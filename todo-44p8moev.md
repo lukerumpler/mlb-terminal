@@ -273,3 +273,9 @@
 - [x] Remove unnecessary explanations while preserving short source and calculation labels.
 - [x] Add or update concise-copy regressions and review responsive layout.
 - [x] Validate and publish the streamlined dashboard copy.
+
+- [x] Inspect repeated source badges, Executive Briefing copy, and compact-label mobile alignment.
+- [x] Consolidate repeated provider badges into concise panel-level status lines.
+- [x] Shorten the Executive Briefing subtitle and refine compact-label alignment on mobile.
+- [x] Add regression coverage and validate desktop/mobile presentation.
+- [x] Publish the panel-status and mobile-layout refinement.

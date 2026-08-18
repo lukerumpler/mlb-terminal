@@ -318,13 +318,10 @@ describe("Team Overview model source and retry interaction", () => {
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
-    const providers = [
-      ...container.querySelectorAll(".skip-overview-source-name"),
-    ].map(node => node.textContent);
-    expect(providers.filter(provider => provider === "FanGraphs")).toHaveLength(
-      7
-    );
-    expect(providers.filter(provider => provider === "Savant")).toHaveLength(4);
+    const sourceLine = container.querySelector('[aria-label="Advanced models data sources"]');
+    expect(sourceLine).toBeInTheDocument();
+    const providers = [...sourceLine.querySelectorAll(".skip-overview-source-name")].map(node => node.textContent);
+    expect(providers).toEqual(["FanGraphs", "MLB Stats API", "Savant"]);
     expect(
       container.querySelector(".skip-status-unavailable")
     ).toBeInTheDocument();
