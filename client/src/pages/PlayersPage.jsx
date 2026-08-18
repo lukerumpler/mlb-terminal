@@ -14,7 +14,7 @@ import {
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
 } from '../engine/skip.js';
 import { Badge, Panel, KVRow, GradeBar, PosBadge } from '../components/atoms.jsx';
-import { PlayerProfileSkeleton } from '../components/PageSkeletons.jsx';
+import { PlayerProfileSkeleton, PlayerProfileHydrationSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
@@ -1408,6 +1408,54 @@ export function PlayerDataConfidenceBadge({ confidence, compact = false } = {}) 
   );
 }
 
+export function getPlayerIdentityConfidence(identity, { pending = false } = {}) {
+  const baseballReference = identity?.baseballReference;
+  if (identity?.status === 'verified' && baseballReference?.confidence === 'exact-name' && baseballReference?.id) {
+    return {
+      tone: 'teal',
+      label: 'IDENTITY VERIFIED',
+      detail: 'MLB player ID, exact normalized name, and canonical Baseball-Reference player page agree.',
+    };
+  }
+  if (pending) {
+    return {
+      tone: 'amber',
+      label: 'IDENTITY CHECKING',
+      detail: 'The core MLB profile is available while the optional external identity check is still running.',
+    };
+  }
+  if (identity?.status === 'not-found' || identity?.status === 'unavailable') {
+    return {
+      tone: 'slate',
+      label: 'IDENTITY UNAVAILABLE',
+      detail: 'No exact external identity match was returned. This profile continues to use verified MLB identity data only.',
+    };
+  }
+  return {
+    tone: 'slate',
+    label: 'IDENTITY NOT CHECKED',
+    detail: 'An external identity result is not available for this profile. This is not a substitute for MLB identity data.',
+  };
+}
+
+export function PlayerIdentityConfidenceBadge({ identity, pending = false, compact = false } = {}) {
+  const confidence = getPlayerIdentityConfidence(identity, { pending });
+  const tone = CONFIDENCE_PALETTE[confidence.tone] || CONFIDENCE_PALETTE.slate;
+  const label = compact ? confidence.label : `PLAYER ${confidence.label}`;
+  return (
+    <span
+      role="note"
+      data-testid="player-identity-confidence"
+      title={confidence.detail}
+      aria-label={`${label}. ${confidence.detail}`}
+      style={{ display:'inline-flex', alignItems:'center', gap:5, minHeight:22, padding:'3px 7px', border:`1px solid ${tone.border}`, borderRadius:999, background:tone.soft, color:tone.color, ...px({ fontSize:8.5, fontWeight:800, letterSpacing:'.045em' }) }}
+    >
+      <span aria-hidden="true" style={{ width:5, height:5, borderRadius:'50%', background:tone.color, flexShrink:0 }} />
+      {label}
+    </span>
+  );
+}
+
 function formatFinancialValue(value) {
   if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
   const n = Number(value);
@@ -2008,11 +2056,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         </div>
       )}
       {loading && !player && <PlayerProfileSkeleton />}
-      {player?.extrasLoading && (
-        <div role="status" style={{ padding:'8px 12px', borderRadius:7, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, color:C.amberDark, fontFamily:"'DM Mono',monospace", fontSize:10 }}>
-          Core MLB profile loaded. Supplemental Savant, contract, financial, and boxscore data are still loading; unavailable values are not estimates.
-        </div>
-      )}
+      {player?.extrasLoading && <PlayerProfileHydrationSkeleton />}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
           background:C.rustSoft, border:`0.5px solid ${C.rustMid}`, borderRadius:8,
@@ -2612,6 +2656,7 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
               {player.isFallback && <Badge color={C.amber} bg={C.amberSoft} border={C.amberMid}>{player.statSeason} fallback</Badge>}
               <SurchargeRiskBadge warning={extensionTaxWarning} compact />
               <PlayerDataConfidenceBadge confidence={dataConfidence} compact />
+              <PlayerIdentityConfidenceBadge identity={player.providerIdentity} pending={player.extrasLoading} compact />
               <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginTop:8 }}>
                 <button type="button" onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? `Remove ${p.fullName} from favorites` : `Add ${p.fullName} to favorites`} title={isFavorite ? 'Remove from favorites' : 'Save to favorites'} style={{ padding:'5px 9px', border:`0.5px solid ${isFavorite ? C.amber : C.border}`, borderRadius:5, background:isFavorite ? C.amberSoft : C.surface2, color:isFavorite ? C.amberDark : C.text2, cursor:'pointer', ...sans({ fontSize:9.5, fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase' }) }}>
                   {isFavorite ? '★ Favorited' : '☆ Favorite'}

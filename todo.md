@@ -11311,3 +11311,6 @@
 - [x] Inventory every GitHub 9aeea29 change against the current shared release.
 - [x] Integrate compatible GitHub identity, Vercel, data-resilience, and test improvements without losing shared functionality.
 - [x] Resolve all merge conflicts, update release-gate baseline and audit evidence, validate, and publish the full combined release.
+- [x] Inspect the player profile’s verified identity payload, confidence presentation, and current loading skeleton.
+- [x] Add an honest identity-confidence indicator and a progressive player-profile loading skeleton.
+- [x] Add regression coverage, verify responsive loading behavior, and publish the player-profile improvement.

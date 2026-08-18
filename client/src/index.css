@@ -675,12 +675,14 @@
 /* Page-shaped loading screens for the primary data workspaces. */
 .skip-overview-skeleton .skip-skeleton-panel,
 .skip-profile-skeleton .skip-skeleton-panel { min-width: 0; }
+.skip-profile-hydration-skeleton { min-width: 0; }
 
 @media (max-width: 900px) {
   .skip-overview-skeleton-strip { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
   .skip-overview-skeleton-grid,
   .skip-profile-skeleton-grid,
-  .skip-profile-skeleton-lower { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .skip-profile-skeleton-lower,
+  .skip-profile-hydration-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
 @media (max-width: 720px) {
@@ -692,7 +694,8 @@
   .skip-overview-skeleton-strip { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .skip-overview-skeleton-grid,
   .skip-profile-skeleton-grid,
-  .skip-profile-skeleton-lower { grid-template-columns: 1fr !important; }
+  .skip-profile-skeleton-lower,
+  .skip-profile-hydration-grid { grid-template-columns: 1fr !important; }
   .skip-profile-skeleton-hero { align-items: flex-start !important; padding: 12px !important; }
   .skip-profile-skeleton-hero > div:last-child { min-width: 0; }
 }
