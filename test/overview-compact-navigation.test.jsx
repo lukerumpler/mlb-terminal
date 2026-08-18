@@ -51,6 +51,20 @@ describe('Team Overview compact navigation', () => {
     expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
   });
 
+  it('keeps the executive briefing ahead of the detailed card workspace on first load', async () => {
+    render(<OverviewPage />);
+
+    const briefing = await screen.findByRole('tabpanel', { name: 'Front Office Read' });
+    const continueLink = screen.getByRole('link', { name: /continue to detailed team cards/i });
+    const detailedCardsHeading = screen.getByRole('heading', { name: 'Detailed team cards' });
+    const teamLeaders = screen.getByText('Team Leaders');
+
+    expect(briefing).toContainElement(continueLink);
+    expect(continueLink).toHaveAttribute('href', '#team-overview-detailed-analysis');
+    expect(briefing.compareDocumentPosition(detailedCardsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('defers FanGraphs model requests until Performance is explicitly opened', async () => {
     render(<OverviewPage />);
 
