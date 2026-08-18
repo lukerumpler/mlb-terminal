@@ -83,8 +83,9 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    expect(await screen.findByText(/OAA — · Savant/i)).toBeInTheDocument();
-    expect(screen.getByText(/Statcast OAA is a separate Baseball Savant fielding signal/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /defense/i }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Separate OAA context: — from Baseball Savant/i);
+    expect(screen.getByText(/Statcast OAA remains a separate Baseball Savant fielding signal/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
     const dialog = screen.getByRole('dialog', { name: /organization depth/i });

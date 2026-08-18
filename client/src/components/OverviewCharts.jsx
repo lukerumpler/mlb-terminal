@@ -473,12 +473,17 @@ export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
       </div>
     );
   }
-  const warValues = data.map(row => Number(row.totalWAR)).filter(Number.isFinite);
+  const warValues = data
+    .map(row => Number(row.totalWAR))
+    .filter(Number.isFinite);
   const minWar = Math.min(0, ...warValues);
   const maxWar = Math.max(0, ...warValues);
   const axisPadding = Math.max(1, (maxWar - minWar) * 0.08);
   return (
-    <ResponsiveContainer width="100%" height={Math.max(178, data.length * 31 + 18)}>
+    <ResponsiveContainer
+      width="100%"
+      height={Math.max(178, data.length * 31 + 18)}
+    >
       <BarChart
         data={data}
         layout="vertical"
@@ -518,8 +523,23 @@ export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
           maxBarSize={14}
           isAnimationActive={false}
         >
-          {data.map(row => <Cell key={row.team} fill={row.team === selectedTeam ? C.teal : C.purple} />)}
-          <LabelList dataKey="totalWAR" position="right" formatter={formatWarValue} fill={C.text2} style={{ fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700 }} />
+          {data.map(row => (
+            <Cell
+              key={row.team}
+              fill={row.team === selectedTeam ? C.teal : C.purple}
+            />
+          ))}
+          <LabelList
+            dataKey="totalWAR"
+            position="right"
+            formatter={formatWarValue}
+            fill={C.text2}
+            style={{
+              fontFamily: "'DM Mono',monospace",
+              fontSize: 9,
+              fontWeight: 700,
+            }}
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>

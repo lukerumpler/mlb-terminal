@@ -365,9 +365,10 @@
 - [x] Merge the user-approved calculated MLB standings fallback proxies with this session’s readiness remediation
 - [x] Validate the calculated proxy labels, full release gates, and managed checkpoint after the approved merge
 - [x] Validate the merged Front Office Evaluation calculation labels, full release gates, and managed checkpoint retry
-- [ ] Reapply the requested transparent Overall Front Office grade from available component grades
-- [ ] Add accessible interactive Front Office calculation tooltips and unavailable-state explanations
-- [ ] Apply the attached Off WAR and Def WAR coverage-gap status correction
+- [x] Reapply the requested transparent Overall Front Office grade from available component grades
+- [x] Add accessible interactive Front Office calculation tooltips and unavailable-state explanations
+- [x] Apply the attached Off WAR and Def WAR coverage-gap status correction
 - [ ] Verify the manually saved Vercel production API-base configuration and the managed CORS allowlist
 - [ ] Run full validation, checkpoint the restored changes, and request final deployment confirmation
 - [ ] Trigger and verify the confirmed Vercel production deployment
+- [ ] Reconcile the reviewed shared workspace with the GitHub source currently linked to Vercel before promotion
