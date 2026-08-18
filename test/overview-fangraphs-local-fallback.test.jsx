@@ -61,7 +61,7 @@ describe('rendered FanGraphs local fallback', () => {
 
     expect((await screen.findAllByText('42.4')).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('88.1%')).toBeInTheDocument();
+    expect(screen.getAllByText('88.1%').length).toBeGreaterThan(0);
     expect(screen.getAllByText('FanGraphs').length).toBeGreaterThan(0);
   });
 
@@ -78,9 +78,9 @@ describe('rendered FanGraphs local fallback', () => {
     render(<OverviewPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
-    expect(await screen.findByText('90.6%')).toBeInTheDocument();
+    expect((await screen.findAllByText('90.6%')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('51.2').length).toBeGreaterThan(0);
-    expect(screen.getByText('WAR Proxy')).toBeInTheDocument();
+    expect(screen.getAllByText('WAR Proxy').length).toBeGreaterThan(0);
     expect(screen.getByText(/calculated playoff proxy/i)).toBeInTheDocument();
     expect(screen.getByText(/not FanGraphs WAR/i)).toBeInTheDocument();
   });

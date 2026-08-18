@@ -91,6 +91,19 @@ function ChartFallback({ height }) {
   );
 }
 
+function SourceMetricCard({ label, value, digits = 1, suffix = '', provider, status, description, accent = C.purple }) {
+  const numeric = Number(value);
+  const available = value != null && value !== '' && Number.isFinite(numeric);
+  return <div style={{ minWidth:0, padding:'10px 11px', border:`1px solid ${C.borderLight}`, borderRadius:8, background:C.surface2, borderTop:`2px solid ${available ? accent : C.border}` }}>
+    <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'flex-start' }}>
+      <div style={sans({ fontSize:9, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em', lineHeight:1.25 })}>{label}</div>
+      <OverviewSourceBadge provider={provider} status={status} title={description || `${label} source status`} />
+    </div>
+    <div style={px({ fontSize:22, fontWeight:800, color:available ? C.text : C.text4, letterSpacing:'-.04em', marginTop:8, lineHeight:1 })}>{available ? `${numeric.toFixed(digits)}${suffix}` : '—'}</div>
+    {description && <div style={sans({ fontSize:8.5, color:C.text4, marginTop:7, lineHeight:1.35 })}>{description}</div>}
+  </div>;
+}
+
 function pctToGrade(p) {
   if (!Number.isFinite(Number(p))) return '—';
   if (p >= 90) return 'A+'; if (p >= 80) return 'A'; if (p >= 70) return 'A-';
@@ -963,6 +976,29 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     return () => { alive = false; };
   }, [affiliateId, affiliateLevel, affiliates]);
 
+  useEffect(() => {
+    let alive = true;
+    if (!teamBase?.id) {
+      setCalculatedIntelligence(null);
+      setCalculatedIntelligenceState('idle');
+      return () => { alive = false; };
+    }
+    setCalculatedIntelligence(null);
+    setCalculatedIntelligenceState('loading');
+    getTeamCalculatedIntelligence(teamBase.id, CURRENT_SEASON)
+      .then(data => {
+        if (!alive) return;
+        setCalculatedIntelligence(data || null);
+        setCalculatedIntelligenceState(data?.metrics ? 'ready' : 'unavailable');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCalculatedIntelligence(null);
+        setCalculatedIntelligenceState('unavailable');
+      });
+    return () => { alive = false; };
+  }, [teamBase?.id]);
+
   const calculatedMetrics = calculatedIntelligence?.metrics || {};
   const calculatedStandingMetric = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   const calculatedStandingFallback = useMemo(() => ({
@@ -1313,6 +1349,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         : teamModelData?.found || teamModelData?.statuses?.teamWar === 'live' || teamModelData?.statuses?.playoffOdds === 'live'
           ? 'verified'
           : teamModelState === 'source-gap' ? 'coverage-gap' : 'unavailable';
+  const hasVerifiedPlayoffOdds = hasProviderPlayoffOdds;
+  const hasVerifiedTeamWar = hasProviderTeamWar;
+  const calculatedTeamWarProxy = calculatedWarProxy;
+  const playoffOddsRaw = providerPlayoffOdds ?? calculatedPlayoffOdds;
+  const teamWarRaw = providerTeamWar ?? calculatedWarProxy;
+  const teamWarLabel = teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR';
   const projectedWinsValue = teamModelData?.advancedMetrics?.projectedWins ?? calculatedMetrics.projectedWins;
   const projectedLossesValue = teamModelData?.advancedMetrics?.projectedLosses ?? calculatedMetrics.projectedLosses;
   const calculatedModelSource = teamModelData?.advancedMetrics?.projectedWins != null ? 'FanGraphs' : projectedWinsValue != null ? 'MLB Stats API · calculated' : 'FanGraphs';
@@ -1321,6 +1363,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const fanGraphsMetricTitle = (label, value) => value == null
     ? `FanGraphs did not return a verified ${label} value; the provider status badge does not verify this missing metric.`
     : `FanGraphs ${label} source health`;
+  const playoffOddsStatus = hasVerifiedPlayoffOdds ? fanGraphsHealthStatus : calculatedPlayoffOdds != null ? 'calculated' : fanGraphsHealthStatus;
+  const teamWarStatus = hasVerifiedTeamWar ? fanGraphsHealthStatus : calculatedTeamWarProxy != null ? 'calculated' : fanGraphsHealthStatus;
+  const fanGraphsWarStatus = teamModelData?.statuses?.teamWar === 'live' ? fanGraphsHealthStatus : 'coverage-gap';
+  const divisionWarStatus = divisionWarData.length ? fanGraphsHealthStatus : fanGraphsWarStatus;
   const affiliateSavantHealthStatus = affiliateSavant?.status === 'loading'
     ? 'loading'
     : affiliateSavant?.freshness === 'stale-cached'
@@ -1804,7 +1850,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <span>Model source: <strong style={{color:C.text2}}>{(playoffOddsIsCalculated || teamWarIsCalculated) ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource} · {teamWarIsCalculated ? 'WAR: MLB Stats API · calculated proxy' : `Team WAR: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`}</span>
       </div>
-      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
+      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs WAR" status={divisionWarStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
           <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Verified cached divisional WAR snapshot · provider currently blocked' : 'FanGraphs provider blocked · no verified divisional rows') : 'Verified total WAR by division · select or hover a bar for the exact component breakdown'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
@@ -1835,6 +1881,36 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           })}
         </div>
         <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || playoffOddsIsCalculated || teamWarIsCalculated) ? 'Verified MLB standings fallback: projected wins/losses use current 162-game pace; playoff odds are a calculated proxy, not official or FanGraphs odds; WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
+      </Panel>
+      <Panel title="Forecast & Team Context" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs forecast" status={calculatedModelStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
+        <div style={{ padding:'12px 14px 10px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={px({ fontSize:9.5, fontWeight:800, color:C.purple, letterSpacing:'.07em', textTransform:'uppercase' })}>Forecast</div>
+            <div style={sans({ fontSize:9, color:C.text4 })}>{calculatedModelSource === 'FanGraphs' ? `Live FanGraphs projection · ${modelFreshness}` : 'Calculated from verified MLB standings'}</div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))', gap:8 }}>
+            <SourceMetricCard label="Projected wins" value={projectedWinsValue} provider={calculatedModelSource === 'FanGraphs' ? 'FanGraphs' : 'MLB calculation'} status={calculatedModelStatus} description={calculatedModelSource === 'FanGraphs' ? 'Live FanGraphs projection' : 'calculated from verified MLB standings; not official odds.'} accent={C.purple} />
+            <SourceMetricCard label="Projected losses" value={projectedLossesValue} provider={calculatedModelSource === 'FanGraphs' ? 'FanGraphs' : 'MLB calculation'} status={calculatedModelStatus} description={calculatedModelSource === 'FanGraphs' ? 'Live FanGraphs projection' : 'calculated from verified MLB standings; not official odds.'} accent={C.purple} />
+            <SourceMetricCard label={hasVerifiedPlayoffOdds ? 'Playoff odds' : 'Playoff estimate'} value={playoffOddsRaw} suffix="%" provider={hasVerifiedPlayoffOdds ? 'FanGraphs' : 'MLB calculation'} status={playoffOddsStatus} description={hasVerifiedPlayoffOdds ? 'Live FanGraphs model probability.' : 'Standings-pace estimate; excludes schedule, roster, injury, and simulation inputs.'} accent={hasVerifiedPlayoffOdds ? C.purple : C.amber} />
+          </div>
+        </div>
+        <div style={{ padding:'11px 14px 13px', borderTop:`1px solid ${C.borderLight}`, background:C.surface }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10, flexWrap:'wrap', marginBottom:8 }}>
+            <div style={px({ fontSize:9.5, fontWeight:800, color:C.teal, letterSpacing:'.07em', textTransform:'uppercase' })}>Performance context</div>
+            <div style={sans({ fontSize:9, color:C.text4 })}>Verified batted-ball data and transparent derived context</div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))', gap:8 }}>
+            <SourceMetricCard label={teamWarLabel} value={teamWarRaw} provider={hasVerifiedTeamWar ? 'FanGraphs' : 'MLB calculation'} status={teamWarStatus} description={hasVerifiedTeamWar ? 'Verified FanGraphs Team WAR.' : 'Pythagorean wins above a 48-win replacement baseline; not FanGraphs Team WAR.'} accent={hasVerifiedTeamWar ? C.purple : C.amber} />
+            <SourceMetricCard label="xwOBA" value={teamSavantDisplayData?.expectedWOBA} digits={3} provider="Savant" status={savantHealthStatus} description="Verified team batted-ball query." accent={C.teal} />
+            <SourceMetricCard label="Exit velocity" value={teamSavantDisplayData?.exitVelocity} suffix=" mph" provider="Savant" status={savantHealthStatus} description="Verified team batted-ball query." accent={C.teal} />
+            {teamModelData?.advancedMetrics?.offenseWar != null && <SourceMetricCard label="Offensive WAR" value={teamModelData.advancedMetrics.offenseWar} provider="FanGraphs" status={fanGraphsHealthStatus} description="Verified only when returned by FanGraphs." accent={C.purple} />}
+            {teamModelData?.advancedMetrics?.defenseWar != null && <SourceMetricCard label="Defensive WAR" value={teamModelData.advancedMetrics.defenseWar} provider="FanGraphs" status={fanGraphsHealthStatus} description="Verified only when returned by FanGraphs." accent={C.purple} />}
+          </div>
+        </div>
+        <div style={{ padding:'9px 14px 11px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', borderTop:`1px solid ${C.borderLight}`, ...sans({ fontSize:9, color:C.text4, lineHeight:1.4 }) }}>
+          <span>{teamSavantDisplayData?.source || 'Baseball Savant'}</span><span aria-hidden="true">·</span><SavantFreshnessText data={teamSavantDisplayData} />
+          {!hasVerifiedTeamWar && teamWarRaw != null && <><span aria-hidden="true">·</span><span>WAR proxy is clearly labelled because verified FanGraphs Team WAR is unavailable.</span></>}
+        </div>
       </Panel>
       </>}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
