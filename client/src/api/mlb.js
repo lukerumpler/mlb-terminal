@@ -1618,12 +1618,14 @@ export async function getGamePBP(gamePk) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function parseStandingsRecord(rec) {
+  const divisionName = rec.division?.name || rec.division?.nameShort || '';
   return {
-    divisionName: rec.division?.name || rec.division?.nameShort || '',
+    divisionName,
     teams: rec.teamRecords.map(t => ({
       id:       t.team.id,
       name:     t.team.name,
       abbr:     t.team.abbreviation || '',
+      divisionName,
       w:        t.wins,
       l:        t.losses,
       pct:      parseFloat(t.winningPercentage) || 0,
@@ -2126,6 +2128,17 @@ export async function getTeamCalculatedIntelligence(teamId, season = SEASON) {
   try {
     const url = `/api/intelligence-calculations?${params.toString()}`;
     return await fetchProviderJson(url, { timeoutMs: 12_000, ttlMs: fanGraphsDailyTtlMs() });
+  } catch {
+    return null;
+  }
+}
+
+export async function getSecondaryPlayoffOdds(teamAbbr) {
+  const normalizedTeam = String(teamAbbr || '').toUpperCase();
+  if (!normalizedTeam) return null;
+  try {
+    const url = `/api/playoffstatus-odds?${new URLSearchParams({ team: normalizedTeam }).toString()}`;
+    return await fetchProviderJson(url, { timeoutMs: 12_000, ttlMs: 15 * 60_000, persistentCacheKey: `skip-playoffstatus-odds:${url}` });
   } catch {
     return null;
   }

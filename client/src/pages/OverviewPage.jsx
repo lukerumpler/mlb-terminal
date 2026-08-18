@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } fro
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines } from '../engine/skip.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSplits, getTeamSavantMetrics, getTeamSavantOaa, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -251,6 +251,44 @@ export function formatDataAge(timestamp, now = Date.now()) {
   if (age < 3_600_000) return `${Math.max(1, Math.floor(age / 60_000))}m ago`;
   if (age < 86_400_000) return `${Math.max(1, Math.floor(age / 3_600_000))}h ago`;
   return `${Math.max(1, Math.floor(age / 86_400_000))}d ago`;
+}
+
+export function formatVerifiedTimestamp(value) {
+  if (!value) return 'timestamp unavailable';
+  const timestamp = Number.isFinite(Number(value)) ? Number(value) : Date.parse(value);
+  if (!Number.isFinite(timestamp)) return 'timestamp unavailable';
+  return new Date(timestamp).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+export function buildPostseasonStandingsContext(liveTeamData, team) {
+  const formatRank = value => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return '—';
+    const rounded = Math.round(numeric);
+    const mod100 = rounded % 100;
+    const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : ({ 1:'st', 2:'nd', 3:'rd' }[rounded % 10] || 'th');
+    return `${rounded}${suffix}`;
+  };
+  const rows = Object.values(liveTeamData?.byAbbr || {})
+    .map(record => record?.standings)
+    .filter(Boolean);
+  const selected = rows.find(row => Number(row.id) === Number(team?.id) || row.abbr === team?.abbr);
+  if (!selected) return null;
+  const divisionRows = rows
+    .filter(row => row.divisionName && row.divisionName === selected.divisionName)
+    .sort((left, right) => Number(right.pct || 0) - Number(left.pct || 0));
+  const divisionLeader = divisionRows[0] || null;
+  return {
+    record: selected.w != null && selected.l != null ? `${selected.w}–${selected.l}` : '—',
+    divisionName: selected.divisionName || team?.div || 'Division',
+    divisionRank: formatRank(selected.divRank),
+    gamesBack: selected.gb == null || selected.gb === '' ? '—' : selected.gb,
+    wildCardRank: formatRank(selected.wildRank),
+    lastTen: selected.l10 || '—',
+    streak: selected.streak || '—',
+    divisionLeader: divisionLeader?.abbr || divisionLeader?.name || '—',
+    divisionLeaderRecord: divisionLeader?.w != null && divisionLeader?.l != null ? `${divisionLeader.w}–${divisionLeader.l}` : '—',
+  };
 }
 
 function MetricValue({ value, loading, width = 42 }) {
@@ -894,6 +932,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
+  const [secondaryPlayoffOddsData, setSecondaryPlayoffOddsData] = useState(null);
+  const [secondaryPlayoffOddsState, setSecondaryPlayoffOddsState] = useState('idle');
   const [calculatedIntelligence, setCalculatedIntelligence] = useState(null);
   const [calculatedIntelligenceState, setCalculatedIntelligenceState] = useState('idle');
   const [teamPlayersLoading, setTeamPlayersLoading] = useState(true);
@@ -1334,6 +1374,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (!alive) return;
       setTeamModelData(data);
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
+      if (data?.playoffOdds != null && data.playoffOdds !== '' && Number.isFinite(Number(data.playoffOdds))) {
+        setSecondaryPlayoffOddsData(null);
+        setSecondaryPlayoffOddsState('idle');
+        return;
+      }
+      setSecondaryPlayoffOddsState('loading');
+      getSecondaryPlayoffOdds(teamBase?.abbr).then(secondary => {
+        if (!alive) return;
+        setSecondaryPlayoffOddsData(secondary);
+        setSecondaryPlayoffOddsState(secondary?.found ? 'ready' : 'unavailable');
+      }).catch(() => {
+        if (!alive) return;
+        setSecondaryPlayoffOddsData(null);
+        setSecondaryPlayoffOddsState('unavailable');
+      });
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
   }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
@@ -1423,10 +1478,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const providerPlayoffOdds = finiteMetric(teamModelData?.playoffOdds);
   const hasProviderPlayoffOdds = providerPlayoffOdds != null;
+  const secondaryPlayoffOddsDisplay = secondaryPlayoffOddsData?.found ? secondaryPlayoffOddsData.playoffOddsDisplay : null;
+  const hasSecondaryPlayoffOdds = Boolean(secondaryPlayoffOddsDisplay);
   const playoffOddsValue = hasProviderPlayoffOdds
     ? `${providerPlayoffOdds.toFixed(1)}%`
-    : 'Unavailable';
-  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : 'Provider unavailable';
+    : hasSecondaryPlayoffOdds ? secondaryPlayoffOddsDisplay : 'Unavailable';
+  const playoffOddsSource = hasProviderPlayoffOdds ? 'FanGraphs' : hasSecondaryPlayoffOdds ? 'PlayoffStatus · secondary' : 'Provider unavailable';
+  const playoffOddsVerifiedAt = hasProviderPlayoffOdds
+    ? teamModelData?.providerUpdatedAt || teamModelData?.retrievedAt
+    : hasSecondaryPlayoffOdds ? secondaryPlayoffOddsData?.lastVerifiedAt || secondaryPlayoffOddsData?.retrievedAt : null;
+  const playoffOddsVerificationLabel = hasProviderPlayoffOdds
+    ? `FanGraphs playoff odds · last verified ${formatVerifiedTimestamp(playoffOddsVerifiedAt)}${teamModelData?.providerUpdatedText ? ` · provider updated ${teamModelData.providerUpdatedText}` : ''}`
+    : hasSecondaryPlayoffOdds
+      ? `PlayoffStatus secondary odds · last verified ${formatVerifiedTimestamp(playoffOddsVerifiedAt)}`
+      : secondaryPlayoffOddsState === 'loading' ? 'Checking secondary postseason probability source…' : 'No verified postseason probability source is currently available.';
   const providerTeamWar = finiteMetric(teamModelData?.teamWar);
   const calculatedWarProxy = finiteMetric(calculatedMetrics.calculatedWarProxy);
   const hasProviderTeamWar = providerTeamWar != null;
@@ -1468,6 +1533,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const fanGraphsMetricTitle = (label, value) => value == null
     ? `FanGraphs did not return a verified ${label} value; the provider status badge does not verify this missing metric.`
     : `FanGraphs ${label} source health`;
+  const standingsContext = useMemo(() => buildPostseasonStandingsContext(liveTeamData, team), [liveTeamData, team]);
   const affiliateSavantHealthStatus = affiliateSavant?.status === 'loading'
     ? 'loading'
     : affiliateSavant?.freshness === 'stale-cached'
@@ -1912,6 +1978,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
           ))}
         </div>
+        <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
         {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
@@ -1971,6 +2038,21 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <span>Model source: <strong style={{color:C.text2}}>{teamWarIsCalculated ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource} · {teamWarIsCalculated ? 'WAR: MLB Stats API · calculated proxy' : `Team WAR: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`}</span>
       </div>
+      <Panel title="Postseason Standing Context" accent={C.teal} badge="MLB Stats API">
+        {standingsContext ? <>
+          <div data-testid="postseason-standings-context" className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(106px,1fr))',gap:8}}>
+            {[
+              ['Record', standingsContext.record],
+              ['Division place', standingsContext.divisionRank],
+              ['Games back', standingsContext.gamesBack],
+              ['Wild-card place', standingsContext.wildCardRank],
+              ['Last 10', standingsContext.lastTen],
+              ['Streak', standingsContext.streak],
+            ].map(([label,value]) => <div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==='—'?C.text3:C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:4})}>{label}</div></div>)}
+          </div>
+          <div style={sans({padding:'0 14px 10px',fontSize:9,color:C.text3,lineHeight:1.4})}>{standingsContext.divisionName} leader: <strong style={{color:C.text2}}>{standingsContext.divisionLeader} ({standingsContext.divisionLeaderRecord})</strong> · verified MLB standings context, not a projected probability.</div>
+        </> : <OverviewEmptyState status={liveTeamDataMode === 'loading' ? 'Loading' : 'Unavailable'} message="Postseason standings context" detail="Verified division and Wild Card position will appear when the current MLB standings snapshot is available." />}
+      </Panel>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
           <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Cached verified rows · provider blocked' : 'Provider blocked · no verified rows') : 'Verified WAR by division'}</span>

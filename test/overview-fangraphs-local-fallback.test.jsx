@@ -38,6 +38,7 @@ describe('rendered FanGraphs local fallback', () => {
         source: 'FanGraphs',
         playoffOdds: 88.1,
         teamWar: 42.4,
+        providerUpdatedText: 'Monday, August 17, 2026 11:50 PM ET',
         statuses: { playoffOdds: 'live', teamWar: 'live' },
         advancedMetrics: { projectedWins: 95.4, projectedLosses: 66.6, offenseWar: 29.1, defenseWar: 8.4 },
       },
@@ -63,6 +64,30 @@ describe('rendered FanGraphs local fallback', () => {
     expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('88.1%')).toBeInTheDocument();
     expect(screen.getAllByText('FanGraphs').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/FanGraphs playoff odds · last verified/i);
+    expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/provider updated Monday, August 17, 2026 11:50 PM ET/i);
+  });
+
+  it('uses the independent published probability only when FanGraphs has no team-specific playoff value', async () => {
+    vi.stubGlobal('fetch', vi.fn(async url => {
+      if (String(url).includes('/api/fangraphs-models')) return jsonResponse({ found:false, playoffOdds:null, teamWar:null, statuses:{ playoffOdds:'unavailable', teamWar:'unavailable' } });
+      if (String(url).includes('/api/playoffstatus-odds')) return jsonResponse({
+        found:true, source:'PlayoffStatus', playoffOddsDisplay:'>99%',
+        retrievedAt:'2026-08-18T08:14:49.217Z', lastVerifiedAt:'2026-08-18T08:14:49.217Z', freshness:'live',
+      });
+      if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
+        source:'MLB Stats API', provenance:'calculated-from-verified-standings', freshness:'calculated',
+        metrics:{ projectedWins:95.9, projectedLosses:66.1, calculatedWarProxy:51.2 },
+      });
+      return jsonResponse({});
+    }));
+
+    render(<OverviewPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
+
+    expect(await screen.findByText('>99%')).toBeInTheDocument();
+    expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/PlayoffStatus secondary odds · last verified/i);
+    expect(screen.getByText(/Playoff odds: PlayoffStatus · secondary/i)).toBeInTheDocument();
   });
 
 it('does not fabricate playoff odds when FanGraphs is unavailable while retaining clearly labeled MLB pace and WAR proxies', async () => {

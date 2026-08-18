@@ -11330,3 +11330,7 @@
 - [x] Trace the Team Overview playoff-odds data source, calculation, fallback, and display states.
 - [x] Validate representative team odds against current standings inputs and source provenance.
 - [x] Correct any playoff-odds accuracy or transparency issue, add regression coverage, and publish the verified result.
+- [x] Inspect existing playoff-odds source timing, verified standings inputs, and fallback interfaces.
+- [x] Vet an authoritative secondary playoff-odds provider and available integration path.
+- [x] Add FanGraphs verification timing, a standings-context panel, and a sourced secondary odds fallback without estimates.
+- [x] Add regression coverage, verify desktop and mobile source states, and publish the enhancement.
