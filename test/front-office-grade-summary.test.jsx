@@ -39,10 +39,24 @@ describe('Front Office Overall grade', () => {
     render(<FrontOfficeGradeCards grades={grades} overall={buildFrontOfficeGradeSummary(grades)} />);
     expect(screen.getByRole('button', { name: /Overall.*4\.30/i })).toBeInTheDocument();
     expect(screen.getByText('4.30')).toBeInTheDocument();
+    expect(screen.getByTitle(/Offense 45%, Pitching 40%, Defense 10%, Baserunning 5%/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /overall/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/Weighted current-performance score from defense/i);
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/not Statcast OAA/i);
+  });
+
+  it('shows an Overall score direction only after a comparable team score changes', () => {
+    window.localStorage.clear();
+    const grades = [{ label: 'Offense', grade: 'B', color: '#008080', detail: 'Verified.' }];
+    const { rerender } = render(<FrontOfficeGradeCards grades={grades} teamKey="SFG" overall={{ grade: 'B', points: 3, detail: 'Initial score.' }} />);
+    expect(screen.queryByLabelText(/Overall score (increased|decreased)/i)).not.toBeInTheDocument();
+
+    rerender(<FrontOfficeGradeCards grades={grades} teamKey="SFG" overall={{ grade: 'B+', points: 3.2, detail: 'Improved score.' }} />);
+    expect(screen.getByLabelText(/Overall score increased by 0\.20/i)).toHaveTextContent('↑');
+
+    rerender(<FrontOfficeGradeCards grades={grades} teamKey="SFG" overall={{ grade: 'B', points: 3, detail: 'Reduced score.' }} />);
+    expect(screen.getByLabelText(/Overall score decreased by 0\.20/i)).toHaveTextContent('↓');
   });
 
   it('labels absent FanGraphs WAR components as a coverage gap while preserving a real zero', () => {

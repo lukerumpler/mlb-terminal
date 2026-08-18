@@ -297,3 +297,9 @@
 - [x] Apply targeted reliability and performance optimizations without weakening provider or unavailable states.
 - [x] Add regression coverage and validate desktop/mobile behavior.
 - [x] Run the full release gate and publish the numeric-score optimization update.
+
+- [x] Inspect Overall score state, tooltip patterns, and available comparable history for a truthful change indicator.
+- [x] Add an accessible hover/focus tooltip explaining core weights and the capped outlook adjustment.
+- [x] Add green/red Overall score direction only when a comparable prior score exists; otherwise show no implied trend.
+- [x] Add regression coverage and validate desktop/mobile score-card interactions.
+- [x] Publish the Overall-score tooltip and change indicator update.

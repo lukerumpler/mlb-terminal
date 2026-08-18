@@ -159,19 +159,44 @@ export function buildFrontOfficeGradeSummary(grades = []) {
   };
 }
 
-export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades) }) {
+const OVERALL_SCORE_TOOLTIP = 'Overall score: Offense 45%, Pitching 40%, Defense 10%, Baserunning 5%. Available core facets are reweighted. Available Depth and Future Value move the core score only 15% toward organization outlook.';
+
+function useOverallScoreDelta(teamKey, points) {
+  const [delta, setDelta] = useState(null);
+  const numericPoints = Number(points);
+  useEffect(() => {
+    setDelta(null);
+    if (!teamKey || !Number.isFinite(numericPoints) || typeof window === 'undefined') return;
+    const storageKey = `skip-front-office-overall-score:${CURRENT_SEASON}:${teamKey}`;
+    try {
+      const prior = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+      if (Number.isFinite(Number(prior?.points))) {
+        const nextDelta = Number((numericPoints - Number(prior.points)).toFixed(2));
+        if (Math.abs(nextDelta) >= 0.01) setDelta(nextDelta);
+      }
+      window.localStorage.setItem(storageKey, JSON.stringify({ points:numericPoints, savedAt:Date.now() }));
+    } catch {
+      // Local history is optional; never hide a verified current score if storage is unavailable.
+    }
+  }, [teamKey, numericPoints]);
+  return delta;
+}
+
+export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '' }) {
   const [activeLabel, setActiveLabel] = useState(null);
   const cards = useMemo(() => [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades], [grades, overall]);
   const activeCard = cards.find(card => card.label === activeLabel) || null;
+  const overallDelta = useOverallScoreDelta(teamKey, overall?.points);
   return <div aria-label="Front Office grade details">
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
         const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
         const numericScore = card.label === 'Overall' && Number.isFinite(overall?.points) ? overall.points.toFixed(2) : null;
-        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
+        const trendLabel = card.label === 'Overall' && overallDelta != null ? ` Overall score ${overallDelta > 0 ? 'increased' : 'decreased'} by ${Math.abs(overallDelta).toFixed(2)} from the prior comparable score.` : '';
+        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30.${trendLabel}` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
           style={{minHeight:46,textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:6,padding:'5px 3px',cursor:'pointer',color:C.text}}>
-          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</span>{numericScore && <span style={px({fontSize:8.5,fontWeight:700,color:C.text3,lineHeight:1})}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}</div>
+          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</span>{numericScore && <span title={OVERALL_SCORE_TOOLTIP} aria-label={`Weighted Overall score ${numericScore} out of 4.30. ${OVERALL_SCORE_TOOLTIP}`} style={{...px({fontSize:8.5,fontWeight:700,color:C.text3,lineHeight:1}),cursor:'help',textDecoration:'underline dotted',textUnderlineOffset:2}}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}{card.label === 'Overall' && overallDelta != null && <span aria-hidden="true" title={`Prior comparable score: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)}`} style={px({fontSize:10,fontWeight:800,color:overallDelta > 0 ? C.teal : C.rust,lineHeight:1})}>{overallDelta > 0 ? '↑' : '↓'}</span>}</div>
           <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
           <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:1})}>details</span>
         </button>;
@@ -2004,6 +2029,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                   ? { ...grade, detail: `${grade.detail} Separate OAA context: ${formatOaa(teamOaaData?.oaa)} from Baseball Savant (${teamOaaData?.playerCount || 0} verified player row${teamOaaData?.playerCount === 1 ? '' : 's'}; ${oaaHealthStatus}).` }
                   : grade)}
                 overall={D.frontOfficeOverall}
+                teamKey={team.abbr}
               />
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
                 <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense and Depth use verified active-roster coverage. Statcast OAA remains a separate Baseball Savant fielding signal (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Future Value uses the current SKIP prospect snapshot and does not replace a live external prospect provider.</div>
