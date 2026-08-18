@@ -238,3 +238,9 @@
 - [x] Make organization depth-chart prospect rows open the matching detailed player profile.
 - [x] Preserve accessible modal behavior and add profile-link navigation regression coverage.
 - [x] Run validation, review the interaction, and publish the linked rows.
+
+- [x] Inspect the Team Overview schedule loader, schedule states, and Divisional WAR comparison data/visual path.
+- [x] Repair schedule loading while preserving verified/cached/unavailable states.
+- [x] Improve the Divisional WAR Comparison visual and its provider/fallback labels.
+- [x] Add regressions for schedule readiness and comparative WAR rendering states.
+- [x] Run validation, visually review the repaired Overview panels, and publish the update.

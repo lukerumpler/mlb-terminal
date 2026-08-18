@@ -656,6 +656,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [teamSplitsState, setTeamSplitsState] = useState('idle');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
+  const [todayGamesState, setTodayGamesState] = useState('loading');
   const [todayGameMetadata, setTodayGameMetadata] = useState({});
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
@@ -987,10 +988,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   // changes teams, while an explicit MLB retry can still refresh it.
   useEffect(() => {
     let alive = true;
+    setTodayGamesState('loading');
     getTodaysGames().then(games => {
-      if (alive) setTodayGames((Array.isArray(games) ? games : []).slice(0, 8));
+      if (!alive) return;
+      const visibleGames = (Array.isArray(games) ? games : []).slice(0, 8);
+      setTodayGames(visibleGames);
+      setTodayGamesState(visibleGames.length ? 'ready' : 'empty');
     }).catch(() => {
-      if (alive) setTodayGames([]);
+      if (!alive) return;
+      setTodayGames([]);
+      setTodayGamesState('unavailable');
     });
     return () => { alive = false; };
   }, [mlbRetryToken]);
@@ -1114,6 +1121,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       }
       if (!data?.divisionAverageWAR && aggregate?.divisionAverageWAR != null) {
         data = { ...data, divisionAverageWAR: aggregate.divisionAverageWAR };
+      }
+      if (aggregate?.divisionTeams?.length) {
+        data = { ...data, divisionTeams: aggregate.divisionTeams };
       }
       if (!alive) return;
       setTeamModelData(data);
@@ -1722,13 +1732,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>
       <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
-          <span style={sans({ fontSize:9.5, color:C.text3 })}>Verified total WAR by division · hover a bar for the exact component breakdown</span>
+          <span style={sans({ fontSize:9.5, color:C.text3 })}>Verified total WAR by division · select or hover a bar for the exact component breakdown</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
         <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
-          <DivisionalWarChart data={divisionWarData} />
+          <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} />
         </Suspense>
-        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>Offensive WAR and pitching WAR are shown only when returned by FanGraphs. Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{divisionWarData.length ? `Total WAR labels are visible on each bar; ${team.abbr} is highlighted. Offensive and pitching components are shown only when returned by FanGraphs.` : 'FanGraphs did not return verified division rows for this view. SKIP does not synthesize competing-team WAR from the selected team’s calculated proxy.'} Separate defensive WAR remains explicitly unavailable when the verified aggregate response does not include it.</div>
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
@@ -2356,14 +2366,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </div>}
 
       {/* ── Live Schedule ── */}
-      {overviewView === 'operations' && todayGames.length > 0 && (
+      {overviewView === 'operations' && (
         <Panel title="Today's Schedule" accent={C.rust} badge={
-          <div style={{display:'flex',alignItems:'center',gap:5}}>
-            <div style={{width:6,height:6,borderRadius:'50%',background:C.teal,animation:'pulse 1.6s ease-in-out infinite'}}/>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:C.teal}}>LIVE</span>
-          </div>
+          todayGamesState === 'loading' ? 'Loading MLB' : todayGamesState === 'unavailable' ? 'Unavailable' : todayGamesState === 'empty' ? 'No games today' : <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:6,height:6,borderRadius:'50%',background:C.teal,animation:'pulse 1.6s ease-in-out infinite'}}/><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:C.teal}}>LIVE</span></div>
         }>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:0}}>
+          {todayGamesState === 'loading' ? <OverviewEmptyState status="Loading" message="Today’s MLB schedule" detail="Loading the official MLB schedule." /> : todayGamesState === 'unavailable' ? <OverviewEmptyState message="Today’s MLB schedule" detail="The official MLB schedule is temporarily unavailable. Use the provider retry control to request a fresh feed." /> : todayGamesState === 'empty' ? <OverviewEmptyState status="No games today" message="Today’s MLB schedule" detail="The official MLB schedule returned no games for today." /> : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:0}}>
             {todayGames.map((g,i)=>{
               const live=g.inning&&g.status!=='Final'&&g.statusCode!=='F';
               const status=g.status==='Final'?'Final':g.inning?`${g.inningHalf==='top'?'▲':'▼'}${g.inning}`:g.status||'Pre';
@@ -2392,7 +2399,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </Panel>
       )}
     </div>

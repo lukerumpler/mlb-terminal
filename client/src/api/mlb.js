@@ -1665,15 +1665,21 @@ export async function getTeamScheduleSplits(teamId, season = SEASON) {
   try {
     const today = new Date();
     const start = new Date(`${season}-03-01T00:00:00Z`);
-    const scheduleDates = [];
-    for (let cursor = start; cursor <= today; cursor = new Date(cursor.getTime() + 30 * 86400000)) {
-      const chunkStart = cursor.toISOString().slice(0, 10);
-      const chunkEnd = new Date(Math.min(cursor.getTime() + 29 * 86400000, today.getTime())).toISOString().slice(0, 10);
-      const data = await mlb('/schedule', { sportId: 1, teamId: id, startDate: chunkStart, endDate: chunkEnd, gameType: 'R', hydrate: 'linescore', language: 'en' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
-      scheduleDates.push(...(data.dates || []));
-    }
+    if (start > today) return [];
+    // A single team-season schedule request is small (at most a regular-season
+    // slate) and avoids the earlier six-request monthly burst that could
+    // compound temporary MLB 429 responses when the Operations view opened.
+    const data = await mlb('/schedule', {
+      sportId: 1,
+      teamId: id,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: today.toISOString().slice(0, 10),
+      gameType: 'R',
+      hydrate: 'linescore',
+      language: 'en',
+    }, { ttl: 5 * 60_000, timeoutMs: 15_000, quietStatuses:[429, 502, 503, 504] });
     const buckets = { home: { w: 0, l: 0 }, away: { w: 0, l: 0 }, day: { w: 0, l: 0 }, night: { w: 0, l: 0 } };
-    for (const game of scheduleDates.flatMap(date => date.games || [])) {
+    for (const game of (data.dates || []).flatMap(date => date.games || [])) {
       if (String(game.status?.abstractGameState || '').toLowerCase() !== 'final') continue;
       const home = Number(game.teams?.home?.team?.id) === id;
       const away = Number(game.teams?.away?.team?.id) === id;
@@ -1692,8 +1698,11 @@ export async function getTeamScheduleSplits(teamId, season = SEASON) {
     ].filter(row => row.w + row.l > 0);
     teamScheduleSplitsCache.set(cacheKey, { rows, expiresAt: Date.now() + 5 * 60_000 });
     return rows;
-  } catch {
-    return [];
+  } catch (error) {
+    // Let the Overview distinguish a verified empty schedule from an upstream
+    // failure; callers still keep explicit unavailable states rather than rows
+    // inferred from aggregate standings.
+    throw error;
   }
 }
 

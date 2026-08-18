@@ -306,4 +306,10 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     );
     expect(chartSource).toContain("aggregate feed.");
   });
+
+  it("renders visible total-WAR labels and supports selected-team emphasis", () => {
+    expect(chartSource).toContain("LabelList");
+    expect(chartSource).toContain("selectedTeam");
+    expect(chartSource).toContain("formatter={formatWarValue}");
+  });
 });
