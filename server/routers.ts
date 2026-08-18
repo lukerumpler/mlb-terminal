@@ -20,15 +20,28 @@ function buildRosterInsightsFallback(input: {
     pitching?: Array<Record<string, unknown>>;
   };
 }) {
+  const finiteMetric = (value: unknown) => {
+    if (value == null || (typeof value === "string" && value.trim() === ""))
+      return NaN;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : NaN;
+  };
   const team = input.team || {};
   const strengths: Array<{ title: string; detail: string; evidence: string }> =
     [];
   const weaknesses: Array<{ title: string; detail: string; evidence: string }> =
     [];
-  const pct = Number(team.pct);
-  const runDiff = Number(team.diff ?? Number(team.rs) - Number(team.ra));
-  const ops = Number(team.ops);
-  const era = team.era != null && team.era !== '' && Number.isFinite(Number(team.era)) ? Number(team.era) : NaN;
+  const pct = finiteMetric(team.pct);
+  const directRunDiff = finiteMetric(team.diff);
+  const runsScored = finiteMetric(team.rs);
+  const runsAllowed = finiteMetric(team.ra);
+  const runDiff = Number.isFinite(directRunDiff)
+    ? directRunDiff
+    : Number.isFinite(runsScored) && Number.isFinite(runsAllowed)
+      ? runsScored - runsAllowed
+      : NaN;
+  const ops = finiteMetric(team.ops);
+  const era = finiteMetric(team.era);
   if (Number.isFinite(runDiff)) {
     (runDiff >= 0 ? strengths : weaknesses).push({
       title:
@@ -176,7 +189,14 @@ export const appRouter = router({
             const content = response.choices[0]?.message?.content;
             if (typeof content !== "string")
               throw new Error("AI insights response was empty");
-            return JSON.parse(content);
+            const parsed = JSON.parse(content);
+            const hasStrengths =
+              Array.isArray(parsed?.strengths) && parsed.strengths.length > 0;
+            const hasWeaknesses =
+              Array.isArray(parsed?.weaknesses) && parsed.weaknesses.length > 0;
+            if (!hasStrengths && !hasWeaknesses)
+              throw new Error("AI insights response had no usable insights");
+            return parsed;
           } catch (error) {
             const message =
               error instanceof Error ? error.message : String(error);

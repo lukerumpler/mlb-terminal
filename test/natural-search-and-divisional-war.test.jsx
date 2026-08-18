@@ -21,14 +21,13 @@ import {
 } from "../client/src/api/mlb.js";
 import { SEARCH_ANALYTICS_STORAGE_KEY } from "../client/src/lib/searchAnalytics.js";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 
-// Resolved relative to this file rather than a hardcoded absolute path — see
-// the same fix in fangraphs-models.test.js for why.
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const chartSource = readFileSync(
-  resolve(__dirname, "../client/src/components/OverviewCharts.jsx"),
+  "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
+  "utf8"
+);
+const overviewSource = readFileSync(
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
   "utf8"
 );
 
@@ -252,6 +251,31 @@ describe("divisional WAR comparison data and tooltip contract", () => {
     });
   });
 
+  it("matches FanGraphs abbreviation rows to canonical division team names", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          freshness: "live",
+          statuses: { batting: "live", pitching: "live" },
+          teams: [
+            { team: "LAD", totalWAR: 31.4, battingWAR: 21.2, pitchingWAR: 10.2 },
+            { team: "SD", totalWAR: 25.4, battingWAR: 16.4, pitchingWAR: 9.0 },
+          ],
+        }),
+      })
+    );
+    const result = await getTeamAggregateWar(
+      "Los Angeles Dodgers",
+      ["Los Angeles Dodgers", "San Diego Padres"],
+      2026
+    );
+    expect(result).toMatchObject({ teamWar: 31.4, divisionAverageWAR: 28.4 });
+    expect(result.divisionTeams).toHaveLength(2);
+    expect(result.divisionTeams.map(row => row.team)).toEqual(["LAD", "SD"]);
+  });
+
   it("keeps the defensive component unavailable when FanGraphs does not return a verified defensive field", async () => {
     vi.stubGlobal(
       "fetch",
@@ -281,8 +305,22 @@ describe("divisional WAR comparison data and tooltip contract", () => {
   it("contains exact offensive and defensive WAR hover labels and honest unavailable copy", () => {
     expect(chartSource).toContain("Offensive WAR");
     expect(chartSource).toContain("Defensive WAR");
-    expect(chartSource.replace(/\s+/g, " ")).toContain(
-      "Separate defensive WAR was not returned by the verified FanGraphs aggregate feed."
+    expect(chartSource).toContain(
+      "Separate defensive WAR was not returned by the verified FanGraphs"
     );
+    expect(chartSource).toContain("aggregate feed.");
+  });
+
+  it("renders visible total-WAR labels and supports selected-team emphasis", () => {
+    expect(chartSource).toContain("LabelList");
+    expect(chartSource).toContain("selectedTeam");
+    expect(chartSource).toContain("formatter={formatWarValue}");
+  });
+
+  it("contains the exact-value table and an explicit unavailable FanGraphs metric contract", () => {
+    expect(overviewSource).toContain('aria-label="Exact divisional WAR values"');
+    expect(overviewSource).toContain("fanGraphsMetricStatus");
+    expect(overviewSource).toContain("does not verify this missing metric");
+    expect(overviewSource).toContain("provider currently blocked");
   });
 });

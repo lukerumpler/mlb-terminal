@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import {
   MILB_STANDINGS_LEAGUES,
   getTeamAffiliates,
@@ -12,15 +10,12 @@ import {
   sortTeamsByLeagueDivisionName,
 } from "../client/src/constants/data.js";
 
-// Resolved relative to this file rather than a hardcoded absolute path — see
-// the same fix in fangraphs-models.test.js for why.
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const overviewSource = readFileSync(
-  resolve(__dirname, "../client/src/pages/OverviewPage.jsx"),
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
   "utf8"
 );
 const mlbSource = readFileSync(
-  resolve(__dirname, "../client/src/api/mlb.js"),
+  "/home/ubuntu/skip-baseball/client/src/api/mlb.js",
   "utf8"
 );
 

@@ -82,6 +82,8 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab]               = useState('overview');
+  const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
+  const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [showAlerts, setShowAlerts] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mobileNavToggleRef = useRef(null);
@@ -175,7 +177,13 @@ export default function App() {
     };
     const onOpenPlayer = e => {
       const detail = e.detail || {};
-      if (detail.id) recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
+      if (detail.id) {
+        recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
+        // The Players workspace is lazy-loaded. Persist the requested player
+        // in App state so a name clicked from another workspace still opens
+        // the profile after the Players page has mounted.
+        setPendingPlayerProfile(detail);
+      }
       setTab('players');
     };
     const onOpenAffiliate = e => {
@@ -185,7 +193,7 @@ export default function App() {
         const team = Object.values(TEAMS).find(item => item.abbr === parentAbbr);
         recordRecentView({ type:'affiliate', affiliateId:detail.affiliateId, parentAbbr, levelId:detail.levelId, label:detail.label || 'Minor-league affiliate', secondary:detail.secondary || `${team?.name || parentAbbr} affiliate` });
         setTab('overview');
-        window.dispatchEvent(new CustomEvent('skip-select-affiliate', { detail }));
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent('skip-select-affiliate', { detail })), 0);
       }
     };
     const onOpenTeam = e => {
@@ -202,12 +210,12 @@ export default function App() {
     window.addEventListener('skip-navigate', onNavigate);
     window.addEventListener('skip-open-player', onOpenPlayer);
     window.addEventListener('skip-open-team', onOpenTeam);
-    window.addEventListener('skip-select-affiliate', onOpenAffiliate);
+    window.addEventListener('skip-open-affiliate', onOpenAffiliate);
     return () => {
       window.removeEventListener('skip-navigate', onNavigate);
       window.removeEventListener('skip-open-player', onOpenPlayer);
       window.removeEventListener('skip-open-team', onOpenTeam);
-      window.removeEventListener('skip-select-affiliate', onOpenAffiliate);
+      window.removeEventListener('skip-open-affiliate', onOpenAffiliate);
     };
   }, []);
 
@@ -381,7 +389,7 @@ export default function App() {
           <PageErrorBoundary resetKey={tab}>
             <Suspense fallback={<PageLoading />}>
               {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
-              {tab === 'players'      && <PlayersPage />}
+              {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
               {tab === 'draft'        && <DraftPage />}
               {tab === 'league'       && <LeaguePage />}

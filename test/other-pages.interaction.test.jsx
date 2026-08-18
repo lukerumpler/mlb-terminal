@@ -112,6 +112,15 @@ describe("Knowledge page", () => {
 });
 
 describe("Intelligence page", () => {
+  it("exposes source, freshness, and model provenance metadata", async () => {
+    const user = userEvent.setup();
+    await goToTab(user, "Intelligence", /Player Comparison Engine/i);
+    const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
+    expect(provenance).toHaveTextContent("MLB Stats API comparison lookup");
+    expect(provenance).toHaveTextContent("Fetched when players are compared");
+    expect(provenance).toHaveTextContent("SKIP model snapshot; not a live provider feed");
+  });
+
   it("rejects comparing a player against themselves", async () => {
     const user = userEvent.setup();
     await goToTab(user, "Intelligence", /Player Comparison Engine/i);
@@ -280,6 +289,7 @@ describe("Settings roster defaults", () => {
 
     const overviewButton = screen.getByTitle("Overview");
     await user.click(overviewButton);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
     await screen.findByText("AI Scout Insights");
     expect(
       screen.getByRole("combobox", { name: "Minimum plate appearances" })

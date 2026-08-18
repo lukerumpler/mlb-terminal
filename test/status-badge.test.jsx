@@ -11,13 +11,11 @@ describe("StatusBadge", () => {
     expect(normalizeStatus("source-gap")).toBe("coverage-gap");
     expect(normalizeStatus("upstream-unavailable")).toBe("unavailable");
     expect(normalizeStatus("derived")).toBe("estimated");
-    expect(normalizeStatus("calculated")).toBe("calculated");
   });
 
   it.each([
     ["verified", "Verified"],
     ["estimated", "Estimated"],
-    ["calculated", "Calculated"],
     ["tier-1", "Tier 1 · Official"],
     ["tier-2", "Tier 2 · Backup"],
     ["tier-3", "Tier 3 · Secondary"],

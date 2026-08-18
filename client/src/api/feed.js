@@ -8,6 +8,7 @@
 
 import { compareValues } from '../lib/sorting.js';
 import { recordFeedSuccess } from '../lib/feedFreshness.js';
+import { apiUrl } from '../lib/apiOrigin.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const STALE_TTL_MS = 30 * 60 * 1_000;
@@ -59,7 +60,7 @@ async function fetchNews(kind, n, handle = null) {
       const query = handle
         ? `handle=${encodeURIComponent(handle)}&n=${n}`
         : `kind=${encodeURIComponent(kind)}&n=${n}`;
-      const response = await fetch(`/api/news?${query}`, {
+      const response = await fetch(apiUrl(`/api/news?${query}`), {
         signal: AbortSignal.timeout(14_000),
       });
       const data = await response.json();

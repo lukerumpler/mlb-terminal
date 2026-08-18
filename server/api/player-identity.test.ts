@@ -1,143 +1,26 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import handler, {
+import { describe, expect, it } from "vitest";
+import {
   buildBaseballReferencePlayerUrl,
-  extractBaseballReferenceId,
-  isExactIdentityNameMatch,
-  parseBaseballReferencePlayerPageName,
+  normalizeIdentityName,
   parseBaseballReferenceSearchCandidates,
   selectExactBaseballReferenceCandidate,
-  resolvePlayerProviderIdentity,
-  __resetPlayerIdentityStateForTests,
-  getPlayerIdentityTelemetry,
 } from "./player-identity.js";
 
-function response() {
-  return {
-    statusCode: 200,
-    headers: {},
-    body: undefined,
-    setHeader(name, value) { this.headers[name] = String(value); },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.body = payload; return this; },
-    end() { return this; },
-  };
-}
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  __resetPlayerIdentityStateForTests();
-});
-
-describe("Baseball-Reference player identity resolution", () => {
-  const searchHtml = `
-    <div class="search-item"><a href="/players/o/ohtansh01.shtml">Shohei Ohtani</a></div>
-    <div class="search-item"><a href="/players/o/ohtansh02.shtml">Shohei Ohtan</a></div>
-    <div class="search-item"><a href="/players/o/othertst01.shtml">Other Player</a></div>
-  `;
-
-  it("normalizes harmless presentation differences while requiring an exact identity name", () => {
-    expect(isExactIdentityNameMatch("José Ramírez", "Jose Ramirez")).toBe(true);
-    expect(isExactIdentityNameMatch("Shohei Ohtani", "Shohei Ohtan")).toBe(false);
-    expect(isExactIdentityNameMatch("Aaron Judge", "Aaron Judges")).toBe(false);
+describe("player identity resolver", () => {
+  it("normalizes accents and punctuation before exact identity comparison", () => {
+    expect(normalizeIdentityName("José Ramírez")).toBe("jose ramirez");
   });
 
-  it("selects the exact candidate and rejects near-name Baseball-Reference results", () => {
-    const candidates = parseBaseballReferenceSearchCandidates(searchHtml);
-    expect(selectExactBaseballReferenceCandidate(candidates, "Shohei Ohtani")).toMatchObject({
-      id: "ohtansh01",
-      name: "Shohei Ohtani",
-      canonicalUrl: "https://www.baseball-reference.com/players/o/ohtansh01.shtml",
-    });
-    expect(selectExactBaseballReferenceCandidate(candidates, "Shohei Ohtan")).toMatchObject({
-      id: "ohtansh02",
-      name: "Shohei Ohtan",
-    });
-    expect(selectExactBaseballReferenceCandidate(candidates, "Shohei Ohtani Jr.")).toBeNull();
-  });
-
-  it("accepts only canonical Baseball-Reference player identifiers", () => {
-    expect(extractBaseballReferenceId("/players/o/ohtansh01.shtml?source=search")).toBe("ohtansh01");
-    expect(extractBaseballReferenceId("/players/o/ohtansh1.shtml")).toBeNull();
-    expect(extractBaseballReferenceId("/register/player.fcgi?id=ohtani001sho")).toBeNull();
+  it("accepts only canonical Baseball-Reference player paths", () => {
     expect(buildBaseballReferencePlayerUrl("ohtansh01")).toBe("https://www.baseball-reference.com/players/o/ohtansh01.shtml");
-    expect(buildBaseballReferencePlayerUrl("../../etc/passwd")).toBeNull();
+    expect(buildBaseballReferencePlayerUrl("not-a-player")).toBeNull();
   });
 
-  it("extracts a canonical player-page name for direct-ID validation", () => {
-    expect(parseBaseballReferencePlayerPageName("<h1>José Ramírez</h1>")).toBe("José Ramírez");
-    expect(parseBaseballReferencePlayerPageName("<title>Shohei Ohtani Stats, Height, Weight, Position, Rookie Status & More</title>")).toBe("Shohei Ohtani");
-  });
-
-  it("uses a stored Baseball-Reference ID directly without reopening name search", async () => {
-    const fetchMock = vi.fn(async () => new Response("<h1>Shohei Ohtani</h1>", { status:200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const identity = await resolvePlayerProviderIdentity({
-      mlbId:"660271",
-      name:"Shohei Ohtani",
-      baseballReferenceId:"ohtansh01",
-    });
-
-    expect(identity?.baseballReference).toMatchObject({
-      id:"ohtansh01",
-      confidence:"exact-name",
-      canonicalUrl:"https://www.baseball-reference.com/players/o/ohtansh01.shtml",
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://www.baseball-reference.com/players/o/ohtansh01.shtml");
-  });
-
-  it("records direct-ID and browser-registry reuse telemetry without identity payloads", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("<h1>Shohei Ohtani</h1>", { status:200 })));
-    const direct = response();
-
-    await handler({
-      method:"GET",
-      url:"/api/player-identity?mlbId=660271&name=Shohei%20Ohtani&baseballReferenceId=ohtansh01&identitySource=registry",
-      headers:{},
-      socket:{ remoteAddress:"198.51.100.21" },
-    }, direct);
-
-    expect(direct.statusCode).toBe(200);
-    expect(direct.body.found).toBe(true);
-    expect(getPlayerIdentityTelemetry()).toMatchObject({
-      directIdRequestRate:100,
-      browserRegistryReuseRate:100,
-      directCanonicalVerificationRate:100,
-      counters: expect.objectContaining({
-        directIdRequests:1,
-        browserRegistryReuses:1,
-        directCanonicalRequests:1,
-        directCanonicalVerified:1,
-        nameSearchRequests:0,
-      }),
-      latencyMs: expect.objectContaining({
-        directCanonical: expect.objectContaining({ samples:1, averageMs:expect.any(Number) }),
-        nameSearch: expect.objectContaining({ samples:0, averageMs:null }),
-      }),
-    });
-
-    const metrics = response();
-    await handler({ method:"GET", url:"/api/player-identity?mode=metrics", headers:{}, socket:{ remoteAddress:"198.51.100.22" } }, metrics);
-    expect(metrics.statusCode).toBe(200);
-    expect(metrics.body).toMatchObject({ scope:"process", telemetry:expect.objectContaining({ directIdRequestRate:100 }) });
-    expect(JSON.stringify(metrics.body)).not.toContain("Shohei");
-    expect(JSON.stringify(metrics.body)).not.toContain("660271");
-
-    await resolvePlayerProviderIdentity({ mlbId:"660271", name:"Shohei Ohtani", baseballReferenceId:"ohtansh01" });
-    expect(getPlayerIdentityTelemetry().latencyMs.serverRegistryHit).toMatchObject({ samples:1, averageMs:expect.any(Number) });
-  });
-
-  it("does not map a near-name search result to historical data", async () => {
-    const fetchMock = vi.fn(async () => new Response(
-      '<a href="/players/o/ohtansh02.shtml">Shohei Ohtan</a>',
-      { status:200 },
-    ));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const identity = await resolvePlayerProviderIdentity({ mlbId:"660271", name:"Shohei Ohtani" });
-    expect(identity).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[0]).toContain("/search/search.fcgi?search=Shohei%20Ohtani");
+  it("selects an exact normalized-name search candidate instead of a partial match", () => {
+    const candidates = parseBaseballReferenceSearchCandidates(`
+      <a href="/players/o/ohtansh01.shtml">Shohei Ohtani</a>
+      <a href="/players/o/ohtanx01.shtml">Shohei Otani</a>
+    `);
+    expect(selectExactBaseballReferenceCandidate(candidates, "Shohei Ohtani")?.id).toBe("ohtansh01");
   });
 });

@@ -9,7 +9,6 @@ const {
   getTeamPlayerStats,
   getMinorLeagueTeamSchedule,
   getTeamSavantMetrics,
-  getTeamPitchArsenal,
   getTeamScheduleSplits,
   mlb,
   __resetMlbClientStateForTests,
@@ -18,6 +17,8 @@ const {
   getGameFeedMetadata,
   getTeamVenueMetadata,
   __resetTeamVenueMetadataCacheForTests,
+  __getMlbQueueSnapshotForTests,
+  __getMlbRequestTraceForTests,
 } = await import("../client/src/api/mlb.js");
 
 describe("MLB request cache optimization", () => {
@@ -42,27 +43,94 @@ describe("MLB request cache optimization", () => {
     vi.unstubAllGlobals();
   });
 
-  it("filters the cached pitch arsenal to requested roster pitchers and normalizes velocity", async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      headers: { get: () => "live" },
-      json: async () => [
-        { player_id: 22, pitch_type: "FF", velocity: 96.4 },
-        { player_id: 99, pitch_type: "SL", velocity: 84.1 },
-      ],
-    });
-
-    await expect(getTeamPitchArsenal([22], 2098)).resolves.toEqual([
-      { pitch_type: "FF", release_speed: 96.4 },
-    ]);
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
   it("keeps standings cached for repeated reads within the five-minute window", async () => {
     await getStandings(2098);
     vi.advanceTimersByTime(60_000);
     await getStandings(2098);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("records queued request, success, and local reuse outcomes for diagnostics", async () => {
+    await mlb("/teams/238", { hydrate: "venue" }, {
+      priority: "core",
+      stage: "core",
+      screen: "overview",
+    });
+    await mlb("/teams/238", { hydrate: "venue" }, {
+      priority: "core",
+      stage: "core",
+      screen: "overview",
+    });
+
+    const trace = __getMlbRequestTraceForTests();
+    expect(trace).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "queued", priority: "core", stage: "core", screen: "overview" }),
+      expect.objectContaining({ event: "started", priority: "core", stage: "core", screen: "overview" }),
+      expect.objectContaining({ event: "success", priority: "core", stage: "core", screen: "overview" }),
+      expect.objectContaining({ event: "local-hit", priority: "core", stage: "core", screen: "overview" }),
+    ]));
+    expect(__getMlbQueueSnapshotForTests()).toMatchObject({ activeRequests: 0, queuedRequests: 0 });
+  });
+
+  it("records in-flight request coalescing without issuing a duplicate fetch", async () => {
+    let release;
+    fetch.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const first = mlb("/teams/239", {}, { screen: "overview" });
+    const duplicate = mlb("/teams/239", {}, { screen: "overview" });
+    release({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await Promise.all([first, duplicate]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(__getMlbRequestTraceForTests()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "deduplicated", screen: "overview" }),
+    ]));
+  });
+
+  it("starts queued core work before queued background work once capacity becomes available", async () => {
+    const releases = [];
+    fetch.mockImplementation(url => new Promise(resolve => {
+      releases.push({ url, resolve });
+    }));
+    const blockers = [1, 2, 3, 4].map(id => mlb(`/queue/blocker-${id}`, {}, { priority: "important" }));
+    const background = mlb("/queue/background", {}, { priority: "background", screen: "overview" });
+    const core = mlb("/queue/core", {}, { priority: "core", stage: "core", screen: "overview" });
+
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledTimes(4);
+    releases[0].resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch.mock.calls[4][0]).toContain(encodeURIComponent("/queue/core"));
+
+    for (const release of releases.slice(1)) {
+      release.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    const backgroundRelease = releases.at(-1);
+    backgroundRelease.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await Promise.all([...blockers, core, background]);
+  });
+
+  it("removes an aborted request while it is queued and never starts its fetch", async () => {
+    const releases = [];
+    fetch.mockImplementation(url => new Promise(resolve => {
+      releases.push({ url, resolve });
+    }));
+    const blockers = [1, 2, 3, 4].map(id => mlb(`/abort/blocker-${id}`));
+    const controller = new AbortController();
+    const aborted = mlb("/abort/queued", {}, { signal: controller.signal, priority: "optional" });
+    controller.abort();
+
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+    expect(__getMlbQueueSnapshotForTests()).toMatchObject({ queuedRequests: 0 });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(__getMlbRequestTraceForTests()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "aborted", key: expect.stringContaining(encodeURIComponent("/abort/queued")) }),
+    ]));
+
+    for (const release of releases) {
+      release.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    }
+    await Promise.all(blockers);
   });
 
   it("keeps affiliate metadata cached for repeated reads within the ten-minute window", async () => {
@@ -350,6 +418,32 @@ describe("MLB request cache optimization", () => {
     vi.advanceTimersByTime(2);
     await expect(fetchContractData(123, "Test Player")).resolves.toMatchObject({ salary: 200 });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("traces Player Profile contract and team-financial enrichment with explicit priorities", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ found: true, contractAvailable: true, salary: 100 }),
+      text: async () => "",
+    });
+
+    await fetchContractData(125, "Priority Player", {
+      priority: "important",
+      stage: "important",
+      screen: "player-profile",
+    });
+    await fetchTeamFinancials("LAD", 2098, {
+      priority: "important",
+      stage: "important",
+      screen: "player-profile",
+    });
+
+    expect(__getMlbRequestTraceForTests()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "queued", resource: "contract", priority: "important", stage: "important", screen: "player-profile" }),
+      expect.objectContaining({ event: "response", resource: "contract", priority: "important", stage: "important", screen: "player-profile", ok: true }),
+      expect.objectContaining({ event: "queued", resource: "team-financials", priority: "important", stage: "important", screen: "player-profile" }),
+      expect.objectContaining({ event: "response", resource: "team-financials", priority: "important", stage: "important", screen: "player-profile", ok: true }),
+    ]));
   });
 
   it("evicts failed contract requests so a later attempt can recover", async () => {

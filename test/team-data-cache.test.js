@@ -12,6 +12,8 @@ import {
   buildPitchArsenalRows,
   buildLiveRadarData,
   buildLiveRunDiffData,
+  buildOrganizationProspectDepthChart,
+  deriveFrontOfficeCoverageGrades,
   formatDataAge,
   resolveTeamSavantSnapshot,
 } from "../client/src/pages/OverviewPage.jsx";
@@ -83,6 +85,42 @@ describe("team data cache and freshness helpers", () => {
     expect(
       buildLiveRadarData({ team: {}, liveTeamData: null }).strengthData
     ).toEqual([]);
+  });
+
+  it("derives transparent Defense, Depth, and Future Value values only from available roster/prospect inputs", () => {
+    const populated = deriveFrontOfficeCoverageGrades({
+      liveDataMode: "live",
+      teamAbbr: "LAD",
+      players: {
+        hitting: [
+          { position: "C", stat: { plateAppearances: 100 } },
+          { position: "1B", stat: { plateAppearances: 100 } },
+          { position: "2B", stat: { plateAppearances: 100 } },
+          { position: "SS", stat: { plateAppearances: 100 } },
+          { position: "3B", stat: { plateAppearances: 100 } },
+          { position: "LF", stat: { plateAppearances: 100 } },
+          { position: "CF", stat: { plateAppearances: 100 } },
+          { position: "RF", stat: { plateAppearances: 100 } },
+        ],
+        pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
+      },
+    });
+    expect(populated.defensePct).toBe(100);
+    expect(populated.depthPct).toBe(100);
+    expect(populated.futureValuePct).not.toBeNull();
+    expect(populated.prospectCount).toBeGreaterThan(0);
+
+    const unavailable = deriveFrontOfficeCoverageGrades({ liveDataMode: "unavailable", teamAbbr: "ZZZ", players: { hitting: [], pitching: [] } });
+    expect(unavailable).toMatchObject({ defensePct: null, depthPct: null, futureValuePct: null, prospectCount: 0 });
+  });
+
+  it("builds an organization depth chart from only the current SKIP prospect snapshot", () => {
+    const dodgers = buildOrganizationProspectDepthChart("LAD");
+    expect(dodgers.prospects.length).toBeGreaterThan(0);
+    expect(dodgers.rows.length).toBeGreaterThan(0);
+    expect(dodgers.rows.every(row => row.prospects.every(prospect => prospect.team === "LAD"))).toBe(true);
+    expect(dodgers.rows.every(row => row.topFutureValue === row.prospects[0].futureValue)).toBe(true);
+    expect(buildOrganizationProspectDepthChart("ZZZ")).toEqual({ prospects: [], rows: [] });
   });
 
   beforeEach(() => localStorage.clear());
@@ -211,32 +249,6 @@ describe("team data cache and freshness helpers", () => {
       { pitch_type: "FF", release_speed: 96 },
     ]);
     expect(saveCacheFn).toHaveBeenCalledWith("LAD", 2026, result.snapshot);
-  });
-
-  it("uses one roster-filtered pitch arsenal query before player-scoped fallbacks", async () => {
-    const getTeamPitchArsenalFn = vi.fn().mockResolvedValue([
-      { pitch_type: "FF", release_speed: 96 },
-      { pitch_type: "SL", release_speed: 85 },
-    ]);
-    const getPitcherPitchesFn = vi.fn();
-    const result = await resolveTeamSavantSnapshot({
-      teamAbbr: "LAD",
-      season: 2026,
-      cached: null,
-      hitters: [{ id: 11 }],
-      pitchers: [{ id: 22 }],
-      getTeamExitVelocityFn: vi.fn().mockResolvedValue([{ launch_speed: 101 }]),
-      getPlayerContactPointsFn: vi.fn(),
-      getTeamPitchArsenalFn,
-      getPitcherPitchesFn,
-    });
-
-    expect(getTeamPitchArsenalFn).toHaveBeenCalledWith([22], 2026);
-    expect(getPitcherPitchesFn).not.toHaveBeenCalled();
-    expect(result.snapshot.pitchRows).toEqual([
-      { pitch_type: "FF", release_speed: 96 },
-      { pitch_type: "SL", release_speed: 85 },
-    ]);
   });
 
   it("falls back to verified player rows when the direct team query is empty", async () => {

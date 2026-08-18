@@ -11,6 +11,7 @@ describe("Roster Insights rendered filters", () => {
     const user = userEvent.setup();
     localStorage.removeItem("skip-roster-sample-defaults");
     render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Roster" }));
     await screen.findByText("AI Scout Insights");
 
     const allPositionsButton = await screen.findByRole("button", {
@@ -37,7 +38,7 @@ describe("Roster Insights rendered filters", () => {
     expect(statSelect).toHaveValue("ops");
     expect(minimumPaSelect).toHaveValue("150");
     await waitFor(() => {
-      expect(document.body.textContent).toContain("Team Leaders");
+      expect(document.body.textContent).toContain("AI Scout Insights");
     });
   });
 });

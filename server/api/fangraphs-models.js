@@ -1,12 +1,12 @@
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
+import { createHash } from 'node:crypto';
+import { readDurableCache, writeDurableCache } from '../durable-cache';
 import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
 
 const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
-const ODDS_API_URL = dateEnd =>
-  `https://www.fangraphs.com/api/playoff-odds/odds?dateEnd=${encodeURIComponent(dateEnd)}&dateDelta=&projectionMode=2&standingsType=mlb`;
 const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
 const AGGREGATE_WAR_URL = (season, stats) =>
   `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
@@ -23,7 +23,6 @@ let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
 const modelDailyAttemptDay = new Map();
 const aggregateDailyAttemptDay = new Map();
-
 const TEAM_NAME_ALIASES = {
   ARI: ["Diamondbacks"], ATH: ["Athletics"], ATL: ["Braves"],
   BAL: ["Orioles"], BOS: ["Red Sox"], CHC: ["Cubs"], CIN: ["Reds"],
@@ -71,6 +70,10 @@ function parseRetryAfterMs(response) {
     : DEFAULT_COOLDOWN_MS;
 }
 
+function durableFanGraphsKey(scope) {
+  return `fangraphs:${createHash('sha256').update(scope).digest('hex')}`;
+}
+
 function modelKey(teamAbbr, season) {
   return `${teamAbbr}:${season}`;
 }
@@ -111,16 +114,10 @@ function numeric(value) {
 }
 
 function findTeamRow(html, teamAbbr) {
-  const upper = String(teamAbbr).toUpperCase();
   for (const table of tablesFromHtml(html)) {
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (
-        cells.some(cell =>
-          new RegExp(`(?:^|\\s)${upper}(?:\\s|$)`, "i").test(cell)
-        )
-      )
-        return cells;
+      if (cells.some(cell => matchesTeamName(cell, teamAbbr))) return cells;
     }
   }
   return null;
@@ -138,18 +135,24 @@ function normalizeMetricKey(value) {
     .replace(/^_|_$/g, "");
 }
 
-function findTeamRowDetails(html, teamAbbr) {
+function matchesTeamName(cell, teamAbbr) {
   const upper = String(teamAbbr).toUpperCase();
   const aliases = [upper, ...(TEAM_NAME_ALIASES[upper] || [])];
-  const matchesTeam = cell => aliases.some(alias =>
-    new RegExp(`(?:^|\\s)${alias.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}(?:\\s|$)`, "i").test(cell)
+  return aliases.some(alias =>
+    new RegExp(
+      `(?:^|\\s)${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|$)`,
+      "i"
+    ).test(cell)
   );
+}
+
+function findTeamRowDetails(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
     const headerMatch = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
     const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
     for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
       const cells = cellsFromRow(row[1]);
-      if (cells.some(matchesTeam)) {
+      if (cells.some(cell => matchesTeamName(cell, teamAbbr))) {
         const metrics = {};
         cells.forEach((cell, index) => {
           const key = normalizeMetricKey(headers[index]);
@@ -214,28 +217,6 @@ export function parseFanGraphsModelHtml(
   };
 }
 
-export function parseFanGraphsPlayoffOddsJson(rows, teamAbbr, season = DEFAULT_SEASON) {
-  const upper = String(teamAbbr || "").toUpperCase();
-  const aliases = new Set([upper, ...(upper === "CWS" ? ["CHW"] : []), ...(upper === "KC" ? ["KCR"] : [])]);
-  const row = Array.isArray(rows)
-    ? rows.find(candidate => aliases.has(String(candidate?.abbName || "").toUpperCase()))
-    : null;
-  const endData = row?.endData || {};
-  const probability = Number(endData.poffTitle);
-  const projectedWins = Number(endData.ExpW);
-  const projectedLosses = Number(endData.ExpL);
-  return {
-    found: Boolean(row),
-    season,
-    teamAbbr: upper,
-    playoffOdds: Number.isFinite(probability) ? Number((probability * 100).toFixed(1)) : null,
-    advancedMetrics: {
-      projectedWins: Number.isFinite(projectedWins) ? Number(projectedWins.toFixed(1)) : null,
-      projectedLosses: Number.isFinite(projectedLosses) ? Number(projectedLosses.toFixed(1)) : null,
-    },
-  };
-}
-
 export function parseFanGraphsAggregateWarHtml(
   { battingHtml, pitchingHtml },
   season = DEFAULT_SEASON
@@ -284,14 +265,18 @@ export function parseFanGraphsAggregateWarHtml(
   };
 }
 
-async function fetchFanGraphs(url, accept) {
+async function fetchHtml(url) {
   const response = await fetch(url, {
-    headers: { "User-Agent": UA, Accept: accept },
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html,application/xhtml+xml,*/*",
+    },
     redirect: "follow",
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    const retryAfterMs = response.status === 429 ? parseRetryAfterMs(response) : 0;
+    const retryAfterMs =
+      response.status === 429 ? parseRetryAfterMs(response) : 0;
     let providerBlocked = false;
     if (response.status === 403) {
       const body = await response.text().catch(() => '');
@@ -302,29 +287,26 @@ async function fetchFanGraphs(url, accept) {
       { status: response.status, retryAfterMs, providerBlocked }
     );
   }
-  return response;
-}
-
-async function fetchHtml(url) {
-  const response = await fetchFanGraphs(url, "text/html,application/xhtml+xml,*/*");
   return response.text();
 }
 
-async function fetchJson(url) {
-  const response = await fetchFanGraphs(url, "application/json,text/plain,*/*");
-  const body = await response.text();
-  try {
-    return JSON.parse(body);
-  } catch {
-    throw Object.assign(new Error("FanGraphs returned invalid JSON"), { status: 502 });
-  }
-}
-
 async function loadAggregateWar(season) {
-  const cached = aggregateWarCache.get(String(season));
+  const key = String(season);
+  let cached = aggregateWarCache.get(key);
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
-  const key = String(season);
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
+    const durable = await readDurableCache(durableFanGraphsKey(`aggregate:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      aggregateWarCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) return { data: cached.data, cache: "DURABLE-HIT" };
+    }
+  }
   const day = utcDayKey();
   const existing = aggregateWarInFlight.get(key);
   if (existing) return { data: await existing, cache: "COALESCED" };
@@ -428,10 +410,20 @@ async function loadAggregateWar(season) {
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
+      const expiresAt = nextUtcMidnightMs();
+      const staleExpiresAt = expiresAt + STALE_TTL_MS;
       aggregateWarCache.set(key, {
         data,
-        expiresAt: nextUtcMidnightMs(),
-        staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
+        expiresAt,
+        staleExpiresAt,
+      });
+      void writeDurableCache({
+        cacheKey: durableFanGraphsKey(`aggregate:${season}`),
+        source: 'FanGraphs',
+        data,
+        freshUntil: new Date(expiresAt),
+        staleUntil: new Date(staleExpiresAt),
+        lastAttemptDay: day,
       });
     return { data, cache: "MISS" };
   } catch (error) {
@@ -500,7 +492,7 @@ export default async function handler(req, res) {
       .json({ error: "Missing or invalid team abbreviation" });
 
   const key = modelKey(teamAbbr, season);
-  const cached = modelCache.get(key);
+  let cached = modelCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader(
       "Cache-Control",
@@ -514,6 +506,21 @@ export default async function handler(req, res) {
         freshness: "cached",
         servedAt: new Date().toISOString(),
       });
+  }
+  if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
+    const durable = await readDurableCache(durableFanGraphsKey(`model:${teamAbbr}:${season}`));
+    if (durable) {
+      cached = {
+        data: durable.data,
+        expiresAt: new Date(durable.freshUntil).getTime(),
+        staleExpiresAt: new Date(durable.staleUntil).getTime(),
+      };
+      modelCache.set(key, cached);
+      if (cached.expiresAt > Date.now()) {
+        res.setHeader('X-Provider-Cache', 'DURABLE-HIT');
+        return res.status(200).json({ ...cached.data, freshness: 'cached', servedAt: new Date().toISOString() });
+      }
+    }
   }
 
   const day = utcDayKey();
@@ -610,12 +617,8 @@ export default async function handler(req, res) {
   modelDailyAttemptDay.set(key, day);
   const upstreamRequest = (async () => {
     const retrievedAt = new Date().toISOString();
-    const today = new Date().toISOString().slice(0, 10);
-    const oddsDateEnd = new Date().getUTCFullYear() === season
-      ? today
-      : `${season}-12-31`;
     const [oddsResult, warResult] = await Promise.allSettled([
-      fetchJson(ODDS_API_URL(oddsDateEnd)),
+      fetchHtml(ODDS_URL),
       fetchHtml(WAR_URL),
     ]);
     const throttledResults = [oddsResult, warResult].filter(
@@ -633,21 +636,14 @@ export default async function handler(req, res) {
         Date.now() + cooldownMs
       );
     }
-    const odds = oddsResult.status === "fulfilled"
-      ? parseFanGraphsPlayoffOddsJson(oddsResult.value, teamAbbr, season)
-      : { found: false, playoffOdds: null, advancedMetrics: {} };
     const parsed = parseFanGraphsModelHtml(
       {
-        oddsHtml: "",
+        oddsHtml: oddsResult.status === "fulfilled" ? oddsResult.value : "",
         warHtml: warResult.status === "fulfilled" ? warResult.value : "",
       },
       teamAbbr,
       season
     );
-    const advancedMetrics = {
-      ...parsed.advancedMetrics,
-      ...odds.advancedMetrics,
-    };
     if (
       !parsed.found &&
       oddsResult.status === "rejected" &&
@@ -680,18 +676,18 @@ export default async function handler(req, res) {
       };
     }
     return {
-      found: odds.playoffOdds != null || parsed.teamWar != null,
+      found: parsed.playoffOdds != null || parsed.teamWar != null,
       retrievedAt,
       source: parsed.source,
       sourceUrls: parsed.sourceUrls,
       season,
       teamAbbr,
-      playoffOdds: odds.playoffOdds,
+      playoffOdds: parsed.playoffOdds,
       teamWar: parsed.teamWar,
-      advancedMetrics,
+      advancedMetrics: parsed.advancedMetrics,
       statuses: {
         playoffOdds:
-          odds.playoffOdds != null
+          parsed.playoffOdds != null
             ? "live"
             : oddsResult.status === "fulfilled"
               ? "unparsed"
@@ -710,10 +706,20 @@ export default async function handler(req, res) {
   try {
     const data = await upstreamRequest;
     modelFailureCooldownUntil.delete(key);
+    const expiresAt = nextUtcMidnightMs();
+    const staleExpiresAt = expiresAt + STALE_TTL_MS;
     modelCache.set(key, {
       data,
-      expiresAt: nextUtcMidnightMs(),
-      staleExpiresAt: nextUtcMidnightMs() + STALE_TTL_MS,
+      expiresAt,
+      staleExpiresAt,
+    });
+    void writeDurableCache({
+      cacheKey: durableFanGraphsKey(`model:${teamAbbr}:${season}`),
+      source: 'FanGraphs',
+      data,
+      freshUntil: new Date(expiresAt),
+      staleUntil: new Date(staleExpiresAt),
+      lastAttemptDay: day,
     });
     if (modelCache.size > 200)
       modelCache.delete(modelCache.keys().next().value);

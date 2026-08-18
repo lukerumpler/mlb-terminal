@@ -1,5 +1,5 @@
 import React from 'react';
-import { C, sans } from '../constants/colors.js';
+import { C, px, sans } from '../constants/colors.js';
 import { SkeletonBlock } from './atoms.jsx';
 
 function SkeletonLine({ width = '100%', height = 10, style = {} }) {
@@ -92,5 +92,31 @@ export function PlayerProfileSkeleton() {
       </div>
       <div style={sans({ fontSize: 10, color: C.text3, textAlign: 'center' })}>Loading profile, season stats, career splits, and Statcast context…</div>
     </div>
+  );
+}
+
+export function PlayerProfileHydrationSkeleton() {
+  return (
+    <section className="skip-profile-hydration-skeleton" role="status" aria-live="polite" aria-label="Loading supplemental player profile data" style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 12px', background: C.surface2, border: `0.5px solid ${C.border}`, borderRadius: 9 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+        <div style={px({ fontSize: 9, fontWeight: 800, color: C.teal, letterSpacing: '.08em', textTransform: 'uppercase' })}>Core MLB profile ready</div>
+        <div style={px({ fontSize: 9, color: C.text3 })}>Hydrating optional context</div>
+      </div>
+      <div className="skip-profile-hydration-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+        {[
+          ['Statcast & Savant', 3],
+          ['Contract & financials', 2],
+          ['Career & boxscore context', 3],
+        ].map(([label, rows]) => (
+          <div key={label} style={{ minWidth: 0, padding: '9px 10px', borderRadius: 7, background: C.surface, border: `0.5px solid ${C.borderLight}` }}>
+            <div style={px({ fontSize: 8.5, color: C.text3, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 8 })}>{label}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Array.from({ length: rows }, (_, index) => <SkeletonLine key={index} width={index === 0 ? '70%' : index === 1 ? '92%' : '56%'} height={7} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={sans({ fontSize: 10, color: C.text3, lineHeight: 1.35 })}>Loading verified supplemental data. Any unavailable fields will remain labeled as unavailable rather than estimated.</div>
+    </section>
   );
 }

@@ -37,7 +37,8 @@ describe('MLB-first team loading sequence', () => {
     expect(screen.getByText(/LOADING MLB TEAM/i)).toBeInTheDocument();
     expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('lad');
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Select minor league affiliate' })).toHaveValue(''));
+    expect(screen.getByRole('button', { name: /minor league/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
   });
 });
 
@@ -53,8 +54,8 @@ describe('MLB-first team loading sequence', () => {
     }));
     render(<OverviewPage />);
     await waitFor(() => {
-      const selectors = screen.getAllByRole('combobox', { name: 'Select minor league affiliate' });
-      expect(selectors.every(select => select.value === '')).toBe(true);
+      expect(screen.getAllByRole('button', { name: /minor league/i }).every(button => button.getAttribute('aria-expanded') === 'false')).toBe(true);
     });
+    expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
     expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
   });

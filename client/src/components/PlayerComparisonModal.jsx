@@ -8,6 +8,7 @@ import { SEASON } from '../constants/data.js';
 import { searchPlayers, loadFullPlayer } from '../api/mlb.js';
 import { percentileColor, percentileLabel } from '../lib/percentile.js';
 import { Spinner } from './ui/spinner.tsx';
+import { apiUrl } from '../lib/apiOrigin.js';
 import { buildSideBySideValuationModel, downloadSideBySideValuationPdf } from '../lib/pdfExports.js';
 
 function displayName(player) {
@@ -199,7 +200,7 @@ export default function PlayerComparisonModal({ primary, isPitcher, getAxes, onC
         { name: displayName(secondary), position: identityLine(secondary), playerType: isPitcher ? 'pitcher' : 'hitter', axes: secondaryAxes.map(axis => ({ axis: axis.axis, pct: axis.pct, rawLabel: axis.rawLabel })) },
       ],
     };
-    fetch('/api/comparison-summary', {
+    fetch(apiUrl('/api/comparison-summary'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
