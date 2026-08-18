@@ -97,6 +97,56 @@ function pctToGrade(p) {
   if (p >= 60) return 'B+'; if (p >= 50) return 'B'; if (p >= 40) return 'B-';
   if (p >= 30) return 'C+'; return 'C';
 }
+
+const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
+  'A+': 8, A: 7, 'A-': 6, 'B+': 5, B: 4, 'B-': 3, 'C+': 2, C: 1,
+});
+const FRONT_OFFICE_GRADES_BY_POINT = ['C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+
+export function buildFrontOfficeGradeSummary(grades = []) {
+  const available = grades.filter(grade => Object.prototype.hasOwnProperty.call(FRONT_OFFICE_GRADE_POINTS, grade?.grade));
+  if (!available.length) return {
+    grade: '—',
+    averagePoints: null,
+    componentCount: 0,
+    detail: 'Unavailable: no verified component grades are available. Missing components are never assigned a neutral score.',
+  };
+
+  const averagePoints = available.reduce((sum, grade) => sum + FRONT_OFFICE_GRADE_POINTS[grade.grade], 0) / available.length;
+  return {
+    grade: FRONT_OFFICE_GRADES_BY_POINT[Math.round(averagePoints) - 1] || '—',
+    averagePoints,
+    componentCount: available.length,
+    detail: `Arithmetic average of ${available.length} available component grade${available.length === 1 ? '' : 's'} on SKIP’s A+ through C scale. Unavailable components are excluded; this is an internal summary, not provider WAR, odds, or a projection.`,
+  };
+}
+
+export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades) }) {
+  const [activeLabel, setActiveLabel] = useState(null);
+  const cards = [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades];
+  const activeCard = cards.find(card => card.label === activeLabel) || null;
+  return <div aria-label="Front Office grade details">
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(72px,1fr))',gap:6}}>
+      {cards.map(card => {
+        const isActive = activeLabel === card.label;
+        const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
+        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
+          style={{textAlign:'center',background:C.surface2,border:`1px solid ${isActive ? card.color : C.borderLight}`,borderRadius:7,padding:'7px 3px',cursor:'pointer',color:C.text}}>
+          <div style={px({fontSize:17,fontWeight:800,color:card.color,lineHeight:1})}>{card.grade}</div>
+          <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{card.label}</div>
+          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:2})}>details</span>
+        </button>;
+      })}
+    </div>
+    {activeCard
+      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.4,marginTop:7,padding:'6px 8px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
+      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Select a grade for its calculation, data source, and limitations.</div>}
+  </div>;
+}
+
+export function resolveMetricProviderStatus(value, providerStatus) {
+  return value == null ? 'coverage-gap' : providerStatus;
+}
 function ord(n) {
   if (n == null || n === '' || !Number.isFinite(Number(n))) return '—';
   const value = Number(n);
@@ -1530,13 +1580,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {lbl:'Defense', pct:defensePct, color:C.teal},
       {lbl:'Baserunning', pct:speedPct, color:C.navy},
     ];
-    const available = [offPct, pitchingPct, speedPct, defensePct, depthPct, futureValuePct].filter(v => v != null);
-    const overallPct = available.length ? Math.round(available.reduce((sum, value) => sum + value, 0) / available.length) : null;
+    const frontOfficeGradeRows = [
+      { label:'Offense', grade:pctToGrade(offPct), color:C.amber, detail:offPct == null ? 'Unavailable: verified team OPS and comparable MLB aggregate data are not both available.' : `Calculated from verified team OPS relative to the available MLB team aggregate set (${Math.round(offPct)}th percentile).` },
+      { label:'Pitching', grade:pctToGrade(pitchingPct), color:C.rust, detail:pitchingPct == null ? 'Unavailable: verified team ERA and comparable MLB aggregate data are not both available.' : `Calculated from verified team ERA relative to the available MLB team aggregate set (${Math.round(pitchingPct)}th percentile).` },
+      { label:'Defense', grade:pctToGrade(defensePct), color:C.teal, detail:defensePct == null ? 'Unavailable: verified active-roster position coverage is not available.' : `Calculated from verified active-roster non-pitcher position coverage (${fieldingPositions.length} positions); it is not Statcast OAA.` },
+      { label:'Baserunning', grade:pctToGrade(speedPct), color:C.teal, detail:speedPct == null ? 'Unavailable: verified stolen-base totals and comparable MLB aggregate data are not both available.' : `Calculated from verified stolen-base totals relative to the available MLB team aggregate set (${Math.round(speedPct)}th percentile); it is not a proprietary baserunning metric.` },
+      { label:'Depth', grade:pctToGrade(depthPct), color:C.slate, detail:depthPct == null ? 'Unavailable: verified active-roster coverage is not available.' : `Calculated from verified active-roster size (${activePlayers}) and listed position coverage; it is not provider WAR.` },
+      { label:'Future Value', grade:pctToGrade(futureValuePct), color:C.purple, detail:futureValuePct == null ? 'Unavailable: no team-scoped SKIP prospect snapshot is available.' : `Calculated from ${prospectCount} player${prospectCount === 1 ? '' : 's'} in the current team-scoped SKIP prospect snapshot; it is not a live external prospect grade.` },
+    ];
+    const frontOfficeOverall = buildFrontOfficeGradeSummary(frontOfficeGradeRows);
     return {
       offenseData:liveRadar.offenseData,strengthData:liveRadar.strengthData,radarSource:liveRadar.source,standings,leagueRanks,pctBars,divName,
       og:pctToGrade(offPct),pg:pctToGrade(pitchingPct),dg:pctToGrade(defensePct),bg:pctToGrade(speedPct),depthGrade:pctToGrade(depthPct),futureValueGrade:pctToGrade(futureValuePct),
       defensePct,depthPct,futureValuePct,fieldingPositions,activePlayers,prospectCount,
-      overall:pctToGrade(overallPct),
+      frontOfficeGradeRows,frontOfficeOverall,overall:frontOfficeOverall.grade,
     };
   },[team, liveTeamData, liveTeamDataMode, teamRollups, rd]);
 
@@ -1742,7 +1799,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /><OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></span>}>
         <div className="skip-balanced-grid" style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(6,minmax(80px,1fr))',gap:8}}>
-          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',fanGraphsHealthStatus],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',fanGraphsHealthStatus],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
+          {[['Projected W',projectedWinsValue,1,calculatedModelSource,calculatedModelStatus],['Projected L',projectedLossesValue,1,calculatedModelSource,calculatedModelStatus],['Off WAR',teamModelData?.advancedMetrics?.offenseWar,1,'FanGraphs',resolveMetricProviderStatus(teamModelData?.advancedMetrics?.offenseWar,fanGraphsHealthStatus)],['Def WAR',teamModelData?.advancedMetrics?.defenseWar,1,'FanGraphs',resolveMetricProviderStatus(teamModelData?.advancedMetrics?.defenseWar,fanGraphsHealthStatus)],['xwOBA',teamSavantDisplayData?.expectedWOBA,3,'Savant',savantHealthStatus],['Exit velo',teamSavantDisplayData?.exitVelocity,1,'Savant',savantHealthStatus]].map(([label,value,digits,provider,status])=><div key={label} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value.toFixed(digits))}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span><OverviewSourceBadge provider={provider} status={status} title={`${provider} metric source health`} /></div></div>)}
         </div>
         <div style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || playoffOddsIsCalculated || teamWarIsCalculated) ? 'Verified MLB standings fallback: projected wins/losses use current 162-game pace; playoff odds are a calculated proxy, not official or FanGraphs odds; WAR proxy is pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR.' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /> <OverviewSourceBadge provider="Savant" status={savantHealthStatus} /></div>
       </Panel>
@@ -1817,19 +1874,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </div>
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6}}>
-                {[['Offense',D.og,C.amber],['Pitching',D.pg,C.rust],['Defense',D.dg,C.teal],['Baserunning',D.bg,C.teal],['Depth',D.depthGrade,C.slate],['Future Value',D.futureValueGrade,C.purple]].map(([lbl,val,color])=>{
-                  const content = <>
-                    <div style={px({fontSize:17,fontWeight:800,color,lineHeight:1})}>{val}</div>
-                    <div style={sans({fontSize:8.5,color:C.text3,marginTop:3,lineHeight:1.2})}>{lbl}</div>
-                    {lbl === 'Defense' && <div style={sans({fontSize:7.5,color:teamOaaData?.oaa == null ? C.text4 : C.teal,marginTop:4,lineHeight:1.15})}>OAA {formatOaa(teamOaaData?.oaa)} · Savant</div>}
-                  </>;
-                  return lbl === 'Future Value' ? (
-                    <button key={lbl} type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px',border:`1px solid ${C.borderLight}`,cursor:'pointer',font:'inherit',color:'inherit'}}>{content}</button>
-                  ) : <div key={lbl} style={{textAlign:'center',background:C.surface2,borderRadius:7,padding:'7px 3px'}}>{content}</div>;
-                })}
+              <FrontOfficeGradeCards
+                grades={D.frontOfficeGradeRows.map(grade => grade.label === 'Defense'
+                  ? { ...grade, detail: `${grade.detail} Separate OAA context: ${formatOaa(teamOaaData?.oaa)} from Baseball Savant (${teamOaaData?.playerCount || 0} verified player row${teamOaaData?.playerCount === 1 ? '' : 's'}; ${oaaHealthStatus}).` }
+                  : grade)}
+                overall={D.frontOfficeOverall}
+              />
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
+                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense and Depth use verified active-roster coverage. Statcast OAA remains a separate Baseball Savant fielding signal (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Future Value uses the current SKIP prospect snapshot and does not replace a live external prospect provider.</div>
+                <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>
               </div>
-              <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35,marginTop:7})}>Defense and Depth are calculated from verified active-roster position coverage. Statcast OAA is a separate Baseball Savant fielding signal ({teamOaaData?.playerCount || 0} verified player row{teamOaaData?.playerCount === 1 ? '' : 's'}; <OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Future Value is calculated from the current SKIP prospect snapshot; select its rating to inspect organization depth. Neither calculated grade substitutes for a live external prospect provider.</div>
             </div>
           </div>
         </Panel>
