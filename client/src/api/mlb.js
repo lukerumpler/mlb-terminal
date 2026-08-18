@@ -531,7 +531,7 @@ function annotateProviderRows(data, response) {
   return data;
 }
 
-async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
+async function fetchLeaderboard(url, { timeoutMs = 8_000, signal } = {}) {
   const cached = cacheGet(url);
   if (cached !== undefined) return cached;
   const pending = inFlight.get(url);
@@ -545,8 +545,9 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
         stage: 'optional',
         screen: 'player-profile',
         resource: 'savant-leaderboard',
-      });
-    } catch {
+      }, signal);
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
       return staleCacheGet(url) ?? null;
     }
     if (!res.ok) {
@@ -1188,8 +1189,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // so waiting for those to resolve first was purely wasted latency: a whole
   // extra sequential network round trip for no reason, doubly so when the
   // current season comes back empty and tryYear falls back to season - 1.
-  const speedPromise = fetchLeaderboard(`/api/savant?endpoint=sprint_speed&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
-  const oaaPromise   = fetchLeaderboard(`/api/savant?endpoint=oaa&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
+  const speedPromise = fetchLeaderboard(`/api/savant?endpoint=sprint_speed&year=${season}`, { timeoutMs: 5_000, signal }).catch(() => null);
+  const oaaPromise   = fetchLeaderboard(`/api/savant?endpoint=oaa&year=${season}`, { timeoutMs: 5_000, signal }).catch(() => null);
 
   // pitch_arsenal (Roadmap #1) — unlike the batter leaderboards above, a
   // pitcher has *multiple* rows in this one (one per pitch type), so this
@@ -1208,7 +1209,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const pitchArsenalPromise = (async () => {
     if (!isPitcher) return { rows: null, population: null };
     const tryPitchYear = async (yr) => {
-      const arr = await fetchLeaderboard(`/api/savant?endpoint=pitch_arsenal&year=${yr}`, { timeoutMs: 7_000 }).catch(() => null);
+      const arr = await fetchLeaderboard(`/api/savant?endpoint=pitch_arsenal&year=${yr}`, { timeoutMs: 7_000, signal }).catch(() => null);
       if (!Array.isArray(arr) || arr.length === 0) return null;
       const rows = arr.filter(p => String(p.player_id ?? p.pitcher_id ?? p.id) === String(id));
       return { rows: rows.length ? rows : null, population: arr };
@@ -1231,9 +1232,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // genuinely pitch-level fetch, not a compact season-aggregate row.
   const contactPointsPromise = (async () => {
     if (isPitcher) return null;
-    const tryYearCP = (yr) => fetchLeaderboard(
-      `/api/savant?endpoint=contact_points&year=${yr}&playerId=${id}`,
-      { timeoutMs: 20_000 },
+      const tryYearCP = (yr) => fetchLeaderboard(
+        `/api/savant?endpoint=contact_points&year=${yr}&playerId=${id}`,
+        { timeoutMs: 20_000, signal },
     ).catch(() => null);
     const cur = await tryYearCP(season);
     if (!Array.isArray(cur)) return null;
@@ -1255,9 +1256,9 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // genuinely pitch-level fetch on this page, not a compact aggregate row.
   const pitcherPitchesPromise = (async () => {
     if (!isPitcher) return null;
-    const tryYearPP = (yr) => fetchLeaderboard(
-      `/api/savant?endpoint=pitcher_pitches&year=${yr}&playerId=${id}`,
-      { timeoutMs: 20_000 },
+      const tryYearPP = (yr) => fetchLeaderboard(
+        `/api/savant?endpoint=pitcher_pitches&year=${yr}&playerId=${id}`,
+        { timeoutMs: 20_000, signal },
     ).catch(() => null);
     const cur = await tryYearPP(season);
     if (!Array.isArray(cur)) return null;
@@ -1280,14 +1281,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     // Try both endpoints for current season first, then prior year if needed
     const tryYear = async (yr) => {
       const [sArr, btArr, scArr] = await Promise.all([
-        fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${yr}`),
-        fetchLeaderboard(`/api/savant?endpoint=bat-tracking&year=${yr}`),
+        fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${yr}`, { signal }),
+        fetchLeaderboard(`/api/savant?endpoint=bat-tracking&year=${yr}`, { signal }),
         // Exit velocity, barrel%, hard-hit%, sweet-spot%, launch angle — this
         // endpoint was defined in the server-side proxy from the start but
         // never actually called from here, so brl_percent/hard_hit_percent/
         // sweet_spot_percent were always undefined and every UI tile reading
         // them was silently falling back to its estimated proxy value.
-        fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${yr}`),
+        fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${yr}`, { signal }),
       ]);
       let sData = null, btData = null;
       if (Array.isArray(sArr) && sArr.length > 0) sData = findByPlayerId(sArr, id);
@@ -1353,6 +1354,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     await pitchArsenalPromise.catch(() => ({ rows: null, population: null }));
   const contactPoints = await contactPointsPromise.catch(() => null);
   const pitcherPitches = await pitcherPitchesPromise.catch(() => null);
+
+  if (signal?.aborted) throw abortError();
 
     const statResult = isPitcher ? pitchingResult : hittingResult;
   const boxscoreSplits = await boxscoreSplitsPromise;

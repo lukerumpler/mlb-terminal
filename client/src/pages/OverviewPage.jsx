@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, memo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, MLB_PIPELINE_FARM_SYSTEM_RANKINGS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines } from '../engine/skip.js';
@@ -159,6 +159,62 @@ export function buildFrontOfficeGradeSummary(grades = []) {
   };
 }
 
+export function getEvaluationPresentation(search = typeof window === 'undefined' ? '' : window.location.search) {
+  return new URLSearchParams(search || '').get('evaluationView') === 'score-ring' ? 'score-ring' : 'baseline';
+}
+
+export function buildFrontOfficeEvaluationViewModel({ teamName = 'Team', grades = [], overall = buildFrontOfficeGradeSummary(grades) } = {}) {
+  const hasGradePoints = grade => Number.isFinite(FRONT_OFFICE_GRADE_POINTS[grade]);
+  const missingDrivers = grades.filter(driver => !hasGradePoints(driver?.grade));
+  const ratingScaleMax = FRONT_OFFICE_GRADE_POINTS['A+'];
+  const overallRating = Number(overall?.points);
+  const hasDefensibleOverall = overall?.grade && overall.grade !== '—'
+    && Number.isFinite(overallRating)
+    && overallRating >= 0
+    && overallRating <= ratingScaleMax;
+  const status = !hasDefensibleOverall ? 'unavailable' : missingDrivers.length ? 'partial' : 'available';
+  const missingLabels = missingDrivers.map(driver => driver?.label).filter(Boolean);
+  return {
+    teamName,
+    overallGrade: hasDefensibleOverall ? overall.grade : '—',
+    overallRating: hasDefensibleOverall ? overallRating : null,
+    ratingScaleMax,
+    normalizedScore: hasDefensibleOverall ? Math.max(0, Math.min(100, Math.round(overallRating / ratingScaleMax * 100))) : null,
+    status,
+    statusLabel: status === 'available'
+      ? 'Available grade inputs'
+      : status === 'partial'
+        ? `Partial coverage — ${missingLabels.join(', ') || 'some category inputs are unavailable'}`
+        : 'Evaluation unavailable — no defensible overall grade',
+    sourceLabel: 'SKIP evaluation · verified team, roster, Savant, and prospect inputs where available',
+  };
+}
+
+const SCORE_RING_RADIUS = 48;
+const SCORE_RING_CIRCUMFERENCE = 2 * Math.PI * SCORE_RING_RADIUS;
+
+export function EvaluationScoreRing({ model, decorative = false }) {
+  const score = model?.status === 'available' || model?.status === 'partial' ? model.normalizedScore : null;
+  const visibleScore = Number.isFinite(Number(score)) ? Math.max(0, Math.min(100, Number(score))) : null;
+  const dashOffset = visibleScore == null ? SCORE_RING_CIRCUMFERENCE : SCORE_RING_CIRCUMFERENCE * (1 - visibleScore / 100);
+  const accessibleLabel = visibleScore == null
+    ? `${model?.teamName || 'Team'}: team evaluation unavailable. ${model?.statusLabel || 'Required inputs are missing.'} ${model?.sourceLabel || ''}`
+    : `${model?.teamName || 'Team'}: overall team evaluation ${model?.overallGrade || 'unavailable'}, ${visibleScore} out of 100 normalized from ${model?.overallRating?.toFixed?.(2) || model?.overallRating} out of ${model?.ratingScaleMax}. ${model?.statusLabel || ''} ${model?.sourceLabel || ''}`;
+  const progressColor = model?.status === 'partial' ? C.amber : model?.status === 'unavailable' ? C.text4 : C.purple;
+  return (
+    <div className="skip-evaluation-score-ring" data-status={model?.status || 'unavailable'} role={decorative ? undefined : 'img'} aria-hidden={decorative || undefined} aria-label={decorative ? undefined : accessibleLabel}>
+      <svg className="skip-evaluation-score-ring-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+        <circle className="skip-evaluation-score-ring-track" cx="60" cy="60" r={SCORE_RING_RADIUS} fill="none" />
+        <circle className="skip-evaluation-score-ring-progress" cx="60" cy="60" r={SCORE_RING_RADIUS} fill="none" stroke={progressColor} strokeLinecap="round" strokeDasharray={SCORE_RING_CIRCUMFERENCE} strokeDashoffset={dashOffset} />
+      </svg>
+      <div className="skip-evaluation-score-ring-value" aria-hidden="true">
+        <strong>{visibleScore == null ? '—' : visibleScore}</strong>
+        <span>{visibleScore == null ? 'unavailable' : 'normalized'}</span>
+      </div>
+    </div>
+  );
+}
+
 const OVERALL_SCORE_TOOLTIP = 'Overall score: Offense 45%, Pitching 40%, Defense 10%, Baserunning 5%. Available core facets are reweighted. Available Depth and Future Value move the core score only 15% toward organization outlook.';
 
 function useOverallScoreDelta(teamKey, points) {
@@ -182,12 +238,37 @@ function useOverallScoreDelta(teamKey, points) {
   return delta;
 }
 
-export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '' }) {
-  const [activeLabel, setActiveLabel] = useState(null);
-  const cards = useMemo(() => [{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }, ...grades], [grades, overall]);
-  const activeCard = cards.find(card => card.label === activeLabel) || null;
+export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '', includeOverall = true, extraDetails = [], activeLabel: controlledActiveLabel, onActiveLabelChange }) {
+  const [internalActiveLabel, setInternalActiveLabel] = useState(null);
+  const buttonRefs = useRef(new Map());
+  const isControlled = typeof onActiveLabelChange === 'function';
+  const activeLabel = isControlled ? controlledActiveLabel : internalActiveLabel;
+  const setActiveLabel = useCallback((next) => {
+    if (isControlled) onActiveLabelChange(next);
+    else setInternalActiveLabel(next);
+  }, [isControlled, onActiveLabelChange]);
+  useEffect(() => {
+    if (!isControlled) setInternalActiveLabel(null);
+  }, [teamKey, isControlled]);
+  const overallCard = useMemo(() => ({ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }), [overall]);
+  const cards = useMemo(() => [
+    ...(includeOverall ? [overallCard] : []),
+    ...grades,
+  ], [grades, includeOverall, overallCard]);
+  const activeCard = [...cards, ...extraDetails].find(card => card.label === activeLabel) || null;
   const overallDelta = useOverallScoreDelta(teamKey, overall?.points);
-  return <div aria-label="Front Office grade details">
+  const closeActiveCard = useCallback(() => {
+    if (!activeLabel) return;
+    const previousLabel = activeLabel;
+    setActiveLabel(null);
+    buttonRefs.current.get(previousLabel)?.focus();
+  }, [activeLabel, setActiveLabel]);
+  return <div aria-label="Front Office grade details" onKeyDown={event => {
+    if (event.key === 'Escape' && activeLabel) {
+      event.preventDefault();
+      closeActiveCard();
+    }
+  }}>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
@@ -195,7 +276,7 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
         const numericScore = card.label === 'Overall' && Number.isFinite(overall?.points) ? overall.points.toFixed(2) : null;
         const trendLabel = card.label === 'Overall' && overallDelta != null ? ` Overall score ${overallDelta > 0 ? 'increased' : 'decreased'} by ${Math.abs(overallDelta).toFixed(2)} from the prior comparable score.` : '';
         const isOverall = card.label === 'Overall';
-        return <button key={card.label} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30.${trendLabel}` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(current => current === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
+        return <button key={card.label} ref={node => { if (node) buttonRefs.current.set(card.label, node); else buttonRefs.current.delete(card.label); }} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30.${trendLabel}` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(activeLabel === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
           style={{minHeight:isOverall ? 62 : 46,textAlign:'center',background:isOverall ? C.surface3 : C.surface2,border:`1px solid ${isActive ? card.color : isOverall ? C.navy : C.borderLight}`,borderRadius:6,padding:isOverall ? '6px 3px 5px' : '5px 3px',cursor:'pointer',color:C.text,boxShadow:isOverall ? `inset 0 2px 0 ${C.navy}` : 'none'}}>
           <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:isOverall ? 5 : 4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:isOverall ? 29 : 17,fontWeight:800,color:card.color,lineHeight:isOverall ? .88 : 1,letterSpacing:isOverall ? '-.06em' : 0})}>{card.grade}</span>{numericScore && <span title={OVERALL_SCORE_TOOLTIP} aria-label={`Weighted Overall score ${numericScore} out of 4.30. ${OVERALL_SCORE_TOOLTIP}`} style={{...px({fontSize:isOverall ? 8 : 8.5,fontWeight:700,color:C.text3,lineHeight:1}),cursor:'help',textDecoration:'underline dotted',textUnderlineOffset:2}}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}{isOverall && overallDelta != null && <span aria-hidden="true" title={`Prior comparable score: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)}`} style={px({fontSize:10,fontWeight:800,color:overallDelta > 0 ? C.teal : C.rust,lineHeight:1})}>{overallDelta > 0 ? '↑' : '↓'}</span>}</div>
           <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
@@ -207,6 +288,37 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
       ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.35,marginTop:6,padding:'5px 7px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
       : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.3,marginTop:6})}>Select a grade for its calculation, data source, and limitations.</div>}
   </div>;
+}
+
+export function FrontOfficeScoreRingPreview({ teamName, grades = [], overall = buildFrontOfficeGradeSummary(grades), teamKey = '', activeLabel, onActiveLabelChange }) {
+  const model = useMemo(() => buildFrontOfficeEvaluationViewModel({ teamName, grades, overall }), [teamName, grades, overall]);
+  const scoreButtonRef = useRef(null);
+  const overallId = 'front-office-grade-overall';
+  const overallExpanded = activeLabel === 'Overall';
+  const toggleOverallDetails = useCallback(() => {
+    onActiveLabelChange?.(overallExpanded ? null : 'Overall');
+  }, [onActiveLabelChange, overallExpanded]);
+  return (
+    <div className="skip-front-office-score-ring-layout" data-status={model.status}>
+      <button ref={scoreButtonRef} type="button" className="skip-front-office-score-ring-summary" aria-expanded={overallExpanded} aria-controls={overallId} aria-label={`Show Overall calculation details: ${model.overallGrade}, ${model.overallRating == null ? 'unavailable' : `${model.overallRating.toFixed(2)} out of ${model.ratingScaleMax.toFixed(2)}`}. ${model.statusLabel}.`} onClick={toggleOverallDetails} onKeyDown={event => {
+        if (event.key === 'Escape' && overallExpanded) {
+          event.preventDefault();
+          onActiveLabelChange?.(null);
+          scoreButtonRef.current?.focus();
+        }
+      }}>
+        <EvaluationScoreRing model={model} decorative />
+        <div className="skip-front-office-score-ring-copy">
+          <div className="skip-front-office-score-ring-grade">{model.overallGrade}</div>
+          <div className="skip-front-office-score-ring-scale">{model.overallRating == null ? '—' : model.overallRating.toFixed(2)} <span>/ {model.ratingScaleMax.toFixed(2)}</span></div>
+          <div className="skip-front-office-score-ring-status">{model.statusLabel}</div>
+          <div className="skip-front-office-score-ring-source">{model.sourceLabel}</div>
+          <span className="skip-front-office-score-ring-details" aria-hidden="true">details</span>
+        </div>
+      </button>
+      <FrontOfficeGradeCards grades={grades} overall={overall} teamKey={teamKey} includeOverall={false} extraDetails={[{ label: 'Overall', grade: overall.grade, color: C.navy, detail: overall.detail }]} activeLabel={activeLabel} onActiveLabelChange={onActiveLabelChange} />
+    </div>
+  );
 }
 
 export function resolveMetricProviderStatus(value, providerStatus) {
@@ -878,6 +990,8 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [overviewView, setOverviewView] = useState('briefing');
+  const [evaluationActiveLabel, setEvaluationActiveLabel] = useState(null);
+  const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
   const [affiliateId, setAffiliateId] = useState('');
   const [affiliates, setAffiliates] = useState([]);
@@ -1187,6 +1301,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       war: null, wrcPlus: null, fip: null, drs: null, bsr: null,
     };
   }, [liveTeamData, teamBase, calculatedStandingFallback]);
+  useEffect(() => {
+    setEvaluationActiveLabel(null);
+  }, [team?.abbr]);
   const liveStandings = liveTeamData?.byId?.[teamBase?.id]?.standings || liveTeamData?.byAbbr?.[teamBase?.abbr]?.standings || null;
   const headlineUsesCalculatedStandings = Boolean(calculatedIntelligence && ['w', 'l', 'pct', 'rs', 'ra', 'diff'].some(key => (liveStandings?.[key] == null || liveStandings?.[key] === '') && calculatedStandingFallback[key] != null));
   // Team-brand accent used for decorative/structural elements (panel accent
@@ -2208,13 +2325,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 ))}
               </div>
             </div>
-            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}}>
+            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}} data-evaluation-presentation={evaluationPresentation}>
               <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
-              <FrontOfficeGradeCards
-                grades={D.frontOfficeGradeRows}
-                overall={D.frontOfficeOverall}
-                teamKey={team.abbr}
-              />
+              {evaluationPresentation === 'score-ring'
+                ? <FrontOfficeScoreRingPreview teamName={team.name} grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />
+                : <FrontOfficeGradeCards grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
                 <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense uses roster coverage and, when available, Statcast OAA (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Baserunning uses steals and success rate; Depth blends roster coverage with a dated MLB Pipeline farm rank. Baseball America is a methodology reference; its subscription-only ranks are not imported.</div>
                 <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>

@@ -11334,3 +11334,8 @@
 - [x] Vet an authoritative secondary playoff-odds provider and available integration path.
 - [x] Add FanGraphs verification timing, a standings-context panel, and a sourced secondary odds fallback without estimates.
 - [x] Add regression coverage, verify desktop and mobile source states, and publish the enhancement.
+
+- [x] Audit the supplied branch, player-profile, and ScoreRing handoffs against the current SKIP release.
+- [x] Implement any compatible player-profile request-cancellation and core-loading improvements without weakening existing sequence safeguards.
+- [x] Add a reversible, data-provenance-safe ScoreRing preview to the existing Front Office Evaluation only if the current data contract supports it.
+- [x] Add regression coverage, validate desktop and mobile states, and publish the selective optimization release.

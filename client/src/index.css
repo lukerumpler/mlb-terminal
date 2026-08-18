@@ -1148,3 +1148,41 @@
   .skip-player-favorites-list { grid-template-columns:1fr; }
   .skip-player-favorite-row { padding:8px; }
 }
+
+/* Reversible Front Office ScoreRing preview. The ring changes only the score
+   treatment inside the established evaluation card; it does not introduce a
+   second dashboard visual language or alter the surrounding overview layout. */
+.skip-front-office-score-ring-layout { display:grid; grid-template-columns:minmax(10.5rem,12rem) minmax(0,1fr); align-items:center; gap:12px; min-width:0; min-height:9rem; }
+.skip-front-office-score-ring-layout > * { min-width:0; }
+.skip-front-office-score-ring-summary { display:flex; align-items:center; gap:9px; min-width:0; min-height:8.5rem; padding:7px; border:1px solid var(--border-light); border-radius:7px; background:linear-gradient(135deg,color-mix(in srgb,var(--purple-soft,#f1edf8) 54%,var(--surface,#fff)),var(--surface,#fff)); color:inherit; cursor:pointer; text-align:left; transition:background-color 160ms cubic-bezier(.23,1,.32,1),border-color 160ms cubic-bezier(.23,1,.32,1),transform 160ms cubic-bezier(.23,1,.32,1); }
+.skip-front-office-score-ring-summary:hover { border-color:color-mix(in srgb,var(--purple,#7656a8) 46%,var(--border-light)); background:linear-gradient(135deg,color-mix(in srgb,var(--purple-soft,#f1edf8) 78%,var(--surface,#fff)),var(--surface,#fff)); }
+.skip-front-office-score-ring-summary:focus-visible { outline:2px solid color-mix(in srgb,var(--purple,#7656a8) 42%,transparent); outline-offset:2px; }
+.skip-front-office-score-ring-summary:active { transform:scale(.985); }
+.skip-evaluation-score-ring { position:relative; display:grid; flex:0 0 86px; width:86px; height:86px; place-items:center; }
+.skip-evaluation-score-ring-svg { width:100%; height:100%; overflow:visible; transform:rotate(-90deg); }
+.skip-evaluation-score-ring-track { stroke:var(--surface3,#eeebe5); stroke-width:9; }
+.skip-evaluation-score-ring-progress { stroke-width:9; transition:stroke-dashoffset 200ms cubic-bezier(.23,1,.32,1),stroke 160ms cubic-bezier(.23,1,.32,1); }
+.skip-evaluation-score-ring[data-status='unavailable'] .skip-evaluation-score-ring-track { stroke-dasharray:5 5; }
+.skip-evaluation-score-ring-value { position:absolute; display:grid; place-items:center; min-width:0; color:var(--text,#24211d); font-variant-numeric:tabular-nums; line-height:1; text-align:center; }
+.skip-evaluation-score-ring-value strong { max-width:100%; font:800 25px/.9 'DM Mono',monospace; letter-spacing:-.07em; overflow-wrap:anywhere; }
+.skip-evaluation-score-ring-value span { margin-top:3px; color:var(--text4,#9c8570); font:800 7px/1 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+.skip-front-office-score-ring-copy { display:flex; min-width:0; flex:1; flex-direction:column; gap:3px; }
+.skip-front-office-score-ring-grade { color:var(--purple,#7656a8); font:800 20px/.9 'DM Mono',monospace; letter-spacing:-.06em; }
+.skip-front-office-score-ring-scale { color:var(--text2,#4b443a); font:800 10px/1 'DM Mono',monospace; font-variant-numeric:tabular-nums; }
+.skip-front-office-score-ring-scale span { color:var(--text4,#9c8570); }
+.skip-front-office-score-ring-status { color:var(--text3,#756d62); font:700 8px/1.32 'Plus Jakarta Sans',sans-serif; overflow-wrap:anywhere; }
+.skip-front-office-score-ring-source { color:var(--text4,#9c8570); font:700 7.5px/1.25 'DM Mono',monospace; letter-spacing:.015em; overflow-wrap:anywhere; }
+.skip-front-office-score-ring-details { margin-top:1px; color:var(--purple,#7656a8); font:800 7px/1 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+.skip-front-office-score-ring-layout [aria-expanded='true'] { border-color:var(--purple,#7656a8); }
+@media (max-width:720px) {
+  .skip-front-office-score-ring-layout { grid-template-columns:1fr; min-height:0; }
+  .skip-front-office-score-ring-summary { min-height:7.5rem; }
+}
+@media (max-width:390px) {
+  .skip-front-office-score-ring-summary { align-items:flex-start; }
+  .skip-evaluation-score-ring { flex-basis:76px; width:76px; height:76px; }
+  .skip-evaluation-score-ring-value strong { font-size:22px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .skip-front-office-score-ring-summary, .skip-evaluation-score-ring-progress { transition:none; }
+}
