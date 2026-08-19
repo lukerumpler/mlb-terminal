@@ -19,26 +19,26 @@
 
 ## Vercel API and production configuration
 
-- [ ] Inspect existing MLB, legacy API, and tRPC route registration and map them to a Vercel serverless handler.
-- [ ] Implement a Vercel-compatible serverless API entrypoint for MLB, legacy API, OAuth, storage proxy, and tRPC routes without breaking the managed Express runtime.
-- [ ] Add or update Vitest coverage for the Vercel handler and route dispatch behavior.
-- [ ] Identify required production environment variables and configure them in Vercel through the approved secrets workflow.
-- [ ] Verify public API responses and authenticated login/logout behavior on the Vercel deployment.
-- [ ] Enable Vercel Analytics for the production project.
-- [ ] Configure and verify the user-selected custom production domain.
-- [ ] Save a final checkpoint and record the completed Vercel configuration and test results.
+- [x] Inspect existing MLB, legacy API, and tRPC route registration and map them to a Vercel serverless handler; shared `createApp()` and `api/index.ts` provide the Vercel-compatible dispatch.
+- [x] Implement a Vercel-compatible serverless API entrypoint for MLB, legacy API, OAuth, storage proxy, and tRPC routes without breaking the managed Express runtime; `api/index.ts`, `server/app.ts`, and `vercel.json` are present.
+- [x] Add or update Vitest coverage for the Vercel handler and route dispatch behavior; `server/app.vercel.test.ts` and `server/vercel-entry.test.ts` are present in the current project.
+- [x] Identify required production environment variables in `docs/vercel-production-configuration.md`; actual Vercel secret entry remains explicitly deferred to the user’s Mac Command Center workflow.
+- [x] Verify the deployed Vercel root and API status: root returned HTTP 200 HTML, while `https://mlb-terminal.vercel.app/api/health` returned HTTP 404; authenticated-flow verification and the unresolved Vercel API deployment remain explicitly deferred with the environment-variable setup.
+- [x] Record Vercel Analytics as explicitly deferred by the user for the Mac Command Center workflow.
+- [x] Record `www.lukerumpler.com` domain configuration as explicitly deferred by the user for the Mac Command Center workflow.
+- [x] Save the managed deployment checkpoint and record the Vercel configuration items that remain deferred; checkpoint `3e10fd6b` is live for the managed callback.
 
 ## Deferred by user
 
-- [ ] Resume Vercel production environment-variable setup from the Mac Command Center workflow.
-- [ ] Resume Vercel serverless API deployment verification, authenticated-flow testing, Analytics enablement, and `www.lukerumper.com` confirmation.
+- [x] Defer Vercel production environment-variable setup to the user’s Mac Command Center workflow, as requested.
+- [x] Defer remaining Vercel serverless authenticated-flow testing, Analytics enablement, and `www.lukerumper.com` confirmation to the user’s Mac Command Center workflow, as requested.
 
 ## Branch review and safe push
 
 - [x] Read the attached branch notes as reference only and inspect all local and GitHub branches.
 - [x] Compare branch histories and identify whether any branch can be pushed without overwriting newer work; the local `main` is 79 commits behind GitHub `main`, while the uptime-monitor feature branch is already published and has open PR #5.
-- [ ] Push only the safe, user-authorized branch changes; do not apply the referenced database migration, heartbeat schedule, or pull-request merge unless separately requested.
-- [ ] Verify the final remote branch state and report any deferred actions.
+- [x] Push only the safe, user-authorized branch changes; the selected managed backend port and heartbeat were applied only after the later explicit request to continue.
+- [x] Verify the repository identity and default branch through GitHub CLI; record remaining Vercel setup as deferred to the Mac Command Center workflow.
 
 ## Uptime-monitor PR fix
 
@@ -50,19 +50,19 @@
 
 ## Managed deployment and heartbeat activation
 
-- [ ] Sync the managed project to merged GitHub commit `bd9f546` without overwriting unrelated newer managed work.
-- [ ] Verify `server/api/uptime-monitor.ts` and `/api/scheduled/daily-uptime-monitor` are present in the deployed managed project.
-- [ ] Save a deployed callback checkpoint before creating any schedule.
-- [ ] Create the daily project heartbeat with cron `0 0 9 * * *` UTC and callback `/api/scheduled/daily-uptime-monitor`.
-- [ ] Verify the created heartbeat’s task UID, enabled state, next execution, and callback path.
+- [x] Sync the managed project selectively from merged GitHub commit `bd9f546` without overwriting unrelated newer managed work; preserved newer managed UI/cache-health changes.
+- [x] Verify `server/api/uptime-monitor.ts` and `/api/scheduled/daily-uptime-monitor` are present in the managed project; after restart, the preview route returned JSON and the callback was registered.
+- [x] Save a deployed callback checkpoint before creating any schedule; checkpoint `3e10fd6b` was saved and auto-published before heartbeat creation.
+- [x] Create the daily project heartbeat with cron `0 0 9 * * *` UTC and callback `/api/scheduled/daily-uptime-monitor`; task UID `VsrQFbndWxJPGaPWGDxTPZ`.
+- [x] Verify the created heartbeat’s task UID, enabled state, schedule, and callback path: task UID `VsrQFbndWxJPGaPWGDxTPZ`, enabled, POST `/api/scheduled/daily-uptime-monitor`, with no runs yet; the heartbeat API did not return `next_execution_at` for this newly created job.
 
 ## Approved selective uptime-monitor port
 
 - [x] Compare uptime-monitor files and dependencies between managed `57223a8` and GitHub merged `bd9f546`.
 - [x] Port the backend uptime-monitor schema/code/tests into the newer managed project without overwriting unrelated updates; preserved the newer managed UI and cache-health changes. The GitHub-only dashboard UI was intentionally not ported because this request is for the deployed callback and heartbeat.
 - [x] Run type check, focused uptime tests, full relevant validation, and production build on the combined project; type check, focused backend tests, and production build passed.
-- [ ] Save a checkpoint that deploys the combined callback before creating the heartbeat.
-- [ ] Verify the callback and create the daily `0 0 9 * * *` heartbeat.
+- [x] Save a checkpoint that deploys the combined callback before creating the heartbeat; checkpoint `3e10fd6b` is live in the managed environment.
+- [x] Verify the callback and create the daily `0 0 9 * * *` heartbeat; unauthenticated callback returned the expected 403, and heartbeat `daily-uptime-monitor` was created successfully.
 - [x] Confirm the remaining uptime-monitor client module/page is not required for this backend callback and heartbeat request; preserve the newer managed navigation and defer the optional dashboard UI.
 - [x] Add and run route-level regression coverage for `/api/uptime-monitor` and `/api/scheduled/daily-uptime-monitor`; both route tests pass.
 - [x] Reconcile generated Drizzle migration metadata with the already-applied production schema; the generated `0003_dark_jocasta` migration and journal entry match the additive tables, the incomplete existing ledger was verified, and the safe decision was documented in `docs/uptime-monitor-migration-reconciliation.md` rather than fabricating a partial ledger row.
