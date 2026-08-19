@@ -15,7 +15,7 @@ import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
-import { fmtWinPct } from '../lib/formatting.js';
+import { fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
 import { DAILY_CACHE_TTL_MS, shouldRefreshDailyCache, readTeamAggregateCache, saveTeamAggregateCache, readTeamPlayersCache, saveTeamPlayersCache, readTeamSavantCache, saveTeamSavantCache, readTeamSavantSummaryCache, saveTeamSavantSummaryCache, readTeamSavantAgainstCache, saveTeamSavantAgainstCache } from '../lib/teamDataCache.js';
 import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
 import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.js';
@@ -854,13 +854,13 @@ function buildRosterInsights(team, players) {
   const weaknesses = [];
   const add = (list, title, detail, evidence) => list.push({ title, detail, evidence });
 
-  if (numeric(team.ops) != null && team.ops >= .750) add(strengths, 'Lineup creates leverage', `${topHitter?.name || 'The lineup'} leads the roster by OPS`, `Team OPS ${formatTeamMetric(team.ops, 3)}`);
+  if (numeric(team.ops) != null && team.ops >= .750) add(strengths, 'Lineup creates leverage', `${topHitter?.name || 'The lineup'} leads the roster by OPS`, `Team OPS ${fmtScorebookRate(team.ops)}`);
   if (numeric(team.hr) != null && team.hr >= 100) add(strengths, 'Power is a carrying tool', 'Home-run production gives the roster a reliable extra-base path', `${formatTeamMetric(team.hr)} HR`);
   if (numeric(team.era) != null && team.era <= 3.70) add(strengths, 'Run prevention is stable', `${topPitcher?.name || 'The staff'} anchors the current pitching group`, `Team ERA ${formatTeamMetric(team.era, 2)}`);
   if (numeric(team.k) != null && team.k >= 700) add(strengths, 'Strikeout volume travels', 'The staff can miss bats and limit balls in play', `${formatTeamMetric(team.k)} strikeouts`);
   if (numeric(rdForInsights(team)) != null && rdForInsights(team) > 0) add(strengths, 'Results support the profile', 'The roster is converting its run-creation and run-prevention balance into wins', `${rdForInsights(team) > 0 ? '+' : ''}${rdForInsights(team)} run differential`);
 
-  if (numeric(team.ops) != null && team.ops < .720) add(weaknesses, 'Offensive margin is thin', 'The lineup may need more on-base traffic or impact contact', `Team OPS ${formatTeamMetric(team.ops, 3)}`);
+  if (numeric(team.ops) != null && team.ops < .720) add(weaknesses, 'Offensive margin is thin', 'The lineup may need more on-base traffic or impact contact', `Team OPS ${fmtScorebookRate(team.ops)}`);
   if (numeric(team.era) != null && team.era > 4.00) add(weaknesses, 'Run prevention needs support', 'The staff is allowing too much damage for a stable team baseline', `Team ERA ${formatTeamMetric(team.era, 2)}`);
   if (numeric(team.whip) != null && team.whip > 1.30) add(weaknesses, 'Traffic is accumulating', 'Base runners allowed per inning are creating avoidable leverage swings', `WHIP ${formatTeamMetric(team.whip, 3)}`);
   if (numeric(rdForInsights(team)) != null && rdForInsights(team) < 0) add(weaknesses, 'Results lag the roster signals', 'The negative run differential points to a current execution gap', `${rdForInsights(team)} run differential`);
@@ -1953,7 +1953,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     const leagueRanks=[
       {label:'Runs Scored',  rank:rankValue(team.rs, standingsRecords, ['rs']), val:team.rs},
       {label:'Home Runs',    rank:rankValue(team.hr, hittingRecords, ['homeRuns']), val:team.hr},
-      {label:'Team OPS',     rank:rankValue(team.ops, hittingRecords, ['ops']), val:formatTeamMetric(team.ops,3)},
+      {label:'Team OPS',     rank:rankValue(team.ops, hittingRecords, ['ops']), val:fmtScorebookRate(team.ops)},
       {label:'Team ERA',     rank:rankValue(team.era, pitchingRecords, ['era'], false), val:formatTeamMetric(team.era,2)},
       {label:'WHIP',         rank:rankValue(team.whip, pitchingRecords, ['whip'], false), val:formatTeamMetric(team.whip,3)},
       {label:'Strikeouts',   rank:rankValue(team.k, pitchingRecords, ['strikeOuts']), val:team.k},
@@ -2036,7 +2036,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const organizationProspectDepth = useMemo(() => buildOrganizationProspectDepthChart(team.abbr), [team.abbr]);
   const formatOaa = value => value == null ? '—' : `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(0)}`;
   const splitRows=splitTab==='home'?splits.slice(0,2):splitTab==='hand'?splits.slice(2,4):splits.slice(4,6);
-  const offRows=[['OPS',formatTeamMetric(team.ops,3)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',formatTeamMetric(team.avg,3)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
+  const offRows=[['OPS',fmtScorebookRate(team.ops)],['OBP',formatTeamMetric(team.obp,3)],['SLG',formatTeamMetric(team.slg,3)],['AVG',fmtScorebookRate(team.avg)],['HR',formatTeamMetric(team.hr)],['SB',formatTeamMetric(team.sb)]];
   const pitRows=[['ERA',formatTeamMetric(team.era,2)],['WHIP',formatTeamMetric(team.whip,3)],['K',formatTeamMetric(team.k)],['FIP','—'],['OAA','—'],['BsR','—'] ];
 
   // Team-level OAA still requires a dedicated Statcast query. Exit-velocity
@@ -2169,11 +2169,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       </Panel>}
 
       {overviewView === 'performance' && <StatStrip items={[
-        {val:<MetricValue value={formatTeamMetric(team.ops,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense', trend:verifiedTrends.ops},
+        {val:<MetricValue value={fmtScorebookRate(team.ops)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense', trend:verifiedTrends.ops},
         {val:<MetricValue value={formatTeamMetric(team.hr)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Home Runs',  sub:'Power'},
         {val:<MetricValue value={formatTeamMetric(team.era,2)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team ERA',   sub:'Pitching', trend:verifiedTrends.era},
         {val:<MetricValue value={formatTeamMetric(team.whip,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'WHIP',      sub:'Command', trend:verifiedTrends.whip},
-        {val:<MetricValue value={formatTeamMetric(team.avg,3)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
+        {val:<MetricValue value={fmtScorebookRate(team.avg)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
         {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR',   sub:<div>{teamWarIsCalculated ? <span style={sans({fontSize:8,color:C.teal})}>MLB Stats API · calculated</span> : <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />}{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple},
@@ -2268,7 +2268,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <div className="skip-overview-executive-grid">
           {[
             {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${fmtScorebookRate(team.ops)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
             {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, destination:'Organization depth', action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
           ].map((item, i) => (
             <button key={item.label} type="button" className="skip-overview-executive-item" onClick={item.action} aria-label={`Open ${item.destination}: ${item.label}`} style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>

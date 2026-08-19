@@ -241,6 +241,7 @@ describe("League page", () => {
     await goToTab(user, "League", /standings|leaders/i);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
+
 });
 
 describe("Follow List page", () => {

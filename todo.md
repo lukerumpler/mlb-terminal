@@ -11357,3 +11357,8 @@
 - [x] Audit all baseball record-percentage displays and add a shared formatter that renders leading-decimal notation such as .598.
 - [x] Migrate eligible win-percentage displays without changing percentage metrics that require a leading zero.
 - [x] Add regression coverage, validate responsive rendering, and publish the baseball percentage formatting update.
+
+- [x] Audit batting-average and OPS displays for scorebook notation and identify the existing League standings export path.
+- [x] Add a shared scorebook rate formatter for batting average and OPS without altering unrelated decimal metrics.
+- [x] Add an accessible standings export that includes Team, W–L, and formatted WIN% with verified export content.
+- [x] Add regression coverage, validate responsive behavior, and publish the notation and standings-export update.

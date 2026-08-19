@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { trueIP } from '../lib/formatting.js';
+import { fmtScorebookRate, trueIP } from '../lib/formatting.js';
 import { SEASON } from '../constants/data.js';
 import { percentile } from '../lib/percentile.js';
 import { usePngExport } from '../lib/usePngExport.js';
@@ -160,7 +160,7 @@ export default function ProspectCard({ prospect, isPitcher, pool, onClose }) {
     { label: 'K/9',  value: kRate ?? '—', pct: percentile(kRate, pool.map(x => trueIP(x.ip) ? (x.so / trueIP(x.ip)) * 9 : null)) },
     { label: 'BB/9', value: bbRate ?? '—', pct: percentile(bbRate, pool.map(x => trueIP(x.ip) ? (x.bb / trueIP(x.ip)) * 9 : null), false) },
   ] : [
-    { label: 'AVG', value: p.avg?.toFixed(3)?.replace(/^0/, '') ?? '—', pct: percentile(p.avg, pool.map(x => x.avg)) },
+    { label: 'AVG', value: fmtScorebookRate(p.avg), pct: percentile(p.avg, pool.map(x => x.avg)) },
     { label: 'OBP', value: p.obp?.toFixed(3)?.replace(/^0/, '') ?? '—', pct: percentile(p.obp, pool.map(x => x.obp)) },
     { label: 'SLG', value: p.slg?.toFixed(3)?.replace(/^0/, '') ?? '—', pct: percentile(p.slg, pool.map(x => x.slg)) },
     { label: 'K%',  value: k100 != null ? `${k100}%` : '—', pct: percentile(k100, pool.map(x => x.pa ? (x.so / x.pa) * 100 : null), false) },
@@ -175,7 +175,7 @@ export default function ProspectCard({ prospect, isPitcher, pool, onClose }) {
 
   const perfLine = isPitcher
     ? `${SEASON} MiLB — ${p.era?.toFixed(2) ?? '—'} ERA, ${p.whip?.toFixed(2) ?? '—'} WHIP, ${p.so ?? '—'} SO, ${p.ip ?? '—'} IP (${p.g ?? '—'} G)`
-    : `${SEASON} MiLB — ${p.avg?.toFixed(3)?.replace(/^0/, '') ?? '—'}/${p.obp?.toFixed(3)?.replace(/^0/, '') ?? '—'}/${p.slg?.toFixed(3)?.replace(/^0/, '') ?? '—'}, ${p.hr ?? '—'} HR, ${p.rbi ?? '—'} RBI, ${p.sb ?? '—'} SB (${p.pa ?? '—'} PA)`;
+    : `${SEASON} MiLB — ${fmtScorebookRate(p.avg)}/${fmtScorebookRate(p.obp)}/${fmtScorebookRate(p.slg)}, ${p.hr ?? '—'} HR, ${p.rbi ?? '—'} RBI, ${p.sb ?? '—'} SB (${p.pa ?? '—'} PA)`;
 
   const projWarStr = p.projWar != null ? (+p.projWar).toFixed(1) : '—';
 

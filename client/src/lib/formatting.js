@@ -70,6 +70,13 @@ export function fmtWinPct(v, decimals = 3) {
   return formatted.startsWith('0.') ? formatted.slice(1) : formatted;
 }
 
+/** Format a baseball rate statistic in scorebook notation, e.g. 0.276 -> ".276" and 1.017 -> "1.017". */
+export function fmtScorebookRate(v, decimals = 3) {
+  if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
+  const formatted = Number(v).toFixed(decimals);
+  return formatted.startsWith('0.') ? formatted.slice(1) : formatted;
+}
+
 /** Convert a number to its ordinal form: 1 -> "1st", 2 -> "2nd", etc. */
 export function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'];
