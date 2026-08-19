@@ -118,6 +118,29 @@ describe("natural-language search", () => {
     window.removeEventListener("skip-open-player", opened);
   });
 
+  it("does not open an inactive player returned by the verified search route", async () => {
+    const user = userEvent.setup();
+    routeNaturalLanguageSearch.mockResolvedValueOnce({
+      intent: "player",
+      tab: "players",
+      entity: "Inactive Player",
+      metric: "OPS",
+      interpretation: "Open the verified player profile for the requested OPS context.",
+    });
+    searchPlayers.mockResolvedValueOnce([{ id: 456, fullName: "Inactive Player", active: false }]);
+    render(
+      <CommandPalette
+        onNavigate={vi.fn()}
+        onOpenProspect={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    await user.type(screen.getByRole("combobox", { name: "Search pages, prospects, or ask SKIP" }), "Inactive Player OPS");
+    await user.click(screen.getByRole("button", { name: "ASK SKIP" }));
+    await user.click(await screen.findByRole("button", { name: /Inactive Player/i }));
+    expect(await screen.findByText(/No verified player match was found/i)).toBeInTheDocument();
+  });
+
   it("keeps AI unavailable states explicit instead of inventing a destination", async () => {
     const user = userEvent.setup();
     routeNaturalLanguageSearch.mockRejectedValueOnce(

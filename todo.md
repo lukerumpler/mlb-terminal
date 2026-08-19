@@ -11362,3 +11362,9 @@
 - [x] Add a shared scorebook rate formatter for batting average and OPS without altering unrelated decimal metrics.
 - [x] Add an accessible standings export that includes Team, W–L, and formatted WIN% with verified export content.
 - [x] Add regression coverage, validate responsive behavior, and publish the notation and standings-export update.
+
+- [x] Audit every player-search source and active-status field, plus current runtime, network, and UI health evidence.
+- [x] Exclude non-active players from global and Players workspace search results without blocking current active-player profiles.
+- [x] Implement only evidence-backed reliability, loading, accessibility, and responsive UX fixes found during the debug pass.
+- [x] Add regression coverage, complete release validation, and publish the active-search and reliability update.
+- [x] Record the reviewed documentation-only GitHub-main advance in the release-gate baseline before publication.
