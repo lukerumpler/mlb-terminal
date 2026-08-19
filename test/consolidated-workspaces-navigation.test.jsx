@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../client/src/App.jsx';
 
@@ -84,5 +84,22 @@ describe('consolidated workspace navigation', () => {
     await user.click(screen.getByRole('tab', { name: 'Alerts' }));
     expect(screen.getByRole('tab', { name: 'Alerts' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Active Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Live operational sources')).toBeInTheDocument();
+    expect(screen.queryByText(/Illustrative examples/i)).toBeNull();
+  });
+
+  it('renders cache health inside Settings and offers compact primary switching for mobile layouts', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByTitle('Settings'));
+    expect(await screen.findByText('Cache Health')).toBeInTheDocument();
+    expect(screen.getByText('Live internal telemetry')).toBeInTheDocument();
+
+    const switcher = document.querySelector('.skip-mobile-workspace-switcher');
+    expect(switcher).toHaveAttribute('aria-label', 'Quick workspace switcher');
+    const talentButton = within(switcher).getByRole('button', { name: /Talent/i, hidden:true });
+    await user.click(talentButton);
+    expect(await screen.findByRole('tablist', { name: 'Talent workspace sections' })).toBeInTheDocument();
   });
 });

@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, laz
 import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
-import { ALERTS, getDailyInsight } from './constants/alerts.js';
+import { getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
+import { getCacheHealth } from './lib/cacheHealthClient.js';
+import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
 import { Panel } from './components/atoms.jsx';
 import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
@@ -123,7 +125,6 @@ const WORKSPACE_GROUPS = [
     label:'Settings',
     section:'System',
     defaultTab:'settings',
-    alertCount: ALERTS.length,
     tabs:[
       { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
       { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
@@ -141,25 +142,34 @@ const PRIMARY_TABS = [
   WORKSPACE_GROUPS[3],
 ];
 
-function AlertsWorkspacePanel() {
+function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
   return (
-    <Panel title="Active Alerts" accent={C.rust} badge="Illustrative examples">
+    <Panel title="Active Alerts" accent={C.rust} badge="Live operational sources">
       <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
-        Illustrative examples — not a live feed yet.
+        Alerts are derived from current cache telemetry, feed-freshness settings, and workspace preferences. SKIP does not invent player news or transaction events.
       </div>
-      {ALERTS.map((a, i) => (
+      {cacheHealthStatus === 'loading' && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>Reading live operational sources…</div>
+      )}
+      {cacheHealthStatus !== 'loading' && alerts.length === 0 && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>No active operational alerts right now.</div>
+      )}
+      {alerts.map((a, i) => (
         <div key={i} style={{
           padding:'10px 14px',
-          borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
-          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
+          borderBottom: i < alerts.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
+          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' ? C.amberSoft : C.surface2,
         }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
-            <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
+            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.title}</span>
+            <span style={px({ fontSize:9, color:C.text3 })}>{a.source}</span>
           </div>
           <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
         </div>
       ))}
+      <div style={{ padding:'7px 14px', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2, ...px({ fontSize:9, color:C.text3 }) }}>
+        Cache telemetry: {cacheHealth?.day ? `UTC ${cacheHealth.day}` : 'not yet available'}
+      </div>
     </Panel>
   );
 }
@@ -169,6 +179,7 @@ export default function App() {
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
@@ -182,6 +193,9 @@ export default function App() {
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
   const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
   const [recentHistory, setRecentHistory] = useState(() => readRecentHistory());
+  const [cacheHealth, setCacheHealth] = useState(null);
+  const [cacheHealthStatus, setCacheHealthStatus] = useState('loading');
+  const [cacheHealthUpdatedAt, setCacheHealthUpdatedAt] = useState(null);
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
   }, []);
@@ -216,9 +230,41 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('skip-theme', theme); } catch { /* best effort */ }
   }, [theme]);
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 720px)');
+    if (!query) return undefined;
+    const sync = () => setCompactMobile(query.matches);
+    sync();
+    query.addEventListener?.('change', sync);
+    return () => query.removeEventListener?.('change', sync);
+  }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const refreshCacheHealth = useCallback(async () => {
+    setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
+    try {
+      const next = await getCacheHealth();
+      if (!next) throw new Error('Cache telemetry was empty');
+      setCacheHealth(next);
+      setCacheHealthUpdatedAt(Date.now());
+      setCacheHealthStatus('ready');
+    } catch {
+      setCacheHealthStatus('error');
+    }
+  }, []);
+  useEffect(() => {
+    refreshCacheHealth();
+    const intervalId = window.setInterval(refreshCacheHealth, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshCacheHealth]);
+  const liveAlerts = useMemo(() => buildOperationalAlerts({
+    cacheHealth,
+    cacheHealthStatus,
+    feedFreshnessSummary,
+    lowDataMode,
+  }), [cacheHealth, cacheHealthStatus, feedFreshnessSummary, lowDataMode]);
+  const alertCount = useMemo(() => countActionableAlerts(liveAlerts), [liveAlerts]);
   const activeWorkspace = useMemo(() => WORKSPACE_GROUPS.find(workspace => workspace.tabs.some(item => item.key === tab)) || null, [tab]);
   const activePrimaryKey = activeWorkspace?.key || tab;
   const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
@@ -372,25 +418,28 @@ export default function App() {
 
         {/* Nav */}
         <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
-          {PRIMARY_TABS.map((t, i) => (
+          {PRIMARY_TABS.map((t, i) => {
+            const workspaceAlertCount = t.key === 'settings-workspace' ? alertCount : t.alertCount;
+            return (
             <React.Fragment key={t.key}>
             {(i === 0 || PRIMARY_TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.alertCount ? `${t.label}: ${t.alertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
+            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.key === 'settings-workspace' ? `${t.label}: ${workspaceAlertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
-              {t.alertCount > 0 && (
+              {t.key === 'settings-workspace' && (
                 <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
-                  <span role="img" aria-label={`${t.alertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
-                  <span aria-hidden="true">{t.alertCount}</span>
+                  <span role="img" aria-label={`${workspaceAlertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
+                  {workspaceAlertCount > 0 && <span aria-hidden="true">{workspaceAlertCount}</span>}
                 </span>
               )}
-              {activePrimaryKey === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
+              {activePrimaryKey === t.key && <div style={{ marginLeft:t.key === 'settings-workspace' ? 4 : 'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
-          ))}
+            );
+          })}
 
         </nav>
 
@@ -431,6 +480,20 @@ export default function App() {
           <div style={{ height:7, width:7, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
         </div>
 
+        <nav className="skip-mobile-workspace-switcher" aria-label="Quick workspace switcher" aria-hidden={!compactMobile}>
+          {PRIMARY_TABS.map(workspace => {
+            const selected = activePrimaryKey === workspace.key;
+            const quickAlertCount = workspace.key === 'settings-workspace' ? alertCount : 0;
+            return (
+              <button key={workspace.key} type="button" tabIndex={compactMobile ? undefined : -1} aria-current={selected ? 'page' : undefined} onClick={() => { setTab(workspace.defaultTab || workspace.key); setMobileNavOpen(false); }}>
+                <span aria-hidden="true">{workspace.icon}</span>
+                <span>{workspace.label}</span>
+                {workspace.key === 'settings-workspace' && quickAlertCount > 0 && <strong aria-label={`${quickAlertCount} active alerts`}>{quickAlertCount}</strong>}
+              </button>
+            );
+          })}
+        </nav>
+
         {/* Scrollable content */}
         <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
@@ -464,8 +527,8 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
-              {tab === 'alerts'       && <AlertsWorkspacePanel />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
               </Suspense>
             </PageErrorBoundary>
           </div>
@@ -545,9 +608,17 @@ export default function App() {
           *[style*="animation"] { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
         }
         @media (max-width:720px) {
+          .skip-mobile-workspace-switcher { display:flex; align-items:center; gap:6px; min-height:43px; padding:6px 10px; overflow-x:auto; overscroll-behavior-x:contain; border-bottom:1px solid ${C.border}; background:${C.surface}; scrollbar-width:none; }
+          .skip-mobile-workspace-switcher::-webkit-scrollbar { display:none; }
+          .skip-mobile-workspace-switcher button { flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; min-height:30px; padding:5px 8px; border:1px solid ${C.border}; border-radius:999px; background:${C.surface2}; color:${C.text3}; cursor:pointer; font:800 9px/1 'DM Mono',monospace; letter-spacing:.03em; white-space:nowrap; }
+          .skip-mobile-workspace-switcher button[aria-current="page"] { border-color:${C.tealMid}; background:${C.tealSoft}; color:${C.teal}; }
+          .skip-mobile-workspace-switcher button strong { display:inline-grid; place-items:center; min-width:15px; height:15px; padding:0 3px; border-radius:999px; background:${C.rustSoft}; color:${C.rust}; font:800 8px/1 'DM Mono',monospace; }
           .skip-workspace-subtabs { align-items:stretch; flex-direction:column; gap:9px; padding:9px; }
           .skip-workspace-subtabs-controls { width:100%; overflow-x:auto; padding-bottom:1px; }
           .skip-workspace-subtabs-controls button { flex:0 0 auto; min-height:32px; }
+        }
+        @media (min-width:721px) {
+          .skip-mobile-workspace-switcher { display:none; }
         }
       `}</style>
     </div>

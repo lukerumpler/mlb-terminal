@@ -17,6 +17,7 @@ import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt } from '../lib/formatting.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
+import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
 
 // FIX: Global tooltip config — z-index 9999 prevents clip behind sibling panels
 const TT = {
@@ -1648,7 +1649,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1707,6 +1708,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
+      <CacheHealthDashboard health={cacheHealth} status={cacheHealthStatus} updatedAt={cacheHealthUpdatedAt} onRefresh={refreshCacheHealth} />
       <Panel title="Roster Insight Defaults" accent={C.teal}>
         <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>
