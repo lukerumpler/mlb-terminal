@@ -69,3 +69,6 @@
 
 - [x] Compare every local and remote branch against `main`, identify superior compatible features, and consolidate only validated changes into `main` without overwriting newer work; the compatible Vercel catch-all routing branch was integrated while preserving current main features.
 - [x] Run type checking, focused routing/uptime tests, the full Vitest suite, and production build on the consolidated `main` branch; all validation completed successfully.
+
+- [x] Add an automated deployment smoke test for `/api/health`, `/api/trpc`, and an MLB data endpoint, with configurable `VERCEL_SMOKE_BASE_URL` and safe skip behavior when no deployment URL is provided; added `pnpm test:smoke` and `.github/workflows/vercel-smoke.yml`.
+- [x] Run the smoke test against the managed API-compatible preview successfully; the configured Vercel production target currently fails all three checks with HTTP 404, proving the test detects the unresolved Vercel API routing/deployment gap. Type checking and focused tests pass; full suite/build are the remaining checkpoint gate.
