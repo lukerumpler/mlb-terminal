@@ -66,3 +66,6 @@
 - [x] Confirm the remaining uptime-monitor client module/page is not required for this backend callback and heartbeat request; preserve the newer managed navigation and defer the optional dashboard UI.
 - [x] Add and run route-level regression coverage for `/api/uptime-monitor` and `/api/scheduled/daily-uptime-monitor`; both route tests pass.
 - [x] Reconcile generated Drizzle migration metadata with the already-applied production schema; the generated `0003_dark_jocasta` migration and journal entry match the additive tables, the incomplete existing ledger was verified, and the safe decision was documented in `docs/uptime-monitor-migration-reconciliation.md` rather than fabricating a partial ledger row.
+
+- [x] Compare every local and remote branch against `main`, identify superior compatible features, and consolidate only validated changes into `main` without overwriting newer work; the compatible Vercel catch-all routing branch was integrated while preserving current main features.
+- [x] Run type checking, focused routing/uptime tests, the full Vitest suite, and production build on the consolidated `main` branch; all validation completed successfully.
