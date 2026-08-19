@@ -14,7 +14,7 @@ import {
 } from '../components/atoms.jsx';
 import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
-import { fmt } from '../lib/formatting.js';
+import { fmt, fmtWinPct } from '../lib/formatting.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
 import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
@@ -1011,7 +1011,7 @@ function LeaguePage() {
                       </td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:teamColor || C.teal }) }}>{t.w}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{t.l}</td>
-                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{(t.pct||0).toFixed(3)}</td>
+                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{fmtWinPct(t.pct)}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.gb === '-' || !t.gb ? '—' : t.gb}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.l10||'—'}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.rs||'—'}</td>

@@ -11353,3 +11353,7 @@
 - [x] Replace the conflicting Performance-workspace legacy SKIP Grade grid with a keyboard-accessible route to the canonical Front Office Evaluation.
 - [x] Defer optional AI roster insights until the Roster workspace opens while retaining immediate verified local roster analysis.
 - [x] Defer redundant calculated-intelligence standings work until Performance opens, while retaining it as a source-labeled fallback there.
+
+- [x] Audit all baseball record-percentage displays and add a shared formatter that renders leading-decimal notation such as .598.
+- [x] Migrate eligible win-percentage displays without changing percentage metrics that require a leading zero.
+- [x] Add regression coverage, validate responsive rendering, and publish the baseball percentage formatting update.
