@@ -11368,3 +11368,9 @@
 - [x] Implement only evidence-backed reliability, loading, accessibility, and responsive UX fixes found during the debug pass.
 - [x] Add regression coverage, complete release validation, and publish the active-search and reliability update.
 - [x] Record the reviewed documentation-only GitHub-main advance in the release-gate baseline before publication.
+
+- [x] Establish a current shared-main baseline using release comparison, provider, runtime, network, and build-health evidence.
+- [x] Audit high-cost data paths, caching, errors, test stability, accessibility, and desktop/mobile interface behavior.
+- [x] Implement only evidence-backed reliability, data-loading, performance, and UX fixes that preserve current source provenance and honest unavailable states.
+- [x] Add regression coverage, complete full release validation, and publish the master optimization release.
+- [x] Repair the React test teardown scheduling exception in the MLB team-loading sequence without changing production data behavior.
