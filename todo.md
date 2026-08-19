@@ -11374,3 +11374,7 @@
 - [x] Implement only evidence-backed reliability, data-loading, performance, and UX fixes that preserve current source provenance and honest unavailable states.
 - [x] Add regression coverage, complete full release validation, and publish the master optimization release.
 - [x] Repair the React test teardown scheduling exception in the MLB team-loading sequence without changing production data behavior.
+
+- [x] Audit the existing Team Overview loading states, skeleton component, styles, and associated regression coverage.
+- [x] Add an accessible animated Team Overview skeleton that mirrors the initial information hierarchy without presenting placeholder values as data.
+- [x] Validate desktop and mobile loading states, reduced-motion behavior, and full release quality before publication.
