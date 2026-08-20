@@ -73,3 +73,6 @@
 - [x] Diagnose and fix the Vercel API 404 routing/deployment configuration for `/api/health`, `/api/trpc`, and `/api/mlb`; restored the catch-all, added explicit health/MLB handlers, added nested tRPC routing, and verified all three production endpoints return HTTP 200 on commit `c0e8a3f`.
 - [x] Configure GitHub Actions to run the deployment smoke test automatically after a successful Vercel deployment; `.github/workflows/vercel-smoke.yml` listens for `deployment_status`, filters for success, targets the public production alias, and run `32407092246` completed successfully.
 - [x] Validate the routing fix and workflow configuration; TypeScript, focused tests, builds, live production checks, and the automatic smoke workflow passed. The GitHub/Vercel fix is published; the managed-project checkpoint is recorded separately below.
+
+- [x] Add accessible sorting and filtering controls to the selected team’s roster/player statistics display, preserving current data formatting and empty states; added player-name, position, plate-appearance, and innings-pitched sorting plus a clear-filters action to the roster workspace.
+- [ ] Save the checkpoint for the validated sorting/filtering enhancement; focused roster tests, full Vitest suite, type checking, production build, and desktop/mobile visual checks completed successfully.

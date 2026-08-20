@@ -19,6 +19,15 @@ describe('roster insights table helpers', () => {
     expect(buildRosterRows(players, [], 'ops', 0, 0, 'desc', 'beta').map(row => row.name)).toEqual(['Beta Batter']);
   });
 
+  it('sorts mixed roster rows by player name and position', () => {
+    const mixedPlayers = {
+      hitting: players.hitting,
+      pitching: [{ id: 4, name: 'Aaron Pitcher', position: 'SP', stat: { inningsPitched: 42 } }],
+    };
+    expect(buildRosterRows(mixedPlayers, [], 'name', 0, 0, 'asc').map(row => row.name)).toEqual(['Aaron Pitcher', 'Alpha Batter', 'Beta Batter', 'Gamma Batter']);
+    expect(buildRosterRows(mixedPlayers, [], 'position', 0, 0, 'asc').map(row => row.position)).toEqual(['1B', 'CF', 'RF', 'SP']);
+  });
+
   it('renders an accessible table-shaped roster loading state', () => {
     render(<RosterInsightsTableSkeleton />);
     expect(screen.getByRole('status', { name: 'Loading roster insight table' })).toBeInTheDocument();
