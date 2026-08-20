@@ -75,4 +75,4 @@
 - [x] Validate the routing fix and workflow configuration; TypeScript, focused tests, builds, live production checks, and the automatic smoke workflow passed. The GitHub/Vercel fix is published; the managed-project checkpoint is recorded separately below.
 
 - [x] Add accessible sorting and filtering controls to the selected team’s roster/player statistics display, preserving current data formatting and empty states; added player-name, position, plate-appearance, and innings-pitched sorting plus a clear-filters action to the roster workspace.
-- [ ] Save the checkpoint for the validated sorting/filtering enhancement; focused roster tests, full Vitest suite, type checking, production build, and desktop/mobile visual checks completed successfully.
+- [x] Save the checkpoint for the validated sorting/filtering enhancement; published as checkpoint `ecc9886f` after focused roster tests, full Vitest suite, type checking, production build, and desktop/mobile visual checks completed successfully.
