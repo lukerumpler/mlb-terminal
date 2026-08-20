@@ -581,6 +581,60 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
   });
 }
 
+function FrontOfficeRead({ rd, team, onOpenPerformance, onOpenProspects }) {
+  const signals = [
+    {
+      label:'Current posture',
+      value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support',
+      detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`,
+      color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust,
+      actionLabel:'Open Performance workspace',
+      action:onOpenPerformance,
+    },
+    {
+      label:'Best signal',
+      value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation',
+      detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`,
+      color:team.ops >= .750 ? C.amber : C.navy,
+      actionLabel:'Open Performance workspace',
+      action:onOpenPerformance,
+    },
+    {
+      label:'Next question',
+      value:'Prospect depth',
+      detail:'Review future value and ETA',
+      color:C.purple,
+      actionLabel:'Open Prospect board',
+      action:onOpenProspects,
+    },
+  ];
+
+  return <section className="skip-front-office-read" aria-labelledby="front-office-read-title">
+    <div className="skip-front-office-read-header">
+      <div>
+        <div className="skip-front-office-eyebrow">Executive briefing</div>
+        <h2 id="front-office-read-title">Front Office Read</h2>
+      </div>
+      <p>Decision-ready summary.</p>
+    </div>
+    <div className="skip-front-office-read-grid">
+      {signals.map(item => (
+        <article key={item.label} className="skip-front-office-read-item">
+          <div className="skip-front-office-read-label">{item.label}</div>
+          <div className="skip-front-office-read-value" style={{color:item.color}}>{item.value}</div>
+          <div className="skip-front-office-read-detail">{item.detail}</div>
+          <button type="button" className="skip-front-office-read-action" onClick={item.action} aria-label={`${item.actionLabel}: ${item.value}`}>
+            {item.actionLabel} <span aria-hidden="true">→</span>
+          </button>
+        </article>
+      ))}
+    </div>
+    <button type="button" className="skip-front-office-read-footer" onClick={onOpenPerformance}>
+      Continue to detailed team cards <span aria-hidden="true">↓</span>
+    </button>
+  </section>;
+}
+
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [overviewView, setOverviewView] = useState('briefing');
@@ -1669,6 +1723,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </> : <OverviewEmptyState status={teamVenueState === 'loading' ? 'Loading' : teamVenueState === 'source-gap' ? 'Source gap' : 'Unavailable'} message="Ballpark metadata" detail="Official MLB venue metadata is not available for this team right now. No static park values are substituted." />}
       </Panel>}
 
+      {overviewView === 'briefing' && <FrontOfficeRead
+        rd={rd}
+        team={team}
+        onOpenPerformance={() => setOverviewView('performance')}
+        onOpenProspects={() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))}
+      />}
+
       {overviewView === 'briefing' && <div id="team-overview-briefing" role="tabpanel" className="overview-responsive-grid overview-decision-row" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr) minmax(250px,1fr)',gap:14,alignItems:'start'}}>
         <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
           <div style={{padding:'8px 14px 6px',borderBottom:`0.5px solid ${C.borderLight}`}}>
@@ -1779,24 +1840,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <div style={{padding:'0 14px 10px',...sans({fontSize:9.5,color:C.text4,lineHeight:1.4})}}>
                         {taxHistoryRange}-season rows are requested from season-specific Spotrac MLB Tax Trackers. Missing rows remain unavailable; SKIP does not interpolate historical tax values. Threshold rules follow the <a href="https://www.mlb.com/glossary/transactions/competitive-balance-tax" target="_blank" rel="noreferrer" style={{color:C.amber}}>MLB CBT glossary</a>.
 
-        </div>
-      </Panel>}
-
-      {overviewView === 'briefing' && <Panel title="Front Office Read" accent={teamAccent} badge="Decision Lens">
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0}}>
-          {[
-            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${formatTeamMetric(team.ops,3)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy},
-            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
-          ].map((item, i) => (
-            <div key={item.label} style={{padding:'12px 14px',borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
-              <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
-              <div style={sans({fontSize:13,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
-              {item.action ? (
-                <button onClick={item.action} style={{marginTop:5,padding:0,border:'none',background:'transparent',fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:10,color:C.purple,cursor:'pointer',textAlign:'left',textDecoration:'underline',textUnderlineOffset:2}}>{item.detail} →</button>
-              ) : <div style={sans({fontSize:10,color:C.text3,marginTop:5,lineHeight:1.4})}>{item.detail}</div>}
-            </div>
-          ))}
         </div>
       </Panel>}
 

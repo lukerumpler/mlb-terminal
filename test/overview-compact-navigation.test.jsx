@@ -78,4 +78,18 @@ describe('Team Overview compact navigation', () => {
       expect(completedGameSplitCalls().length).toBeGreaterThan(0);
     });
   });
+
+  it('uses the Front Office Read actions as one-click routes into the detailed workspace', async () => {
+    render(<OverviewPage />);
+
+    await screen.findByRole('heading', { name: 'Front Office Read' });
+    const performanceLinks = screen.getAllByRole('button', { name: /Open Performance workspace:/i });
+    expect(performanceLinks).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /Open Prospect board:/i })).toBeInTheDocument();
+
+    fireEvent.click(performanceLinks[0]);
+    expect(screen.getByRole('button', { name: 'Performance' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Divisional WAR Comparison')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Front Office Read' })).not.toBeInTheDocument();
+  });
 });

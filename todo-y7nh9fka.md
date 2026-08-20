@@ -206,3 +206,12 @@
 - [x] Add regression coverage for each issue resolved during this debugging pass.
 - [x] Run focused and full validation, production build, and responsive previews.
 - [x] Save a new live checkpoint for the validated debugging and optimization pass.
+
+- [ ] Review the supplied Front Office Read reference and recommendations against the current Team Overview briefing.
+- [ ] Apply a compact executive-briefing layout with stronger hierarchy and decision-ready content framing.
+- [ ] Add fast, labeled navigation links from each briefing signal to the relevant Overview workspace.
+- [ ] Preserve verified-data status, provenance access, responsive behavior, and all existing detailed workspaces.
+- [ ] Add regression coverage for the new executive-briefing navigation and responsive behavior.
+- [ ] Run type checks, tests, production build, previews, and save a live checkpoint with a concise design review.
+
+- [ ] Reconcile the newly published roster-sorting work with the Front Office Read redesign without overwriting either workstream.
