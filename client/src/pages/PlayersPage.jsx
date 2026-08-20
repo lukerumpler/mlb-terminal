@@ -8,7 +8,7 @@ import {
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import { SEASON, TEAMS } from '../constants/data.js';
 import { SKIP_QUOTES } from '../constants/alerts.js';
-import { searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
+import { filterActivePlayerSearchResults, searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
 import {
   computeKPIs, decisionScore, verdict, verdictColor,
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
@@ -1764,7 +1764,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         // slower request can otherwise resolve after a newer one and
         // clobber its results with stale data.
         if (mountedRef.current && latestQueryRef.current === q) {
-          const matches = Array.isArray(r) ? r : [];
+          const matches = filterActivePlayerSearchResults(r);
           setResults(matches);
           setActiveResultIndex(-1);
           setSearchStatus(matches.length ? 'ready' : 'empty');
@@ -2023,7 +2023,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         <div aria-live="polite" aria-atomic="true" style={{ minHeight:18, padding:'4px 2px 0', ...sans({ fontSize:10, color:C.text3 }) }}>
           {searchStatus === 'searching' && 'Searching verified MLB and MiLB player records…'}
           {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — use Up and Down arrows to navigate, then press Enter to open the profile.${activeResultIndex >= 0 ? ` ${activeResultIndex + 1} of ${results.length} selected.` : ''}`}
-          {searchStatus === 'empty' && `No verified player matches found for “${query.trim()}”.`}
+          {searchStatus === 'empty' && `No active verified player matches found for “${query.trim()}”.`}
           {searchStatus === 'error' && 'Player search is temporarily unavailable. Please try again.'}
         </div>
         {results.length > 0 && (

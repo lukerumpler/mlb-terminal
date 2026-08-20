@@ -741,6 +741,17 @@ export async function getHandednessSplits(id, season, requestOptions = {}) {
 // PLAYER API
 // ═══════════════════════════════════════════════════════════════════════════
 
+export function isActivePlayerSearchResult(person) {
+  const active = person?.active;
+  if (active === false || active === 0 || ['false', 'n', 'no'].includes(String(active).trim().toLowerCase())) return false;
+  const status = String(person?.rosterStatus ?? person?.statusCode ?? '').trim().toLowerCase();
+  return !['inactive', 'retired', 'released'].includes(status);
+}
+
+export function filterActivePlayerSearchResults(people) {
+  return (Array.isArray(people) ? people : []).filter(isActivePlayerSearchResult);
+}
+
 export async function searchPlayers(query, limit = 12) {
   try {
     // Search both MLB and MiLB players by including all sportIds
@@ -749,7 +760,7 @@ export async function searchPlayers(query, limit = 12) {
       limit,
       sportId: '1,11,12,13,14,15,16,17,5442'
     });
-    return data.people || [];
+    return filterActivePlayerSearchResults(data.people);
   } catch { return []; }
 }
 

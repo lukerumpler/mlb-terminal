@@ -11362,3 +11362,19 @@
 - [x] Add a shared scorebook rate formatter for batting average and OPS without altering unrelated decimal metrics.
 - [x] Add an accessible standings export that includes Team, W–L, and formatted WIN% with verified export content.
 - [x] Add regression coverage, validate responsive behavior, and publish the notation and standings-export update.
+
+- [x] Audit every player-search source and active-status field, plus current runtime, network, and UI health evidence.
+- [x] Exclude non-active players from global and Players workspace search results without blocking current active-player profiles.
+- [x] Implement only evidence-backed reliability, loading, accessibility, and responsive UX fixes found during the debug pass.
+- [x] Add regression coverage, complete release validation, and publish the active-search and reliability update.
+- [x] Record the reviewed documentation-only GitHub-main advance in the release-gate baseline before publication.
+
+- [x] Establish a current shared-main baseline using release comparison, provider, runtime, network, and build-health evidence.
+- [x] Audit high-cost data paths, caching, errors, test stability, accessibility, and desktop/mobile interface behavior.
+- [x] Implement only evidence-backed reliability, data-loading, performance, and UX fixes that preserve current source provenance and honest unavailable states.
+- [x] Add regression coverage, complete full release validation, and publish the master optimization release.
+- [x] Repair the React test teardown scheduling exception in the MLB team-loading sequence without changing production data behavior.
+
+- [x] Audit the existing Team Overview loading states, skeleton component, styles, and associated regression coverage.
+- [x] Add an accessible animated Team Overview skeleton that mirrors the initial information hierarchy without presenting placeholder values as data.
+- [x] Validate desktop and mobile loading states, reduced-motion behavior, and full release quality before publication.

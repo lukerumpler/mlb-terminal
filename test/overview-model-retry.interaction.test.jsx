@@ -158,7 +158,9 @@ describe("Team Overview model source and retry interaction", () => {
     render(<OverviewPage />);
     expect(
       screen.getByRole("status", { name: "Loading team overview" })
-    ).toBeInTheDocument();
+    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText(/Loading verified team data/i)).toBeInTheDocument();
+    expect(document.querySelector(".skip-overview-skeleton-briefing")).toBeInTheDocument();
     expect(
       await screen.findByText("Season overview", { exact: false })
     ).toBeInTheDocument();
