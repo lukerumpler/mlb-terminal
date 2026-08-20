@@ -66,3 +66,7 @@
 - [x] Confirm the remaining uptime-monitor client module/page is not required for this backend callback and heartbeat request; preserve the newer managed navigation and defer the optional dashboard UI.
 - [x] Add and run route-level regression coverage for `/api/uptime-monitor` and `/api/scheduled/daily-uptime-monitor`; both route tests pass.
 - [x] Reconcile generated Drizzle migration metadata with the already-applied production schema; the generated `0003_dark_jocasta` migration and journal entry match the additive tables, the incomplete existing ledger was verified, and the safe decision was documented in `docs/uptime-monitor-migration-reconciliation.md` rather than fabricating a partial ledger row.
+
+- [x] Diagnose and fix the Vercel API 404 routing/deployment configuration for `/api/health`, `/api/trpc`, and `/api/mlb`; restored the catch-all, added explicit health/MLB handlers, added nested tRPC routing, and verified all three production endpoints return HTTP 200 on commit `c0e8a3f`.
+- [x] Configure GitHub Actions to run the deployment smoke test automatically after a successful Vercel deployment; `.github/workflows/vercel-smoke.yml` listens for `deployment_status`, filters for success, targets the public production alias, and run `32407092246` completed successfully.
+- [x] Validate the routing fix and workflow configuration; TypeScript, focused tests, builds, live production checks, and the automatic smoke workflow passed. The GitHub/Vercel fix is published; the managed-project checkpoint is recorded separately below.
