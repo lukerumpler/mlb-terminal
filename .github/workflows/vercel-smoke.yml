@@ -1,0 +1,43 @@
+name: Vercel deployment smoke test
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployed Vercel base URL"
+        required: false
+        default: "https://mlb-terminal.vercel.app"
+        type: string
+
+jobs:
+  smoke:
+    name: API deployment smoke test
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success')
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_SMOKE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || github.event.deployment_status.target_url || vars.VERCEL_SMOKE_BASE_URL || 'https://mlb-terminal.vercel.app' }}
+      VERCEL_SMOKE_TIMEOUT_MS: "15000"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Vercel API smoke test
+        run: pnpm test:smoke

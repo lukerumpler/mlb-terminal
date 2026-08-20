@@ -6,6 +6,9 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
+    "api/[...path].ts": {
+      "maxDuration": 60
+    },
     "api/news.js": {
       "maxDuration": 15
     }
