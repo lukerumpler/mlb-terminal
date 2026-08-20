@@ -147,7 +147,18 @@ describe("SKIP motion and responsive UI hooks", () => {
     );
     expect(indexSource).toContain(".skip-overview-executive-briefing {");
     expect(indexSource).toContain("justify-content:flex-start;");
+    expect(indexSource).toContain("min-height:0;");
+    expect(indexSource).toContain("height:auto;");
+    expect(indexSource).toContain(".skip-overview-deferred-analysis-intro { margin-top:32px; }");
+    expect(indexSource).toContain(".overview-responsive-grid.overview-decision-row.skip-overview-deferred-analysis { align-items:start; }");
     expect(indexSource).not.toContain("min-height:min(460px, calc(100svh - 220px));");
+    expect(overviewSource).toContain('function ExecutivePercentileMarker');
+    expect(overviewSource).toContain('marker:executivePercentiles.posture');
+    expect(overviewSource).toContain('marker:executivePercentiles.best');
+    expect(overviewSource).toContain('population:\'the available MLB team standings set\'');
+    expect(overviewSource).toContain('playerId: row?.id ?? null');
+    expect(overviewSource).toContain('<PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />');
+    expect(indexSource).toContain('.skip-executive-percentile-track');
     expect(overviewSource).toContain(
       'className="skip-affiliate-overview-grid skip-balanced-grid"'
     );

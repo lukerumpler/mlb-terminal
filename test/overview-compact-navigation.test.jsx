@@ -66,6 +66,22 @@ describe('Team Overview compact navigation', () => {
     expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('uses stable cached roster IDs for Team Leader portraits while keeping the visible player name as context', async () => {
+    window.localStorage.clear();
+    saveTeamPlayersCache(119, 2026, {
+      hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { homeRuns: 24, avg: .300, ops: .950, stolenBases: 18 } }],
+      pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { era: 2.75, strikeOuts: 190, whip: 1.01 } }],
+    });
+    const { container } = render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    expect(screen.getAllByText('Verified Hitter').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Verified Pitcher').length).toBeGreaterThan(0);
+    expect(container.querySelector('img[src*="/people/518692/headshot/67/current"]')).toBeInTheDocument();
+    expect(container.querySelector('img[src*="/people/605483/headshot/67/current"]')).toBeInTheDocument();
+    window.localStorage.clear();
+  });
+
   it('uses all Executive Briefing items as direct workspace shortcuts', async () => {
     const onNavigate = vi.fn();
     window.addEventListener('skip-navigate', onNavigate);

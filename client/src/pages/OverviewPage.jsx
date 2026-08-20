@@ -13,6 +13,7 @@ import { openPlayerProfile, openTab } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { percentile } from '../lib/percentile.js';
+import PlayerPhoto from '../components/PlayerPhoto.jsx';
 import { buildCbtHistorySeasons, readCbtHistoryRange, saveCbtHistoryRange, CBT_HISTORY_OPTIONS } from '../lib/cbtHistory.js';
 import { captureVerifiedSnapshot, deriveVerifiedTrends, formatTrendDelta, readVerifiedSnapshot } from '../lib/trendSnapshots.js';
 import { fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
@@ -656,16 +657,28 @@ function getLeaders(hittingRows = [], pitchingRows = []) {
       : Number(b.stat[key]) - Number(a.stat[key]))[0] || null;
   const hit = (cat, key, digits = 0, direction = 'desc') => {
     const row = top(hittingRows, key, direction);
-    return { cat, player: row?.name || '—', val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
+    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
   };
   const pit = (cat, key, digits = 0, direction = 'desc') => {
     const row = top(pitchingRows, key, direction);
-    return { cat, player: row?.name || '—', val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
+    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
   };
   return {
     batting: [hit('HR', 'homeRuns'), hit('AVG', 'avg', 3), hit('OPS', 'ops', 3), hit('SB', 'stolenBases')],
     pitching: [pit('ERA', 'era', 2, 'asc'), pit('K', 'strikeOuts'), pit('WHIP', 'whip', 2, 'asc')],
   };
+}
+
+function ExecutivePercentileMarker({ label, percentile: value, population }) {
+  const percentileValue = Number(value);
+  if (!Number.isFinite(percentileValue)) return null;
+  const clamped = Math.max(0, Math.min(100, percentileValue));
+  const rank = percentileLabel(clamped);
+  return <div className="skip-executive-percentile" aria-label={`${label}: ${rank} percentile among ${population}`}>
+    <span className="skip-executive-percentile-label">League percentile</span>
+    <span className="skip-executive-percentile-track" aria-hidden="true"><i style={{ left:`${clamped}%` }} /></span>
+    <strong>{rank}</strong>
+  </div>;
 }
 
 function getBattedBall() { return null; }
@@ -1995,6 +2008,20 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     };
   },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, rd]);
 
+  const executivePercentiles = useMemo(() => {
+    const runDiff = D.offenseData.find(row => row.axis === 'Run Diff')?.val ?? null;
+    const offense = D.pctBars.find(row => row.lbl === 'Offense')?.pct ?? null;
+    const pitching = D.pctBars.find(row => row.lbl === 'Pitching')?.pct ?? null;
+    return {
+      posture:runDiff == null ? null : { label:'Run differential', percentile:runDiff, population:'the available MLB team standings set' },
+      best:team.ops >= .750 && offense != null
+        ? { label:'Team OPS', percentile:offense, population:'the available MLB team aggregate set' }
+        : team.era != null && team.era <= 3.50 && pitching != null
+          ? { label:'Team ERA', percentile:pitching, population:'the available MLB team aggregate set' }
+          : null,
+    };
+  }, [D, team.ops, team.era]);
+
   // These only depend on `team`, but were previously called directly in the
   // render body — every unrelated state change on this page (e.g. clicking
   // a split/arsenal tab) was silently recomputing all five for the same
@@ -2279,14 +2306,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
         <div className="skip-overview-executive-grid">
           {[
-            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${fmtScorebookRate(team.ops)} · ERA ${formatTeamMetric(team.era,2)}`, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, marker:executivePercentiles.posture, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
+            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${fmtScorebookRate(team.ops)} · ERA ${formatTeamMetric(team.era,2)}`, marker:executivePercentiles.best, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
             {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, destination:'Organization depth', action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
           ].map((item, i) => (
             <button key={item.label} type="button" className="skip-overview-executive-item" onClick={item.action} aria-label={`Open ${item.destination}: ${item.label}`} style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
               <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
               <div style={sans({fontSize:15,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
               <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>
+              {item.marker && <ExecutivePercentileMarker {...item.marker} />}
               <span className="skip-overview-executive-item-link">Open {item.destination} →</span>
             </button>
           ))}
@@ -2310,6 +2338,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
                   <span style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
+                  <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
                   <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
                 </div>
                 <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
@@ -2322,6 +2351,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
                   <span style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
+                  <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
                   <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
                 </div>
                 <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>

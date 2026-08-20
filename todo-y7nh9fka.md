@@ -215,3 +215,12 @@
 - [x] Run type checks, tests, production build, previews, and save a live checkpoint with a concise design review.
 
 - [x] Reconcile the newly published roster-sorting work with the Front Office Read redesign without overwriting either workstream.
+
+- [x] Audit documented percentile populations, Team Leader roster identifiers, defensive-position data, and radar benchmark inputs.
+- [x] Add executive-briefing gradient percentile markers only for documented measured populations.
+- [x] Add Team Leader portraits only when a stable verified player ID is available, with safe initials fallbacks.
+- [x] Document whether current data coverage supports an honest defensive field map and benchmark radar implementation.
+- [x] Add regression coverage and validate the new presentation at desktop and mobile widths.
+- [x] Run type checks, full tests, production build, and save a live checkpoint with source-coverage findings.
+
+- [x] Apply the scoped Overview density hotfix: content-driven executive briefing, normal Supporting Analysis spacing, and content-sized detailed decision cards.

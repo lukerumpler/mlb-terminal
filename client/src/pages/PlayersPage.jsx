@@ -29,12 +29,11 @@ import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
-import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
+import PlayerPhoto from '../components/PlayerPhoto.jsx';
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation, getSurchargeBand } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
-import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 
 const VISUAL_QA_PLAYERS = [
@@ -76,34 +75,6 @@ function pctBar(pct, color) {
 const TT = { ...WARM_TOOLTIP, wrapperStyle:{ zIndex:9999 } };
 
 /* ─── Module-scope helpers ────────────────────────────────────────── */
-/* ─── Player photo ────────────────────────────────────────────────── */
-function PlayerPhoto({ id, name, size = 96 }) {
-  const [err, setErr] = useState(false);
-  const lowDataMode = useLowDataMode();
-  // This component isn't remounted per-player (no `key` on it in the
-  // parent), so state persists across different players searched in the
-  // same session. Without this, one player's photo failing to load
-  // (broken/missing MLB image, network hiccup) would leave `err` stuck at
-  // true forever — every player searched afterward would show the fallback
-  // placeholder even if their real photo would have loaded fine.
-  useEffect(() => { setErr(false); }, [id]);
-  const primary = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/${id}/headshot/67/current`;
-  const h = Math.round(size * 1.25);
-  const cx = size / 2;
-  const { bg: phBg, fg: phFg } = placeholderColors();
-  const fallback = `data:image/svg+xml,${encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + h + '" viewBox="0 0 ' + size + ' ' + h + '">' +
-    '<rect width="' + size + '" height="' + h + '" rx="10" fill="' + phBg + '"/>' +
-    '<circle cx="' + cx + '" cy="' + Math.round(h * 0.30) + '" r="' + Math.round(size * 0.22) + '" fill="' + phFg + '"/>' +
-    '<ellipse cx="' + cx + '" cy="' + Math.round(h * 0.88) + '" rx="' + Math.round(size * 0.32) + '" ry="' + Math.round(h * 0.22) + '" fill="' + phFg + '"/>' +
-    '</svg>'
-  )}`;
-  return (
-    <img src={err || lowDataMode ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
-      style={{ width:size, height:h, borderRadius:10, objectFit:'cover', objectPosition:'center top',
-        border:`1px solid ${C.border}`, flexShrink:0, background:C.surface2, display:'block' }} />
-  );
-}
 
 /* ─── Source-safe player video discovery ──────────────────────────── */
 // These are search destinations, not fabricated individual video records. Each
