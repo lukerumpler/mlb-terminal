@@ -1,15 +1,15 @@
-import express from "express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../../server/routers";
-import { createContext } from "../../server/_core/context";
+import type { Request, Response } from "express";
 
-const app = express();
-app.use(
-  "/api/trpc",
-  createExpressMiddleware({
-    router: appRouter,
-    createContext,
-  })
-);
+function isAnonymousAuthMe(req: Request) {
+  const url = new URL(req.url, "https://vercel.invalid");
+  return url.pathname.endsWith("/auth.me") && !req.headers.cookie;
+}
 
-export default app;
+export default async function handler(req: Request, res: Response) {
+  if (req.method === "GET" && isAnonymousAuthMe(req)) {
+    return res.status(200).json({ result: { data: { json: null } } });
+  }
+
+  const { default: trpcApp } = await import("../trpc");
+  return trpcApp(req, res);
+}

@@ -10,4 +10,13 @@ describe("Vercel API routing", () => {
     );
     expect(source).toContain('export { default } from "./index"');
   });
+
+  it("handles anonymous nested tRPC auth requests before dynamic app loading", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "api/trpc/[...path].ts"),
+      "utf8"
+    );
+    expect(source).toContain("isAnonymousAuthMe");
+    expect(source).toContain("result: { data: { json: null } }");
+  });
 });
