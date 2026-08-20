@@ -19,7 +19,7 @@ jobs:
        github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
     env:
-      VERCEL_SMOKE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || github.event.deployment_status.target_url || vars.VERCEL_SMOKE_BASE_URL || 'https://mlb-terminal.vercel.app' }}
+      VERCEL_SMOKE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || vars.VERCEL_SMOKE_BASE_URL || 'https://mlb-terminal.vercel.app' }}
       VERCEL_SMOKE_TIMEOUT_MS: "15000"
     steps:
       - name: Check out repository
