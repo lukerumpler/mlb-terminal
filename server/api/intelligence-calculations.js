@@ -42,6 +42,13 @@ function calculateFromStanding(standing, season) {
   const pythagoreanWinPct = runsScored != null && runsAllowed != null && runsScored + runsAllowed > 0
     ? (runsScored ** pythagoreanExponent) / ((runsScored ** pythagoreanExponent) + (runsAllowed ** pythagoreanExponent))
     : null;
+  const pythagoreanProjectedWins = pythagoreanWinPct == null ? null : pythagoreanWinPct * seasonLength;
+  const pythagoreanProjectedLosses = pythagoreanProjectedWins == null ? null : seasonLength - pythagoreanProjectedWins;
+  // Pythagorean expected wins above a fixed 48-win replacement baseline.
+  // This is a team wins-above-replacement proxy, not FanGraphs player WAR.
+  const calculatedWarProxy = pythagoreanProjectedWins == null
+    ? null
+    : Math.max(0, pythagoreanProjectedWins - 48);
 
   return {
     season: Number(season),
@@ -54,6 +61,8 @@ function calculateFromStanding(standing, season) {
       projectedWins: "current verified win percentage multiplied by a 162-game season",
       projectedLosses: "162 minus calculated projected wins",
       pythagoreanWinPct: pythagoreanWinPct == null ? null : "runs scored and runs allowed with exponent 1.83",
+      pythagoreanProjectedLosses: pythagoreanProjectedLosses == null ? null : "162 minus pythagorean projected wins from verified runs scored and runs allowed",
+      calculatedWarProxy: calculatedWarProxy == null ? null : "pythagorean expected 162-game wins minus a 48-win replacement baseline; a team wins-above-replacement proxy, not FanGraphs WAR",
     },
     metrics: {
       wins,
@@ -66,6 +75,9 @@ function calculateFromStanding(standing, season) {
       runsAllowed,
       runDifferential: runsScored != null && runsAllowed != null ? runsScored - runsAllowed : null,
       pythagoreanWinPct,
+      pythagoreanProjectedWins,
+      pythagoreanProjectedLosses,
+      calculatedWarProxy,
     },
   };
 }

@@ -17,10 +17,20 @@ beforeEach(() => {
 
 async function goToTab(user, label, waitForText) {
   render(<App />);
-  const navButton = await screen.findByRole("button", {
-    name: new RegExp(label),
-  });
-  await user.click(navButton);
+  const groupedTabs = {
+    Draft: { workspace: "Talent", tab: "Draft Board" },
+    AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
+  };
+  const grouped = groupedTabs[label];
+  if (grouped) {
+    await user.click(await screen.findByTitle(grouped.workspace));
+    await user.click(await screen.findByRole("tab", { name: grouped.tab }));
+  } else {
+    const navButton = await screen.findByRole("button", {
+      name: new RegExp(label),
+    });
+    await user.click(navButton);
+  }
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
 
@@ -80,8 +90,9 @@ describe("Knowledge page", () => {
   it("cycles through every knowledge tab without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", { name: /Knowledge/ });
+    const navButton = await screen.findByTitle("Intelligence");
     await user.click(navButton);
+    await user.click(await screen.findByRole("tab", { name: "Knowledge" }));
     await screen.findByRole(
       "button",
       { name: /^Game Theory$/ },
@@ -230,16 +241,21 @@ describe("League page", () => {
     await goToTab(user, "League", /standings|leaders/i);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
+
 });
 
 describe("Follow List page", () => {
   it("filters by category without crashing", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const navButton = await screen.findByRole("button", {
-      name: /Follow List/,
-    });
+    const navButton = document.querySelector(
+      '.skip-sidebar button[title="Intel Feed"]'
+    );
+    expect(navButton).toBeTruthy();
     await user.click(navButton);
+    await user.click(
+      await screen.findByRole("tab", { name: "Follow List" })
+    );
     await screen.findByPlaceholderText(
       /Search by name, handle, or bio/i,
       {},

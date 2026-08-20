@@ -73,7 +73,14 @@ describe("backend intelligence calculations", () => {
       runDifferential: 100,
     });
     expect(result.body.metrics.pythagoreanWinPct).toBeCloseTo(0.57006, 5);
+    expect(result.body.metrics.pythagoreanProjectedWins).toBeCloseTo(92.35, 2);
+    expect(result.body.metrics.pythagoreanProjectedLosses).toBeCloseTo(69.65, 2);
+    expect(result.body.metrics).not.toHaveProperty("calculatedPlayoffOdds");
+    expect(result.body.metrics.calculatedWarProxy).toBeCloseTo(44.35, 2);
     expect(result.body.methodology.projectedWins).toMatch(/verified win percentage/);
+    expect(result.body.methodology.pythagoreanProjectedLosses).toMatch(/162 minus pythagorean projected wins/i);
+    expect(result.body.methodology).not.toHaveProperty("calculatedPlayoffOdds");
+    expect(result.body.methodology.calculatedWarProxy).toMatch(/not FanGraphs WAR/i);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

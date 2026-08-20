@@ -12,6 +12,9 @@ describe("legacy API route registration", () => {
       "/api/contract",
       "/api/comparison-summary",
       "/api/natural-search",
+      "/api/playoffstatus-odds",
+      "/api/player-advanced",
+      "/api/player-identity",
     ]);
   });
 });

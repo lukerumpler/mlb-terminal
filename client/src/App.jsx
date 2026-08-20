@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, laz
 import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
-import { ALERTS, getDailyInsight } from './constants/alerts.js';
+import { getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
+import { getCacheHealth } from './lib/cacheHealthClient.js';
+import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
 import { Panel } from './components/atoms.jsx';
 import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
@@ -78,14 +80,106 @@ const TABS = [
   { key:'notes',        icon:'✎', label:'Scouting Notes', section:'Workflow' },
   { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
   { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
+  { key:'alerts',       icon:'🔔', label:'Alerts',         section:'System' },
 ];
+
+const WORKSPACE_GROUPS = [
+  {
+    key:'talent',
+    icon:'↑',
+    label:'Talent',
+    section:'Evaluation',
+    defaultTab:'players',
+    tabs:[
+      { key:'players', label:'Players', description:'Player profiles, evaluation, and comparison' },
+      { key:'prospects', label:'Prospects', description:'Farm, ranking, and development context' },
+      { key:'draft', label:'Draft Board', description:'Amateur scouting and board organization' },
+    ],
+  },
+  {
+    key:'intelligence-workspace',
+    icon:'◆',
+    label:'Intelligence',
+    section:'Monitor',
+    defaultTab:'intelligence',
+    tabs:[
+      { key:'intelligence', label:'Intelligence', description:'Team and market intelligence' },
+      { key:'amd', label:'AMD / IMD', description:'Analytical model development' },
+      { key:'knowledge', label:'Knowledge', description:'Methods, concepts, and reference material' },
+    ],
+  },
+  {
+    key:'feed-workspace',
+    icon:'▤',
+    label:'Intel Feed',
+    section:'Monitor',
+    defaultTab:'feed',
+    tabs:[
+      { key:'feed', label:'Intel Feed', description:'Source-aware league and team intelligence' },
+      { key:'follows', label:'Follow List', description:'Tracked players and follow-up activity' },
+    ],
+  },
+  {
+    key:'settings-workspace',
+    icon:'⚙',
+    label:'Settings',
+    section:'System',
+    defaultTab:'settings',
+    tabs:[
+      { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
+      { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
+    ],
+  },
+];
+
+const PRIMARY_TABS = [
+  { key:'overview', icon:'⊞', label:'Overview', section:'Overview' },
+  WORKSPACE_GROUPS[0],
+  { key:'league', icon:'◎', label:'League', section:'Monitor' },
+  WORKSPACE_GROUPS[1],
+  WORKSPACE_GROUPS[2],
+  { key:'notes', icon:'✎', label:'Scouting Notes', section:'Workflow' },
+  WORKSPACE_GROUPS[3],
+];
+
+function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
+  return (
+    <Panel title="Active Alerts" accent={C.rust} badge="Live operational sources">
+      <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
+        Alerts are derived from current cache telemetry, feed-freshness settings, and workspace preferences. SKIP does not invent player news or transaction events.
+      </div>
+      {cacheHealthStatus === 'loading' && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>Reading live operational sources…</div>
+      )}
+      {cacheHealthStatus !== 'loading' && alerts.length === 0 && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>No active operational alerts right now.</div>
+      )}
+      {alerts.map((a, i) => (
+        <div key={i} style={{
+          padding:'10px 14px',
+          borderBottom: i < alerts.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
+          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' ? C.amberSoft : C.surface2,
+        }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.title}</span>
+            <span style={px({ fontSize:9, color:C.text3 })}>{a.source}</span>
+          </div>
+          <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
+        </div>
+      ))}
+      <div style={{ padding:'7px 14px', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2, ...px({ fontSize:9, color:C.text3 }) }}>
+        Cache telemetry: {cacheHealth?.day ? `UTC ${cacheHealth.day}` : 'not yet available'}
+      </div>
+    </Panel>
+  );
+}
 
 export default function App() {
   const [tab, setTab]               = useState('overview');
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
@@ -99,6 +193,9 @@ export default function App() {
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
   const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
   const [recentHistory, setRecentHistory] = useState(() => readRecentHistory());
+  const [cacheHealth, setCacheHealth] = useState(null);
+  const [cacheHealthStatus, setCacheHealthStatus] = useState('loading');
+  const [cacheHealthUpdatedAt, setCacheHealthUpdatedAt] = useState(null);
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
   }, []);
@@ -133,9 +230,44 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('skip-theme', theme); } catch { /* best effort */ }
   }, [theme]);
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 720px)');
+    if (!query) return undefined;
+    const sync = () => setCompactMobile(query.matches);
+    sync();
+    query.addEventListener?.('change', sync);
+    return () => query.removeEventListener?.('change', sync);
+  }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const refreshCacheHealth = useCallback(async () => {
+    setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
+    try {
+      const next = await getCacheHealth();
+      if (!next) throw new Error('Cache telemetry was empty');
+      setCacheHealth(next);
+      setCacheHealthUpdatedAt(Date.now());
+      setCacheHealthStatus('ready');
+    } catch {
+      setCacheHealthStatus('error');
+    }
+  }, []);
+  useEffect(() => {
+    refreshCacheHealth();
+    const intervalId = window.setInterval(refreshCacheHealth, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshCacheHealth]);
+  const liveAlerts = useMemo(() => buildOperationalAlerts({
+    cacheHealth,
+    cacheHealthStatus,
+    feedFreshnessSummary,
+    lowDataMode,
+  }), [cacheHealth, cacheHealthStatus, feedFreshnessSummary, lowDataMode]);
+  const alertCount = useMemo(() => countActionableAlerts(liveAlerts), [liveAlerts]);
+  const activeWorkspace = useMemo(() => WORKSPACE_GROUPS.find(workspace => workspace.tabs.some(item => item.key === tab)) || null, [tab]);
+  const activePrimaryKey = activeWorkspace?.key || tab;
+  const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
 
   const [showPalette, setShowPalette] = useState(false);
   useEffect(() => {
@@ -276,51 +408,39 @@ export default function App() {
             <text x="122" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">P</text>
             <line x1="4" y1="67" x2="178" y2="67" stroke="#CC2222" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
-          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'3px 8px', borderRadius:20, background:C.amberSoft, border:`0.5px solid ${C.amberMid}`, width:'fit-content' }}>
-            <div style={{ width:5, height:5, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
-            <span style={px({ fontSize:10, color:C.teal, letterSpacing:'.06em', fontWeight:600 })}>LIVE · 2026</span>
-          </div>
+          <button type="button" onClick={() => setShowPalette(true)} title="Search everything" aria-label="Search everything"
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, cursor:'pointer', width:'100%', textAlign:'left' }}>
+            <span aria-hidden="true" style={{ fontSize:14, lineHeight:1 }}>⌕</span>
+            <span style={sans({ fontSize:10.5, fontWeight:800, flex:1 })}>Search</span>
+            <span className="skip-nav-shortcut" style={px({ fontSize:8.5, color:C.teal, border:`0.5px solid ${C.tealMid}`, borderRadius:4, padding:'1px 4px' })}>⌘K</span>
+          </button>
         </div>
 
         {/* Nav */}
         <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
-          {TABS.map((t, i) => (
+          {PRIMARY_TABS.map((t, i) => {
+            const workspaceAlertCount = t.key === 'settings-workspace' ? alertCount : t.alertCount;
+            return (
             <React.Fragment key={t.key}>
-            {(i === 0 || TABS[i - 1].section !== t.section) && (
+            {(i === 0 || PRIMARY_TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} onClick={() => { setTab(t.key); setMobileNavOpen(false); }} aria-current={tab===t.key ? 'page' : undefined}
-              style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:tab===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:tab===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
+            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.key === 'settings-workspace' ? `${t.label}: ${workspaceAlertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
+              style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
-              {tab === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
+              {t.key === 'settings-workspace' && (
+                <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
+                  <span role="img" aria-label={`${workspaceAlertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
+                  {workspaceAlertCount > 0 && <span aria-hidden="true">{workspaceAlertCount}</span>}
+                </span>
+              )}
+              {activePrimaryKey === t.key && <div style={{ marginLeft:t.key === 'settings-workspace' ? 4 : 'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
-          ))}
+            );
+          })}
 
-          <button onClick={() => setShowPalette(true)} title="Search everything"
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>⌕</span>
-            <span className="skip-nav-label" style={sans({ fontSize:12, fontWeight:600, flex:1 })}>Search</span>
-            <span className="skip-nav-shortcut" style={px({ fontSize:9.5, color:C.text4, border:`0.5px solid ${C.border}`, borderRadius:4, padding:'1px 5px' })}>⌘K</span>
-          </button>
-
-          <div style={{ height:1, background:C.border, margin:'6px 2px' }} />
-          <div className="skip-nav-section skip-utility-section" aria-hidden="true">Workspace</div>
-
-          <button onClick={() => setShowAlerts(s => !s)} title="View alerts" aria-expanded={showAlerts}
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:showAlerts?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:showAlerts?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>Alerts</span>
-            <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:C.rust, borderRadius:10, padding:'1px 7px' }}>
-              {ALERTS.length}
-            </span>
-          </button>
-
-          <button onClick={toggleTheme} title="Toggle light / dark theme"
-            style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:C.text2, transition:'all .12s', textAlign:'left' }}>
-            <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{theme === 'dark' ? '☀' : '☾'}</span>
-            <span className="skip-utility-label" style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-          </button>
         </nav>
 
         <div className="skip-sidebar-insight" style={{ padding:'8px 10px', borderTop:`1px solid ${C.border}` }}>
@@ -338,7 +458,7 @@ export default function App() {
         <div className="skip-topbar" style={{ height:46, flexShrink:0, background:C.surface, borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', padding:'0 18px', gap:12, boxShadow:`0 2px 12px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
           <button type="button" ref={mobileNavToggleRef} className="skip-mobile-nav-toggle" aria-controls="skip-mobile-nav" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(open => !open)} style={{ display:'none', alignItems:'center', justifyContent:'center', width:34, height:34, border:`1px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text, cursor:'pointer', fontSize:18, lineHeight:1 }}>☰</button>
           <div style={sans({ fontSize:14, fontWeight:800, color:C.text, letterSpacing:'-.01em' })}>
-            {TABS.find(t => t.key === tab)?.label || 'SKIP'}
+            {activeTitle}
           </div>
           <div style={{ flex:1 }} />
           <RecentHistoryDropdown items={recentHistory} onClear={() => setRecentHistory(readRecentHistory())} />
@@ -360,34 +480,42 @@ export default function App() {
           <div style={{ height:7, width:7, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
         </div>
 
+        <nav className="skip-mobile-workspace-switcher" aria-label="Quick workspace switcher" aria-hidden={!compactMobile}>
+          {PRIMARY_TABS.map(workspace => {
+            const selected = activePrimaryKey === workspace.key;
+            const quickAlertCount = workspace.key === 'settings-workspace' ? alertCount : 0;
+            return (
+              <button key={workspace.key} type="button" tabIndex={compactMobile ? undefined : -1} aria-current={selected ? 'page' : undefined} onClick={() => { setTab(workspace.defaultTab || workspace.key); setMobileNavOpen(false); }}>
+                <span aria-hidden="true">{workspace.icon}</span>
+                <span>{workspace.label}</span>
+                {workspace.key === 'settings-workspace' && quickAlertCount > 0 && <strong aria-label={`${quickAlertCount} active alerts`}>{quickAlertCount}</strong>}
+              </button>
+            );
+          })}
+        </nav>
+
         {/* Scrollable content */}
         <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
-          {showAlerts && (
-            <div style={{ marginBottom:16 }}>
-              <Panel title="Active Alerts" accent={C.rust} badge="Sample feed">
-                <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
-                  Illustrative examples — not a live feed yet.
-                </div>
-                {ALERTS.map((a, i) => (
-                  <div key={i} style={{
-                    padding:'10px 14px',
-                    borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
-                    background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
-                  }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
-                      <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
-                    </div>
-                    <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
-                  </div>
+          {activeWorkspace && (
+            <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
+              <div className="skip-workspace-subtabs-copy">
+                <span>{activeWorkspace.label} workspace</span>
+                <strong>{activeWorkspace.tabs.find(item => item.key === tab)?.description}</strong>
+              </div>
+              <div className="skip-workspace-subtabs-controls">
+                {activeWorkspace.tabs.map(item => (
+                  <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`skip-workspace-panel-${item.key}`} onClick={() => setTab(item.key)}>
+                    {item.label}
+                  </button>
                 ))}
-              </Panel>
-            </div>
+              </div>
+            </nav>
           )}
 
-          <PageErrorBoundary resetKey={tab}>
-            <Suspense fallback={<PageLoading />}>
+          <div id={`skip-workspace-panel-${tab}`} role={activeWorkspace ? 'tabpanel' : undefined} aria-label={activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
+            <PageErrorBoundary resetKey={tab}>
+              <Suspense fallback={<PageLoading />}>
               {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
               {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
@@ -399,9 +527,11 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
-            </Suspense>
-          </PageErrorBoundary>
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
+              </Suspense>
+            </PageErrorBoundary>
+          </div>
         </div>
 
         <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />
@@ -464,11 +594,31 @@ export default function App() {
         .skip-content > * { animation: fadeUp .24s cubic-bezier(.23,1,.32,1) both; }
         .skip-content > *:nth-child(2) { animation-delay: .03s; }
         .skip-content > *:nth-child(3) { animation-delay: .06s; }
+        .skip-workspace-subtabs { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px; padding:9px 10px; border:1px solid ${C.border}; border-radius:9px; background:${C.surface}; box-shadow:0 4px 12px color-mix(in srgb, ${C.navy} 3%, transparent); }
+        .skip-workspace-subtabs-copy { display:flex; flex-direction:column; gap:2px; min-width:0; }
+        .skip-workspace-subtabs-copy span { font:700 9px/1 'DM Mono',monospace; color:${C.teal}; letter-spacing:.08em; text-transform:uppercase; }
+        .skip-workspace-subtabs-copy strong { font:600 11px/1.3 'Plus Jakarta Sans',sans-serif; color:${C.text2}; }
+        .skip-workspace-subtabs-controls { display:flex; align-items:center; gap:5px; flex-shrink:0; }
+        .skip-workspace-subtabs-controls button { min-height:30px; padding:5px 9px; border:1px solid ${C.border}; border-radius:6px; background:${C.surface2}; color:${C.text3}; cursor:pointer; font:800 9px/1 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+        .skip-workspace-subtabs-controls button[aria-selected="true"] { border-color:${C.tealMid}; background:${C.tealSoft}; color:${C.teal}; }
 
         @media (prefers-reduced-motion: reduce) {
           .page-enter, .skip-content > * { animation: none !important; }
           *, *::before, *::after { transition-duration: .001ms !important; scroll-behavior: auto !important; }
           *[style*="animation"] { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+        }
+        @media (max-width:720px) {
+          .skip-mobile-workspace-switcher { display:flex; align-items:center; gap:6px; min-height:43px; padding:6px 10px; overflow-x:auto; overscroll-behavior-x:contain; border-bottom:1px solid ${C.border}; background:${C.surface}; scrollbar-width:none; }
+          .skip-mobile-workspace-switcher::-webkit-scrollbar { display:none; }
+          .skip-mobile-workspace-switcher button { flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; min-height:30px; padding:5px 8px; border:1px solid ${C.border}; border-radius:999px; background:${C.surface2}; color:${C.text3}; cursor:pointer; font:800 9px/1 'DM Mono',monospace; letter-spacing:.03em; white-space:nowrap; }
+          .skip-mobile-workspace-switcher button[aria-current="page"] { border-color:${C.tealMid}; background:${C.tealSoft}; color:${C.teal}; }
+          .skip-mobile-workspace-switcher button strong { display:inline-grid; place-items:center; min-width:15px; height:15px; padding:0 3px; border-radius:999px; background:${C.rustSoft}; color:${C.rust}; font:800 8px/1 'DM Mono',monospace; }
+          .skip-workspace-subtabs { align-items:stretch; flex-direction:column; gap:9px; padding:9px; }
+          .skip-workspace-subtabs-controls { width:100%; overflow-x:auto; padding-bottom:1px; }
+          .skip-workspace-subtabs-controls button { flex:0 0 auto; min-height:32px; }
+        }
+        @media (min-width:721px) {
+          .skip-mobile-workspace-switcher { display:none; }
         }
       `}</style>
     </div>

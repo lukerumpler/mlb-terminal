@@ -135,7 +135,7 @@ describe("SKIP motion and responsive UI hooks", () => {
     );
     expect(playersSource).toContain("import MetricInfo from");
     expect(indexSource).toContain(".skip-metric-info-popover");
-    expect(appSource).toContain("skip-utility-section");
+    expect(appSource).toContain("skip-settings-alert-indicator");
     expect(tickerSource).toContain('className="skip-ticker-message"');
     expect(tickerSource).toContain('className="skip-ticker-shell"');
     expect(indexSource).toContain("-webkit-overflow-scrolling:touch");
@@ -145,6 +145,9 @@ describe("SKIP motion and responsive UI hooks", () => {
     expect(indexSource).toContain(
       ".skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }"
     );
+    expect(indexSource).toContain(".skip-overview-executive-briefing {");
+    expect(indexSource).toContain("justify-content:flex-start;");
+    expect(indexSource).not.toContain("min-height:min(460px, calc(100svh - 220px));");
     expect(overviewSource).toContain(
       'className="skip-affiliate-overview-grid skip-balanced-grid"'
     );

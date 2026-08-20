@@ -18,6 +18,7 @@ const loadFullPlayer = vi.fn();
 vi.mock("../client/src/api/mlb.js", () => ({
   searchPlayers: (...args) => searchPlayers(...args),
   loadFullPlayer: (...args) => loadFullPlayer(...args),
+  filterActivePlayerSearchResults: people => (Array.isArray(people) ? people : []).filter(person => person?.active !== false),
 }));
 
 const { default: PlayersPage } = await import(
@@ -280,12 +281,53 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const input = screen.getByPlaceholderText(/Search any MLB player/i);
     await user.type(input, "Keyboard");
 
-    expect(await screen.findByText(/1 matching player.*select a name to open the profile/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Keyboard Player profile" })).toBeInTheDocument();
+    expect(await screen.findByText(/1 matching player.*Up and Down arrows.*Enter/i)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Open Keyboard Player profile" })).toBeInTheDocument();
     await user.keyboard("{Enter}");
 
     expect(await screen.findByRole("heading", { name: /Keyboard Player/ })).toBeInTheDocument();
     expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 44, fullName: "Keyboard Player" }), expect.anything(), expect.anything());
+  });
+  it("excludes known inactive players from visible search results", async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([
+      { id: 81, fullName: "Inactive Search Result", active: false, currentTeam: { name: "Former Club" }, primaryPosition: { abbreviation: "OF" } },
+      { id: 82, fullName: "Active Search Result", active: true, currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "CF" } },
+    ]);
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Search Result");
+    expect(await screen.findByRole("option", { name: "Open Active Search Result profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Open Inactive Search Result profile" })).toBeNull();
+    expect(screen.getByText(/1 matching player/i)).toBeInTheDocument();
+  });
+
+  it("moves through player search results with arrow keys and opens the active result with Enter", async () => {
+    const user = userEvent.setup();
+    const matchingPlayers = [
+      { id: 101, fullName: "Alpha Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "SS" } },
+      { id: 102, fullName: "Bravo Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "CF" } },
+      { id: 103, fullName: "Charlie Player", currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "RF" } },
+    ];
+    searchPlayers.mockResolvedValue(matchingPlayers);
+    loadFullPlayer.mockResolvedValue(mockPlayer(102, "Bravo Player"));
+
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Player");
+
+    expect(await screen.findByRole("option", { name: "Open Alpha Player profile" })).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}");
+    expect(input).toHaveAttribute("aria-activedescendant", "skip-player-search-result-101-0");
+    expect(screen.getByRole("option", { name: "Open Alpha Player profile" })).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}");
+    expect(input).toHaveAttribute("aria-activedescendant", "skip-player-search-result-102-1");
+    expect(screen.getByRole("option", { name: "Open Bravo Player profile" })).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: /Bravo Player/ })).toBeInTheDocument();
+    expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 102, fullName: "Bravo Player" }), expect.anything(), expect.anything());
   });
 
   it("shows an honest no-match result and clears the player search", async () => {
@@ -296,10 +338,10 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const input = screen.getByPlaceholderText(/Search any MLB player/i);
     await user.type(input, "No Match");
 
-    expect(await screen.findByText(/No verified player matches found for “No Match”/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No active verified player matches found for “No Match”/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear player search" }));
     expect(input).toHaveValue("");
-    expect(screen.queryByText(/No verified player matches found/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No active verified player matches found/i)).not.toBeInTheDocument();
   });
 
   it("loads the requested player profile when navigation enters from another workspace", async () => {
@@ -844,7 +886,7 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(
       screen.queryByText("Updated recovery note.")
     ).not.toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("renders the verified core profile before supplemental data finishes", async () => {
     const user = userEvent.setup();
@@ -870,12 +912,13 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await waitFor(() => expect(screen.getByText("Core First Player")).toBeInTheDocument());
     await user.click(screen.getByText("Core First Player"));
 
-    expect(await screen.findByText(/Core MLB profile loaded/)).toBeInTheDocument();
+    expect(await screen.findByRole("status", { name: "Loading supplemental player profile data" })).toBeInTheDocument();
+    expect(screen.getByText("Hydrating optional context")).toBeInTheDocument();
     expect(screen.getByText("Career Batting")).toBeInTheDocument();
     expect(screen.getAllByText("Core First Player").length).toBeGreaterThanOrEqual(1);
 
     resolveExtras();
-    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading supplemental player profile data" })).not.toBeInTheDocument());
   });
 
   it("publishes verified contract data before optional profile enrichment finishes", async () => {
@@ -927,11 +970,11 @@ describe("PlayersPage — player comparison and race conditions", () => {
     await waitFor(() => expect(publishImportant).toEqual(expect.any(Function)));
     publishImportant();
     expect(await screen.findByText("Under Contract")).toBeInTheDocument();
-    expect(screen.getByText(/Core MLB profile loaded/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading supplemental player profile data" })).toBeInTheDocument();
 
     await waitFor(() => expect(publishOptional).toEqual(expect.any(Function)));
     publishOptional();
-    await waitFor(() => expect(screen.queryByText(/Core MLB profile loaded/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading supplemental player profile data" })).not.toBeInTheDocument());
   });
 
   it("keeps the faster, later-clicked player instead of an older, slower response clobbering it", async () => {

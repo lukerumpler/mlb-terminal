@@ -14,7 +14,7 @@ const overviewSource = readFileSync(
 describe("FanGraphs model source adapter", () => {
   it("parses team playoff odds and team WAR when the upstream exposes HTML tables", () => {
     const oddsHtml =
-      "<table><tr><th>Team</th><th>Playoff Odds</th><th>Projected Wins</th><th>Projected Losses</th></tr><tr><td>LAD</td><td>87.5%</td><td>95.4</td><td>66.6</td></tr></table>";
+      "<p>Updated: Monday, August 17, 2026 11:50 PM ET</p><table><tr><th>Team</th><th>Playoff Odds</th><th>Projected Wins</th><th>Projected Losses</th></tr><tr><td>LAD</td><td>87.5%</td><td>95.4</td><td>66.6</td></tr></table>";
     const warHtml =
       "<table><tr><th>Team</th><th>WAR</th><th>Off WAR</th><th>Def WAR</th></tr><tr><td>LAD</td><td>42.7</td><td>29.1</td><td>8.4</td></tr></table>";
     const result = parseFanGraphsModelHtml({ oddsHtml, warHtml }, "LAD", 2026);
@@ -26,6 +26,7 @@ describe("FanGraphs model source adapter", () => {
     expect(result.advancedMetrics.projectedLosses).toBe(66.6);
     expect(result.advancedMetrics.offenseWar).toBe(29.1);
     expect(result.advancedMetrics.defenseWar).toBe(8.4);
+    expect(result.providerUpdatedText).toBe("Monday, August 17, 2026 11:50 PM ET");
   });
 
   it("parses aggregate batting and pitching WAR by header name and computes total WAR", () => {

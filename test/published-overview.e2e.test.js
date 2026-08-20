@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterAll, describe, it } from 'vitest';
 import { chromium } from 'playwright';
+import { resolvePublishedOverviewTarget } from './helpers/publishedOverviewTarget.js';
 
-const LIVE_URL = process.env.SKIP_LIVE_URL || 'https://skipbasebal-mm6hz9ps.manus.space/?e2e=overview-default';
+const LIVE_URL = resolvePublishedOverviewTarget();
 let browser;
 
 async function openLivePage(url, setup) {

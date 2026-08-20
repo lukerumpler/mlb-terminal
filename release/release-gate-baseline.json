@@ -1,0 +1,7 @@
+{
+  "githubRepository": "lukerumpler/mlb-terminal",
+  "acceptedGithubMain": "f180e6afda43bf80497ab5ad2ddc33463b8d4546",
+  "acceptedOn": "2026-08-19",
+  "audit": "docs/branch-release-integration-audit-2026-08-18.md",
+  "policy": "A newer GitHub main commit requires a documented compatibility review before the next shared-project release."
+}

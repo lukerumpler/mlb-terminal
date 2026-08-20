@@ -26,6 +26,10 @@ const chartSource = readFileSync(
   "/home/ubuntu/skip-baseball/client/src/components/OverviewCharts.jsx",
   "utf8"
 );
+const overviewSource = readFileSync(
+  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
+  "utf8"
+);
 
 afterEach(() => {
   cleanup();
@@ -112,6 +116,29 @@ describe("natural-language search", () => {
     );
     expect(opened).toHaveBeenCalled();
     window.removeEventListener("skip-open-player", opened);
+  });
+
+  it("does not open an inactive player returned by the verified search route", async () => {
+    const user = userEvent.setup();
+    routeNaturalLanguageSearch.mockResolvedValueOnce({
+      intent: "player",
+      tab: "players",
+      entity: "Inactive Player",
+      metric: "OPS",
+      interpretation: "Open the verified player profile for the requested OPS context.",
+    });
+    searchPlayers.mockResolvedValueOnce([{ id: 456, fullName: "Inactive Player", active: false }]);
+    render(
+      <CommandPalette
+        onNavigate={vi.fn()}
+        onOpenProspect={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    await user.type(screen.getByRole("combobox", { name: "Search pages, prospects, or ask SKIP" }), "Inactive Player OPS");
+    await user.click(screen.getByRole("button", { name: "ASK SKIP" }));
+    await user.click(await screen.findByRole("button", { name: /Inactive Player/i }));
+    expect(await screen.findByText(/No verified player match was found/i)).toBeInTheDocument();
   });
 
   it("keeps AI unavailable states explicit instead of inventing a destination", async () => {
@@ -305,5 +332,18 @@ describe("divisional WAR comparison data and tooltip contract", () => {
       "Separate defensive WAR was not returned by the verified FanGraphs"
     );
     expect(chartSource).toContain("aggregate feed.");
+  });
+
+  it("renders visible total-WAR labels and supports selected-team emphasis", () => {
+    expect(chartSource).toContain("LabelList");
+    expect(chartSource).toContain("selectedTeam");
+    expect(chartSource).toContain("formatter={formatWarValue}");
+  });
+
+  it("contains the exact-value table and an explicit unavailable FanGraphs metric contract", () => {
+    expect(overviewSource).toContain('aria-label="Exact divisional WAR values"');
+    expect(overviewSource).toContain("fanGraphsMetricStatus");
+    expect(overviewSource).toContain("does not verify this missing metric");
+    expect(overviewSource).toContain("Provider blocked · no verified rows");
   });
 });

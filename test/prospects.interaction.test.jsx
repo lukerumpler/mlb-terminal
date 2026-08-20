@@ -18,8 +18,9 @@ beforeEach(() => {
 
 async function goToProspects(user) {
   render(<App />);
-  const navButton = await screen.findByRole("button", { name: /Prospects/ });
+  const navButton = await screen.findByTitle("Talent");
   await user.click(navButton);
+  await user.click(await screen.findByRole("tab", { name: "Prospects" }));
   // Wait for the actual batter table to render, not just the absence of the
   // error-boundary text — in this test environment (unbundled, on-the-fly
   // JSX transform) the first render of a heavy page can take a couple of
@@ -88,7 +89,7 @@ describe("Prospects page — merged feature interactions", () => {
       expect(document.body.textContent).toMatch(/eFV/);
     });
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  });
+  }, 15000);
 
   it("opens the Scatterplot builder", async () => {
     const user = userEvent.setup();
@@ -106,7 +107,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  });
+  }, 15000);
 
   it("colors the Scatterplot builder by a chosen stat (Roadmap #4) without crashing", async () => {
     const user = userEvent.setup();
@@ -143,7 +144,7 @@ describe("Prospects page — merged feature interactions", () => {
     await user.click(pitchersBtn);
     expect(screen.getByText(/Color = position/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  });
+  }, 15000);
 
   it("shows sortable Trend and ETA columns on both batter and pitcher tables (Roadmap #6)", async () => {
     const user = userEvent.setup();

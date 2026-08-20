@@ -213,3 +213,105 @@
 - [x] Preserve an explicit unavailable state when no verified divisional WAR rows exist.
 - [x] Add regression tests for Favorites and verified/unavailable divisional WAR states.
 - [x] Run full validation, review responsive behavior, and publish the update.
+
+- [x] Calculate playoff odds from verified MLB standings when provider odds are unavailable, with an explicit calculated label.
+- [x] Calculate a projected WAR proxy from verified MLB team inputs when provider Team WAR is unavailable, with an explicit calculated label.
+- [x] Preserve provider-first values and explicit unavailable states when verified inputs are insufficient.
+- [x] Add regression coverage for provider, calculated, and unavailable metric paths.
+- [x] Run validation, review responsive Overview labels, and publish the update.
+
+- [x] Inspect Front Office Evaluation grade inputs for Defense, Depth, and Future Value.
+- [x] Calculate and label Defense, Depth, and Future Value grades from verified team, roster, and prospect inputs where supported.
+- [x] Preserve explicit unavailable labels when a required verified input is absent.
+- [x] Add regression tests for populated and unavailable Front Office grades.
+- [x] Run validation, review the rating strip, and publish the repair.
+
+- [x] Inspect existing Baseball Savant OAA inputs and prospect-chart patterns.
+- [x] Display verified Statcast OAA alongside the calculated Defense grade with a clear source distinction.
+- [x] Add a clickable Future Value rating that opens an accessible organization-level prospect depth-chart modal.
+- [x] Preserve explicit OAA and prospect-data unavailable states.
+- [x] Add regression tests for OAA context, modal opening/closing, and source labels.
+- [x] Repair the release-blocking package-manager declaration introduced by the shared production-readiness update.
+- [x] Run full validation, review responsive behavior, and publish the enhancements.
+
+- [x] Inspect existing player-profile navigation and depth-chart row semantics.
+- [x] Make organization depth-chart prospect rows open the matching detailed player profile.
+- [x] Preserve accessible modal behavior and add profile-link navigation regression coverage.
+- [x] Run validation, review the interaction, and publish the linked rows.
+
+- [x] Inspect the Team Overview schedule loader, schedule states, and Divisional WAR comparison data/visual path.
+- [x] Repair schedule loading while preserving verified/cached/unavailable states.
+- [x] Improve the Divisional WAR Comparison visual and its provider/fallback labels.
+- [x] Add regressions for schedule readiness and comparative WAR rendering states.
+- [x] Run validation, visually review the repaired Overview panels, and publish the update.
+
+- [x] Inspect the current Divisional WAR comparison panel and verified component fields.
+- [x] Add a compact exact-value divisional WAR table beneath the chart.
+- [x] Preserve selected-team emphasis and explicit unavailable component fields.
+- [x] Add regression coverage and validate the compact comparison table.
+- [x] Review and publish the Divisional WAR table update.
+
+- [x] Inspect the interrupted compact-table patch and current FanGraphs provider status signals.
+- [x] Remove verified-status badges from unavailable Off WAR and Def WAR values.
+- [x] Clarify provider-blocked, cached historical, and live FanGraphs states in the Divisional WAR panel.
+- [x] Complete the compact exact-value Divisional WAR table without manufacturing missing components.
+- [x] Add blocked/cached/unavailable presentation regressions, validate, and publish.
+
+- [x] Audit remaining unavailable Overview and model metrics against verified backend inputs.
+- [x] Define backend calculation fallbacks only for metrics with sufficient verified source fields.
+- [x] Implement calculated metrics with explicit method and provenance labels.
+- [x] Preserve unavailable states for unsupported provider-only metrics.
+- [x] Add calculation integrity regressions, validate responsive UI labels, and publish.
+
+- [x] Inspect current win-pace projection presentation, request lifecycle, cache boundaries, and recent dashboard errors.
+- [x] Add a compact pythagorean W–L comparison beside the existing win-pace projections with clear calculated provenance.
+- [x] Apply targeted dashboard reliability and performance optimizations without suppressing source-gap states.
+- [x] Add regression coverage for the comparison, request bounds, and optimized fallback behavior.
+- [x] Run full validation, review desktop/mobile dashboard performance, and publish.
+
+- [x] Inspect dashboard explanation blocks and identify redundant copy.
+- [x] Remove unnecessary explanations while preserving short source and calculation labels.
+- [x] Add or update concise-copy regressions and review responsive layout.
+- [x] Validate and publish the streamlined dashboard copy.
+
+- [x] Inspect repeated source badges, Executive Briefing copy, and compact-label mobile alignment.
+- [x] Consolidate repeated provider badges into concise panel-level status lines.
+- [x] Shorten the Executive Briefing subtitle and refine compact-label alignment on mobile.
+- [x] Add regression coverage and validate desktop/mobile presentation.
+- [x] Publish the panel-status and mobile-layout refinement.
+
+- [x] Inspect Batted Ball, Pitching, and dashboard empty-state component patterns.
+- [x] Consolidate Batted Ball and Pitching provider labels into panel-level status lines.
+- [x] Convert long empty-state details into concise expandable notes while preserving honest source context.
+- [x] Add regression coverage and validate desktop/mobile interactions.
+- [x] Publish the consolidated panels and expandable empty notes.
+
+- [x] Review the supplied overall-grade scoring system and map each formula input to verified platform data.
+- [x] Identify unsupported metrics, hidden assumptions, availability rules, and differences from the current Front Office grade.
+- [x] Present the validation findings and obtain approval for any necessary substitutions before integration.
+- [x] Integrate the approved scoring system with provenance, unavailable states, and regression coverage.
+- [x] Run full validation, review the overall-grade display, and publish.
+
+- [x] Inspect the Overall-grade display, dashboard request paths, recent errors, and accessibility/performance hotspots.
+- [x] Display the numeric weighted Overall score beside the letter grade with clear scale context.
+- [x] Apply targeted reliability and performance optimizations without weakening provider or unavailable states.
+- [x] Add regression coverage and validate desktop/mobile behavior.
+- [x] Run the full release gate and publish the numeric-score optimization update.
+
+- [x] Inspect Overall score state, tooltip patterns, and available comparable history for a truthful change indicator.
+- [x] Add an accessible hover/focus tooltip explaining core weights and the capped outlook adjustment.
+- [x] Add green/red Overall score direction only when a comparable prior score exists; otherwise show no implied trend.
+- [x] Add regression coverage and validate desktop/mobile score-card interactions.
+- [x] Publish the Overall-score tooltip and change indicator update.
+
+- [x] Audit the current Overall presentation and Depth, Defense, Baserunning, and Future Value grade inputs/formulas.
+- [x] Make the Overall letter grade the primary visual signal while keeping the numeric score, weighting tooltip, and honest change indicator secondary.
+- [x] Recalculate or improve supported facet grades from validated inputs, preserving explicit calculated and unavailable provenance.
+- [x] Add regression coverage and validate the upgraded grade cards on desktop and mobile.
+- [x] Publish the Overall hierarchy and facet-grade evaluation upgrade.
+
+- [x] Verify licit, stable Baseball America and official MLB farm-ranking sources and their usable access level.
+- [x] Audit the current Depth calculation against validated organization-ranking inputs and the Playoff Odds source contract.
+- [x] Implement only source-approved Depth or Playoff Odds improvements, with explicit freshness and unavailable states.
+- [x] Add source-integrity regressions, run the full release gate, and validate responsive presentation.
+- [x] Publish the verified farm-ranking and playoff-odds update.

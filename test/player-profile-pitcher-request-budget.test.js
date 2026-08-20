@@ -12,6 +12,16 @@ function response(data) {
   };
 }
 
+function failedResponse(status = 503) {
+  return {
+    ok: false,
+    status,
+    headers: { get: () => null },
+    json: async () => ({}),
+    text: async () => '',
+  };
+}
+
 function seasonStats(group, stat = {}) {
   return {
     stats: [{
@@ -158,6 +168,56 @@ describe('Player Profile pitcher request budget', () => {
     expect(urls.some(url => url.includes(encodeURIComponent('/schedule')))).toBe(false);
   });
 
+  it('propagates cancellation into active optional Savant work before an optional profile snapshot can publish', async () => {
+    let sprintSpeedSignal;
+    const onOptionalReady = vi.fn();
+    vi.stubGlobal('fetch', vi.fn((input, init = {}) => {
+      const url = String(input);
+      if (url.includes('/api/savant?endpoint=sprint_speed')) {
+        sprintSpeedSignal = init.signal;
+        return new Promise((resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' })), { once: true });
+        });
+      }
+      if (url.includes('/api/savant')) return Promise.resolve(response([]));
+      if (url.includes('/api/contract')) return Promise.resolve(response({ found: false }));
+      if (url.includes('/api/team-financials')) return Promise.resolve(response({ found: false }));
+      if (url.includes('/api/player-advanced')) return Promise.resolve(response({}));
+
+      const parsed = new URL(url, 'https://skipbasebal-mm6hz9ps.manus.space');
+      const path = parsed.searchParams.get('path');
+      const group = parsed.searchParams.get('group');
+      const stats = parsed.searchParams.get('stats');
+      if (path === '/people/409') {
+        return Promise.resolve(response({ people: [{
+          id: 409,
+          fullName: 'Optional Canceled Batter',
+          primaryPosition: { type: 'Outfielder', abbreviation: 'CF' },
+          currentTeam: { id: 119, abbreviation: 'LAD', sport: { id: 1 } },
+        }] }));
+      }
+      if (path === '/schedule') return Promise.resolve(response({ dates: [] }));
+      if (path === '/people/409/stats') {
+        if (stats === 'yearByYear' || stats === 'career') return Promise.resolve(response({ stats: [] }));
+        return Promise.resolve(response(seasonStats(group || 'hitting', group === 'hitting' ? { atBats: 10, ops: '.800' } : {})));
+      }
+      return Promise.resolve(response({}));
+    }));
+
+    const controller = new AbortController();
+    const operation = loadFullPlayer(
+      { id: 409, fullName: 'Optional Canceled Batter', team: 'LAD' },
+      2026,
+      { signal: controller.signal, onOptionalReady },
+    );
+    await vi.waitFor(() => expect(sprintSpeedSignal).toBeDefined());
+    controller.abort();
+
+    await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sprintSpeedSignal.aborted).toBe(true);
+    expect(onOptionalReady).not.toHaveBeenCalled();
+  });
+
   it('starts current-season and career handedness split reads in parallel for batters', async () => {
     const releases = {};
     vi.stubGlobal('fetch', vi.fn(input => {
@@ -187,4 +247,44 @@ describe('Player Profile pitcher request budget', () => {
       careerRows: [{ side: 'LHP' }, { side: 'RHP' }],
     });
   });
+
+  it('does not double a player-scoped Savant request into the prior season after an upstream failure', async () => {
+    const urls = [];
+    vi.stubGlobal('fetch', vi.fn(async input => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes('/api/contract')) return response({ found: false });
+      if (url.includes('/api/team-financials')) return response({ found: false });
+      if (url.includes('/api/player-advanced')) return response({});
+      if (url.includes('/api/savant')) {
+        if (url.includes('endpoint=contact_points')) return failedResponse(503);
+        return response([]);
+      }
+
+      const parsed = new URL(url, 'https://skipbasebal-mm6hz9ps.manus.space');
+      const path = parsed.searchParams.get('path');
+      if (path === '/people/407') {
+        return response({ people: [{
+          id: 407,
+          fullName: 'Budget Batter',
+          primaryPosition: { type: 'Infielder', abbreviation: 'SS' },
+          currentTeam: { id: 119, abbreviation: 'LAD', sport: { id: 1 } },
+        }] });
+      }
+      if (path === '/schedule') return response({ dates: [] });
+      if (path === '/people/407/stats') {
+        const group = parsed.searchParams.get('group');
+        return response(seasonStats(group || 'hitting', group === 'hitting' ? { atBats: 12, ops: '.800' } : {}));
+      }
+      return response({});
+    }));
+
+    const player = await loadFullPlayer({ id: 407, fullName: 'Budget Batter', team: 'LAD' }, 2026);
+    const contactRequests = urls.filter(url => url.includes('endpoint=contact_points'));
+
+    expect(player.isPitcher).toBe(false);
+    expect(contactRequests).toHaveLength(1);
+    expect(contactRequests[0]).toContain('year=2026');
+    expect(contactRequests.some(url => url.includes('year=2025'))).toBe(false);
+  }, 15_000);
 });

@@ -3,7 +3,10 @@ import { getExtensionTaxWarning } from "../client/src/pages/PlayersPage.jsx";
 import {
   buildTeamFinancialCsv,
   buildTeamFinancialCsvRows,
+  buildMlbStandingsCsv,
+  buildMlbStandingsCsvRows,
 } from "../client/src/lib/csvExports.js";
+import { fmtWinPct } from "../client/src/lib/formatting.js";
 
 describe("player extension surcharge warnings", () => {
   it("warns when current tax payroll is above the CBT threshold", () => {
@@ -95,6 +98,31 @@ describe("team financial CSV export", () => {
     ).toBe(true);
     expect(csv).toContain('"Club, Test"');
     expect(csv).toContain("estimated_tax");
+  });
+});
+
+describe("MLB standings CSV export", () => {
+  const standings = {
+    "AL East": [
+      { name: "Boston, Red Sox", abbr: "BOS", w: 76, l: 51, pct: 0.598, gb: "—", l10: "7-3", rs: 634, ra: 491 },
+    ],
+  };
+
+  it("includes division, W–L, scorebook WIN%, source, and retrieval time", () => {
+    const rows = buildMlbStandingsCsvRows({
+      standings,
+      source: "MLB Stats API",
+      retrievedAt: "2026-08-19T12:00:00.000Z",
+      formatWinPct: fmtWinPct,
+    });
+    expect(rows[0]).toEqual(["division", "team", "team_abbr", "w_l", "win_pct", "games_back", "last_10", "runs_scored", "runs_allowed", "source", "retrieved_at"]);
+    expect(rows[1]).toEqual(["AL East", "Boston, Red Sox", "BOS", "76-51", ".598", "—", "7-3", 634, 491, "MLB Stats API", "2026-08-19T12:00:00.000Z"]);
+  });
+
+  it("returns a valid escaped CSV carrying W–L and formatted WIN%", () => {
+    const csv = buildMlbStandingsCsv({ standings, retrievedAt: "2026-08-19T12:00:00.000Z", formatWinPct: fmtWinPct });
+    expect(csv).toContain('"Boston, Red Sox"');
+    expect(csv).toContain('76-51,.598');
   });
 });
 

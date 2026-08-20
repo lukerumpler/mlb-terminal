@@ -1,5 +1,5 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 
@@ -7,6 +7,12 @@ describe('MLB-first team loading sequence', () => {
   beforeEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   it('renders loading badge and ensures MLB team identity is prioritized before affiliates', async () => {

@@ -1,6 +1,13 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
+import {
+  getStoredPlayerProviderIdentity,
+  isUsablePlayerProviderIdentity,
+  removeStoredPlayerProviderIdentity,
+  storePlayerProviderIdentity,
+} from '../lib/playerIdentityRegistry.js';
+import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js';
 
 // All requests route through /api/mlb (Vercel serverless proxy) to avoid CORS.
 // Same MLB Stats API serves both MLB and all MiLB levels via sportId/levelIds.
@@ -120,6 +127,11 @@ export function __resetFanGraphsLocalSnapshotForTests() {
       }
     }
   }
+}
+
+export function __resetProviderJsonCacheForTests() {
+  providerJsonCache.clear();
+  providerJsonInFlight.clear();
 }
 
 async function fetchProviderJson(url, {
@@ -519,7 +531,7 @@ function annotateProviderRows(data, response) {
   return data;
 }
 
-async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
+async function fetchLeaderboard(url, { timeoutMs = 8_000, signal } = {}) {
   const cached = cacheGet(url);
   if (cached !== undefined) return cached;
   const pending = inFlight.get(url);
@@ -533,8 +545,9 @@ async function fetchLeaderboard(url, { timeoutMs = 8_000 } = {}) {
         stage: 'optional',
         screen: 'player-profile',
         resource: 'savant-leaderboard',
-      });
-    } catch {
+      }, signal);
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
       return staleCacheGet(url) ?? null;
     }
     if (!res.ok) {
@@ -728,6 +741,17 @@ export async function getHandednessSplits(id, season, requestOptions = {}) {
 // PLAYER API
 // ═══════════════════════════════════════════════════════════════════════════
 
+export function isActivePlayerSearchResult(person) {
+  const active = person?.active;
+  if (active === false || active === 0 || ['false', 'n', 'no'].includes(String(active).trim().toLowerCase())) return false;
+  const status = String(person?.rosterStatus ?? person?.statusCode ?? '').trim().toLowerCase();
+  return !['inactive', 'retired', 'released'].includes(status);
+}
+
+export function filterActivePlayerSearchResults(people) {
+  return (Array.isArray(people) ? people : []).filter(isActivePlayerSearchResult);
+}
+
 export async function searchPlayers(query, limit = 12) {
   try {
     // Search both MLB and MiLB players by including all sportIds
@@ -736,7 +760,7 @@ export async function searchPlayers(query, limit = 12) {
       limit,
       sportId: '1,11,12,13,14,15,16,17,5442'
     });
-    return data.people || [];
+    return filterActivePlayerSearchResults(data.people);
   } catch { return []; }
 }
 
@@ -755,6 +779,8 @@ const teamFinancialsCache = new Map();
 const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
 const contractClientCache = new Map();
 const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
+const playerProviderIdentityCache = new Map();
+const PLAYER_PROVIDER_IDENTITY_TTL_MS = 10 * 60_000;
 
 export async function fetchTeamFinancials(teamAbbreviation, season = SEASON, {
   priority = 'background',
@@ -830,6 +856,66 @@ export async function fetchContractData(playerId, fullName, {
   contractClientCache.set(cacheKey, {
     promise,
     expiresAt: Date.now() + CONTRACT_CLIENT_TTL_MS,
+  });
+  return promise;
+}
+
+export async function fetchPlayerProviderIdentity(player, requestOptions = {}) {
+  const mlbId = String(player?.id || '').trim();
+  const fullName = String(player?.fullName || '').trim();
+  if (!mlbId || !fullName) return null;
+  const cachedIdentity = getStoredPlayerProviderIdentity({ mlbId, fullName });
+  const cacheKey = `${mlbId}:${fullName.toLowerCase()}`;
+  const cached = playerProviderIdentityCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) playerProviderIdentityCache.delete(cacheKey);
+
+  recordPlayerIdentityTelemetry('resolver-request');
+  recordPlayerIdentityTelemetry(cachedIdentity ? 'registry-reuse' : 'name-search-request');
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ mlbId, name: fullName });
+      if (cachedIdentity?.baseballReference?.id) {
+        params.set('baseballReferenceId', cachedIdentity.baseballReference.id);
+        recordPlayerIdentityTelemetry('direct-id-request');
+      }
+      const response = await scheduledFetch(apiUrl(`/api/player-identity?${params}`), 12_000, {
+        priority: requestOptions.priority || 'important',
+        stage: requestOptions.stage || 'important',
+        screen: requestOptions.screen || 'player-profile',
+        resource: 'player-identity',
+        signal: requestOptions.signal,
+        pauseGlobalQueueOn429: false,
+      });
+      if (!response.ok) {
+        recordPlayerIdentityTelemetry('transport-fallback');
+        return cachedIdentity || null;
+      }
+      const payload = await response.json();
+      if (payload?.invalidateBaseballReferenceId) {
+        removeStoredPlayerProviderIdentity({ mlbId });
+        recordPlayerIdentityTelemetry('direct-id-invalidated');
+      }
+      if (payload?.found && payload?.identity) {
+        storePlayerProviderIdentity({ mlbId, fullName, identity: payload.identity });
+        recordPlayerIdentityTelemetry(cachedIdentity ? 'direct-id-verified' : 'name-search-resolved');
+        return payload.identity;
+      }
+      recordPlayerIdentityTelemetry('no-match');
+      return payload?.identity || null;
+    } catch {
+      recordPlayerIdentityTelemetry('transport-fallback');
+      return cachedIdentity || null;
+    }
+  })().then(identity => {
+    if (!isUsablePlayerProviderIdentity(identity, { mlbId, fullName })) {
+      playerProviderIdentityCache.delete(cacheKey);
+    }
+    return identity;
+  });
+  playerProviderIdentityCache.set(cacheKey, {
+    promise,
+    expiresAt: Date.now() + PLAYER_PROVIDER_IDENTITY_TTL_MS,
   });
   return promise;
 }
@@ -1081,6 +1167,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     ...coreSnapshot,
     advancedMetrics,
     providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
+    providerIdentity: null,
     career: careerHitting,
     careerPitching,
     careerAdvanced,
@@ -1113,8 +1200,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // so waiting for those to resolve first was purely wasted latency: a whole
   // extra sequential network round trip for no reason, doubly so when the
   // current season comes back empty and tryYear falls back to season - 1.
-  const speedPromise = fetchLeaderboard(`/api/savant?endpoint=sprint_speed&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
-  const oaaPromise   = fetchLeaderboard(`/api/savant?endpoint=oaa&year=${season}`, { timeoutMs: 5_000 }).catch(() => null);
+  const speedPromise = fetchLeaderboard(`/api/savant?endpoint=sprint_speed&year=${season}`, { timeoutMs: 5_000, signal }).catch(() => null);
+  const oaaPromise   = fetchLeaderboard(`/api/savant?endpoint=oaa&year=${season}`, { timeoutMs: 5_000, signal }).catch(() => null);
 
   // pitch_arsenal (Roadmap #1) — unlike the batter leaderboards above, a
   // pitcher has *multiple* rows in this one (one per pitch type), so this
@@ -1133,7 +1220,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const pitchArsenalPromise = (async () => {
     if (!isPitcher) return { rows: null, population: null };
     const tryPitchYear = async (yr) => {
-      const arr = await fetchLeaderboard(`/api/savant?endpoint=pitch_arsenal&year=${yr}`, { timeoutMs: 7_000 }).catch(() => null);
+      const arr = await fetchLeaderboard(`/api/savant?endpoint=pitch_arsenal&year=${yr}`, { timeoutMs: 7_000, signal }).catch(() => null);
       if (!Array.isArray(arr) || arr.length === 0) return null;
       const rows = arr.filter(p => String(p.player_id ?? p.pitcher_id ?? p.id) === String(id));
       return { rows: rows.length ? rows : null, population: arr };
@@ -1156,12 +1243,13 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // genuinely pitch-level fetch, not a compact season-aggregate row.
   const contactPointsPromise = (async () => {
     if (isPitcher) return null;
-    const tryYearCP = (yr) => fetchLeaderboard(
-      `/api/savant?endpoint=contact_points&year=${yr}&playerId=${id}`,
-      { timeoutMs: 20_000 },
+      const tryYearCP = (yr) => fetchLeaderboard(
+        `/api/savant?endpoint=contact_points&year=${yr}&playerId=${id}`,
+        { timeoutMs: 20_000, signal },
     ).catch(() => null);
     const cur = await tryYearCP(season);
-    if (Array.isArray(cur) && cur.length) return cur;
+    if (!Array.isArray(cur)) return null;
+    if (cur.length) return cur;
     const prev = await tryYearCP(season - 1);
     return Array.isArray(prev) && prev.length ? prev : null;
   })();
@@ -1179,12 +1267,13 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   // genuinely pitch-level fetch on this page, not a compact aggregate row.
   const pitcherPitchesPromise = (async () => {
     if (!isPitcher) return null;
-    const tryYearPP = (yr) => fetchLeaderboard(
-      `/api/savant?endpoint=pitcher_pitches&year=${yr}&playerId=${id}`,
-      { timeoutMs: 20_000 },
+      const tryYearPP = (yr) => fetchLeaderboard(
+        `/api/savant?endpoint=pitcher_pitches&year=${yr}&playerId=${id}`,
+        { timeoutMs: 20_000, signal },
     ).catch(() => null);
     const cur = await tryYearPP(season);
-    if (Array.isArray(cur) && cur.length) return cur;
+    if (!Array.isArray(cur)) return null;
+    if (cur.length) return cur;
     const prev = await tryYearPP(season - 1);
     return Array.isArray(prev) && prev.length ? prev : null;
   })();
@@ -1203,14 +1292,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     // Try both endpoints for current season first, then prior year if needed
     const tryYear = async (yr) => {
       const [sArr, btArr, scArr] = await Promise.all([
-        fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${yr}`),
-        fetchLeaderboard(`/api/savant?endpoint=bat-tracking&year=${yr}`),
+        fetchLeaderboard(`/api/savant?endpoint=expected_statistics&year=${yr}`, { signal }),
+        fetchLeaderboard(`/api/savant?endpoint=bat-tracking&year=${yr}`, { signal }),
         // Exit velocity, barrel%, hard-hit%, sweet-spot%, launch angle — this
         // endpoint was defined in the server-side proxy from the start but
         // never actually called from here, so brl_percent/hard_hit_percent/
         // sweet_spot_percent were always undefined and every UI tile reading
         // them was silently falling back to its estimated proxy value.
-        fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${yr}`),
+        fetchLeaderboard(`/api/savant?endpoint=statcast_leaderboard&year=${yr}`, { signal }),
       ]);
       let sData = null, btData = null;
       if (Array.isArray(sArr) && sArr.length > 0) sData = findByPlayerId(sArr, id);
@@ -1277,6 +1366,8 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const contactPoints = await contactPointsPromise.catch(() => null);
   const pitcherPitches = await pitcherPitchesPromise.catch(() => null);
 
+  if (signal?.aborted) throw abortError();
+
     const statResult = isPitcher ? pitchingResult : hittingResult;
   const boxscoreSplits = await boxscoreSplitsPromise;
   const optionalSnapshot = {
@@ -1286,6 +1377,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     stats:        statResult?.stat        || {},
     advancedMetrics,
     providerIds: { ...coreSnapshot.providerIds, ...(fallbackAdvancedMetrics.providerIds || {}) },
+    providerIdentity: null,
     statSeason:   statResult?.season      || season,
     isFallback:   statResult?.isFallback  || false,
     career:       careerHitting,
@@ -1305,6 +1397,23 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     extrasLoading: false,
   };
   try { onOptionalReady?.(optionalSnapshot); } catch { /* UI callback is optional */ }
+  void fetchPlayerProviderIdentity(profile || person, {
+    priority: 'background',
+    stage: 'background',
+    screen: 'player-profile',
+    signal,
+  }).then(providerIdentity => {
+    if (!providerIdentity || signal?.aborted) return;
+    const identitySnapshot = {
+      ...optionalSnapshot,
+      providerIdentity,
+      providerIds: {
+        ...optionalSnapshot.providerIds,
+        ...(providerIdentity.baseballReference?.id ? { baseballReference: providerIdentity.baseballReference.id } : {}),
+      },
+    };
+    try { onOptionalReady?.(identitySnapshot); } catch { /* UI callback is optional */ }
+  });
   return optionalSnapshot;
 }
 
@@ -1525,12 +1634,14 @@ export async function getGamePBP(gamePk) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function parseStandingsRecord(rec) {
+  const divisionName = rec.division?.name || rec.division?.nameShort || '';
   return {
-    divisionName: rec.division?.name || rec.division?.nameShort || '',
+    divisionName,
     teams: rec.teamRecords.map(t => ({
       id:       t.team.id,
       name:     t.team.name,
       abbr:     t.team.abbreviation || '',
+      divisionName,
       w:        t.wins,
       l:        t.losses,
       pct:      parseFloat(t.winningPercentage) || 0,
@@ -1572,15 +1683,21 @@ export async function getTeamScheduleSplits(teamId, season = SEASON) {
   try {
     const today = new Date();
     const start = new Date(`${season}-03-01T00:00:00Z`);
-    const scheduleDates = [];
-    for (let cursor = start; cursor <= today; cursor = new Date(cursor.getTime() + 30 * 86400000)) {
-      const chunkStart = cursor.toISOString().slice(0, 10);
-      const chunkEnd = new Date(Math.min(cursor.getTime() + 29 * 86400000, today.getTime())).toISOString().slice(0, 10);
-      const data = await mlb('/schedule', { sportId: 1, teamId: id, startDate: chunkStart, endDate: chunkEnd, gameType: 'R', hydrate: 'linescore', language: 'en' }, { ttl: 5 * 60_000, timeoutMs: 12_000 });
-      scheduleDates.push(...(data.dates || []));
-    }
+    if (start > today) return [];
+    // A single team-season schedule request is small (at most a regular-season
+    // slate) and avoids the earlier six-request monthly burst that could
+    // compound temporary MLB 429 responses when the Operations view opened.
+    const data = await mlb('/schedule', {
+      sportId: 1,
+      teamId: id,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: today.toISOString().slice(0, 10),
+      gameType: 'R',
+      hydrate: 'linescore',
+      language: 'en',
+    }, { ttl: 5 * 60_000, timeoutMs: 15_000, quietStatuses:[429, 502, 503, 504] });
     const buckets = { home: { w: 0, l: 0 }, away: { w: 0, l: 0 }, day: { w: 0, l: 0 }, night: { w: 0, l: 0 } };
-    for (const game of scheduleDates.flatMap(date => date.games || [])) {
+    for (const game of (data.dates || []).flatMap(date => date.games || [])) {
       if (String(game.status?.abstractGameState || '').toLowerCase() !== 'final') continue;
       const home = Number(game.teams?.home?.team?.id) === id;
       const away = Number(game.teams?.away?.team?.id) === id;
@@ -1599,8 +1716,11 @@ export async function getTeamScheduleSplits(teamId, season = SEASON) {
     ].filter(row => row.w + row.l > 0);
     teamScheduleSplitsCache.set(cacheKey, { rows, expiresAt: Date.now() + 5 * 60_000 });
     return rows;
-  } catch {
-    return [];
+  } catch (error) {
+    // Let the Overview distinguish a verified empty schedule from an upstream
+    // failure; callers still keep explicit unavailable states rather than rows
+    // inferred from aggregate standings.
+    throw error;
   }
 }
 
@@ -2029,6 +2149,17 @@ export async function getTeamCalculatedIntelligence(teamId, season = SEASON) {
   }
 }
 
+export async function getSecondaryPlayoffOdds(teamAbbr) {
+  const normalizedTeam = String(teamAbbr || '').toUpperCase();
+  if (!normalizedTeam) return null;
+  try {
+    const url = `/api/playoffstatus-odds?${new URLSearchParams({ team: normalizedTeam }).toString()}`;
+    return await fetchProviderJson(url, { timeoutMs: 12_000, ttlMs: 15 * 60_000, persistentCacheKey: `skip-playoffstatus-odds:${url}` });
+  } catch {
+    return null;
+  }
+}
+
 export async function getTeamModelSources(teamAbbr, season = SEASON) {
   const params = new URLSearchParams({ team: String(teamAbbr || '').toUpperCase(), season: String(season) });
   try {
@@ -2186,5 +2317,54 @@ export async function getTeamSavantMetrics(teamAbbr, year = SEASON) {
     };
   } catch {
     return { status: 'upstream-unavailable', source: 'Baseball Savant', retrievedAt: new Date().toISOString(), sampleSize: 0 };
+  }
+}
+
+export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
+  try {
+    const rows = await fetchLeaderboard(`/api/savant?endpoint=oaa&year=${year}`, { timeoutMs: 8_000 });
+    const providerMeta = Array.isArray(rows) ? rows.__providerMeta || null : null;
+    const targetAbbr = String(teamAbbr || '').toUpperCase();
+    const targetName = canonicalTeamName(teamName || teamAbbr);
+    const teamRows = (Array.isArray(rows) ? rows : []).filter(row => {
+      const rowAbbr = String(row?.team_abbr || row?.team_code || row?.team || '').toUpperCase();
+      const rowName = canonicalTeamName(row?.team_name || row?.team_full_name || row?.team || '');
+      return rowAbbr === targetAbbr || rowName === targetName;
+    });
+    const playerRows = teamRows.map(row => {
+      const oaa = Number(row?.oaa ?? row?.outs_above_average);
+      return {
+        name: String(row?.last_name_first || row?.player_name || row?.name || 'Unknown player'),
+        position: String(row?.position || row?.pos || '—'),
+        oaa: Number.isFinite(oaa) ? oaa : null,
+      };
+    }).filter(row => row.oaa != null);
+    const oaaByTeam = new Map();
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      const oaa = Number(row?.oaa ?? row?.outs_above_average);
+      const team = String(row?.team_abbr || row?.team_code || row?.team_name || row?.team_full_name || row?.team || '').toUpperCase();
+      if (!team || !Number.isFinite(oaa)) return;
+      oaaByTeam.set(team, (oaaByTeam.get(team) || 0) + oaa);
+    });
+    const freshness = providerMeta?.freshness || 'live';
+    const oaa = playerRows.length ? playerRows.reduce((sum, row) => sum + row.oaa, 0) : null;
+    const teamOaaValues = [...oaaByTeam.values()];
+    const oaaPercentile = oaa != null && teamOaaValues.length
+      ? Math.round((teamOaaValues.filter(value => value < oaa).length / teamOaaValues.length) * 100)
+      : null;
+    return {
+      status: oaa == null ? 'source-gap' : (freshness === 'stale-cached' ? 'cached' : 'live'),
+      source: 'Baseball Savant Statcast OAA leaderboard',
+      freshness,
+      cache: providerMeta?.cache || null,
+      retrievedAt: new Date().toISOString(),
+      oaa,
+      oaaPercentile,
+      leagueTeamCount:teamOaaValues.length,
+      playerCount: playerRows.length,
+      playerRows: playerRows.sort((a, b) => b.oaa - a.oaa),
+    };
+  } catch {
+    return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, oaaPercentile:null, leagueTeamCount:0, playerCount:0, playerRows:[] };
   }
 }

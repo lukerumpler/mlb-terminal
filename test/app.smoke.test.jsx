@@ -6,16 +6,11 @@ import App from "../client/src/App.jsx";
 
 const TABS = [
   "Overview",
-  "Players",
-  "Prospects",
-  "Draft",
+  "Talent",
   "League",
   "Intelligence",
-  "AMD / IMD",
-  "Knowledge",
   "Scouting Notes",
   "Intel Feed",
-  "Follow List",
   "Settings",
 ];
 
@@ -41,18 +36,22 @@ describe("SKIP app — mobile navigation", () => {
     expect(
       document.querySelector(".skip-sidebar.skip-mobile-nav-open")
     ).toBeTruthy();
-    const playersButton = document.querySelector(
-      '.skip-sidebar button[title="Players"]'
+    const talentButton = document.querySelector(
+      '.skip-sidebar button[title="Talent"]'
     );
-    expect(playersButton).toBeTruthy();
-    await user.click(playersButton);
+    expect(talentButton).toBeTruthy();
+    await user.click(talentButton);
     await waitFor(() =>
       expect(
         document.querySelector(".skip-sidebar.skip-mobile-nav-open")
       ).toBeNull()
     );
     expect(document.querySelector(".skip-topbar")?.textContent).toContain(
-      "Players"
+      "Talent"
+    );
+    expect(screen.getByRole("tab", { name: "Players" })).toHaveAttribute(
+      "aria-selected",
+      "true"
     );
   });
 

@@ -14,9 +14,11 @@ import {
 } from '../components/atoms.jsx';
 import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
-import { fmt } from '../lib/formatting.js';
+import { fmt, fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
+import { downloadMlbStandingsCsv } from '../lib/csvExports.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
+import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
 
 // FIX: Global tooltip config — z-index 9999 prevents clip behind sibling panels
 const TT = {
@@ -749,6 +751,7 @@ function LeaguePage() {
   const [teamStats,   setTeamStats]   = useState({ hitting:{}, pitching:{} });
   const [gamesLoading,setGamesLoading]= useState(true);
   const [stdLoading,  setStdLoading]  = useState(true);
+  const [standingsRetrievedAt, setStandingsRetrievedAt] = useState(null);
 
   // Static leaderboard state (Statcast-enriched data)
   const [lbTab,    setLbTab]    = useState('hitting');
@@ -815,8 +818,8 @@ function LeaguePage() {
   const lbTeams = ['all', ...new Set(liveHitterRows.map(r => r.team).filter(Boolean))].sort();
 
   const HIT_COLS = [
-    { key:'avg',  label:'AVG', fmt:v=>v.toFixed(3).replace('0.','.') },
-    { key:'ops',  label:'OPS', fmt:v=>v.toFixed(3).replace('0','') },
+    { key:'avg',  label:'AVG', fmt:fmtScorebookRate },
+    { key:'ops',  label:'OPS', fmt:fmtScorebookRate },
     { key:'hr',   label:'HR',  fmt:v=>String(v) },
     { key:'rbi',  label:'RBI', fmt:v=>String(v) },
     { key:'sb',   label:'SB',  fmt:v=>String(v) },
@@ -855,7 +858,7 @@ function LeaguePage() {
     const hitting = Object.values(teamStats.hitting).filter(s => s.ops != null);
     const pitching = Object.values(teamStats.pitching).filter(s => s.era != null);
     return {
-      avgOps: hitting.length ? (hitting.reduce((sum, s) => sum + Number(s.ops), 0) / hitting.length).toFixed(3) : '—',
+      avgOps: hitting.length ? fmtScorebookRate(hitting.reduce((sum, s) => sum + Number(s.ops), 0) / hitting.length) : '—',
       avgEra: pitching.length ? (pitching.reduce((sum, s) => sum + Number(s.era), 0) / pitching.length).toFixed(2) : '—',
       homeRuns: hitting.length ? hitting.reduce((sum, s) => sum + Number(s.homeRuns || 0), 0).toLocaleString() : '—',
     };
@@ -882,7 +885,10 @@ function LeaguePage() {
           getStandings(), getAllLeaders(), getAllTeamStats('hitting'), getAllTeamStats('pitching'),
         ]);
         if (alive) {
-          if (std.status === 'fulfilled') setStandings(std.value);
+          if (std.status === 'fulfilled') {
+            setStandings(std.value);
+            setStandingsRetrievedAt(Date.now());
+          }
           if (ldr.status === 'fulfilled') setLeaders(ldr.value);
           setTeamStats({
             hitting: hitting.status === 'fulfilled' ? hitting.value : {},
@@ -897,6 +903,12 @@ function LeaguePage() {
 
   const hasStandings = Object.keys(standings).length > 0;
   const hasLeaders   = Object.keys(leaders).length > 0;
+  const handleStandingsExport = () => downloadMlbStandingsCsv({
+    standings,
+    source: 'MLB Stats API',
+    retrievedAt: standingsRetrievedAt,
+    formatWinPct,
+  });
 
   function gameStatusLabel(g) {
     if (g.statusCode === 'F' || g.status === 'Final') return 'Final';
@@ -981,7 +993,12 @@ function LeaguePage() {
         <div style={{ padding:'10px 14px' }}><SkeletonRows count={6} height={26} /></div>
       )}
       {!stdLoading && hasStandings && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12 }}>
+        <section aria-label="Official MLB standings">
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginBottom:8}}>
+            <span style={sans({fontSize:10,color:C.text3})}>Official MLB standings · {standingsRetrievedAt ? `retrieved ${new Date(standingsRetrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : 'retrieval time unavailable'}</span>
+            <button type="button" onClick={handleStandingsExport} aria-label="Download MLB standings CSV with W–L and WIN%" style={{minHeight:28,padding:'5px 8px',border:`1px solid ${C.tealMid}`,borderRadius:6,background:C.tealSoft,color:C.teal,cursor:'pointer',...px({fontSize:8.5,fontWeight:800,letterSpacing:'.04em'})}}>EXPORT STANDINGS CSV</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12 }}>
           {Object.entries(standings).map(([div, teams]) => (
             <Panel key={div} title={div} accent={C.navy}>
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -1010,7 +1027,7 @@ function LeaguePage() {
                       </td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:teamColor || C.teal }) }}>{t.w}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{t.l}</td>
-                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{(t.pct||0).toFixed(3)}</td>
+                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{fmtWinPct(t.pct)}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.gb === '-' || !t.gb ? '—' : t.gb}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.l10||'—'}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.rs||'—'}</td>
@@ -1022,12 +1039,16 @@ function LeaguePage() {
               </table>
             </Panel>
           ))}
-        </div>
+          </div>
+        </section>
       )}
       {!stdLoading && !hasStandings && (
         <Panel title="Standings" accent={C.navy} badge="Unavailable">
           <div style={{padding:'16px 14px',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             Official MLB standings are unavailable right now. Static snapshots are intentionally hidden so stale records are not presented as current.
+          </div>
+          <div style={{padding:'0 14px 14px'}}>
+            <button type="button" disabled aria-label="Download MLB standings CSV with W–L and WIN%" style={{minHeight:28,padding:'5px 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface2,color:C.text4,cursor:'not-allowed',...px({fontSize:8.5,fontWeight:800,letterSpacing:'.04em'})}}>EXPORT STANDINGS CSV</button>
           </div>
         </Panel>
       )}
@@ -1046,15 +1067,15 @@ function LeaguePage() {
               <BarChart data={opsSorted} layout="vertical" margin={{ top:2,right:40,bottom:2,left:4 }}>
                 <CartesianGrid stroke={C.borderLight} horizontal={false}/>
                 <XAxis type="number" domain={[opsMin,opsMax]}
-                  tickFormatter={v=>(v/1000).toFixed(3).replace('0.','. ')}
+                  tickFormatter={v=>fmtScorebookRate(v/1000)}
                   tick={{ fontSize:10,fill:C.text3 }} axisLine={false} tickLine={false}/>
                 <YAxis type="category" dataKey="team"
                   tick={{ fontSize:11,fill:C.text2,fontFamily:"'DM Mono',monospace",fontWeight:600 }}
                   width={38} axisLine={false} tickLine={false}/>
-                <Tooltip {...TT} formatter={v=>[(v/1000).toFixed(3),'OPS']}/>
+                <Tooltip {...TT} formatter={v=>[fmtScorebookRate(v/1000),'OPS']}/>
                 <Bar isAnimationActive={false} dataKey="ops" fill={C.amber} radius={[0,3,3,0]} maxBarSize={20}
                   label={{ position:'right',fontSize:10,fill:C.amberDark,fontFamily:"'DM Mono',monospace",
-                    formatter:v=>(v/1000).toFixed(3).replace('0.','.')}}/>
+                    formatter:v=>fmtScorebookRate(v/1000)}}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1648,7 +1669,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1677,7 +1698,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
           <div>
             <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
             <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
-              Switch between light and dark theme. This is also always one click away from the sidebar.
+              Switch between light and dark theme for the entire terminal.
             </div>
           </div>
           {toggleTheme && (
@@ -1707,6 +1728,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
+      <CacheHealthDashboard health={cacheHealth} status={cacheHealthStatus} updatedAt={cacheHealthUpdatedAt} onRefresh={refreshCacheHealth} />
       <Panel title="Roster Insight Defaults" accent={C.teal}>
         <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>

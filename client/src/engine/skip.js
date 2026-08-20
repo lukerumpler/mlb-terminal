@@ -1,6 +1,6 @@
 // SKIP — Decision Engine
 // CAS, DQS, DPI, TPVI scoring + verdicts + archetypes
-import { trueIP } from '../lib/formatting.js';
+import { fmtScorebookRate, trueIP } from '../lib/formatting.js';
 
 // Clamp a value to [20, 99] — all SKIP scores live on this range
 function clamp(v) { return Math.max(20, Math.min(99, v || 0)); }
@@ -94,7 +94,7 @@ export function getStrengths(stats, kpis, isPitcher) {
     const pa  = Number.isFinite(paRaw) && paRaw > 0 ? paRaw : null; // see computeKPIs' comment on this same guard
     const hr  = parseInt(stats.homeRuns) || 0;
     const sb  = parseInt(stats.stolenBases) || 0;
-    if (ops   >= 0.900) out.push(`${(+stats.ops).toFixed(3)} OPS — elite offensive production`);
+    if (ops   >= 0.900) out.push(`${fmtScorebookRate(stats.ops)} OPS — elite offensive production`);
     if (avg   >= 0.300) out.push(`Batting .${Math.round(avg*1000)} — plus hit tool, above league avg`);
     if (pa && bb / pa >= 0.12) out.push(`${((bb / pa) * 100).toFixed(1)}% BB rate — elite plate discipline`);
     if (hr    >= 25)    out.push(`${hr} HR — genuine power threat in the lineup`);
@@ -123,7 +123,7 @@ export function getRisks(stats, profile, isPitcher) {
     const pa  = Number.isFinite(paRaw) && paRaw > 0 ? paRaw : null; // see computeKPIs' comment on this same guard
     const ops = parseFloat(stats.ops) || 0;
     if (pa && k / pa > 0.27) out.push(`${((k / pa) * 100).toFixed(1)}% K rate — two-strike vulnerability`);
-    if (ops < 0.700)   out.push(`${(+stats.ops).toFixed(3)} OPS — below-average offensive output`);
+    if (ops < 0.700)   out.push(`${fmtScorebookRate(stats.ops)} OPS — below-average offensive output`);
     if (out.length === 0) out.push('No material risk flags at current performance level');
   }
   return out.slice(0, 3);

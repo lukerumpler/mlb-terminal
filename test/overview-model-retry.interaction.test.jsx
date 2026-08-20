@@ -158,7 +158,9 @@ describe("Team Overview model source and retry interaction", () => {
     render(<OverviewPage />);
     expect(
       screen.getByRole("status", { name: "Loading team overview" })
-    ).toBeInTheDocument();
+    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText(/Loading verified team data/i)).toBeInTheDocument();
+    expect(document.querySelector(".skip-overview-skeleton-briefing")).toBeInTheDocument();
     expect(
       await screen.findByText("Season overview", { exact: false })
     ).toBeInTheDocument();
@@ -233,6 +235,16 @@ describe("Team Overview model source and retry interaction", () => {
     expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps an explicit official-schedule panel visible when MLB returns no games", async () => {
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+
+    await user.click(screen.getByRole("button", { name: "Operations" }));
+    expect(await screen.findByText("Today's Schedule")).toBeInTheDocument();
+    expect(screen.getAllByText("No games today").length).toBeGreaterThan(0);
+    expect(screen.getByText(/official MLB schedule returned no games for today/i)).toBeInTheDocument();
+  });
+
   it("commits available aggregate data when one provider fails instead of waiting for all feeds", async () => {
     partialAggregate = true;
     render(<OverviewPage />);
@@ -257,6 +269,37 @@ describe("Team Overview model source and retry interaction", () => {
       screen.getByRole("button", { name: "Recent performance" })
     );
     expect(sortSelect).toHaveValue("recentOps");
+  });
+
+  it("filters the roster table by player name and reverses the active metric sort", async () => {
+    const user = userEvent.setup();
+    saveTeamPlayersCache(119, 2026, {
+      hitting: [
+        { id: 1, name: "Sample Hitter", position: "CF", stat: { ops: 0.912, plateAppearances: 180 } },
+        { id: 2, name: "Other Batter", position: "RF", stat: { ops: 0.801, plateAppearances: 150 } },
+      ],
+      pitching: [],
+    });
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+
+    const table = await screen.findByRole("table", {
+      name: "Roster insights sorted by OPS",
+    });
+    expect(table).toBeInTheDocument();
+
+    const search = screen.getByRole("textbox", {
+      name: "Filter roster insights by player name",
+    });
+    await user.type(search, "hitter");
+    expect(screen.getByRole("rowheader", { name: "Sample Hitter" })).toBeInTheDocument();
+
+    const direction = screen.getByRole("button", {
+      name: /Reverse roster insights sort direction; currently descending/i,
+    });
+    await user.click(direction);
+    expect(direction).toHaveTextContent("ASC ↑");
+    expect(direction).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
@@ -308,13 +351,10 @@ describe("Team Overview model source and retry interaction", () => {
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
-    const providers = [
-      ...container.querySelectorAll(".skip-overview-source-name"),
-    ].map(node => node.textContent);
-    expect(providers.filter(provider => provider === "FanGraphs")).toHaveLength(
-      7
-    );
-    expect(providers.filter(provider => provider === "Savant")).toHaveLength(4);
+    const sourceLine = container.querySelector('[aria-label="Advanced models data sources"]');
+    expect(sourceLine).toBeInTheDocument();
+    const providers = [...sourceLine.querySelectorAll(".skip-overview-source-name")].map(node => node.textContent);
+    expect(providers).toEqual(["FanGraphs", "MLB Stats API", "Savant"]);
     expect(
       container.querySelector(".skip-status-unavailable")
     ).toBeInTheDocument();
@@ -345,6 +385,38 @@ describe("Team Overview model source and retry interaction", () => {
     render(<OverviewPage />);
     await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText(/div avg/)).toBeInTheDocument();
+  });
+
+  it("propagates verified division rows into a labeled Divisional WAR comparison", async () => {
+    vi.spyOn(mlbApi, "getTeamModelSources").mockResolvedValueOnce({
+      found: true,
+      retrievedAt: "2026-08-14T02:02:00.000Z",
+      source: "FanGraphs",
+      playoffOdds: 72.4,
+      teamWar: 31.4,
+      statuses: { playoffOdds: "live", teamWar: "live" },
+    });
+    vi.spyOn(mlbApi, "getTeamAggregateWar").mockResolvedValueOnce({
+      teamWar: 31.4,
+      divisionAverageWAR: 26.2,
+      source: "FanGraphs aggregate Team WAR",
+      freshness: "live",
+      status: "live",
+      divisionTeams: [
+        { team: "Los Angeles Dodgers", totalWAR: 31.4, offensiveWAR: 21.2, pitchingWAR: 10.2, defensiveWAR: null },
+        { team: "San Diego Padres", totalWAR: 21.0, offensiveWAR: 12.5, pitchingWAR: 8.5, defensiveWAR: null },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<OverviewPage />);
+
+    await user.click(screen.getByRole("button", { name: "Performance" }));
+    expect(await screen.findByText("2 teams")).toBeInTheDocument();
+    expect(screen.getByText(/LAD highlighted/i)).toBeInTheDocument();
+    const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
+    expect(exactValuesTable).toHaveTextContent("LAD");
+    expect(exactValuesTable).toHaveTextContent("+31.4");
+    expect(exactValuesTable).toHaveTextContent("SD");
   });
 
   it("shows explicit unavailable model states, exposes retry, and recovers MLB data without refreshing FanGraphs", async () => {

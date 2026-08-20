@@ -40,9 +40,9 @@ export function FeedFreshnessPanel({ settings, successes, updateSettings }) {
           <option value="exact">Exact date and time</option>
         </select>
       </label>
-      <div aria-label="Tracked data feeds">
+      <div className="skip-data-list" role="list" aria-label="Tracked data feeds">
         {rows.map((row, index) => (
-          <div key={row.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderBottom:index < rows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none' }}>
+          <div key={row.key} role="listitem" style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderBottom:index < rows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none' }}>
             <span aria-hidden="true" style={{ width:7, height:7, flexShrink:0, borderRadius:'50%', background:row.lastSuccess != null ? C.teal : C.text4 }} />
             <div style={{ flex:1, minWidth:0 }}>
               <div style={sans({ fontSize:11.5, fontWeight:700, color:C.text })}>{row.label}</div>

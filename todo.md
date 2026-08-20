@@ -11293,3 +11293,88 @@
 - [x] Inspect the existing Players name-search and player-profile navigation flow.
 - [x] Make matching player names and quick-access cards open the corresponding player profile.
 - [x] Add search and profile-navigation regression tests, verify responsive behavior, and publish the enhancement.
+- [x] Inspect the current Players search keyboard flow and result accessibility semantics.
+- [x] Add Up/Down arrow navigation, Enter selection, and active-result feedback to player search results.
+- [x] Add keyboard-navigation regressions, validate the interaction, and publish the enhancement.
+- [x] Capture the current local and shared-main commit state before synchronization.
+- [x] Synchronize the local project to the latest shared main branch without overwriting newer work.
+- [x] Inspect, validate, and document the best compatible combined release state.
+- [x] Inspect existing release scripts, provider health checks, and GitHub comparison conventions.
+- [x] Add a permanent release comparison and deterministic provider-health smoke-test workflow.
+- [x] Document the preferred release procedure, validate the workflow, and publish it.
+- [x] Define the release-gate acceptance criteria for the selected release-gate-only workflow.
+- [x] Implement local release comparison and provider-health smoke-test commands.
+- [x] Add release-gate tests, document the exact procedure, validate it, and publish the workflow.
+- [x] Inspect the current shared and GitHub release references plus the production package-manager build failure.
+- [x] Preserve the strongest compatible version set and repair the package-manager configuration for production builds.
+- [x] Re-run the release gate, verify the deployed application, and publish the reconciled release.
+- [x] Inventory every GitHub 9aeea29 change against the current shared release.
+- [x] Integrate compatible GitHub identity, Vercel, data-resilience, and test improvements without losing shared functionality.
+- [x] Resolve all merge conflicts, update release-gate baseline and audit evidence, validate, and publish the full combined release.
+- [x] Inspect the player profile’s verified identity payload, confidence presentation, and current loading skeleton.
+- [x] Add an honest identity-confidence indicator and a progressive player-profile loading skeleton.
+- [x] Add regression coverage, verify responsive loading behavior, and publish the player-profile improvement.
+- [x] Inspect the Team Overview’s initial viewport and identify card sections to defer.
+- [x] Reorder Team Overview content so card-based analysis appears later without hiding team controls or decision context.
+- [x] Add regression coverage, verify desktop and mobile layout order, and publish the refinement.
+- [x] Inspect Executive Briefing shortcut destinations and current Team Overview data-card spacing.
+- [x] Add accessible Executive Briefing workspace shortcuts and compact the detailed data-card layout without reducing readability.
+- [x] Add regression coverage, verify desktop and mobile behavior, and publish the shortcut and spacing refinement.
+- [x] Inventory available branch histories, current shared release state, and pending changes.
+- [x] Compare candidate branch changes for compatibility, user value, and optimization impact.
+- [x] Implement selected compatible optimizations with regression coverage and managed publication.
+- [x] Inspect current primary navigation, workspace routing, search placement, and Settings theme controls.
+- [x] Combine Prospects with Draft and combine AMD/IMD with Intelligence and Knowledge using horizontal sub-tabs.
+- [x] Replace the visible LIVE 2026 treatment with Search and move theme switching into Settings.
+- [x] Add navigation regression coverage, verify desktop and mobile workflows, and publish the workspace reorganization.
+- [x] Trace the Team Overview playoff-odds data source, calculation, fallback, and display states.
+- [x] Validate representative team odds against current standings inputs and source provenance.
+- [x] Correct any playoff-odds accuracy or transparency issue, add regression coverage, and publish the verified result.
+- [x] Inspect existing playoff-odds source timing, verified standings inputs, and fallback interfaces.
+- [x] Vet an authoritative secondary playoff-odds provider and available integration path.
+- [x] Add FanGraphs verification timing, a standings-context panel, and a sourced secondary odds fallback without estimates.
+- [x] Add regression coverage, verify desktop and mobile source states, and publish the enhancement.
+
+- [x] Audit the supplied branch, player-profile, and ScoreRing handoffs against the current SKIP release.
+- [x] Implement any compatible player-profile request-cancellation and core-loading improvements without weakening existing sequence safeguards.
+- [x] Add a reversible, data-provenance-safe ScoreRing preview to the existing Front Office Evaluation only if the current data contract supports it.
+- [x] Add regression coverage, validate desktop and mobile states, and publish the selective optimization release.
+
+- [x] Establish a current release baseline with runtime, network, data-source, and build-health evidence.
+- [x] Audit and prioritize verified reliability, loading, caching, accessibility, and responsive UX issues across the application.
+- [x] Implement only evidence-backed optimization and defect fixes while preserving explicit source provenance and unavailable states.
+- [x] Add regression coverage, complete release validation, and publish the optimization pass.
+- [x] Record the already documented GitHub-main synchronization commit in the release-gate baseline after compatibility review.
+- [x] Defer official ballpark metadata loading until the Operations workspace is opened, with an explicit idle state before that request begins.
+- [x] Defer heavyweight team Statcast rollups until the Performance workspace is opened, preserving source-aware loading and cached states.
+- [x] Reset Performance-only team Statcast state on a team change so one club’s values cannot remain visible while another club loads.
+- [x] Compare the supplied canonical ScoreRing guide with the active canonical grade model and retain only non-conflicting accessibility or integrity improvements.
+- [x] Audit the supplied uptime-monitor branch guidance without applying migrations, schedules, or branch merges unless separately planned and verified.
+- [x] Replace the conflicting Performance-workspace legacy SKIP Grade grid with a keyboard-accessible route to the canonical Front Office Evaluation.
+- [x] Defer optional AI roster insights until the Roster workspace opens while retaining immediate verified local roster analysis.
+- [x] Defer redundant calculated-intelligence standings work until Performance opens, while retaining it as a source-labeled fallback there.
+
+- [x] Audit all baseball record-percentage displays and add a shared formatter that renders leading-decimal notation such as .598.
+- [x] Migrate eligible win-percentage displays without changing percentage metrics that require a leading zero.
+- [x] Add regression coverage, validate responsive rendering, and publish the baseball percentage formatting update.
+
+- [x] Audit batting-average and OPS displays for scorebook notation and identify the existing League standings export path.
+- [x] Add a shared scorebook rate formatter for batting average and OPS without altering unrelated decimal metrics.
+- [x] Add an accessible standings export that includes Team, W–L, and formatted WIN% with verified export content.
+- [x] Add regression coverage, validate responsive behavior, and publish the notation and standings-export update.
+
+- [x] Audit every player-search source and active-status field, plus current runtime, network, and UI health evidence.
+- [x] Exclude non-active players from global and Players workspace search results without blocking current active-player profiles.
+- [x] Implement only evidence-backed reliability, loading, accessibility, and responsive UX fixes found during the debug pass.
+- [x] Add regression coverage, complete release validation, and publish the active-search and reliability update.
+- [x] Record the reviewed documentation-only GitHub-main advance in the release-gate baseline before publication.
+
+- [x] Establish a current shared-main baseline using release comparison, provider, runtime, network, and build-health evidence.
+- [x] Audit high-cost data paths, caching, errors, test stability, accessibility, and desktop/mobile interface behavior.
+- [x] Implement only evidence-backed reliability, data-loading, performance, and UX fixes that preserve current source provenance and honest unavailable states.
+- [x] Add regression coverage, complete full release validation, and publish the master optimization release.
+- [x] Repair the React test teardown scheduling exception in the MLB team-loading sequence without changing production data behavior.
+
+- [x] Audit the existing Team Overview loading states, skeleton component, styles, and associated regression coverage.
+- [x] Add an accessible animated Team Overview skeleton that mirrors the initial information hierarchy without presenting placeholder values as data.
+- [x] Validate desktop and mobile loading states, reduced-motion behavior, and full release quality before publication.

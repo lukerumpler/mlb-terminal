@@ -63,14 +63,14 @@ export default function DataSourceStatusCenter({ successes = {}, settings = { en
       <div style={{ padding:'10px 14px 8px', ...sans({ fontSize:11, color:C.text3, lineHeight:1.45 }) }}>
         Each provider reports its own freshness. A retry refreshes only the selected source and never replaces a verified value with an estimate.
       </div>
-      <div aria-label="Data-source providers">
+      <div className="skip-data-list" role="list" aria-label="Data-source providers">
         {PROVIDERS.map((provider, index) => {
           const row = freshnessByKey.get(provider.key);
           const successful = Boolean(row?.lastSuccess);
           const isRetrying = retrying === provider.key;
           const providerRetry = retryState[provider.key];
           return (
-            <div key={provider.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
+            <div key={provider.key} role="listitem" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
               <span aria-hidden="true" style={{ width:8, height:8, flexShrink:0, borderRadius:'50%', background:successful ? C.teal : C.amber }} />
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={sans({ fontSize:11.5, fontWeight:800, color:C.text })}>{provider.label}</div>

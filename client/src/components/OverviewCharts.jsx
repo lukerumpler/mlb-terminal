@@ -42,6 +42,7 @@ import {
   Pie,
   Cell,
   BarChart,
+  LabelList,
 } from "recharts";
 import { C, WARM_TOOLTIP } from "../constants/colors.js";
 
@@ -451,7 +452,7 @@ function DivisionalWarTooltip({ active, payload }) {
   );
 }
 
-export function DivisionalWarChart({ data = [] }) {
+export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
   if (!data.length) {
     return (
       <div
@@ -472,17 +473,27 @@ export function DivisionalWarChart({ data = [] }) {
       </div>
     );
   }
+  const warValues = data
+    .map(row => Number(row.totalWAR))
+    .filter(Number.isFinite);
+  const minWar = Math.min(0, ...warValues);
+  const maxWar = Math.max(0, ...warValues);
+  const axisPadding = Math.max(1, (maxWar - minWar) * 0.08);
   return (
-    <ResponsiveContainer width="100%" height={178}>
+    <ResponsiveContainer
+      width="100%"
+      height={Math.max(178, data.length * 31 + 18)}
+    >
       <BarChart
         data={data}
         layout="vertical"
-        margin={{ top: 4, right: 12, bottom: 0, left: 8 }}
+        margin={{ top: 4, right: 44, bottom: 0, left: 8 }}
         barCategoryGap="18%"
       >
         <CartesianGrid stroke={C.borderLight} horizontal={false} />
         <XAxis
           type="number"
+          domain={[minWar - axisPadding, maxWar + axisPadding]}
           tick={{ fontSize: 8.5, fill: C.text3 }}
           axisLine={false}
           tickLine={false}
@@ -511,7 +522,25 @@ export function DivisionalWarChart({ data = [] }) {
           radius={[0, 3, 3, 0]}
           maxBarSize={14}
           isAnimationActive={false}
-        />
+        >
+          {data.map(row => (
+            <Cell
+              key={row.team}
+              fill={row.team === selectedTeam ? C.teal : C.purple}
+            />
+          ))}
+          <LabelList
+            dataKey="totalWAR"
+            position="right"
+            formatter={formatWarValue}
+            fill={C.text2}
+            style={{
+              fontFamily: "'DM Mono',monospace",
+              fontSize: 9,
+              fontWeight: 700,
+            }}
+          />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
