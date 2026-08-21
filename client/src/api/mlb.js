@@ -1455,13 +1455,14 @@ function normalizeGame(g) {
   };
 }
 
-export async function getTodaysGames(date) {
+export async function getTodaysGames(date, requestOptions = {}) {
   const d    = date || new Date().toISOString().slice(0, 10);
+  const { ttl = 60_000, ...options } = requestOptions;
   const data = await mlb('/schedule', {
     sportId: 1, date: d,
     hydrate: 'linescore(matchup,runners),team,flags,review,weather',
     language: 'en',
-  }, { ttl: 60_000 });
+  }, { ttl, ...options });
   return (data.dates?.[0]?.games || []).map(normalizeGame);
 }
 
