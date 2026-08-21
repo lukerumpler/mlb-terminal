@@ -3,12 +3,18 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Vercel API routing", () => {
-  it("forwards arbitrary /api/* paths to the shared Express serverless entry", () => {
-    const source = readFileSync(
+  it("bundles the primary and catch-all API entries from the shared handler module", () => {
+    const catchAllSource = readFileSync(
       resolve(process.cwd(), "api/[...path].ts"),
       "utf8"
     );
-    expect(source).toContain('export { default } from "./index"');
+    const primarySource = readFileSync(
+      resolve(process.cwd(), "api/index.ts"),
+      "utf8"
+    );
+    expect(catchAllSource).toContain('export { default } from "../server/vercel-handler";');
+    expect(catchAllSource).not.toContain('from "./index"');
+    expect(primarySource).toContain('export { default, normalizeServerlessRequestUrl } from "../server/vercel-handler";');
   });
 
   it("handles anonymous nested tRPC auth requests before dynamic app loading", () => {
