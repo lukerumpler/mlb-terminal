@@ -15,4 +15,4 @@
 - [x] Add focused regression coverage for live, final, delayed, and no-game ticker states
 - [x] Restore Express 5-compatible local fallback routing so the ticker can receive visual browser verification
 - [x] Make the isolated LLM retry fixture independent of injected Forge credentials for clean-suite validation
-- [ ] Validate and publish the ticker repair without regressing existing navigation or data contracts
+- [x] Validate and publish the ticker repair without regressing existing navigation or data contracts
