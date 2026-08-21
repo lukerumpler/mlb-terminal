@@ -16,6 +16,7 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
 const FRESH_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 24 * 60 * 60_000;
+const UNAVAILABLE_CACHE_MS = 60_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_ITEMS = 25;
 const MAX_CACHE_ENTRIES = 100;
@@ -201,7 +202,7 @@ function cachePayload(entry, status, reason = null) {
     retrievedAt: entry.retrievedAt,
     ageSeconds: ageSeconds(entry.retrievedAt),
     status,
-    freshness: status === "cached-fallback" ? "stale-cached" : "cached",
+    freshness: status === "cached-fallback" ? "stale-cached" : status === "unavailable" ? "unavailable" : "cached",
     tier: entry.tier,
     source: entry.source,
     sourceUrl: entry.sourceUrl,
@@ -355,12 +356,13 @@ export default async function handler(req, res) {
   const hit = cache.get(key);
 
   if (hit && hit.freshUntil > now) {
+    const unavailable = Boolean(hit.unavailable);
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=900, stale-while-revalidate=3600"
+      unavailable ? "no-store" : "public, s-maxage=900, stale-while-revalidate=3600"
     );
-    res.setHeader("X-News-Cache", "HIT");
-    return res.status(200).json(cachePayload(hit, "cached"));
+    res.setHeader("X-News-Cache", unavailable ? "NEGATIVE" : "HIT");
+    return res.status(200).json(cachePayload(hit, unavailable ? "unavailable" : "cached", unavailable ? "all-sources-unavailable-cooldown" : null));
   }
 
   const pending = inFlight.get(key);
@@ -429,19 +431,29 @@ export default async function handler(req, res) {
       };
     }
 
-    return {
-      handle: handle || team || kind,
+    // A short, explicit negative cache prevents every panel remount from
+    // fanning out to all providers during an outage. It never fabricates
+    // headlines, never replaces a stale verified snapshot, and remains
+    // transparent to the client through `unavailable` + X-News-Cache.
+    const retrievedAt = Date.now();
+    const unavailableEntry = {
+      kind: handle ? `handle:${handle}` : team ? "team" : kind,
+      team,
+      handle,
       items: [],
-      fetchedAt: new Date().toISOString(),
-      retrievedAt: null,
-      ageSeconds: null,
-      status: "unavailable",
-      freshness: "unavailable",
+      retrievedAt,
+      freshUntil: retrievedAt + UNAVAILABLE_CACHE_MS,
+      staleUntil: retrievedAt + UNAVAILABLE_CACHE_MS,
       tier: null,
       source: null,
       sourceUrl: null,
-      sourceStatuses,
       sources: configuredSources,
+      sourceStatuses,
+      unavailable: true,
+    };
+    setCache(key, unavailableEntry);
+    return {
+      ...cachePayload(unavailableEntry, "unavailable", "all-sources-unavailable"),
       attempts,
       error: "All configured news sources are unavailable",
     };

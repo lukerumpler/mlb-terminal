@@ -194,4 +194,29 @@ describe("resilient /api/news route", () => {
     ).toBe("Cached official headline summary");
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
+
+  it("uses a short transparent negative cache when all team-news providers are unavailable", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => new Response("busy", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = response();
+    const second = response();
+    await newsHandler(request("/api/news?team=LAD&n=2", "198.51.100.45"), first);
+    await newsHandler(request("/api/news?team=LAD&n=2", "198.51.100.45"), second);
+
+    expect(first.body).toMatchObject({ status: "unavailable", freshness: "unavailable" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(second.headers["X-News-Cache"]).toBe("NEGATIVE");
+    expect(second.body).toMatchObject({
+      status: "unavailable",
+      freshness: "unavailable",
+      reason: "all-sources-unavailable-cooldown",
+    });
+
+    vi.advanceTimersByTime(60_001);
+    const afterCooldown = response();
+    await newsHandler(request("/api/news?team=LAD&n=2", "198.51.100.45"), afterCooldown);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
 });

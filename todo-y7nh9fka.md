@@ -255,3 +255,13 @@
 - [x] Implement high-impact fixes with regression coverage while preserving verified-source and unavailable-state behavior.
 - [x] Run type checks, linting, focused and supported full tests, production build, and representative desktop/mobile visual validation.
 - [x] Save a live checkpoint documenting the full-site master debugging pass and remaining external limitations.
+
+- [x] Inventory local and remote branch states, recent commits, divergence, and available validation evidence.
+- [x] Compare candidate branches for feature completeness, data-integrity safeguards, optimization quality, and test/build health.
+- [x] Select and optimize the strongest branch while preserving compatible improvements from other branches.
+- [x] Run type checks, linting, supported full tests, production build, and desktop/mobile verification on the selected branch.
+- [x] Save a live checkpoint documenting the selected branch, optimization work, and validation evidence.
+
+- [x] Classify the attached UI enhancement recommendations as already complete, actionable with existing data, deferred for verified-data limits, or not applicable to the active managed SKIP build.
+- [x] Add the actionable attached recommendations to the selected-branch improvement record without duplicating completed density, portrait, percentile, or semantic-status work.
+- [x] Apply the selected new sourced-news outage-resilience optimization and its regression coverage on the chosen branch.
