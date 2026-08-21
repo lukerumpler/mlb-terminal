@@ -47,3 +47,12 @@
 - [x] Save the validated Padres Operations and default-team-preference release checkpoint
 - [x] Deliver the final Padres Operations and preference release report
 - [x] Deliver the user-facing Padres Operations and preference release report
+- [x] Inspect existing schedule, game metadata, venue, cache, and Operations request-boundary contracts
+- [x] Add an official schedule-derived winning or losing streak summary to Recent Results
+- [x] Add a verified Petco Park game-time and weather module with transparent live, scheduled, cached, and unavailable states
+- [x] Add regression coverage and validate the Operations presentation at desktop and mobile widths
+- [ ] Publish and report the verified streak and Petco Park context release
+- [x] Reconcile and preserve the shared front-office source refinements while adding Operations context
+- [x] Capture explicit desktop and mobile visual evidence for the Operations streak and Petco Park game-context panels after the schedule snapshot resolves, or document an upstream blocker with alternate verifiable rendering evidence
+- [ ] Save and report the validated streak and Petco Park context release
+- [x] Reconcile and preserve the shared selected-team source-isolation refinements in the final Operations release

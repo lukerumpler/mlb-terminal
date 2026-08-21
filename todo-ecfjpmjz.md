@@ -81,3 +81,6 @@
 
 - [x] Add verified-data visual charts for recent player performance and hot-streak trends, with distinct loading and unavailable states; added labeled recent OPS/ERA charts, lower-is-better ERA interpretation, and explicit unavailable handling.
 - [x] Add cross-team comparison tables with shared metric, division, and team-search filters plus sort direction, distinct loading/empty states, a pure row-builder regression suite, type checking, focused tests, and production build; ready for checkpoint publication.
+
+- [x] Inspect the current project for reproducible bugs, validation failures, runtime warnings, and high-risk code paths; identified string-keyed team-stat lookups and Vercel tRPC URL-shape fragility as actionable risks, while browser logs showed no current runtime errors.
+- [x] Implement targeted debugging and code-quality improvements, add regression coverage, and validate; comparison rows now support numeric/string provider IDs, anonymous tRPC auth detection handles Vercel/Express path shapes, focused routing/comparison/player tests, TypeScript, and production build pass. Checkpoint publication remains next.
