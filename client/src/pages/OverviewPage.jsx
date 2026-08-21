@@ -758,17 +758,20 @@ export async function resolveTeamSavantSnapshot({
     getTeamExitVelocityFn(teamAbbr, season).catch(() => null),
     typeof getTeamBattedBallsFn === 'function' ? getTeamBattedBallsFn(teamAbbr, season).catch(() => null) : Promise.resolve(null),
   ]);
+  const hasDirectBattedRows = Array.isArray(directBattedRows) && directBattedRows.length > 0;
   const contactRows = Array.isArray(directRows) && directRows.length
     ? directRows
+    : hasDirectBattedRows
+      ? directBattedRows
     : (await Promise.all(hitters.filter(row => row?.id).map(row => getPlayerContactPointsFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
   const pitchRows = (await Promise.all(pitchers.filter(row => row?.id).map(row => getPitcherPitchesFn(row.id, season).catch(() => null)))).flatMap(result => Array.isArray(result) ? result : []);
-  const source = Array.isArray(directBattedRows) && directBattedRows.length
+  const source = hasDirectBattedRows
     ? 'Baseball Savant Statcast Search · verified team batted-ball query'
     : Array.isArray(directRows) && directRows.length
       ? 'Baseball Savant Statcast Search · team query'
       : (contactRows.length || pitchRows.length ? 'Baseball Savant Statcast Search · verified roster rollup' : '');
-  const snapshot = { exitVelocityRows: contactRows, battedBallRows: Array.isArray(directBattedRows) && directBattedRows.length ? directBattedRows : contactRows, pitchRows };
-  const hasVerifiedRows = contactRows.length > 0 || (Array.isArray(directBattedRows) && directBattedRows.length > 0) || pitchRows.length > 0;
+  const snapshot = { exitVelocityRows: contactRows, battedBallRows: hasDirectBattedRows ? directBattedRows : contactRows, pitchRows };
+  const hasVerifiedRows = contactRows.length > 0 || hasDirectBattedRows || pitchRows.length > 0;
   if (hasVerifiedRows) saveCacheFn(teamAbbr, season, snapshot);
   return { snapshot, source, cacheHit: false };
 }

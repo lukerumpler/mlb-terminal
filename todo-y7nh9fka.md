@@ -224,3 +224,9 @@
 - [x] Run type checks, full tests, production build, and save a live checkpoint with source-coverage findings.
 
 - [x] Apply the scoped Overview density hotfix: content-driven executive briefing, normal Supporting Analysis spacing, and content-sized detailed decision cards.
+
+- [x] Inspect current application health, runtime logs, network behavior, test stability, bundle output, and responsive surfaces for reproducible issues.
+- [x] Diagnose and prioritize concrete reliability, performance, accessibility, and user-interface defects while preserving verified baseball data behavior.
+- [x] Implement targeted fixes with regression coverage and no fabricated fallback data.
+- [x] Run type checks, linting, the supported full test suite, production build, and desktop/mobile visual validation.
+- [x] Save a live checkpoint documenting the completed debugging and optimization pass.

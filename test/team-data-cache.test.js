@@ -285,6 +285,25 @@ describe("team data cache and freshness helpers", () => {
     expect(saveCacheFn).toHaveBeenCalledWith("LAD", 2026, result.snapshot);
   });
 
+  it("uses verified team batted-ball rows before issuing large per-hitter contact rollups", async () => {
+    const getPlayerContactPointsFn = vi.fn();
+    const directBattedRows = [{ launch_speed: 101, xwoba: 0.412 }];
+    const result = await resolveTeamSavantSnapshot({
+      teamAbbr: "LAD",
+      season: 2026,
+      cached: null,
+      hitters: [{ id: 11 }, { id: 12 }],
+      pitchers: [],
+      getTeamExitVelocityFn: vi.fn().mockResolvedValue([]),
+      getTeamBattedBallsFn: vi.fn().mockResolvedValue(directBattedRows),
+      getPlayerContactPointsFn,
+    });
+    expect(getPlayerContactPointsFn).not.toHaveBeenCalled();
+    expect(result.source).toContain("verified team batted-ball query");
+    expect(result.snapshot.exitVelocityRows).toEqual(directBattedRows);
+    expect(result.snapshot.battedBallRows).toEqual(directBattedRows);
+  });
+
   it("falls back to verified player rows when the direct team query is empty", async () => {
     const getPlayerContactPointsFn = vi
       .fn()
