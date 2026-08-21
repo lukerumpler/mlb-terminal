@@ -89,3 +89,7 @@
 - [x] Add source-backed recent game highlights/news context to player profiles with loading and unavailable states; added `PlayerNewsPanel` using the resilient feed API and fixed the existing TeamNewsPanel React hook import contract.
 - [x] Add an AI-powered natural-language MLB query bar for player-stat and team-comparison questions, with safe structured results and regression coverage; added server-side `ai.query`, source-constrained JSON output, graceful provider fallback, and input validation coverage.
 - [x] Validate all three features and publish a checkpoint; focused page/routing/player regressions, AI contract test, type checking, production build, and visual dashboard review passed.
+
+- [x] Add an efficient single-request progressive response state for longer AI comparison queries without making additional model calls or exposing provider credentials; shows staged context/metric/answer progress while the structured response is pending.
+- [x] Add lightweight local query history with save, reuse, case-insensitive deduplication, bounded six-question retention, remove controls, and regression coverage; reuse fills the input without sending a model request.
+- [ ] Publish the validated AI search enhancement; focused history/AI/page tests, type checking, and production build pass, with checkpoint publication remaining.
