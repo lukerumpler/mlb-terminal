@@ -92,4 +92,4 @@
 
 - [x] Add an efficient single-request progressive response state for longer AI comparison queries without making additional model calls or exposing provider credentials; shows staged context/metric/answer progress while the structured response is pending.
 - [x] Add lightweight local query history with save, reuse, case-insensitive deduplication, bounded six-question retention, remove controls, and regression coverage; reuse fills the input without sending a model request.
-- [ ] Publish the validated AI search enhancement; focused history/AI/page tests, type checking, and production build pass, with checkpoint publication remaining.
+- [x] Publish the validated AI search enhancement; checkpoint `1458b83c` contains the progressive response state, bounded local history, focused tests, type checking, and production build.
