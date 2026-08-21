@@ -1,6 +1,6 @@
 import { desc, eq, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUptimeMonitorCheck, InsertUser, UptimeMonitorCheck, uptimeMonitorChecks, uptimeMonitorSchedules, users } from "../drizzle/schema";
+import { InsertUptimeMonitorCheck, InsertUser, UptimeMonitorCheck, uptimeMonitorChecks, uptimeMonitorSchedules, users } from "../drizzle/schema.js";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;

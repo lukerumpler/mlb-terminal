@@ -48,9 +48,11 @@ describe("Vercel API routing", () => {
 
   it("keeps uptime database access handler-bound so initialization errors become controlled responses", () => {
     const source = readFileSync(resolve(process.cwd(), "server/api/uptime-monitor.ts"), "utf8");
+    const databaseSource = readFileSync(resolve(process.cwd(), "server/db.ts"), "utf8");
 
     expect(source).not.toContain('from "../db"');
     expect(source).not.toContain('from "express"');
     expect(source).toContain('await import("../db.js")');
+    expect(databaseSource).toContain('from "../drizzle/schema.js"');
   });
 });
