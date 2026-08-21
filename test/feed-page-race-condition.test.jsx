@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { act, render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Mocks fetchFeeds directly — FeedPage.jsx's load() race condition (fixed
@@ -120,5 +120,41 @@ describe("FeedPage — load() race condition", () => {
     expect(
       screen.queryByText("Stale initial-load post")
     ).not.toBeInTheDocument();
+  });
+
+  it("pauses auto-refresh while hidden and refreshes immediately when the document returns", async () => {
+    vi.useFakeTimers();
+    const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    const setVisibility = value => Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value,
+    });
+    try {
+      setVisibility("hidden");
+      fetchFeeds.mockResolvedValue(feedResult("Visible refresh"));
+      render(<FeedPage />);
+      expect(fetchFeeds).not.toHaveBeenCalled();
+
+      setVisibility("visible");
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      expect(fetchFeeds).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await Promise.resolve();
+        vi.advanceTimersByTime(5 * 60 * 1_000);
+        await Promise.resolve();
+      });
+      expect(fetchFeeds).toHaveBeenCalledTimes(2);
+
+      setVisibility("hidden");
+      act(() => document.dispatchEvent(new Event("visibilitychange")));
+      act(() => vi.advanceTimersByTime(10 * 60 * 1_000));
+      expect(fetchFeeds).toHaveBeenCalledTimes(2);
+    } finally {
+      cleanup();
+      if (visibilityDescriptor) Object.defineProperty(document, "visibilityState", visibilityDescriptor);
+      else delete document.visibilityState;
+      vi.useRealTimers();
+    }
   });
 });
