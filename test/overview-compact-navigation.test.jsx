@@ -1,7 +1,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import OverviewPage from '../client/src/pages/OverviewPage.jsx';
+import OverviewPage, { getTeamLeaderHitterPaMinimum } from '../client/src/pages/OverviewPage.jsx';
 import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
 import { __resetFeedClientStateForTests } from '../client/src/api/feed.js';
 import { saveTeamAggregateCache, saveTeamPlayersCache, saveTeamSavantSummaryCache } from '../client/src/lib/teamDataCache.js';
@@ -55,12 +55,17 @@ describe('Team Overview compact navigation', () => {
     expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
   });
 
+  it('derives the Team Leaders batting minimum from one third of an everyday player workload', () => {
+    expect(getTeamLeaderHitterPaMinimum({ w:77, l:51 })).toBe(148);
+    expect(getTeamLeaderHitterPaMinimum({ w:0, l:0 })).toBeNull();
+  });
+
   it('keeps the compact executive briefing ahead of the detailed card workspace on first load', async () => {
     render(<OverviewPage />);
 
     const briefing = await screen.findByRole('region', { name: 'Front Office Read' });
     const detailedCardsHeading = screen.getByRole('heading', { name: 'Detailed team cards' });
-    const teamLeaders = screen.getByText('Team Leaders');
+    const teamLeaders = screen.getByText(/Team Leaders/);
 
     expect(briefing.compareDocumentPosition(detailedCardsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -93,7 +98,8 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     expect(screen.getAllByText('Verified Hitter').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Verified Pitcher').length).toBeGreaterThan(0);
-    expect(screen.getByText('AVG · 50 PA+')).toBeInTheDocument();
+    expect(screen.getByText(/AVG · \d+ PA\+/)).toBeInTheDocument();
+    expect(screen.getByText(/Team Leaders · \d+ PA min/)).toBeInTheDocument();
     expect(screen.getByText('ERA · 10 IP+')).toBeInTheDocument();
     expect(screen.getByText('15-day hot streak')).toBeInTheDocument();
     expect(screen.getByText('OPS · 20 PA+')).toBeInTheDocument();
@@ -299,7 +305,7 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/comparable Baseball Savant OAA and verified roster coverage are required/i);
-    expect(screen.getByText(/Defense is OAA-first and receives a performance grade only with comparable Statcast coverage/i)).toBeInTheDocument();
+    expect(screen.getByText(/Defense methodology/i)).toHaveTextContent(/comparable Baseball Savant OAA/i);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
     const dialog = screen.getByRole('dialog', { name: /organization depth/i });

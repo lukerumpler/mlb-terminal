@@ -265,3 +265,10 @@
 - [x] Classify the attached UI enhancement recommendations as already complete, actionable with existing data, deferred for verified-data limits, or not applicable to the active managed SKIP build.
 - [x] Add the actionable attached recommendations to the selected-branch improvement record without duplicating completed density, portrait, percentile, or semantic-status work.
 - [x] Apply the selected new sourced-news outage-resilience optimization and its regression coverage on the chosen branch.
+
+- [x] Map the existing per-position OAA data contract, Front Office Evaluation grade selection/methodology logic, and Team Leaders sample-threshold calculation.
+- [x] Build an accessible compact defensive field map using only returned per-position OAA values, with clear unavailable coverage behavior.
+- [x] Scope Front Office Evaluation methodology content to the currently selected grade and add an explicit zero-item weaknesses state.
+- [x] Calculate and display the Team Leaders batting threshold as ceil(0.33 × 3.5 PA × team games played), adjacent to the Team Leaders title.
+- [x] Add regression coverage for the OAA map, methodology selection, threshold calculation, and unavailable states.
+- [x] Run type checks, linting, supported full tests, production build, and desktop/mobile validation, then save a live checkpoint.
