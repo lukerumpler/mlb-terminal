@@ -50,7 +50,7 @@ export async function probeUptimeEndpoint(endpoint: string, runKey: string, chec
 
 export async function runUptimeMonitorBatch(runKey: string, checkedAt = new Date(), fetchImpl: typeof fetch = fetch) {
   const results = await Promise.all(UPTIME_MONITOR_ENDPOINTS.map(target => probeUptimeEndpoint(target.url, runKey, checkedAt, fetchImpl)));
-  const { recordUptimeMonitorCheck } = await import("../db");
+  const { recordUptimeMonitorCheck } = await import("../db.js");
   await Promise.all(results.map(result => recordUptimeMonitorCheck(result)));
   return results;
 }
@@ -73,7 +73,7 @@ function summaryForTarget(target: (typeof UPTIME_MONITOR_ENDPOINTS)[number], che
 export async function getUptimeMonitorDashboard(days: 7 | 30) {
   const now = new Date();
   const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const { listUptimeMonitorChecksSince } = await import("../db");
+  const { listUptimeMonitorChecksSince } = await import("../db.js");
   const all30DayChecks = await listUptimeMonitorChecksSince(since30Days);
   const sinceSelectedRange = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const selectedChecks = all30DayChecks.filter(check => check.checkedAt >= sinceSelectedRange);
@@ -88,10 +88,10 @@ export async function getUptimeMonitorDashboard(days: 7 | 30) {
 
 export async function scheduledDailyUptimeMonitor(req: UptimeMonitorRequest, res: UptimeMonitorResponse) {
   try {
-    const { sdk } = await import("../_core/sdk");
+    const { sdk } = await import("../_core/sdk.js");
     const user = await sdk.authenticateRequest(req as never);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only", timestamp: new Date().toISOString() });
-    const { getUptimeMonitorScheduleByTaskUid } = await import("../db");
+    const { getUptimeMonitorScheduleByTaskUid } = await import("../db.js");
     const schedule = await getUptimeMonitorScheduleByTaskUid(user.taskUid);
     if (!schedule || !schedule.enabled) return res.json({ ok: true, skipped: "orphaned-or-disabled-schedule" });
     const checkedAt = new Date();

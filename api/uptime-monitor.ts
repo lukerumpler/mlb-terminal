@@ -2,7 +2,7 @@ import {
   serveUptimeMonitorDashboard,
   type UptimeMonitorRequest,
   type UptimeMonitorResponse,
-} from "../server/api/uptime-monitor";
+} from "../server/api/uptime-monitor.js";
 
 export default function handler(req: UptimeMonitorRequest, res: UptimeMonitorResponse) {
   if (req.method !== "GET") {
