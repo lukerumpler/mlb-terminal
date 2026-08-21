@@ -7,12 +7,64 @@ import type {
   Response,
 } from "express";
 
+// Vercel packages each serverless entry independently. These imports stay
+// static so every legacy handler is included in api/[...path]'s artifact
+// instead of being resolved dynamically during function initialization.
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import mlbHandler from "./mlb.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import ncaaHandler from "./ncaa.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import savantHandler from "./savant.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import feedHandler from "./feed.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import newsHandler from "./news.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import contractHandler from "./contract.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import comparisonSummaryHandler from "./comparison-summary.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import naturalSearchHandler from "./natural-search.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import teamFinancialsHandler from "./team-financials.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import fangraphsModelsHandler from "./fangraphs-models.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import intelligenceCalculationsHandler from "./intelligence-calculations.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import playoffStatusOddsHandler from "./playoffstatus-odds.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import cacheHealthHandler from "./cache-health.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import playerAdvancedHandler from "./player-advanced.js";
+// @ts-expect-error JavaScript handler has no separate declaration file.
+import playerIdentityHandler from "./player-identity.js";
+
 type LegacyHandler = (
   req: Request,
   res: Response
 ) => unknown | Promise<unknown>;
 
 type ApiModule = { default: LegacyHandler };
+
+const legacyModules: ApiModule[] = [
+  { default: mlbHandler },
+  { default: ncaaHandler },
+  { default: savantHandler },
+  { default: feedHandler },
+  { default: newsHandler },
+  { default: contractHandler },
+  { default: comparisonSummaryHandler },
+  { default: naturalSearchHandler },
+  { default: teamFinancialsHandler },
+  { default: fangraphsModelsHandler },
+  { default: intelligenceCalculationsHandler },
+  { default: playoffStatusOddsHandler },
+  { default: cacheHealthHandler },
+  { default: playerAdvancedHandler },
+  { default: playerIdentityHandler },
+];
 
 function wrapLegacyHandler(handler: LegacyHandler): RequestHandler {
   return (req, res, next) => {
@@ -21,42 +73,6 @@ function wrapLegacyHandler(handler: LegacyHandler): RequestHandler {
 }
 
 export async function registerLegacyApiRoutes(app: Express) {
-  const modules = (await Promise.all([
-    // The migrated handlers are intentionally kept as JavaScript to preserve the original source.
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./mlb.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./ncaa.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./savant.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./feed.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./news.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./contract.js"),
-    // Server-side structured AI comparison summary; credentials stay inside invokeLLM.
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./comparison-summary.js"),
-    // Natural-language search intent router; credentials stay inside invokeLLM.
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./natural-search.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./team-financials.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./fangraphs-models.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./intelligence-calculations.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./playoffstatus-odds.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./cache-health.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./player-advanced.js"),
-    // @ts-expect-error JavaScript handler has no separate declaration file.
-    import("./player-identity.js"),
-  ])) as ApiModule[];
-
   const paths = [
     "/api/mlb",
     "/api/ncaa",
@@ -75,7 +91,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/player-identity",
   ] as const;
   paths.forEach((path, index) => {
-    app.all(path, wrapLegacyHandler(modules[index].default));
+    app.all(path, wrapLegacyHandler(legacyModules[index].default));
   });
 }
 

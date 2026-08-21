@@ -4,6 +4,7 @@
 - [ ] Create an isolated Vercel API-routing repair branch from the merged production baseline
 - [x] Route `/api/*` requests to the Express serverless entry point while preserving the existing news endpoint
 - [x] Add regression coverage for deployed API route reachability
+- [x] Replace legacy route runtime imports with static handler imports so Vercel includes every dependency in the catch-all artifact
 - [ ] Validate, publish, and merge the deployment-routing repair
 - [ ] Verify production `/api/health` and `/api/uptime-monitor` behavior after deployment
 - [ ] Apply the additive uptime-monitor production database migration
