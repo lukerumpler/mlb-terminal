@@ -11399,6 +11399,6 @@
 - [x] Apply safe high-impact low-data optimizations while preserving verified MLB data, source provenance, and honest unavailable states.
 - [x] Slow the visual ticker motion, retain reduced-motion safeguards, add request-budget regression coverage, validate responsive layouts, and publish the release.
 
-- [ ] Audit the existing Front Office defense, baserunning, depth, and future-value grade calculations, underlying source rows, and user-supplied reference notes.
-- [ ] Improve the four grade models with verified inputs, explicit coverage thresholds, transparent fallbacks, and calculation-detail explanations.
-- [ ] Add grade-model integrity regressions, validate desktop and mobile Front Office Evaluation behavior, and publish the enhancement.
+- [x] Audit the existing Front Office defense, baserunning, depth, and future-value grade calculations, underlying source rows, and user-supplied reference notes.
+- [x] Improve the four grade models with verified inputs, explicit coverage thresholds, transparent fallbacks, and calculation-detail explanations.
+- [x] Add grade-model integrity regressions, validate desktop and mobile Front Office Evaluation behavior, and publish the enhancement.

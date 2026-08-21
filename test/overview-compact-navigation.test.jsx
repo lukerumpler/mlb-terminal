@@ -305,7 +305,7 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/comparable Baseball Savant OAA and verified roster coverage are required/i);
-    expect(screen.getByText(/Defense methodology/i)).toHaveTextContent(/comparable Baseball Savant OAA/i);
+    expect(document.querySelector('[data-selected-grade="Defense"]')).toHaveTextContent(/comparable Baseball Savant OAA/i);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
     const dialog = screen.getByRole('dialog', { name: /organization depth/i });
