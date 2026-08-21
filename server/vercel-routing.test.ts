@@ -50,6 +50,7 @@ describe("Vercel API routing", () => {
     const source = readFileSync(resolve(process.cwd(), "server/api/uptime-monitor.ts"), "utf8");
 
     expect(source).not.toContain('from "../db"');
+    expect(source).not.toContain('from "express"');
     expect(source).toContain('await import("../db")');
   });
 });

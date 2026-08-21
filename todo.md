@@ -7,6 +7,7 @@
 - [x] Replace legacy route runtime imports with static handler imports so Vercel includes every dependency in the catch-all artifact
 - [ ] Validate, publish, and merge the deployment-routing repair
 - [ ] Verify production `/api/health` and `/api/uptime-monitor` behavior after deployment
+- [ ] Replace the dedicated uptime function's Express type dependency with a minimal serverless request/response contract and confirm its public production invocation
 - [ ] Apply the additive uptime-monitor production database migration
 - [ ] Create and persist the project-owned daily 09:00 UTC uptime-monitor Heartbeat
 

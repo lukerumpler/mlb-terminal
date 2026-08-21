@@ -1,6 +1,22 @@
-import type { Express, Request, Response } from "express";
 import type { UptimeMonitorCheck } from "../../drizzle/schema";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+
+export type UptimeMonitorRequest = {
+  method?: string;
+  query: Record<string, unknown>;
+  originalUrl?: string;
+};
+
+export type UptimeMonitorResponse = {
+  setHeader(name: string, value: string | number): unknown;
+  status(statusCode: number): UptimeMonitorResponse;
+  json(body: unknown): unknown;
+};
+
+export type UptimeMonitorRouter = {
+  get(path: string, handler: (...args: any[]) => unknown): unknown;
+  post(path: string, handler: (...args: any[]) => unknown): unknown;
+};
 
 export const UPTIME_MONITOR_ENDPOINTS = [
   { key: "mlbApi", label: "MLB API health", url: "https://mlb-terminal.vercel.app/api/health" },
@@ -70,10 +86,10 @@ export async function getUptimeMonitorDashboard(days: 7 | 30) {
   };
 }
 
-export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
+export async function scheduledDailyUptimeMonitor(req: UptimeMonitorRequest, res: UptimeMonitorResponse) {
   try {
     const { sdk } = await import("../_core/sdk");
-    const user = await sdk.authenticateRequest(req as unknown as Request);
+    const user = await sdk.authenticateRequest(req as never);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only", timestamp: new Date().toISOString() });
     const { getUptimeMonitorScheduleByTaskUid } = await import("../db");
     const schedule = await getUptimeMonitorScheduleByTaskUid(user.taskUid);
@@ -89,12 +105,12 @@ export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
 }
 
 export async function serveUptimeMonitorDashboard(
-  req: Request,
-  res: Response,
+  req: UptimeMonitorRequest,
+  res: UptimeMonitorResponse,
   loadDashboard: typeof getUptimeMonitorDashboard = getUptimeMonitorDashboard
 ) {
-  applyCors(req, res);
-  if (isRateLimited(req, "uptime-monitor")) return rateLimitResponse(res);
+  applyCors(req as never, res as never);
+  if (isRateLimited(req as never, "uptime-monitor")) return rateLimitResponse(res as never);
   try {
     const requestedDays = Number(req.query.days);
     const days: 7 | 30 = requestedDays === 30 ? 30 : 7;
@@ -108,9 +124,9 @@ export async function serveUptimeMonitorDashboard(
 }
 
 export function registerUptimeMonitorRoutes(
-  app: Express,
+  app: UptimeMonitorRouter,
   loadDashboard: typeof getUptimeMonitorDashboard = getUptimeMonitorDashboard
 ) {
-  app.get("/api/uptime-monitor", (req, res) => serveUptimeMonitorDashboard(req, res, loadDashboard));
+  app.get("/api/uptime-monitor", (req: UptimeMonitorRequest, res: UptimeMonitorResponse) => serveUptimeMonitorDashboard(req, res, loadDashboard));
   app.post("/api/scheduled/daily-uptime-monitor", scheduledDailyUptimeMonitor);
 }
