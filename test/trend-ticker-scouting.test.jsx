@@ -12,7 +12,10 @@ import ScoutingGradesPreview, {
   SCOUTING_GRADE_PREVIEW_ROWS,
   buildScoutingGradeRows,
 } from "../client/src/components/ScoutingGradesPreview.jsx";
-import LiveScoreTicker from "../client/src/components/LiveScoreTicker.jsx";
+import LiveScoreTicker, {
+  formatLiveScoreTick,
+  getTickerPresentation,
+} from "../client/src/components/LiveScoreTicker.jsx";
 import { StatStrip } from "../client/src/components/atoms.jsx";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
@@ -61,10 +64,13 @@ describe("verified trend snapshots", () => {
 });
 
 describe("ticker and scouting preview contracts", () => {
-  it("uses explicit refresh states without an in-process interval", () => {
+  it("uses a guarded 30-second visible-tab refresh without bypassing shared request controls", () => {
     expect(appSource).toContain("const refreshTicker = useCallback");
     expect(appSource).toContain("<LiveScoreTicker status={tickerStatus}");
-    expect(appSource).not.toContain("setInterval(refresh, 30_000");
+    expect(appSource).toContain("const TICKER_POLL_INTERVAL_MS = 30_000");
+    expect(appSource).toContain("tickerRefreshInFlight");
+    expect(appSource).toContain("window.setInterval(refreshWhenVisible, TICKER_POLL_INTERVAL_MS)");
+    expect(appSource).toContain("ttl:0, priority:'core', stage:'ticker', screen:'app-shell'");
   });
 
   it("renders loading, empty, error, stale, and updating states with retry behavior", () => {
@@ -73,17 +79,51 @@ describe("ticker and scouting preview contracts", () => {
     expect(screen.getByRole("status", { hidden: true })).toBeInTheDocument();
     rerender(<LiveScoreTicker status="empty" />);
     expect(
-      screen.getByText("No games in progress right now.")
+      screen.getByText("No games scheduled today.")
     ).toBeInTheDocument();
     rerender(<LiveScoreTicker status="error" onRetry={retry} />);
     screen.getByRole("button", { name: "RETRY" }).click();
     expect(retry).toHaveBeenCalledTimes(1);
     rerender(<LiveScoreTicker status="stale" ticks={["LAD 3, SD 1 (▲6)"]} />);
-    expect(screen.getByText(/Scores may be out of date/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Scores may be out of date/).length).toBeGreaterThan(0);
     rerender(
       <LiveScoreTicker status="refreshing" ticks={["LAD 3, SD 1 (▲6)"]} />
     );
     expect(screen.getByText("UPDATING")).toBeInTheDocument();
+  });
+
+  it("formats live, final, delayed, and no-game ticker states without inventing scores", () => {
+    const liveGame = {
+      status: "In Progress",
+      statusCode: "I",
+      inning: 6,
+      inningHalf: "top",
+      away: { abbr: "LAD", runs: 3 },
+      home: { abbr: "SD", runs: 1 },
+    };
+    const finalGame = {
+      status: "Final",
+      statusCode: "F",
+      away: { abbr: "NYY", runs: 4 },
+      home: { abbr: "BOS", runs: 2 },
+    };
+    const delayedGame = {
+      status: "Delayed",
+      away: { abbr: "CHC", runs: 1 },
+      home: { abbr: "STL", runs: 1 },
+    };
+
+    expect(formatLiveScoreTick(liveGame)).toBe("LAD 3, SD 1 · ▲6");
+    expect(formatLiveScoreTick(finalGame)).toBe("NYY 4, BOS 2 · Final");
+    expect(formatLiveScoreTick(delayedGame)).toBe("CHC 1, STL 1 · Delayed");
+    expect(getTickerPresentation([])).toEqual({ status: "empty", ticks: [] });
+    expect(getTickerPresentation([liveGame, finalGame])).toMatchObject({
+      status: "live",
+      ticks: ["LAD 3, SD 1 · ▲6", "NYY 4, BOS 2 · Final"],
+    });
+
+    render(<LiveScoreTicker status="live" ticks={[formatLiveScoreTick(liveGame)]} />);
+    expect(screen.getAllByText("LAD 3, SD 1 · ▲6").length).toBeGreaterThan(0);
   });
 
   it("shows a verified trend arrow only when a baseline-derived trend is present", () => {

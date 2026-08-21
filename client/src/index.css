@@ -936,9 +936,20 @@
 
 .skip-utility-section { padding-top:4px; }
 .skip-ticker-message { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.skip-ticker-viewport{position:relative;display:block;flex:1;min-width:0;overflow:hidden}
+.skip-ticker-track{display:flex;align-items:stretch;width:max-content;min-width:200%;white-space:nowrap;will-change:transform}
+.skip-ticker-track[data-animate="true"]{animation:skip-ticker-scroll var(--skip-ticker-duration,50s) linear infinite}
+.skip-ticker-segment{display:flex;align-items:center;flex:0 0 auto;min-width:100%}
+.skip-ticker-item{display:inline-flex;align-items:center;flex:0 0 auto;min-height:32px;padding:0 20px;border-right:1px solid rgba(255,255,255,.1)}
+.skip-ticker-stale-note{color:rgba(255,255,255,.55)}
+.skip-ticker-indicator[data-live="true"]{animation:skip-ticker-indicator-pulse 1.6s ease-in-out infinite}
+.skip-ticker-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@keyframes skip-ticker-scroll{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+@keyframes skip-ticker-indicator-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
 @media (max-width:720px) {
   .skip-utility-section { display:none; }
   .skip-ticker-message { padding-left:12px !important; padding-right:12px !important; }
+  .skip-ticker-item{padding-left:14px;padding-right:14px}
   .skip-ticker-shell { height:calc(32px + env(safe-area-inset-bottom)) !important; padding-bottom:env(safe-area-inset-bottom); }
 }
 
@@ -986,7 +997,7 @@
 .skip-ticker-skeleton i:nth-child(2){width:86px;animation-delay:.14s}
 .skip-ticker-skeleton i:nth-child(3){width:42px;animation-delay:.28s}
 @keyframes skip-ticker-pulse{0%,100%{opacity:.34}50%{opacity:.9}}
-@media (prefers-reduced-motion: reduce){.skip-ticker-skeleton i{animation:none;opacity:.6}}
+@media (prefers-reduced-motion: reduce){.skip-ticker-skeleton i,.skip-ticker-indicator[data-live="true"]{animation:none;opacity:.6}.skip-ticker-track[data-animate="true"]{animation:none;transform:none}}
 
 @media (min-width:721px){
   .skip-sidebar .skip-nav-label,.skip-sidebar .skip-utility-label{min-width:0;white-space:nowrap;overflow:visible;text-overflow:clip;}

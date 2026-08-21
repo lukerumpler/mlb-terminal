@@ -5,7 +5,7 @@ import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, saniti
 import { ALERTS, getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
 import { Panel } from './components/atoms.jsx';
-import LiveScoreTicker from './components/LiveScoreTicker.jsx';
+import LiveScoreTicker, { getTickerPresentation } from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
@@ -28,6 +28,7 @@ const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
 const UptimeMonitorPage = lazy(() => import('./pages/UptimeMonitorPage.jsx'));
+const TICKER_POLL_INTERVAL_MS = 30_000;
 
 function PageLoading() {
   return (
@@ -175,7 +176,8 @@ export default function App() {
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
-  // 'loading' | 'live' | 'empty' | 'error' — the ticker used to seed itself
+  const tickerRefreshInFlight = useRef(false);
+  // 'loading' | 'live' | 'scores' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
   // fetch failed or returned nothing, next to a pulsing "LIVE" dot. Tracking
   // real status means we only ever show genuinely live data as live.
@@ -308,38 +310,50 @@ export default function App() {
     };
   }, []);
 
-  const refreshTicker = useCallback(() => {
-    setTickerStatus(current => current === 'live' ? 'refreshing' : 'loading');
-    return getTodaysGames().then(games => {
-      if (!games.length) {
-        setLiveTicker([]);
-        setTickerStatus('empty');
-        return [];
-      }
-      const ticks = games.map(g => {
-        const sc = g.away.runs != null
-          ? `${g.away.abbr} ${g.away.runs}, ${g.home.abbr} ${g.home.runs}`
-          : `${g.away.abbr} vs ${g.home.abbr}`;
-        const status = g.status === 'Final' ? '(F)' : g.inning
-          ? `(${g.inningHalf === 'top' ? '▲' : '▼'}${g.inning})` : '(Pre)';
-        return `${sc} ${status}`;
-      });
-      setLiveTicker(ticks);
-      setTickerStatus('live');
-      return ticks;
-    }).catch(() => {
-      setTickerStatus(current => current === 'live' || current === 'refreshing' ? 'stale' : 'error');
+  const refreshTicker = useCallback(async () => {
+    if (tickerRefreshInFlight.current) return [];
+    tickerRefreshInFlight.current = true;
+    setTickerStatus(current => ['live', 'scores', 'refreshing', 'stale'].includes(current) ? 'refreshing' : 'loading');
+    try {
+      // The shared client queue, upstream cooldown, and Vercel proxy cache remain
+      // authoritative. Zero local TTL only prevents this UI from presenting a
+      // minute-old browser cache as a newly polled score update.
+      const games = await getTodaysGames(undefined, { ttl:0, priority:'core', stage:'ticker', screen:'app-shell' });
+      const presentation = getTickerPresentation(games);
+      setLiveTicker(presentation.ticks);
+      setTickerStatus(presentation.status);
+      return presentation.ticks;
+    } catch {
+      setTickerStatus(current => ['live', 'scores', 'refreshing', 'stale'].includes(current) ? 'stale' : 'error');
       return [];
-    });
+    } finally {
+      tickerRefreshInFlight.current = false;
+    }
   }, []);
   useEffect(() => {
-    refreshTicker();
-    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') refreshTicker(); };
+    let refreshTimer = null;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshTicker();
+    };
+    const startPolling = () => {
+      if (refreshTimer !== null) window.clearInterval(refreshTimer);
+      refreshWhenVisible();
+      if (document.visibilityState === 'visible') refreshTimer = window.setInterval(refreshWhenVisible, TICKER_POLL_INTERVAL_MS);
+    };
+    const syncVisibility = () => {
+      if (document.visibilityState === 'visible') startPolling();
+      else if (refreshTimer !== null) {
+        window.clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    };
+    startPolling();
     window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
+    document.addEventListener('visibilitychange', syncVisibility);
     return () => {
+      if (refreshTimer !== null) window.clearInterval(refreshTimer);
       window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', syncVisibility);
     };
   }, [refreshTicker]);
 
@@ -518,7 +532,6 @@ export default function App() {
           .skip-long-table table thead .skip-table-group-row + tr th { top:24px; }
         }
 
-        @keyframes scrollx { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         @keyframes pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
         @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
