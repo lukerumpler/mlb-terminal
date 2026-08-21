@@ -54,5 +54,6 @@ describe("Vercel API routing", () => {
     expect(source).not.toContain('from "express"');
     expect(source).toContain('await import("../db.js")');
     expect(databaseSource).toContain('from "../drizzle/schema.js"');
+    expect(databaseSource).toContain('from "./_core/env.js"');
   });
 });
