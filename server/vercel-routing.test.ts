@@ -45,4 +45,11 @@ describe("Vercel API routing", () => {
     expect(scheduledSource).toContain('from "../../server/api/uptime-monitor"');
     expect(scheduledSource).toContain("scheduledDailyUptimeMonitor");
   });
+
+  it("keeps uptime database access handler-bound so initialization errors become controlled responses", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/api/uptime-monitor.ts"), "utf8");
+
+    expect(source).not.toContain('from "../db"');
+    expect(source).toContain('await import("../db")');
+  });
 });

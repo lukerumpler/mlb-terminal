@@ -1,6 +1,5 @@
 import type { Express, Request, Response } from "express";
 import type { UptimeMonitorCheck } from "../../drizzle/schema";
-import { getUptimeMonitorScheduleByTaskUid, listUptimeMonitorChecksSince, recordUptimeMonitorCheck } from "../db";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
 export const UPTIME_MONITOR_ENDPOINTS = [
@@ -35,6 +34,7 @@ export async function probeUptimeEndpoint(endpoint: string, runKey: string, chec
 
 export async function runUptimeMonitorBatch(runKey: string, checkedAt = new Date(), fetchImpl: typeof fetch = fetch) {
   const results = await Promise.all(UPTIME_MONITOR_ENDPOINTS.map(target => probeUptimeEndpoint(target.url, runKey, checkedAt, fetchImpl)));
+  const { recordUptimeMonitorCheck } = await import("../db");
   await Promise.all(results.map(result => recordUptimeMonitorCheck(result)));
   return results;
 }
@@ -57,6 +57,7 @@ function summaryForTarget(target: (typeof UPTIME_MONITOR_ENDPOINTS)[number], che
 export async function getUptimeMonitorDashboard(days: 7 | 30) {
   const now = new Date();
   const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const { listUptimeMonitorChecksSince } = await import("../db");
   const all30DayChecks = await listUptimeMonitorChecksSince(since30Days);
   const sinceSelectedRange = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const selectedChecks = all30DayChecks.filter(check => check.checkedAt >= sinceSelectedRange);
@@ -74,6 +75,7 @@ export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
     const { sdk } = await import("../_core/sdk");
     const user = await sdk.authenticateRequest(req as unknown as Request);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only", timestamp: new Date().toISOString() });
+    const { getUptimeMonitorScheduleByTaskUid } = await import("../db");
     const schedule = await getUptimeMonitorScheduleByTaskUid(user.taskUid);
     if (!schedule || !schedule.enabled) return res.json({ ok: true, skipped: "orphaned-or-disabled-schedule" });
     const checkedAt = new Date();
