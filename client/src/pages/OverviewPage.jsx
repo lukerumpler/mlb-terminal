@@ -761,7 +761,7 @@ export function CompactExecutiveBriefing({ rd, ops, era, executivePercentiles, a
   ];
   return <section id="team-overview-briefing" role="region" className="skip-compact-executive-briefing" aria-labelledby="team-overview-briefing-title" data-active-view={activeView}>
     <div className="skip-compact-executive-title"><span>Executive</span><strong id="team-overview-briefing-title">Front Office Read</strong></div>
-    <div className="skip-compact-executive-signals" role="list">
+    <div className="skip-compact-executive-signals">
       {signals.map(signal => <button key={signal.label} type="button" onClick={signal.action} className="skip-compact-executive-signal" aria-label={`Open ${signal.destination}: ${signal.label}`}>
         <span>{signal.label}</span><strong style={{color:signal.color}}>{signal.value}</strong><small>{signal.detail}</small>{signal.marker && <ExecutivePercentileMarker {...signal.marker} compact />}
       </button>)}
