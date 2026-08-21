@@ -40,9 +40,9 @@ describe("Vercel API routing", () => {
       "utf8"
     );
 
-    expect(dashboardSource).toContain('from "../server/api/uptime-monitor"');
+    expect(dashboardSource).toContain('from "../server/api/uptime-monitor.js"');
     expect(dashboardSource).toContain("serveUptimeMonitorDashboard");
-    expect(scheduledSource).toContain('from "../../server/api/uptime-monitor"');
+    expect(scheduledSource).toContain('from "../../server/api/uptime-monitor.js"');
     expect(scheduledSource).toContain("scheduledDailyUptimeMonitor");
   });
 
@@ -51,6 +51,6 @@ describe("Vercel API routing", () => {
 
     expect(source).not.toContain('from "../db"');
     expect(source).not.toContain('from "express"');
-    expect(source).toContain('await import("../db")');
+    expect(source).toContain('await import("../db.js")');
   });
 });
