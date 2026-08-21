@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { getMlbScheduleDate } from '../client/src/api/mlb.js';
-import { deriveTickerStatus, formatTickerGame } from '../client/src/lib/ticker.js';
+import { deriveTickerStatus, formatTickerGame, getTickerRefreshDelay, TICKER_SCROLL_DURATION_SECONDS } from '../client/src/lib/ticker.js';
 import LiveScoreTicker from '../client/src/components/LiveScoreTicker.jsx';
 
 describe('official MLB ticker integrity', () => {
@@ -30,5 +30,14 @@ describe('official MLB ticker integrity', () => {
     expect(screen.getByLabelText(/schedule ticker · MLB Stats API/i)).toHaveTextContent('SCHEDULE · MLB');
     expect(screen.getAllByText('ATL @ MIL · 7:10 PM')).toHaveLength(2);
     expect(screen.queryByText('LIVE · MLB')).not.toBeInTheDocument();
+    expect(document.querySelector('.skip-ticker-scroll')).toHaveStyle(`animation: scrollx ${TICKER_SCROLL_DURATION_SECONDS}s linear infinite`);
+  });
+
+  it('uses adaptive, low-data-aware official ticker refresh intervals instead of a fixed rapid poll', () => {
+    expect(getTickerRefreshDelay('live')).toBe(120_000);
+    expect(getTickerRefreshDelay('scheduled')).toBe(300_000);
+    expect(getTickerRefreshDelay('final')).toBe(900_000);
+    expect(getTickerRefreshDelay('live', { lowDataMode: true })).toBe(180_000);
+    expect(getTickerRefreshDelay('scheduled', { lowDataMode: true })).toBe(600_000);
   });
 });

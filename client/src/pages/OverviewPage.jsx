@@ -1685,6 +1685,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, [overviewView, teamBase?.abbr]);
 
   useEffect(() => {
+    if (overviewView !== 'performance') return undefined;
     let alive = true;
     setTeamOaaData(null);
     getTeamSavantOaa(teamBase?.abbr, teamBase?.name, CURRENT_SEASON).then(data => {
@@ -1693,7 +1694,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive) setTeamOaaData({ status:'upstream-unavailable', source:'Baseball Savant Statcast OAA leaderboard', retrievedAt:new Date().toISOString(), oaa:null, playerCount:0, playerRows:[] });
     });
     return () => { alive = false; };
-  }, [teamBase?.abbr, teamBase?.name, savantRetryToken]);
+  }, [overviewView, teamBase?.abbr, teamBase?.name, savantRetryToken]);
 
   const rosterInsightKey = useMemo(() => JSON.stringify({
     team: { name:team.name, abbr:team.abbr, w:team.w, l:team.l, pct:team.pct, rs:team.rs, ra:team.ra, ops:team.ops, hr:team.hr, era:team.era, whip:team.whip, k:team.k, sb:team.sb },
@@ -2019,6 +2020,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   }, [teamBase?.id, hotStreakDays, mlbRetryToken, teamPlayersLoading]);
 
   useEffect(() => {
+    if (overviewView !== 'operations') return undefined;
     let alive = true;
     const teamAbbr = teamBase?.abbr;
     if (!teamAbbr) return () => { alive = false; };
@@ -2039,7 +2041,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         }
       });
     return () => { alive = false; };
-  }, [teamBase?.abbr, taxHistorySeasons]);
+  }, [overviewView, teamBase?.abbr, taxHistorySeasons]);
 
   const exportTeamDataQuality = format => {
     const payload = buildTeamDataQualityPayload({ team, liveTeamData, teamModelData, teamSavantData, liveTeamDataUpdatedAt, teamPlayersUpdatedAt, teamBattedBallData });
