@@ -11394,3 +11394,7 @@
 - [x] Audit hot-streak range state, official MLB by-date-range request behavior, and threshold requirements for 7, 15, and 30 days.
 - [x] Add an accessible 7-, 15-, and 30-day hot-streak selector with verified request, loading, source, and unavailable states.
 - [x] Add range-switch regression coverage, validate desktop and mobile behavior, and publish the enhancement.
+
+- [x] Audit all initial and workspace-specific network requests, delivered assets, cache behavior, and the current ticker refresh and animation settings.
+- [x] Apply safe high-impact low-data optimizations while preserving verified MLB data, source provenance, and honest unavailable states.
+- [x] Slow the visual ticker motion, retain reduced-motion safeguards, add request-budget regression coverage, validate responsive layouts, and publish the release.

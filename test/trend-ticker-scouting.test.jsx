@@ -61,10 +61,12 @@ describe("verified trend snapshots", () => {
 });
 
 describe("ticker and scouting preview contracts", () => {
-  it("uses explicit refresh states with a bounded periodic official refresh", () => {
+  it("uses explicit refresh states with a visibility-aware adaptive official refresh", () => {
     expect(appSource).toContain("const refreshTicker = useCallback");
     expect(appSource).toContain("<LiveScoreTicker status={tickerStatus}");
-    expect(appSource).toContain("setInterval(refreshWhenVisible, 90_000)");
+    expect(appSource).toContain("getTickerRefreshDelay(status, { lowDataMode })");
+    expect(appSource).toContain("window.setTimeout(refreshAndSchedule, delay)");
+    expect(appSource).not.toContain("setInterval(refreshWhenVisible, 90_000)");
     expect(appSource).toContain("document.visibilityState !== 'hidden'");
   });
 
