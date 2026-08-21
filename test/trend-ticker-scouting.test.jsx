@@ -64,7 +64,8 @@ describe("ticker and scouting preview contracts", () => {
   it("uses explicit refresh states with a bounded periodic official refresh", () => {
     expect(appSource).toContain("const refreshTicker = useCallback");
     expect(appSource).toContain("<LiveScoreTicker status={tickerStatus}");
-    expect(appSource).toContain("setInterval(refreshTicker, 90_000)");
+    expect(appSource).toContain("setInterval(refreshWhenVisible, 90_000)");
+    expect(appSource).toContain("document.visibilityState !== 'hidden'");
   });
 
   it("renders loading, empty, error, stale, and updating states with retry behavior", () => {

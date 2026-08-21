@@ -291,6 +291,19 @@ function requestAbortSignal(timeoutMs, signal) {
   return signal;
 }
 
+function dequeueHighestPriorityRequest() {
+  let selectedIndex = 0;
+  for (let index = 1; index < requestQueue.length; index += 1) {
+    const candidate = requestQueue[index];
+    const selected = requestQueue[selectedIndex];
+    if (candidate.priorityWeight < selected.priorityWeight
+      || (candidate.priorityWeight === selected.priorityWeight && candidate.queueId < selected.queueId)) {
+      selectedIndex = index;
+    }
+  }
+  return requestQueue.splice(selectedIndex, 1)[0];
+}
+
 function pumpRequestQueue() {
   if (queueTimer != null) return;
   const now = Date.now();
@@ -308,8 +321,7 @@ function pumpRequestQueue() {
     return;
   }
 
-  requestQueue.sort((left, right) => left.priorityWeight - right.priorityWeight || left.queueId - right.queueId);
-  const job = requestQueue.shift();
+  const job = dequeueHighestPriorityRequest();
   job.removeQueuedAbortListener?.();
   activeRequests += 1;
   requestStarts.push(now);
@@ -421,8 +433,8 @@ export async function mlb(path, params = {}, {
   screen = 'unknown',
   signal,
 } = {}) {
-  const extraQs = Object.entries(params)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
+  const extraQs = Object.keys(params).sort()
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key])).replace(/%2C/g, ',')}`)
     .join('&');
   const url = `${BASE}?path=${encodeURIComponent(path)}${extraQs ? '&' + extraQs : ''}`;
 

@@ -256,9 +256,16 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
-    refreshCacheHealth();
-    const intervalId = window.setInterval(refreshCacheHealth, 60_000);
-    return () => window.clearInterval(intervalId);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshCacheHealth();
+    };
+    refreshWhenVisible();
+    const intervalId = window.setInterval(refreshWhenVisible, 60_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [refreshCacheHealth]);
   const liveAlerts = useMemo(() => buildOperationalAlerts({
     cacheHealth,
@@ -372,9 +379,11 @@ export default function App() {
     });
   }, []);
   useEffect(() => {
-    refreshTicker();
-    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') refreshTicker(); };
-    const refreshIntervalId = window.setInterval(refreshTicker, 90_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshTicker();
+    };
+    refreshWhenVisible();
+    const refreshIntervalId = window.setInterval(refreshWhenVisible, 90_000);
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {

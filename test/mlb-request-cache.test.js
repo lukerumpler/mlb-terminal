@@ -86,6 +86,20 @@ describe("MLB request cache optimization", () => {
     ]));
   });
 
+  it("coalesces equivalent MLB queries even when callers construct parameter objects in a different order", async () => {
+    let release;
+    fetch.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const first = mlb("/teams/240", { season: 2098, hydrate: "venue" }, { screen: "overview" });
+    const equivalent = mlb("/teams/240", { hydrate: "venue", season: 2098 }, { screen: "overview" });
+    release({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await Promise.all([first, equivalent]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(__getMlbRequestTraceForTests()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "deduplicated", screen: "overview" }),
+    ]));
+  });
+
   it("starts queued core work before queued background work once capacity becomes available", async () => {
     const releases = [];
     fetch.mockImplementation(url => new Promise(resolve => {
@@ -108,6 +122,29 @@ describe("MLB request cache optimization", () => {
     const backgroundRelease = releases.at(-1);
     backgroundRelease.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
     await Promise.all([...blockers, core, background]);
+  });
+
+  it("keeps same-priority queued work in first-in-first-out order", async () => {
+    const releases = [];
+    fetch.mockImplementation(url => new Promise(resolve => {
+      releases.push({ url, resolve });
+    }));
+    const blockers = [1, 2, 3, 4].map(id => mlb(`/fifo/blocker-${id}`));
+    const firstQueued = mlb("/fifo/first", {}, { priority: "important" });
+    const secondQueued = mlb("/fifo/second", {}, { priority: "important" });
+
+    await Promise.resolve();
+    releases[0].resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch.mock.calls[4][0]).toContain(encodeURIComponent("/fifo/first"));
+
+    for (const release of releases.slice(1)) {
+      release.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    const secondQueuedRelease = releases.at(-1);
+    secondQueuedRelease.resolve({ ok: true, json: async () => ({ teams: [] }), text: async () => "" });
+    await Promise.all([...blockers, firstQueued, secondQueued]);
   });
 
   it("removes an aborted request while it is queued and never starts its fetch", async () => {

@@ -230,3 +230,9 @@
 - [x] Implement targeted fixes with regression coverage and no fabricated fallback data.
 - [x] Run type checks, linting, the supported full test suite, production build, and desktop/mobile visual validation.
 - [x] Save a live checkpoint documenting the completed debugging and optimization pass.
+
+- [x] Establish a fresh baseline for code health, runtime behavior, request volume, rendering cost, test reliability, and production bundle composition.
+- [x] Identify and prioritize master-level optimization opportunities across shared data clients, page state, component rendering, and provider resilience.
+- [x] Implement measurable reliability and performance improvements with focused regression coverage and no synthetic baseball data.
+- [x] Validate with type checks, linting, focused and supported full tests, production build, and desktop/mobile visual review.
+- [x] Save a live checkpoint with the master optimization findings and remaining known external-provider limitations.
