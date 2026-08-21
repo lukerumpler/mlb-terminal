@@ -236,3 +236,9 @@
 - [x] Implement measurable reliability and performance improvements with focused regression coverage and no synthetic baseball data.
 - [x] Validate with type checks, linting, focused and supported full tests, production build, and desktop/mobile visual review.
 - [x] Save a live checkpoint with the master optimization findings and remaining known external-provider limitations.
+
+- [x] Map Player Profile responsibilities, data boundaries, and existing test contracts before extraction.
+- [x] Extract cohesive Player Profile feature modules while preserving current user-visible behavior and verified-data states.
+- [x] Update imports and add regression coverage for the modular boundary contracts.
+- [x] Run type checks, linting, focused and supported full tests, production build, and responsive Player Profile validation.
+- [x] Save a live checkpoint for the validated Player Profile modularization.
