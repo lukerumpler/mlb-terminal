@@ -96,3 +96,8 @@
 
 - [x] Audit all-team selection, standings/stat lookups, cross-team comparisons, loading/error states, and responsive rendering for reproducible issues; all 30 configured team intelligence endpoints returned valid responses, the in-app League UI rendered its comparison heading and metric control with 111 table rows at desktop and mobile widths without horizontal overflow, and the comparison audit found a NaN/null filtering defect.
 - [x] Fix validated all-teams issues, add regression coverage, run validation, and publish a checkpoint; comparison rows now exclude null/NaN metrics, support deterministic tie sorting, and top-six charts exclude missing metric values while accepting numeric/string provider IDs.
+
+- [x] Compare lukerumpler.com with the latest managed project and identify whether the custom domain points to a different deployment; it initially served a separate Vercel build, while the managed preview served the latest Padres-first interface.
+- [x] Align the correct production deployment after verification; GitHub main was reconciled through PR #19, Vercel deployment status passed, and lukerumpler.com now serves the current Padres-first interface.
+
+- [x] Synchronize the approved latest managed release into GitHub main/Vercel production and verify lukerumpler.com matches it; custom-domain reload now shows the current managed layout and API endpoints return HTTP 200.
