@@ -16,6 +16,7 @@ import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllT
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt, fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
 import { downloadMlbStandingsCsv } from '../lib/csvExports.js';
+import { openPlayerProfile, openTab } from '../lib/navigation.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
 import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
@@ -25,6 +26,27 @@ const TT = {
   ...WARM_TOOLTIP,
   wrapperStyle: { zIndex: 9999 },
 };
+
+export function buildComparisonMetricSummary(rows = []) {
+  const summary = { compared:0, firstWins:0, secondWins:0, ties:0, unavailable:0, firstLabels:[], secondLabels:[] };
+  for (const [label,,, firstValue, secondValue, lowerIsBetter] of Array.isArray(rows) ? rows : []) {
+    if (!Number.isFinite(firstValue) || !Number.isFinite(secondValue)) {
+      summary.unavailable += 1;
+      continue;
+    }
+    summary.compared += 1;
+    if (firstValue === secondValue) {
+      summary.ties += 1;
+    } else if (lowerIsBetter ? firstValue < secondValue : firstValue > secondValue) {
+      summary.firstWins += 1;
+      summary.firstLabels.push(label);
+    } else {
+      summary.secondWins += 1;
+      summary.secondLabels.push(label);
+    }
+  }
+  return summary;
+}
 
 // Module-scope, not defined inside DraftMoversPanel: a component defined
 // inside another component's render body gets a brand-new function identity
@@ -1414,18 +1436,19 @@ function IntelligencePage() {
         ? ` (using ${r1.season}/${r2.season} data)` : '';
       // Display a real 0 as "0", not "—" (em dash is reserved for genuinely missing data)
       const dash = (v) => (v === null || v === undefined || v === '') ? '—' : v;
+      const finiteOrNull = value => Number.isFinite(Number(value)) ? Number(value) : null;
       if (mountedRef.current) setCompData({
-        n1: r1.name, n2: r2.name, seasonNote,
+        n1: r1.name, n2: r2.name, id1:r1.id, id2:r2.id, seasonNote, retrievedAt:new Date().toISOString(),
         rows: [
-          ['AVG', fmt(s1.avg),           fmt(s2.avg),           parseFloat(s1.avg)||0,       parseFloat(s2.avg)||0],
-          ['OBP', fmt(s1.obp),           fmt(s2.obp),           parseFloat(s1.obp)||0,       parseFloat(s2.obp)||0],
-          ['SLG', fmt(s1.slg),           fmt(s2.slg),           parseFloat(s1.slg)||0,       parseFloat(s2.slg)||0],
-          ['OPS', fmt(s1.ops),           fmt(s2.ops),           parseFloat(s1.ops)||0,       parseFloat(s2.ops)||0],
-          ['HR',  dash(s1.homeRuns),     dash(s2.homeRuns),     parseInt(s1.homeRuns)||0,    parseInt(s2.homeRuns)||0],
-          ['RBI', dash(s1.rbi),          dash(s2.rbi),          parseInt(s1.rbi)||0,         parseInt(s2.rbi)||0],
-          ['SB',  dash(s1.stolenBases),  dash(s2.stolenBases),  parseInt(s1.stolenBases)||0, parseInt(s2.stolenBases)||0],
-          ['K',   dash(s1.strikeOuts),   dash(s2.strikeOuts),   parseInt(s1.strikeOuts)||0,  parseInt(s2.strikeOuts)||0, true],
-          ['BB',  dash(s1.baseOnBalls),  dash(s2.baseOnBalls),  parseInt(s1.baseOnBalls)||0, parseInt(s2.baseOnBalls)||0],
+          ['AVG', fmt(s1.avg),           fmt(s2.avg),           finiteOrNull(s1.avg),          finiteOrNull(s2.avg)],
+          ['OBP', fmt(s1.obp),           fmt(s2.obp),           finiteOrNull(s1.obp),          finiteOrNull(s2.obp)],
+          ['SLG', fmt(s1.slg),           fmt(s2.slg),           finiteOrNull(s1.slg),          finiteOrNull(s2.slg)],
+          ['OPS', fmt(s1.ops),           fmt(s2.ops),           finiteOrNull(s1.ops),          finiteOrNull(s2.ops)],
+          ['HR',  dash(s1.homeRuns),     dash(s2.homeRuns),     finiteOrNull(s1.homeRuns),     finiteOrNull(s2.homeRuns)],
+          ['RBI', dash(s1.rbi),          dash(s2.rbi),          finiteOrNull(s1.rbi),          finiteOrNull(s2.rbi)],
+          ['SB',  dash(s1.stolenBases),  dash(s2.stolenBases),  finiteOrNull(s1.stolenBases),  finiteOrNull(s2.stolenBases)],
+          ['K',   dash(s1.strikeOuts),   dash(s2.strikeOuts),   finiteOrNull(s1.strikeOuts),   finiteOrNull(s2.strikeOuts), true],
+          ['BB',  dash(s1.baseOnBalls),  dash(s2.baseOnBalls),  finiteOrNull(s1.baseOnBalls),  finiteOrNull(s2.baseOnBalls)],
         ],
       });
     } catch (err) {
@@ -1462,14 +1485,15 @@ function IntelligencePage() {
     ['Freddie Freeman 1B LAD',12,'Low','Clean history, optimal workload management',C.teal],
     ['Zack Wheeler RHP PHI',14,'Low','Durable profile, consistent mechanics',C.teal],
   ];
+  const comparisonSummary = useMemo(() => buildComparisonMetricSummary(compData?.rows), [compData?.rows]);
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <div className="skip-profile-source-strip" role="region" aria-label="Intelligence data provenance">
         <span className="skip-profile-source-title">DATA PROVENANCE</span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot is-ready" aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">MLB Stats API comparison lookup</span></span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">Fetched when players are compared</span></span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">SKIP model snapshot; not a live provider feed</span></span>
+        <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compData ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">{compData ? 'MLB Stats API comparison lookup' : 'MLB Stats API · on demand'}</span></span>
+        <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compLoading ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">{compLoading ? 'Retrieving selected players' : compData ? `Retrieved ${new Date(compData.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}` : 'Retrieved only when compared'}</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">Reference snapshots; not live feeds or Team Overview grades</span></span>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
 
@@ -1515,8 +1539,9 @@ function IntelligencePage() {
                   </thead>
                   <tbody>
                     {compData.rows.map(([m,v1,v2,n1,n2,lowerIsBetter],i,arr)=>{
-                      const p1Wins = lowerIsBetter ? (n1>0 && n1<n2) : n1>n2;
-                      const p2Wins = lowerIsBetter ? (n2>0 && n2<n1) : n2>n1;
+                      const isComparable = Number.isFinite(n1) && Number.isFinite(n2);
+                      const p1Wins = isComparable && (lowerIsBetter ? n1<n2 : n1>n2);
+                      const p2Wins = isComparable && (lowerIsBetter ? n2<n1 : n2>n1);
                       return (
                       <tr key={m} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}>
                         <td style={{ padding:'6px 10px', ...sans({ fontSize:12, color:C.text2 }) }}>{m}</td>
@@ -1528,12 +1553,26 @@ function IntelligencePage() {
                   </tbody>
                 </table>
               </div>
+              <div style={{ padding:'9px 14px 11px', borderTop:`0.5px solid ${C.borderLight}`, display:'flex', flexDirection:'column', gap:7 }}>
+                <div style={sans({ fontSize:10, color:C.text2, lineHeight:1.45 })}>
+                  {comparisonSummary.compared
+                    ? `${compData.n1} leads ${comparisonSummary.firstWins} of ${comparisonSummary.compared} comparable season metrics${comparisonSummary.firstLabels.length ? ` (${comparisonSummary.firstLabels.join(', ')})` : ''}; ${compData.n2} leads ${comparisonSummary.secondWins}${comparisonSummary.secondLabels.length ? ` (${comparisonSummary.secondLabels.join(', ')})` : ''}.`
+                    : 'No comparable verified season metrics were returned for this comparison.'}
+                  {comparisonSummary.unavailable ? ` ${comparisonSummary.unavailable} metric${comparisonSummary.unavailable === 1 ? ' was' : 's were'} unavailable and excluded.` : ''}
+                </div>
+                <div style={sans({ fontSize:9, color:C.text4, lineHeight:1.4 })}>This readout compares returned season totals only. It does not infer player value, injury risk, team fit, Statcast performance, or Front Office grades.</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  <button type="button" onClick={() => openPlayerProfile(compData.id1, compData.n1)} style={{ height:28, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:5, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Open {compData.n1.split(' ').slice(-1)[0]} profile</button>
+                  <button type="button" onClick={() => openPlayerProfile(compData.id2, compData.n2)} style={{ height:28, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:5, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Open {compData.n2.split(' ').slice(-1)[0]} profile</button>
+                  <button type="button" onClick={() => openTab('overview')} style={{ height:28, padding:'0 9px', border:`1px solid ${C.border}`, borderRadius:5, background:C.surface3, color:C.text2, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Review team evaluation inputs</button>
+                </div>
+              </div>
             </>
           )}
         </Panel>
 
         {/* Injury risk — FIX: bar transition added, consistent layout */}
-        <Panel title="Injury Risk Model" accent={C.rust} badge="SKIP Model">
+        <Panel title="Injury Risk Model" accent={C.rust} badge="Reference snapshot">
           {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
             <div key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none', padding:'7px 14px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1552,7 +1591,7 @@ function IntelligencePage() {
         </Panel>
 
         {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="SKIP Model">
+        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
               <thead>
@@ -1579,7 +1618,7 @@ function IntelligencePage() {
         </Panel>
 
         {/* Pitcher projections */}
-        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="SKIP Model">
+        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="Reference snapshot">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:340 }}>
               <thead>
@@ -1605,8 +1644,9 @@ function IntelligencePage() {
           </div>
         </Panel>
       </div>
+      <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Reference snapshots preserve original SKIP research examples. They are not automatically refreshed with provider data, do not alter selected-team metrics, and do not feed Front Office grades. Use the comparison engine or player profiles for verified current-season player data.</div>
       {/* ── Trade Value Simulator ── */}
-      <Panel title="Trade Value Simulator" accent={C.purple} badge="SKIP Model">
+      <Panel title="Trade Value Simulator" accent={C.purple} badge="Reference scenario">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
           {/* Side A */}
           <div style={{ padding:'14px', borderRight:`0.5px solid ${C.border}` }}>

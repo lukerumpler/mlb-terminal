@@ -11410,3 +11410,7 @@
 - [x] Audit the complete Front Office Evaluation section for calculation integrity, deferred-request behavior, provider fallbacks, and responsive-detail issues.
 - [x] Repair verified Front Office defects and optimize data, rendering, and accessibility behavior without fabricating baseball metrics.
 - [x] Add regression coverage, complete desktop/mobile validation, and publish the Front Office optimization release.
+
+- [ ] Audit Intelligence workspace metric inputs, source states, calculation reuse, and Front Office evaluation connections.
+- [ ] Optimize verified metric reuse and source-aware Intelligence explanations without creating unsupported metrics.
+- [ ] Add regressions, validate desktop/mobile Intelligence interactions, and publish the metric-integration optimization.
