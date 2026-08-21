@@ -2414,7 +2414,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
         </div>
         {divisionWarData.length ? <Suspense fallback={<div role="status" style={{ height:178, display:'flex', alignItems:'center', justifyContent:'center', color:C.text3, ...px({ fontSize:10 }) }}>Loading WAR chart…</div>}>
-          <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} />
+          <DivisionalWarChart data={divisionWarData} selectedTeam={team.abbr} selectedTeamAccent={teamAccent} />
         </Suspense> : <OverviewEmptyState status={teamModelData?.providerBlocked ? 'Provider blocked' : 'Unavailable'} message="Divisional WAR rows" detail="No verified FanGraphs divisional WAR rows are available for this view, so SKIP does not reserve chart-sized space for an empty comparison." />}
         {divisionWarData.length > 0 && <div className="skip-divisional-war-table-wrap">
           <table className="skip-divisional-war-table" aria-label="Exact divisional WAR values">
@@ -2428,7 +2428,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </tr>)}</tbody>
           </table>
         </div>}
-        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Historical cache; not live.' : 'No cached divisional WAR available.') : divisionWarData.length ? `${team.abbr} highlighted · missing components shown as —.` : 'No verified divisional WAR available.'}</div>
+        <div style={sans({ padding:'0 14px 10px', fontSize:9, color:C.text4, lineHeight:1.4 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Historical cache; not live.' : 'No cached divisional WAR available.') : divisionWarData.length ? <><span style={{ color:teamAccent, fontWeight:800 }}>{team.abbr} highlighted in club color</span><span> · division peers remain neutral purple · missing components shown as —.</span></> : 'No verified divisional WAR available.'}</div>
       </Panel>
       <Panel title="Advanced Models & Savant" accent={C.purple}>
         <div className="skip-overview-panel-status" role="status" aria-label="Advanced models data sources">

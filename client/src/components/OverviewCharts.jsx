@@ -452,7 +452,19 @@ function DivisionalWarTooltip({ active, payload }) {
   );
 }
 
-export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
+export function getDivisionalWarFill(
+  row,
+  selectedTeam = "",
+  selectedTeamAccent = C.teal
+) {
+  return row?.team === selectedTeam ? selectedTeamAccent : C.purple;
+}
+
+export function DivisionalWarChart({
+  data = [],
+  selectedTeam = "",
+  selectedTeamAccent = C.teal,
+}) {
   if (!data.length) {
     return (
       <div
@@ -526,7 +538,7 @@ export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
           {data.map(row => (
             <Cell
               key={row.team}
-              fill={row.team === selectedTeam ? C.teal : C.purple}
+              fill={getDivisionalWarFill(row, selectedTeam, selectedTeamAccent)}
             />
           ))}
           <LabelList

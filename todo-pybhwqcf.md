@@ -24,3 +24,7 @@
 - [x] Improve readable contrast for team palettes, including Padres brown, across the new and affected team-context elements
 - [x] Add regression coverage and validate responsive desktop/mobile rendering
 - [x] Publish and report the team-context visual improvements
+- [x] Inspect shared chart colors and selected-team accent usage for a readable theme preview
+- [x] Apply a reversible selected-team chart color preview without changing metric values or comparison semantics
+- [x] Validate the chart-color preview at desktop and mobile widths
+- [x] Deliver the preview and implementation options
