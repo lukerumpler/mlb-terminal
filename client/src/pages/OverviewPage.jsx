@@ -55,6 +55,8 @@ export const OVERVIEW_ACCENTS = Object.freeze({
   context: C.purple,
 });
 
+export const DEFAULT_OVERVIEW_TEAM_KEY = 'sd';
+
 const OVERVIEW_VIEW_OPTIONS = [
   { id: 'briefing', label: 'Briefing', detail: 'Core signals' },
   { id: 'performance', label: 'Performance', detail: 'Models & field play' },
@@ -1121,7 +1123,7 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
 }
 
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
-  const [selTeam,setSelTeam]=useState('lad');
+  const [selTeam,setSelTeam]=useState(DEFAULT_OVERVIEW_TEAM_KEY);
   const [overviewView, setOverviewView] = useState('briefing');
   const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
@@ -1154,15 +1156,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
-  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentByDays:{} });
-  const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.updatedAt || null);
-  const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON) ? 'cached' : 'loading');
+  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentByDays:{} });
+  const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.updatedAt || null);
+  const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [hotStreakDays, setHotStreakDays] = useState(15);
   const [hotStreakRows, setHotStreakRows] = useState(() => {
-    const cached = readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data;
+    const cached = readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data;
     return cached?.recentByDays?.[15] || { hitting:[], pitching:[] };
   });
-  const [hotStreakState, setHotStreakState] = useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data?.recentByDays?.[15] ? 'cached' : 'loading');
+  const [hotStreakState, setHotStreakState] = useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data?.recentByDays?.[15] ? 'cached' : 'loading');
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
   const [teamExitVelocitySource, setTeamExitVelocitySource] = useState('');
   const [teamExitVelocityState, setTeamExitVelocityState] = useState('idle');

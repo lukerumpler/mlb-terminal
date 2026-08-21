@@ -29,13 +29,13 @@ describe('OverviewPage Savant retry helper policy', () => {
   it('does not call Savant helpers again when retry is dispatched during the same UTC day', async () => {
     const updatedAt = Date.now() - 2 * 60 * 60 * 1000;
     localStorage.setItem('skip-team-savant-summary-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt, data:{ status:'cached', source:'Baseball Savant', retrievedAt:new Date(updatedAt).toISOString() } },
+      '2026:SD': { updatedAt, data:{ status:'cached', source:'Baseball Savant', retrievedAt:new Date(updatedAt).toISOString() } },
     }));
     localStorage.setItem('skip-team-savant-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt, data:{ exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } },
+      '2026:SD': { updatedAt, data:{ exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } },
     }));
     localStorage.setItem('skip-team-savant-against-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt, data:[] },
+      '2026:SD': { updatedAt, data:[] },
     }));
 
     render(<OverviewPage />);

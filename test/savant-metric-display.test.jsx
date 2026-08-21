@@ -13,13 +13,13 @@ describe('Savant metric display and source badge separation', () => {
   it('renders the real Overview Savant panel cache age from a same-day cached summary', async () => {
     const retrievedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     localStorage.setItem('skip-team-savant-summary-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: { status:'cached', source:'Baseball Savant', retrievedAt, expectedWOBA:0.331, exitVelocity:89.4 } },
+      '2026:SD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: { status:'cached', source:'Baseball Savant', retrievedAt, expectedWOBA:0.331, exitVelocity:89.4 } },
     }));
     localStorage.setItem('skip-team-savant-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: { exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } },
+      '2026:SD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: { exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } },
     }));
     localStorage.setItem('skip-team-savant-against-cache-v1', JSON.stringify({
-      '2026:LAD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: [] },
+      '2026:SD': { updatedAt: Date.now() - 2 * 60 * 60 * 1000, data: [] },
     }));
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok:true, status:200, headers:{ get:() => null }, json:async()=>({}), text:async()=>JSON.stringify({}) })));
 
@@ -31,9 +31,9 @@ describe('Savant metric display and source badge separation', () => {
   it('does not refetch Savant when the provider retry event occurs during the same UTC day', async () => {
     const updatedAt = Date.now() - 2 * 60 * 60 * 1000;
     const fetchMock = vi.fn(async () => ({ ok:true, status:200, headers:{ get:() => null }, json:async()=>({}), text:async()=>JSON.stringify({}) }));
-    localStorage.setItem('skip-team-savant-summary-cache-v1', JSON.stringify({ '2026:LAD': { updatedAt, data:{ status:'cached', source:'Baseball Savant', retrievedAt:new Date(updatedAt).toISOString() } } }));
-    localStorage.setItem('skip-team-savant-cache-v1', JSON.stringify({ '2026:LAD': { updatedAt, data:{ exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } } }));
-    localStorage.setItem('skip-team-savant-against-cache-v1', JSON.stringify({ '2026:LAD': { updatedAt, data:[] } }));
+    localStorage.setItem('skip-team-savant-summary-cache-v1', JSON.stringify({ '2026:SD': { updatedAt, data:{ status:'cached', source:'Baseball Savant', retrievedAt:new Date(updatedAt).toISOString() } } }));
+    localStorage.setItem('skip-team-savant-cache-v1', JSON.stringify({ '2026:SD': { updatedAt, data:{ exitVelocityRows:[{ launch_speed:97 }], battedBallRows:[], pitchRows:[] } } }));
+    localStorage.setItem('skip-team-savant-against-cache-v1', JSON.stringify({ '2026:SD': { updatedAt, data:[] } }));
     vi.stubGlobal('fetch', fetchMock);
 
     render(<OverviewPage />);

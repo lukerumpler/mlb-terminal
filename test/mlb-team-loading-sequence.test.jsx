@@ -20,12 +20,12 @@ describe('MLB-first team loading sequence', () => {
       'fetch',
       vi.fn(async url => {
         const urlStr = String(url);
-        if (urlStr.includes('/teams/238/affiliates')) {
+        if (urlStr.includes('/teams/135/affiliates')) {
           return {
             ok: true,
             status: 200,
             headers: { get: () => null },
-            json: async () => [{ id: 501, name: 'Oklahoma City Dodgers', level: 'Triple-A', levelId: 11, league: 'PCL' }],
+            json: async () => [{ id: 501, name: 'El Paso Chihuahuas', level: 'Triple-A', levelId: 11, league: 'PCL' }],
             text: async () => JSON.stringify([]),
           };
         }
@@ -42,7 +42,7 @@ describe('MLB-first team loading sequence', () => {
     render(<OverviewPage />);
     expect(screen.getByText(/LOADING MLB TEAM/i)).toBeInTheDocument();
     expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('lad');
+    expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('sd');
     expect(screen.getByRole('button', { name: /minor league/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
   });
@@ -53,7 +53,7 @@ describe('MLB-first team loading sequence', () => {
       { type: 'affiliate', affiliateId: 501, parentAbbr: 'LAD', levelId: 11, label: 'Oklahoma City Comets', secondary: 'Triple-A · Los Angeles Dodgers', viewedAt: Date.now() },
     ]));
     vi.stubGlobal('fetch', vi.fn(async url => {
-      if (String(url).includes('/teams/238/affiliates')) {
+      if (String(url).includes('/teams/135/affiliates')) {
         return { ok: true, status: 200, headers: { get: () => null }, json: async () => [{ id: 501, name: 'Oklahoma City Comets', level: 'Triple-A', levelId: 11, league: 'PCL' }], text: async () => '[]' };
       }
       return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => '{}' };
@@ -64,4 +64,5 @@ describe('MLB-first team loading sequence', () => {
     });
     expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
     expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('sd');
   });
