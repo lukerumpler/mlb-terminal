@@ -57,11 +57,14 @@ export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamS
     const pitching = teamStats.pitching?.[team.id] ?? teamStats.pitching?.[String(team.id)] ?? {};
     const standing = standingsById.get(String(team.id)) || {};
     const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : null;
-    const value = Number(raw);
+    const value = raw == null || raw === '' ? null : Number(raw);
     return { id:team.id, abbr:team.abbr, name:team.name, division:standing.division || 'Division unavailable', value:Number.isFinite(value) ? value : null, wins:standing.wins, losses:standing.losses };
-  }).filter(row => row.value != null);
+  }).filter(row => Number.isFinite(row.value));
   const query = String(search || '').trim().toLowerCase();
-  return rows.filter(row => (!query || `${row.name} ${row.abbr}`.toLowerCase().includes(query)) && (division === 'all' || row.division === division)).sort((a, b) => direction === 'asc' ? a.value - b.value : b.value - a.value);
+  return rows.filter(row => (!query || `${row.name} ${row.abbr}`.toLowerCase().includes(query)) && (division === 'all' || row.division === division)).sort((a, b) => {
+    const valueDelta = direction === 'asc' ? a.value - b.value : b.value - a.value;
+    return valueDelta || a.name.localeCompare(b.name);
+  });
 }
 
 // Module-scope, not defined inside DraftMoversPanel: a component defined
@@ -889,16 +892,16 @@ function LeaguePage() {
 
   const { opsSorted, eraSorted, opsMin, opsMax, eraMin, eraMax } = useMemo(() => {
     const teamBarData = Object.values(TEAMS).map(t => {
-      const hitting = teamStats.hitting[t.id] || {};
-      const pitching = teamStats.pitching[t.id] || {};
+      const hitting = teamStats.hitting?.[t.id] ?? teamStats.hitting?.[String(t.id)] ?? {};
+      const pitching = teamStats.pitching?.[t.id] ?? teamStats.pitching?.[String(t.id)] ?? {};
       return {
         team: t.abbr,
-        ops: hitting.ops != null ? Math.round(Number(hitting.ops) * 1000) : null,
-        era: pitching.era != null ? Number(pitching.era) : null,
+        ops: Number.isFinite(Number(hitting.ops)) ? Math.round(Number(hitting.ops) * 1000) : null,
+        era: Number.isFinite(Number(pitching.era)) ? Number(pitching.era) : null,
       };
-    }).filter(t => t.ops != null || t.era != null);
-    const opsSorted = [...teamBarData].sort((a,b) => b.ops - a.ops).slice(0,6);
-    const eraSorted = [...teamBarData].sort((a,b) => a.era - b.era).slice(0,6);
+    });
+    const opsSorted = teamBarData.filter(row => row.ops != null).sort((a,b) => (b.ops - a.ops) || a.team.localeCompare(b.team)).slice(0,6);
+    const eraSorted = teamBarData.filter(row => row.era != null).sort((a,b) => (a.era - b.era) || a.team.localeCompare(b.team)).slice(0,6);
     return {
       opsSorted, eraSorted,
       opsMin: opsSorted.length ? Math.floor(opsSorted[opsSorted.length-1].ops / 10) * 10 - 10 : 0,
