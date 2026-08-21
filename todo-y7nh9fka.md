@@ -272,3 +272,9 @@
 - [x] Calculate and display the Team Leaders batting threshold as ceil(0.33 × 3.5 PA × team games played), adjacent to the Team Leaders title.
 - [x] Add regression coverage for the OAA map, methodology selection, threshold calculation, and unavailable states.
 - [x] Run type checks, linting, supported full tests, production build, and desktop/mobile validation, then save a live checkpoint.
+
+- [x] Map the current Team Strength radar inputs, live MLB team aggregate pool, and radar fallback behavior.
+- [x] Compute and render a dashed league-average benchmark series only when a documented current MLB team comparison population is available.
+- [x] Debug and optimize radar data preparation and responsive rendering without inventing missing benchmark values.
+- [x] Add regression coverage for benchmark calculation, absent-pool behavior, legend/source labeling, and responsive chart integration.
+- [x] Run type checks, linting, supported full tests, production build, and desktop/mobile validation, then save a live checkpoint.

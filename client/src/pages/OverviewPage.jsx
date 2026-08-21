@@ -937,6 +937,23 @@ export function buildTeamStrengthData({ offense, power, speed, contact, pitching
     .map(row => ({ ...row, val:Number(row.val) }));
 }
 
+export const MLB_LEAGUE_COMPARISON_TEAM_COUNT = 30;
+
+function averageFinite(values = []) {
+  const numeric = values
+    .filter(value => value != null && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
+  return numeric.length ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : null;
+}
+
+function firstFiniteMetric(row, keys = []) {
+  const value = keys
+    .map(key => row?.[key])
+    .find(candidate => candidate != null && candidate !== '' && Number.isFinite(Number(candidate)));
+  return value == null || value === '' ? null : Number(value);
+}
+
 export function buildLiveRadarData({ team = {}, liveTeamData, runDiff = null } = {}) {
   const records = Object.values(liveTeamData?.byAbbr || {});
   const hittingRecords = records.map(row => row?.hitting).filter(Boolean);
@@ -946,7 +963,7 @@ export function buildLiveRadarData({ team = {}, liveTeamData, runDiff = null } =
     if (value == null || value === '') return null;
     const current = Number(value);
     if (!Number.isFinite(current)) return null;
-    const values = rows.map(row => keys.map(key => Number(row?.[key])).find(Number.isFinite)).filter(Number.isFinite);
+    const values = rows.map(row => firstFiniteMetric(row, keys)).filter(Number.isFinite);
     return values.length ? percentile(current, values, higher) : null;
   };
   const offense = rankValue(team.ops, hittingRecords, ['ops']);
@@ -955,6 +972,27 @@ export function buildLiveRadarData({ team = {}, liveTeamData, runDiff = null } =
   const contact = rankValue(team.avg, hittingRecords, ['avg']);
   const pitching = rankValue(team.era, pitchingRecords, ['era'], false);
   const command = rankValue(team.whip, pitchingRecords, ['whip'], false);
+  const completeLeaguePopulation = records.length === MLB_LEAGUE_COMPARISON_TEAM_COUNT;
+  const leagueAveragePercentile = (rows, keys, higher = true) => {
+    if (!completeLeaguePopulation) return null;
+    const values = rows.map(row => firstFiniteMetric(row, keys)).filter(Number.isFinite);
+    if (values.length !== MLB_LEAGUE_COMPARISON_TEAM_COUNT) return null;
+    const average = averageFinite(values);
+    return average == null ? null : percentile(average, values, higher);
+  };
+  const strengthBenchmark = {
+    offense:leagueAveragePercentile(hittingRecords, ['ops']),
+    power:leagueAveragePercentile(hittingRecords, ['homeRuns']),
+    speed:leagueAveragePercentile(hittingRecords, ['stolenBases']),
+    contact:leagueAveragePercentile(hittingRecords, ['avg']),
+    pitching:leagueAveragePercentile(pitchingRecords, ['era'], false),
+    command:leagueAveragePercentile(pitchingRecords, ['whip'], false),
+  };
+  const strengthData = buildTeamStrengthData({ offense, power, speed, contact, pitching, command }).map(row => ({
+    ...row,
+    leagueAverage:strengthBenchmark[row.axis.toLowerCase()] ?? null,
+  }));
+  const hasLeagueBenchmark = strengthData.length === 6 && strengthData.every(row => row.leagueAverage != null && Number.isFinite(Number(row.leagueAverage)));
   const offenseData = [
     { axis:'OPS', val:offense },
     { axis:'SLG', val:rankValue(team.slg, hittingRecords, ['slg']) },
@@ -965,9 +1003,22 @@ export function buildLiveRadarData({ team = {}, liveTeamData, runDiff = null } =
   ].filter(row => row.val != null);
   return {
     offenseData,
-    strengthData: buildTeamStrengthData({ offense, power, speed, contact, pitching, command }),
+    strengthData,
+    hasLeagueBenchmark,
+    leagueTeamCount:completeLeaguePopulation ? MLB_LEAGUE_COMPARISON_TEAM_COUNT : records.length,
     source: offenseData.length || records.length ? 'MLB Stats API team aggregates' : 'MLB Stats API unavailable',
   };
+}
+
+export function getStrengthRadarBenchmarkCaption({
+  hasLeagueBenchmark = false,
+  leagueTeamCount = 0,
+  radarSource = 'MLB Stats API unavailable',
+} = {}) {
+  if (hasLeagueBenchmark && leagueTeamCount === MLB_LEAGUE_COMPARISON_TEAM_COUNT) {
+    return `Solid: selected team percentile · dashed: MLB average benchmark · current documented ${leagueTeamCount}-team aggregate pool.`;
+  }
+  return `Source: ${radarSource}. League-average benchmark unavailable until a complete documented current ${MLB_LEAGUE_COMPARISON_TEAM_COUNT}-team aggregate pool is returned.`;
 }
 
 function getFrontOffice(t) {
@@ -2646,11 +2697,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <Panel title="Team Strength Radar" accent={OVERVIEW_ACCENTS.context} badge="Percentiles">
           <div style={{padding:'3px 8px 0'}}>
             <Suspense fallback={<ChartFallback height={196}/> }>
-              <StrengthRadar data={D.strengthData} accent={teamAccent}/>
+              <StrengthRadar data={D.strengthData} accent={teamAccent} showLeagueBenchmark={D.hasLeagueBenchmark}/>
             </Suspense>
           </div>
           <div style={{padding:'0 14px 10px',...sans({fontSize:9.5,color:C.text4,lineHeight:1.4})}}>
-            Live league-relative scores. Offense and Pitching mirror the rating tiles; the remaining axes show the specific strengths behind the evaluation.
+            {getStrengthRadarBenchmarkCaption({hasLeagueBenchmark:D.hasLeagueBenchmark,leagueTeamCount:D.leagueTeamCount,radarSource:D.radarSource})}
           </div>
         </Panel>
         </div>
@@ -2791,9 +2842,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             </Panel>
             <Panel title="Team Strengths" accent={teamAccent} badge={D.strengthData.length ? 'MLB Stats API' : 'Unavailable'}>
               {D.strengthData.length ? <Suspense fallback={<ChartFallback height={196}/> }>
-                <StrengthRadar data={D.strengthData} accent={teamAccent}/>
+                <StrengthRadar data={D.strengthData} accent={teamAccent} showLeagueBenchmark={D.hasLeagueBenchmark}/>
               </Suspense> : <OverviewEmptyState message="Team strengths unavailable" detail="No verified current-season team aggregates were returned by the MLB Stats API." />}
-              <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4})}>Source: {D.radarSource}.</div>
+              <div style={sans({padding:'0 12px 9px',fontSize:9,color:C.text4,lineHeight:1.4})}>{getStrengthRadarBenchmarkCaption({hasLeagueBenchmark:D.hasLeagueBenchmark,leagueTeamCount:D.leagueTeamCount,radarSource:D.radarSource})}</div>
             </Panel>
           </div>
           <Panel title={`Run Differential — ${CURRENT_SEASON}`} accent={teamAccent} badge={liveRunDiffData.length ? 'MLB Stats API' : 'Unavailable'}>
