@@ -1239,3 +1239,24 @@
   .skip-overview-skeleton-loading-mark { animation:none !important; }
   .skip-overview-skeleton-loading-mark { box-shadow:none; }
 }
+
+/* Team leader controls retain compact terminal density while exposing the
+   profile action and the verified 14-day performance window. */
+.skip-team-leader-profile-link { display:inline-flex; min-width:0; align-items:center; gap:7px; padding:0; border:0; background:transparent; color:inherit; text-align:left; }
+.skip-team-leader-profile-link span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.skip-team-leader-profile-link:hover span { color:var(--teal,#157a6e) !important; text-decoration:underline; text-underline-offset:2px; }
+.skip-team-leader-profile-link:focus-visible { outline:2px solid color-mix(in srgb,var(--teal,#157a6e) 42%,transparent); outline-offset:3px; border-radius:3px; }
+.skip-team-hot-streak { padding:8px 10px 9px; border-top:1px solid var(--border-light,#e2ddd3); background:linear-gradient(90deg,color-mix(in srgb,var(--teal-soft,#e7f5f0) 30%,transparent),transparent); }
+.skip-team-hot-streak-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:8px; margin-bottom:7px; }
+.skip-team-hot-streak-heading div { display:flex; flex-direction:column; gap:2px; }
+.skip-team-hot-streak-heading div > span { color:var(--teal,#157a6e); font:800 7.5px/1 'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+.skip-team-hot-streak-heading strong { color:var(--text2,#4b443a); font:800 10px/1.15 'Plus Jakarta Sans',sans-serif; }
+.skip-team-hot-streak-heading > span { color:var(--text4,#9c8570); font:700 7px/1.2 'DM Mono',monospace; letter-spacing:.035em; text-align:right; }
+.skip-team-hot-streak-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 8px; }
+.skip-team-hot-streak-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:5px; min-width:0; padding:4px 0; border-bottom:1px solid color-mix(in srgb,var(--border-light,#e2ddd3) 70%,transparent); }
+.skip-team-hot-streak-row strong { color:var(--text,#24211d); font:800 11px/1 'DM Mono',monospace; }
+.skip-team-hot-streak-unavailable { color:var(--text4,#9c8570); font:500 9px/1.4 'Plus Jakarta Sans',sans-serif; }
+@media (max-width:720px) {
+  .skip-team-hot-streak-grid { grid-template-columns:1fr; gap:0; }
+  .skip-team-hot-streak-heading > span { max-width:120px; }
+}

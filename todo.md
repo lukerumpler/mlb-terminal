@@ -11386,3 +11386,7 @@
 - [x] Audit Team Leaders category coverage, official MLB source rows, and existing hitter-pitcher stat mapping.
 - [x] Expand the Team Leaders card with verified batting and pitching leader categories protected by role-specific stat guards.
 - [x] Add data-separation regression coverage, validate desktop and mobile layouts, and publish the enhancement.
+
+- [x] Audit leader eligibility rules, player-profile navigation conventions, and existing 14-day official MLB player-stat input.
+- [x] Add explicit rate-stat eligibility labels, accessible profile links, and verified 14-day hot-streak leader rows with honest source states.
+- [x] Add regression coverage, validate desktop and mobile leader-card behavior, and publish the enhancement.

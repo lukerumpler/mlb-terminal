@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
-import { saveTeamAggregateCache, saveTeamPlayersCache } from '../client/src/lib/teamDataCache.js';
+import { saveTeamAggregateCache, saveTeamPlayersCache, saveTeamSavantSummaryCache } from '../client/src/lib/teamDataCache.js';
 
 describe('Team Overview compact navigation', () => {
   beforeEach(() => {
@@ -68,17 +68,29 @@ describe('Team Overview compact navigation', () => {
 
   it('uses stable cached roster IDs for Team Leader portraits while keeping the visible player name as context', async () => {
     window.localStorage.clear();
+    const onOpenPlayer = vi.fn();
+    window.addEventListener('skip-open-player', onOpenPlayer);
     saveTeamPlayersCache(119, 2026, {
       hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 500, homeRuns: 24, avg: .300, ops: .950, rbi: 74, stolenBases: 18 } }],
       pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '180.0', era: 2.75, strikeOuts: 190, whip: 1.01, wins: 16, saves: 0 } }],
+      recentHitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 28, homeRuns: 5, ops: .998 } }],
+      recentPitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '8.0', era: 1.50, strikeOuts: 12 } }],
     });
     const { container } = render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     expect(screen.getAllByText('Verified Hitter').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Verified Pitcher').length).toBeGreaterThan(0);
+    expect(screen.getByText('AVG · 50 PA+')).toBeInTheDocument();
+    expect(screen.getByText('ERA · 10 IP+')).toBeInTheDocument();
+    expect(screen.getByText('14-day hot streak')).toBeInTheDocument();
+    expect(screen.getByText('OPS · 20 PA+')).toBeInTheDocument();
+    expect(screen.getByText('ERA · 5 IP+')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open Verified Hitter player profile from season batting leaders' })[0]);
+    expect(onOpenPlayer).toHaveBeenCalledWith(expect.objectContaining({ detail: { id: 518692, fullName: 'Verified Hitter' } }));
     expect(container.querySelector('img[src*="/people/518692/headshot/67/current"]')).toBeInTheDocument();
     expect(container.querySelector('img[src*="/people/605483/headshot/67/current"]')).toBeInTheDocument();
+    window.removeEventListener('skip-open-player', onOpenPlayer);
     window.localStorage.clear();
   });
 
@@ -221,19 +233,13 @@ describe('Team Overview compact navigation', () => {
 
   it('clears a prior club’s Performance Statcast summary before the newly selected club can load', async () => {
     window.localStorage.clear();
-    vi.stubGlobal('fetch', vi.fn(async input => {
-      const url = String(input);
-      if (url.includes('endpoint=expected_statistics')) {
-        const rows = [{ player_id: 1, team_abbr: 'LAD', est_woba: 0.456, est_ba: 0.333, est_slg: 0.678 }];
-        return {
-          ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify(rows), json: async () => rows,
-        };
-      }
-      if (url.includes('endpoint=statcast_leaderboard')) {
-        return { ok: true, status: 200, headers: { get: () => null }, text: async () => '[]', json: async () => [] };
-      }
-      return { ok: true, status: 200, headers: { get: () => null }, text: async () => '{}', json: async () => ({}) };
-    }));
+    saveTeamSavantSummaryCache('LAD', 2026, {
+      status: 'live',
+      source: 'Baseball Savant · verified team summary',
+      expectedWOBA: 0.456,
+      exitVelocity: 91.2,
+      retrievedAt: new Date().toISOString(),
+    });
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });

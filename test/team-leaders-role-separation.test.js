@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLeaders, isHittingLeaderRow, isPitchingLeaderRow } from '../client/src/pages/OverviewPage.jsx';
+import { getHotStreakLeaders, getLeaders, isHittingLeaderRow, isPitchingLeaderRow } from '../client/src/pages/OverviewPage.jsx';
 
 describe('Team Leaders role separation', () => {
   const qualifiedHitter = {
@@ -46,7 +46,22 @@ describe('Team Leaders role separation', () => {
     expect(leaders.batting.every(row => row.player === 'Verified Hitter')).toBe(true);
     expect(leaders.pitching.slice(0, 4).every(row => row.player === 'Verified Pitcher')).toBe(true);
     expect(leaders.pitching.find(row => row.cat === 'SV')).toMatchObject({ player: 'Small Sample Pitcher', val: '2' });
-    expect(leaders.batting.find(row => row.cat === 'AVG')).toMatchObject({ val: '.303' });
-    expect(leaders.batting.find(row => row.cat === 'OPS')).toMatchObject({ val: '.941' });
+    expect(leaders.batting.find(row => row.cat === 'AVG')).toMatchObject({ val: '.303', eligibility: '50 PA+' });
+    expect(leaders.batting.find(row => row.cat === 'OPS')).toMatchObject({ val: '.941', eligibility: '50 PA+' });
+    expect(leaders.pitching.find(row => row.cat === 'ERA')).toMatchObject({ eligibility: '10 IP+' });
+    expect(leaders.pitching.find(row => row.cat === 'WHIP')).toMatchObject({ eligibility: '10 IP+' });
+  });
+
+  it('builds the 14-day hot-streak group from separately qualified official hitter and pitcher rows', () => {
+    const hotHitter = { ...qualifiedHitter, stat: { ...qualifiedHitter.stat, plateAppearances: 24, ops: '.998', homeRuns: 5 } };
+    const hotPitcher = { ...qualifiedPitcher, stat: { ...qualifiedPitcher.stat, inningsPitched: '6.0', era: '1.50', strikeOuts: 12 } };
+    const ineligibleHotHitter = { ...qualifiedHitter, id: 6, name: 'Small Sample Hitter', stat: { ...qualifiedHitter.stat, plateAppearances: 8, ops: '1.500', homeRuns: 4 } };
+    const ineligibleHotPitcher = { ...qualifiedPitcher, id: 7, name: 'Small Sample Pitcher', stat: { ...qualifiedPitcher.stat, inningsPitched: '2.0', era: '0.00', strikeOuts: 8 } };
+
+    const leaders = getHotStreakLeaders([hotHitter, ineligibleHotHitter], [hotPitcher, ineligibleHotPitcher]);
+
+    expect(leaders.available).toBe(true);
+    expect(leaders.batting).toMatchObject([{ cat: 'OPS', player: 'Verified Hitter', eligibility: '20 PA+' }, { cat: 'HR', player: 'Verified Hitter' }]);
+    expect(leaders.pitching).toMatchObject([{ cat: 'ERA', player: 'Verified Pitcher', eligibility: '5 IP+' }, { cat: 'K', player: 'Verified Pitcher' }]);
   });
 });

@@ -662,37 +662,67 @@ export function isPitchingLeaderRow(row) {
   return Number.isFinite(inningsPitched) && inningsPitched > 0 && !(Number.isFinite(plateAppearances) && plateAppearances > 0);
 }
 
-export function getLeaders(hittingRows = [], pitchingRows = []) {
+export const TEAM_LEADER_ELIGIBILITY = Object.freeze({
+  season: Object.freeze({ hitterRatePa: 50, pitcherRateIp: 10 }),
+  hotStreak: Object.freeze({ hitterRatePa: 20, pitcherRateIp: 5 }),
+});
+
+function buildLeaderGroups(hittingRows = [], pitchingRows = [], { hitterRatePa, pitcherRateIp, hotStreak = false }) {
   const top = (rows, key, direction = 'desc', rowFilter = () => true) => [...rows]
     .filter(row => rowFilter(row) && Number.isFinite(Number(row.stat?.[key])))
     .sort((a, b) => direction === 'asc'
       ? Number(a.stat[key]) - Number(b.stat[key])
       : Number(b.stat[key]) - Number(a.stat[key]))[0] || null;
-  const rateEligiblePitcher = row => isPitchingLeaderRow(row) && Number(row?.stat?.inningsPitched ?? row?.stat?.ip) >= 10;
-  const hit = (cat, key, digits = 0, direction = 'desc', scorebookRate = false) => {
-    const row = top(hittingRows, key, direction, isHittingLeaderRow);
-    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits, scorebookRate) : '—' };
+  const rateEligibleHitter = row => isHittingLeaderRow(row) && Number(row?.stat?.plateAppearances ?? row?.stat?.pa) >= hitterRatePa;
+  const rateEligiblePitcher = row => isPitchingLeaderRow(row) && Number(row?.stat?.inningsPitched ?? row?.stat?.ip) >= pitcherRateIp;
+  const hit = (cat, key, digits = 0, direction = 'desc', scorebookRate = false, isRate = false) => {
+    const row = top(hittingRows, key, direction, isRate ? rateEligibleHitter : isHittingLeaderRow);
+    return {
+      cat,
+      eligibility: isRate ? `${hitterRatePa} PA+` : null,
+      player: row?.name || '—',
+      playerId: row?.id ?? null,
+      val: row ? formatLeaderValue(row.stat[key], digits, scorebookRate) : '—',
+    };
   };
-  const pit = (cat, key, digits = 0, direction = 'desc', useRateQualifier = false) => {
-    const row = top(pitchingRows, key, direction, useRateQualifier ? rateEligiblePitcher : isPitchingLeaderRow);
-    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
+  const pit = (cat, key, digits = 0, direction = 'desc', isRate = false) => {
+    const row = top(pitchingRows, key, direction, isRate ? rateEligiblePitcher : isPitchingLeaderRow);
+    return {
+      cat,
+      eligibility: isRate ? `${pitcherRateIp} IP+` : null,
+      player: row?.name || '—',
+      playerId: row?.id ?? null,
+      val: row ? formatLeaderValue(row.stat[key], digits) : '—',
+    };
   };
   return {
-    batting: [
-      hit('HR', 'homeRuns'),
-      hit('AVG', 'avg', 3, 'desc', true),
-      hit('OPS', 'ops', 3, 'desc', true),
-      hit('RBI', 'rbi'),
-      hit('SB', 'stolenBases'),
-    ],
-    pitching: [
-      pit('ERA', 'era', 2, 'asc', true),
-      pit('K', 'strikeOuts'),
-      pit('WHIP', 'whip', 2, 'asc', true),
-      pit('W', 'wins'),
-      pit('SV', 'saves'),
-    ],
+    batting: hotStreak
+      ? [hit('OPS', 'ops', 3, 'desc', true, true), hit('HR', 'homeRuns')]
+      : [hit('HR', 'homeRuns'), hit('AVG', 'avg', 3, 'desc', true, true), hit('OPS', 'ops', 3, 'desc', true, true), hit('RBI', 'rbi'), hit('SB', 'stolenBases')],
+    pitching: hotStreak
+      ? [pit('ERA', 'era', 2, 'asc', true), pit('K', 'strikeOuts')]
+      : [pit('ERA', 'era', 2, 'asc', true), pit('K', 'strikeOuts'), pit('WHIP', 'whip', 2, 'asc', true), pit('W', 'wins'), pit('SV', 'saves')],
   };
+}
+
+export function getLeaders(hittingRows = [], pitchingRows = []) {
+  return buildLeaderGroups(hittingRows, pitchingRows, TEAM_LEADER_ELIGIBILITY.season);
+}
+
+export function getHotStreakLeaders(hittingRows = [], pitchingRows = []) {
+  const groups = buildLeaderGroups(hittingRows, pitchingRows, { ...TEAM_LEADER_ELIGIBILITY.hotStreak, hotStreak: true });
+  return { ...groups, available: [...groups.batting, ...groups.pitching].some(row => row.playerId != null) };
+}
+
+function TeamLeaderProfileLink({ row, color, group }) {
+  const content = <>
+    <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
+    <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
+  </>;
+  if (row.playerId == null) return <span style={{display:'flex',gap:7,alignItems:'center'}}>{content}</span>;
+  return <button type="button" className="skip-team-leader-profile-link" onClick={() => openPlayerProfile(row.playerId, row.player)} aria-label={`Open ${row.player} player profile from ${group} leaders`}>
+    {content}
+  </button>;
 }
 
 function ExecutivePercentileMarker({ label, percentile: value, population }) {
@@ -1078,7 +1108,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
-  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[] });
+  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentHitting:[], recentPitching:[] });
   const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON)?.updatedAt || null);
   const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS.lad?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
@@ -1780,7 +1810,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     setLiveTeamDataUpdatedAt(cachedAggregate?.updatedAt || null);
     setLiveTeamDataMode(cachedAggregate ? 'cached' : 'loading');
     const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
-    setLiveTeamPlayers(cachedPlayers?.data || { hitting:[], pitching:[] });
+    setLiveTeamPlayers(cachedPlayers?.data || { hitting:[], pitching:[], recentHitting:[], recentPitching:[] });
     setTeamPlayersUpdatedAt(cachedPlayers?.updatedAt || null);
     setTeamPlayersDataMode(cachedPlayers ? 'cached' : 'loading');
     setLiveTeamError(false);
@@ -1864,13 +1894,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         getTeamPlayerStats(teamBase.id, 'hitting'),
         getTeamPlayerStats(teamBase.id, 'pitching'),
         getTeamRecentPlayerStats(teamBase.id, 'hitting', CURRENT_SEASON, 14),
-      ]).then(([teamHitters, teamPitchers, recentHitters]) => {
+        getTeamRecentPlayerStats(teamBase.id, 'pitching', CURRENT_SEASON, 14),
+      ]).then(([teamHitters, teamPitchers, recentHitters, recentPitchers]) => {
         if (!alive) return;
         const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
         const bothFailed = teamHitters.status === 'rejected' && teamPitchers.status === 'rejected';
         const recentById = recentHitters.status === 'fulfilled'
           ? Object.fromEntries(recentHitters.value.map(row => [row.id, row]))
           : {};
+        const recentHittingRows = recentHitters.status === 'fulfilled' ? recentHitters.value : (cachedPlayers?.data?.recentHitting || []);
+        const recentPitchingRows = recentPitchers.status === 'fulfilled' ? recentPitchers.value : (cachedPlayers?.data?.recentPitching || []);
         const seasonHitters = teamHitters.status === 'fulfilled' ? teamHitters.value : (cachedPlayers?.data?.hitting || []);
         const nextPlayers = {
           hitting: seasonHitters.map(row => {
@@ -1879,13 +1912,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             return recentOps == null ? row : { ...row, stat: { ...row.stat, recentOps } };
           }),
           pitching: teamPitchers.status === 'fulfilled' ? teamPitchers.value : (cachedPlayers?.data?.pitching || []),
+          recentHitting: recentHittingRows,
+          recentPitching: recentPitchingRows,
         };
-        const snapshot = teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled'
+        const receivedVerifiedRows = [teamHitters, teamPitchers, recentHitters, recentPitchers].some(result => result.status === 'fulfilled');
+        const snapshot = receivedVerifiedRows
           ? saveTeamPlayersCache(teamBase.id, CURRENT_SEASON, nextPlayers)
           : cachedPlayers;
         setLiveTeamPlayers(nextPlayers);
         setTeamPlayersUpdatedAt(snapshot?.updatedAt || null);
-        setTeamPlayersDataMode(snapshot ? (teamHitters.status === 'fulfilled' || teamPitchers.status === 'fulfilled' ? 'live' : 'cached') : 'error');
+        setTeamPlayersDataMode(snapshot ? (receivedVerifiedRows ? 'live' : 'cached') : 'error');
         setTeamPlayersError(bothFailed && !cachedPlayers);
         setTeamPlayersLoading(false);
       });
@@ -2055,9 +2091,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   // render body — every unrelated state change on this page (e.g. clicking
   // a split/arsenal tab) was silently recomputing all five for the same
   // team. Memoized on selTeam to match the `D` useMemo above.
-  const { splits, leaders, bb, arsenal, fo } = useMemo(() => ({
+  const { splits, leaders, hotStreakLeaders, bb, arsenal, fo } = useMemo(() => ({
     splits:  teamSplitRows,
     leaders: getLeaders(liveTeamPlayers.hitting, liveTeamPlayers.pitching),
+    hotStreakLeaders: getHotStreakLeaders(liveTeamPlayers.recentHitting, liveTeamPlayers.recentPitching),
     bb:      teamBattedBallData,
     arsenal: teamPitchArsenalData,
     fo:      getFrontOffice(team),
@@ -2366,9 +2403,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             {leaders.batting.map((row,i)=>(
               <div key={row.cat} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                  <span style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
-                  <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
-                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
+                  <span title={row.eligibility ? `Minimum eligibility: ${row.eligibility}` : undefined} style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:row.eligibility ? 54 : 30,textAlign:'center'}}>{row.cat}{row.eligibility ? ` · ${row.eligibility}` : ''}</span>
+                  <TeamLeaderProfileLink row={row} color={C.amber} group="season batting" />
                 </div>
                 <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
               </div>
@@ -2379,15 +2415,29 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             {leaders.pitching.map((row,i)=>(
               <div key={row.cat} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                  <span style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
-                  <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
-                  <span style={sans({fontSize:11,color:C.text2})}>{row.player}</span>
+                  <span title={row.eligibility ? `Minimum eligibility: ${row.eligibility}` : undefined} style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:row.eligibility ? 54 : 30,textAlign:'center'}}>{row.cat}{row.eligibility ? ` · ${row.eligibility}` : ''}</span>
+                  <TeamLeaderProfileLink row={row} color={C.rust} group="season pitching" />
                 </div>
                 <span style={px({fontSize:12,fontWeight:800,color:C.text})}>{row.val}</span>
               </div>
             ))}
           </div>
-          <div style={sans({padding:'6px 10px 8px',fontSize:8.5,color:C.text4,lineHeight:1.35,borderTop:`0.5px solid ${C.borderLight}`})}>MLB hitting and pitching splits are evaluated separately. AVG and OPS use hitter rows with PA; ERA and WHIP require pitcher rows with 10+ IP.</div>
+          <section className="skip-team-hot-streak" aria-labelledby="team-hot-streak-title">
+            <div className="skip-team-hot-streak-heading">
+              <div><span>Recent performance</span><strong id="team-hot-streak-title">14-day hot streak</strong></div>
+              <span>Official MLB Stats API</span>
+            </div>
+            {hotStreakLeaders.available ? <div className="skip-team-hot-streak-grid">
+              {[...hotStreakLeaders.batting.map(row => ({ row, color:C.amber, surface:C.amberSoft, group:'14-day batting' })), ...hotStreakLeaders.pitching.map(row => ({ row, color:C.rust, surface:C.rustSoft, group:'14-day pitching' }))].map(({row,color,surface,group}) => (
+                <div className="skip-team-hot-streak-row" key={`${group}-${row.cat}`}>
+                  <span title={row.eligibility ? `Minimum eligibility: ${row.eligibility}` : undefined} style={{...px({fontSize:9,fontWeight:700,color}),background:surface,padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap'}}>{row.cat}{row.eligibility ? ` · ${row.eligibility}` : ''}</span>
+                  <TeamLeaderProfileLink row={row} color={color} group={group} />
+                  <strong>{row.val}</strong>
+                </div>
+              ))}
+            </div> : <div className="skip-team-hot-streak-unavailable" role="status">No verified 14-day player-split rows are available. Recent leaders are intentionally hidden.</div>}
+          </section>
+          <div style={sans({padding:'6px 10px 8px',fontSize:8.5,color:C.text4,lineHeight:1.35,borderTop:`0.5px solid ${C.borderLight}`})}>Rate-stat requirements appear beside each leader: AVG and OPS use qualifying hitter PA; ERA and WHIP use qualifying pitcher IP. Hitter and pitcher splits remain separate.</div>
         </Panel>
 
         <div id="team-overview-front-office-evaluation">

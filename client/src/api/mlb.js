@@ -1852,9 +1852,17 @@ export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEA
 // split per team when no teamId is supplied; keeping this in one helper lets
 // every team-facing view use the same authoritative snapshot rather than the
 // older static examples in data.js.
-export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season = SEASON, days = 14) {
-  const endDate = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(Date.now() - Number(days) * 86400000).toISOString().slice(0, 10);
+export function getMlbRecentDateRange(days = 14, now = new Date()) {
+  const parsedDays = Number(days);
+  const requestedDays = Number.isFinite(parsedDays) ? Math.max(1, Math.floor(parsedDays)) : 14;
+  const endDate = getMlbScheduleDate(now);
+  const start = new Date(`${endDate}T12:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() - (requestedDays - 1));
+  return { startDate: start.toISOString().slice(0, 10), endDate };
+}
+
+export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season = SEASON, days = 14, now = new Date()) {
+  const { startDate, endDate } = getMlbRecentDateRange(days, now);
   const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'onBasePlusSlugging';
   const data = await mlb('/stats', {
     stats: 'byDateRange', group, season, sportIds: 1, teamId,
