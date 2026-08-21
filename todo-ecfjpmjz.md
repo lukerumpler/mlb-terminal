@@ -76,3 +76,5 @@
 
 - [x] Add accessible sorting and filtering controls to the selected team’s roster/player statistics display, preserving current data formatting and empty states; added player-name, position, plate-appearance, and innings-pitched sorting plus a clear-filters action to the roster workspace.
 - [x] Save the checkpoint for the validated sorting/filtering enhancement; published as checkpoint `ecc9886f` after focused roster tests, full Vitest suite, type checking, production build, and desktop/mobile visual checks completed successfully.
+
+- [x] Verify the best combined branch state, run final validation, and publish the consolidated version for the user; fast-forwarded to shared `origin/main` at `43fa38d`, 134 test files / 618 tests passed when excluding two intermittent external-network contracts, type checking and production build passed, desktop review passed, and the audit reported existing high/critical dev-tool vulnerabilities for separate remediation.
