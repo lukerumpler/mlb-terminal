@@ -11411,6 +11411,6 @@
 - [x] Repair verified Front Office defects and optimize data, rendering, and accessibility behavior without fabricating baseball metrics.
 - [x] Add regression coverage, complete desktop/mobile validation, and publish the Front Office optimization release.
 
-- [ ] Audit Intelligence workspace metric inputs, source states, calculation reuse, and Front Office evaluation connections.
-- [ ] Optimize verified metric reuse and source-aware Intelligence explanations without creating unsupported metrics.
-- [ ] Add regressions, validate desktop/mobile Intelligence interactions, and publish the metric-integration optimization.
+- [x] Audit Intelligence workspace metric inputs, source states, calculation reuse, and Front Office evaluation connections.
+- [x] Optimize verified metric reuse and source-aware Intelligence explanations without creating unsupported metrics.
+- [x] Add regressions, validate desktop/mobile Intelligence interactions, and publish the metric-integration optimization.

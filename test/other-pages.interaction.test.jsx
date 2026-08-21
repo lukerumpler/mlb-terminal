@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../client/src/App.jsx";
-import { buildCrossTeamComparisonRows } from "../client/src/pages/OtherPages.jsx";
+import { buildComparisonMetricSummary, buildCrossTeamComparisonRows } from "../client/src/pages/OtherPages.jsx";
 
 beforeEach(() => {
   cleanup();
@@ -54,6 +54,15 @@ describe("Cross-team comparison helpers", () => {
     expect(rows.map(row => row.name)).toEqual(["Alpha Club", "Beta Club"]);
     expect(rows.map(row => row.value)).toEqual([.820, .740]);
     expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }, { id:2 }] }, teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 } }, pitching:{} }, metric:"ops", direction:"asc" }).map(row => row.name)).toEqual(["Beta Club", "Alpha Club"]);
+  });
+
+  it("excludes missing comparison metrics while preserving real zeroes and lower-is-better logic", () => {
+    expect(buildComparisonMetricSummary([
+      ["HR", "0", "5", 0, 5],
+      ["OPS", "—", ".900", null, .9],
+      ["K", "20", "10", 20, 10, true],
+      ["BB", "12", "12", 12, 12],
+    ])).toMatchObject({ compared:3, firstWins:0, secondWins:2, ties:1, unavailable:1, secondLabels:["HR", "K"] });
   });
 });
 
@@ -150,9 +159,11 @@ describe("Intelligence page", () => {
     const user = userEvent.setup();
     await goToTab(user, "Intelligence", /Player Comparison Engine/i);
     const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
-    expect(provenance).toHaveTextContent("MLB Stats API comparison lookup");
-    expect(provenance).toHaveTextContent("Fetched when players are compared");
-    expect(provenance).toHaveTextContent("SKIP model snapshot; not a live provider feed");
+    expect(provenance).toHaveTextContent(/MLB Stats API.*on demand/i);
+    expect(provenance).toHaveTextContent(/Retrieved only when compared/i);
+    expect(provenance).toHaveTextContent(/Reference snapshots; not live feeds or Team Overview grades/i);
+    expect(screen.getAllByText("Reference snapshot").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText(/Reference snapshots preserve original SKIP research examples/i)).toBeInTheDocument();
   });
 
   it("rejects comparing a player against themselves", async () => {

@@ -1838,7 +1838,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
 
       {player && derived && !loading && (
         <>
-          <PlayerProfile player={player} derived={derived} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
+          <PlayerProfile player={player} derived={derived} boxscoreStatus={boxscoreStatus} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -1969,7 +1969,7 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
+function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
   const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
     ? VISUAL_QA_PLAYERS
     : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
