@@ -1,7 +1,6 @@
 import type { Express, Request, Response } from "express";
 import type { UptimeMonitorCheck } from "../../drizzle/schema";
 import { getUptimeMonitorScheduleByTaskUid, listUptimeMonitorChecksSince, recordUptimeMonitorCheck } from "../db";
-import { sdk } from "../_core/sdk";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
 export const UPTIME_MONITOR_ENDPOINTS = [
@@ -72,6 +71,7 @@ export async function getUptimeMonitorDashboard(days: 7 | 30) {
 
 export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
   try {
+    const { sdk } = await import("../_core/sdk");
     const user = await sdk.authenticateRequest(req as unknown as Request);
     if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only", timestamp: new Date().toISOString() });
     const schedule = await getUptimeMonitorScheduleByTaskUid(user.taskUid);
@@ -86,23 +86,29 @@ export async function scheduledDailyUptimeMonitor(req: Request, res: Response) {
   }
 }
 
+export async function serveUptimeMonitorDashboard(
+  req: Request,
+  res: Response,
+  loadDashboard: typeof getUptimeMonitorDashboard = getUptimeMonitorDashboard
+) {
+  applyCors(req, res);
+  if (isRateLimited(req, "uptime-monitor")) return rateLimitResponse(res);
+  try {
+    const requestedDays = Number(req.query.days);
+    const days: 7 | 30 = requestedDays === 30 ? 30 : 7;
+    res.setHeader("Cache-Control", "private, max-age=15");
+    return res.json(await loadDashboard(days));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[uptime-monitor] dashboard query failed", message);
+    return res.status(503).json({ error: "uptime-monitor-unavailable" });
+  }
+}
+
 export function registerUptimeMonitorRoutes(
   app: Express,
   loadDashboard: typeof getUptimeMonitorDashboard = getUptimeMonitorDashboard
 ) {
-  app.get("/api/uptime-monitor", async (req, res) => {
-    applyCors(req, res);
-    if (isRateLimited(req, "uptime-monitor")) return rateLimitResponse(res);
-    try {
-      const requestedDays = Number(req.query.days);
-      const days: 7 | 30 = requestedDays === 30 ? 30 : 7;
-      res.setHeader("Cache-Control", "private, max-age=15");
-      res.json(await loadDashboard(days));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error("[uptime-monitor] dashboard query failed", message);
-      res.status(503).json({ error: "uptime-monitor-unavailable" });
-    }
-  });
+  app.get("/api/uptime-monitor", (req, res) => serveUptimeMonitorDashboard(req, res, loadDashboard));
   app.post("/api/scheduled/daily-uptime-monitor", scheduledDailyUptimeMonitor);
 }

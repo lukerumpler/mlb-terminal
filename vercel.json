@@ -18,6 +18,12 @@
     "api/mlb.js": {
       "maxDuration": 30
     },
+    "api/uptime-monitor.ts": {
+      "maxDuration": 60
+    },
+    "api/scheduled/daily-uptime-monitor.ts": {
+      "maxDuration": 60
+    },
     "api/[...path].ts": {
       "maxDuration": 60
     },
