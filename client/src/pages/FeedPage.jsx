@@ -236,7 +236,17 @@ export default memo(function FeedPage() {
   const load = useCallback(async (handles) => {
     latestHandlesRef.current = handles;
     setLoading(true);
-    const result = await fetchFeeds(handles, 12);
+    let result;
+    try {
+      result = await fetchFeeds(handles, 12);
+    } catch (error) {
+      if (!mountedRef.current || latestHandlesRef.current !== handles) return;
+      setErrors([{ handle:'feed', source:'Intel Feed', error:error?.message || 'Feed request failed' }]);
+      setFeedStatus('unavailable');
+      setSourceStatuses([]);
+      setLoading(false);
+      return;
+    }
     // Bug fix 2026-08-11: toggling groups quickly fires this effect (and
     // this call) twice in close succession with two different handle sets
     // — nothing cancels the first request, so without this check a slower
@@ -263,8 +273,15 @@ export default memo(function FeedPage() {
   // safe to depend on directly instead of JSON.stringify-ing it each render.
   useEffect(() => {
     load(activeHandles);
-    timerRef.current = setInterval(() => load(activeHandles), REFRESH_MS);
-    return () => clearInterval(timerRef.current);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') load(activeHandles);
+    };
+    timerRef.current = setInterval(refreshIfVisible, REFRESH_MS);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
   }, [activeHandles, load]);
 
   const toggleGroup = (key) => {

@@ -70,7 +70,7 @@ export const apiCacheTelemetry = mysqlTable("apiCacheTelemetry", {
 export type ApiCacheTelemetry = typeof apiCacheTelemetry.$inferSelect;
 export type InsertApiCacheTelemetry = typeof apiCacheTelemetry.$inferInsert;
 
-/** UTC-backed observations for the dedicated uptime-monitor feature branch. */
+/** UTC-backed observations for the uptime-monitor feature. */
 export const uptimeMonitorChecks = mysqlTable(
   "uptime_monitor_checks",
   {
@@ -88,7 +88,7 @@ export const uptimeMonitorChecks = mysqlTable(
   ]
 );
 
-/** The scheduled callback is authorized exclusively by its platform task identity. */
+/** The scheduled callback is authorized by its platform task identity. */
 export const uptimeMonitorSchedules = mysqlTable(
   "uptime_monitor_schedules",
   {

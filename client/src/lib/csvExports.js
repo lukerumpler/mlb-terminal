@@ -59,3 +59,45 @@ export function downloadTeamFinancialCsv({ teamName, teamFinancials, taxProjecti
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+export function buildMlbStandingsCsvRows({ standings = {}, source = 'MLB Stats API', retrievedAt = null, formatWinPct } = {}) {
+  const rows = [['division', 'team', 'team_abbr', 'w_l', 'win_pct', 'games_back', 'last_10', 'runs_scored', 'runs_allowed', 'source', 'retrieved_at']];
+  Object.entries(standings || {}).forEach(([division, teams]) => {
+    (Array.isArray(teams) ? teams : []).forEach(team => {
+      const wins = team?.w;
+      const losses = team?.l;
+      rows.push([
+        division || 'Unavailable',
+        team?.name || 'Unavailable',
+        team?.abbr || '—',
+        Number.isFinite(Number(wins)) && Number.isFinite(Number(losses)) ? `${wins}-${losses}` : '—',
+        typeof formatWinPct === 'function' ? formatWinPct(team?.pct) : (team?.pct ?? '—'),
+        team?.gb === '-' || team?.gb == null || team?.gb === '' ? '—' : team.gb,
+        team?.l10 || '—',
+        team?.rs == null || team?.rs === '' ? '—' : team.rs,
+        team?.ra == null || team?.ra === '' ? '—' : team.ra,
+        source || 'Unavailable',
+        retrievedAt ? new Date(retrievedAt).toISOString() : 'Unavailable',
+      ]);
+    });
+  });
+  return rows;
+}
+
+export function buildMlbStandingsCsv(options = {}) {
+  return buildMlbStandingsCsvRows(options).map(row => row.map(csvCell).join(',')).join('\n') + '\n';
+}
+
+export function downloadMlbStandingsCsv(options = {}) {
+  const csv = buildMlbStandingsCsv(options);
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  const date = options.retrievedAt ? new Date(options.retrievedAt).toISOString().slice(0, 10) : 'current';
+  anchor.href = url;
+  anchor.download = `skip-mlb-standings-${date}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

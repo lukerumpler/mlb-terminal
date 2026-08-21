@@ -6,11 +6,8 @@ const browserOrigin = String(process.env.ALLOWED_ORIGIN || '')
   .split(',')
   .map(value => value.trim())
   .find(Boolean);
-const describeProductionContract = process.env.RUN_PRODUCTION_ORIGIN_CONTRACT === 'true'
-  ? describe
-  : describe.skip;
 
-describeProductionContract('production origin contract', () => {
+describe('production origin contract', () => {
   it('allows the configured production frontend to read the lightweight managed API health endpoint', async () => {
     expect(apiOrigin).toMatch(/^https:\/\//);
     expect(browserOrigin).toMatch(/^https:\/\//);

@@ -121,4 +121,13 @@ describe("FeedPage — load() race condition", () => {
       screen.queryByText("Stale initial-load post")
     ).not.toBeInTheDocument();
   });
+
+  it("clears the loading state and keeps an honest unavailable status when the client request rejects", async () => {
+    fetchFeeds.mockRejectedValueOnce(new Error('transport unavailable'));
+    render(<FeedPage />);
+
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading Intel Feed headlines' })).not.toBeInTheDocument());
+    expect(screen.getByText(/No posts available right now/i)).toBeInTheDocument();
+    expect(screen.getByText(/Intel Feed \(transport unavailable\)/i)).toBeInTheDocument();
+  });
 });

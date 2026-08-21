@@ -1,6 +1,6 @@
 // SKIP — Decision Engine
 // CAS, DQS, DPI, TPVI scoring + verdicts + archetypes
-import { trueIP } from '../lib/formatting.js';
+import { fmtScorebookRate, trueIP } from '../lib/formatting.js';
 
 // Clamp a value to [20, 99] — all SKIP scores live on this range
 function clamp(v) { return Math.max(20, Math.min(99, v || 0)); }
@@ -94,7 +94,7 @@ export function getStrengths(stats, kpis, isPitcher) {
     const pa  = Number.isFinite(paRaw) && paRaw > 0 ? paRaw : null; // see computeKPIs' comment on this same guard
     const hr  = parseInt(stats.homeRuns) || 0;
     const sb  = parseInt(stats.stolenBases) || 0;
-    if (ops   >= 0.900) out.push(`${(+stats.ops).toFixed(3)} OPS — elite offensive production`);
+    if (ops   >= 0.900) out.push(`${fmtScorebookRate(stats.ops)} OPS — elite offensive production`);
     if (avg   >= 0.300) out.push(`Batting .${Math.round(avg*1000)} — plus hit tool, above league avg`);
     if (pa && bb / pa >= 0.12) out.push(`${((bb / pa) * 100).toFixed(1)}% BB rate — elite plate discipline`);
     if (hr    >= 25)    out.push(`${hr} HR — genuine power threat in the lineup`);
@@ -123,7 +123,7 @@ export function getRisks(stats, profile, isPitcher) {
     const pa  = Number.isFinite(paRaw) && paRaw > 0 ? paRaw : null; // see computeKPIs' comment on this same guard
     const ops = parseFloat(stats.ops) || 0;
     if (pa && k / pa > 0.27) out.push(`${((k / pa) * 100).toFixed(1)}% K rate — two-strike vulnerability`);
-    if (ops < 0.700)   out.push(`${(+stats.ops).toFixed(3)} OPS — below-average offensive output`);
+    if (ops < 0.700)   out.push(`${fmtScorebookRate(stats.ops)} OPS — below-average offensive output`);
     if (out.length === 0) out.push('No material risk flags at current performance level');
   }
   return out.slice(0, 3);
@@ -274,6 +274,24 @@ const LEVEL_INFO = {
   MLB:        { etaYears: 0, ageBaseline: 24.0, proximity: 0.00 },
 };
 function levelInfo(level) { return LEVEL_INFO[level] || LEVEL_INFO.AA; }
+
+// Reuses the same level baselines that inform the FV and risk calculations.
+// This is a descriptive context layer, not another FV adjustment: a positive
+// gap means a prospect is older than SKIP's typical age for the listed level.
+export function getProspectAgeForLevelContext(prospect) {
+  if (!prospect) return null;
+  const info = levelInfo(prospect.level);
+  const age = Number(prospect.age);
+  if (!Number.isFinite(age)) return null;
+  const ageGap = age - info.ageBaseline;
+  return {
+    age,
+    level: prospect.level || 'AA',
+    ageBaseline: info.ageBaseline,
+    ageGap,
+    bucket: ageGap < -1 ? 'young-for-level' : ageGap > 1 ? 'old-for-level' : 'on-track',
+  };
+}
 
 // Batters and pitchers are ranked on one shared Top-100 board (a batter's
 // `rank` and a pitcher's `rank` are positions in the same combined list,

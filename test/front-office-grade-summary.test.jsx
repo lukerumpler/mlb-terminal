@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, resolveMetricProviderStatus } from '../client/src/pages/OverviewPage.jsx';
+import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, deriveBaserunningGrade, deriveFrontOfficeCoverageGrades, deriveOrganizationFutureValue, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, isCurrentTeamSource, resolveMetricProviderStatus, scopeTeamPlayerSnapshot } from '../client/src/pages/OverviewPage.jsx';
 
 describe('Front Office Overall grade', () => {
   it('weights current performance and applies the approved capped organization-outlook nudge', () => {
@@ -66,6 +66,15 @@ describe('Front Office Overall grade', () => {
     expect(resolveMetricProviderStatus(0, 'cached')).toBe('cached');
   });
 
+  it('withholds a prior-team roster snapshot until the selected team has a matching verified cache or response', () => {
+    const priorTeamRows = { hitting: [{ id: 1, name: 'Prior club hitter' }], pitching: [], recentByDays: {} };
+    expect(isCurrentTeamSource(135, 135)).toBe(true);
+    expect(isCurrentTeamSource(135, 119)).toBe(false);
+    expect(isCurrentTeamSource(null, 119)).toBe(false);
+    expect(scopeTeamPlayerSnapshot(priorTeamRows, 135, 119)).toEqual({ hitting: [], pitching: [], recentByDays: {} });
+    expect(scopeTeamPlayerSnapshot(priorTeamRows, 135, 135)).toBe(priorTeamRows);
+  });
+
   it('offers a query-parameter-isolated ScoreRing that preserves the canonical grade, scale, and calculation detail', () => {
     const grades = [
       { label: 'Offense', grade: 'A', color: '#c68a1d', detail: 'Verified team offense input.' },
@@ -100,5 +109,106 @@ describe('Front Office Overall grade', () => {
     fireEvent.keyDown(overallButton, { key: 'Escape' });
     expect(onActiveLabelChange).toHaveBeenLastCalledWith(null);
     expect(overallButton).toHaveFocus();
+  });
+});
+
+describe('Front Office targeted facet integrity', () => {
+  it('requires a meaningful steal-attempt sample and favors rate-normalized opportunity plus success efficiency', () => {
+    const insufficient = deriveBaserunningGrade({ stolenBases: 4, caughtStealing: 2, plateAppearances: 240 });
+    expect(insufficient).toMatchObject({ percentile: null, status: 'insufficient-sample', attempts: 6, minimumAttempts: 8 });
+
+    const qualified = deriveBaserunningGrade({
+      stolenBases: 20,
+      caughtStealing: 4,
+      plateAppearances: 600,
+      comparisonRows: [
+        { stolenBases: 12, caughtStealing: 4, plateAppearances: 600 },
+        { stolenBases: 18, caughtStealing: 8, plateAppearances: 600 },
+        { stolenBases: 25, caughtStealing: 10, plateAppearances: 600 },
+      ],
+    });
+    expect(qualified).toMatchObject({ status: 'verified-rate', attempts: 24, opportunityMetric: 'stolen bases per 600 PA' });
+    expect(qualified.percentile).toBeGreaterThan(qualified.volumePercentile);
+  });
+
+  it('keeps the verified stolen-base model functional without Statcast, then blends optional team sprint speed and extra-base-taken context transparently', () => {
+    const baseInput = {
+      stolenBases: 20,
+      caughtStealing: 4,
+      plateAppearances: 600,
+      comparisonRows: [
+        { stolenBases: 12, caughtStealing: 4, plateAppearances: 600 },
+        { stolenBases: 18, caughtStealing: 8, plateAppearances: 600 },
+        { stolenBases: 25, caughtStealing: 10, plateAppearances: 600 },
+      ],
+    };
+    const baseline = deriveBaserunningGrade(baseInput);
+    const enhanced = deriveBaserunningGrade({ ...baseInput, sprintSpeedPercentile: 90, extraBasesTakenPercentile: 10 });
+    const sprintOnly = deriveBaserunningGrade({ ...baseInput, sprintSpeedPercentile: 90 });
+
+    expect(baseline).toMatchObject({ statcastInputCount: 0, modelWeights: { stolenBaseModel: 100, sprintSpeed: 0, extraBasesTaken: 0 } });
+    expect(enhanced).toMatchObject({ statcastInputCount: 2, modelWeights: { stolenBaseModel: 50, sprintSpeed: 25, extraBasesTaken: 25 } });
+    expect(enhanced.percentile).toBe(Math.round(baseline.percentile * 0.5 + 90 * 0.25 + 10 * 0.25));
+    expect(sprintOnly).toMatchObject({ statcastInputCount: 1, modelWeights: { stolenBaseModel: 75, sprintSpeed: 25, extraBasesTaken: 0 } });
+    expect(sprintOnly.percentile).toBe(Math.round(baseline.percentile * 0.75 + 90 * 0.25));
+  });
+
+  it('withholds a defense performance grade until comparable Statcast OAA is present, then makes OAA the primary signal', () => {
+    const players = {
+      hitting: [
+        { position: 'C', stat: { plateAppearances: 80 } }, { position: '1B', stat: { plateAppearances: 80 } },
+        { position: '2B', stat: { plateAppearances: 80 } }, { position: '3B', stat: { plateAppearances: 80 } },
+        { position: 'SS', stat: { plateAppearances: 80 } }, { position: 'LF', stat: { plateAppearances: 80 } },
+        { position: 'CF', stat: { plateAppearances: 80 } }, { position: 'RF', stat: { plateAppearances: 80 } },
+      ],
+      pitching: [{ position: 'P', stat: { inningsPitched: 40 } }, { position: 'P', stat: { inningsPitched: 40 } }],
+    };
+    const awaitingOaa = deriveFrontOfficeCoverageGrades({ players, liveDataMode: 'live', teamAbbr: 'LAD' });
+    expect(awaitingOaa).toMatchObject({ defensePct: null, defenseStatus: 'awaiting-statcast', depthStatus: 'verified' });
+
+    const verified = deriveFrontOfficeCoverageGrades({ players, liveDataMode: 'live', teamAbbr: 'LAD', oaaPercentile: 90, oaaPopulationCount: 30 });
+    expect(verified).toMatchObject({ defenseStatus: 'verified', oaaPercentile: 90, oaaPopulationCount: 30, workloadCoveragePct: 100 });
+    expect(verified.defensePct).toBeGreaterThan(80);
+    expect(verified.depthPct).toBeGreaterThan(verified.rosterDepthPct);
+  });
+
+  it('reports official non-pitcher fielding innings as a coverage-only context without changing the OAA-first defense model', () => {
+    const players = {
+      hitting: [
+        { position: 'C', stat: { plateAppearances: 80 } }, { position: '1B', stat: { plateAppearances: 80 } },
+        { position: '2B', stat: { plateAppearances: 80 } }, { position: '3B', stat: { plateAppearances: 80 } },
+        { position: 'SS', stat: { plateAppearances: 80 } }, { position: 'LF', stat: { plateAppearances: 80 } },
+        { position: 'CF', stat: { plateAppearances: 80 } }, { position: 'RF', stat: { plateAppearances: 80 } },
+      ],
+      pitching: [{ position: 'P', stat: { inningsPitched: 40 } }],
+    };
+    const base = deriveFrontOfficeCoverageGrades({ players, liveDataMode: 'live', teamAbbr: 'LAD', oaaPercentile: 75, oaaPopulationCount: 30 });
+    const withInnings = deriveFrontOfficeCoverageGrades({
+      players,
+      liveDataMode: 'live',
+      teamAbbr: 'LAD',
+      oaaPercentile: 75,
+      oaaPopulationCount: 30,
+      teamGames: 10,
+      fieldingDataMode: 'live',
+      fieldingRows: [
+        { position: 'C', stat: { innings: '90.0' } },
+        { position: 'SS', stat: { innings: '90.0' } },
+        { position: 'P', stat: { innings: '90.0' } },
+      ],
+    });
+    expect(withInnings).toMatchObject({ nonPitcherInnings: 180, expectedDefensiveInnings: 720, defensiveInningCoveragePct: 25, defensiveInningRowCount: 2 });
+    expect(withInnings.defensePct).toBe(base.defensePct);
+  });
+
+  it('uses only a comparable multi-prospect SKIP snapshot for future value and exposes the separate quality tiers', () => {
+    const futureValue = deriveOrganizationFutureValue('LAD');
+    expect(futureValue).toMatchObject({ status: 'snapshot-complete' });
+    expect(futureValue.prospectCount).toBeGreaterThanOrEqual(5);
+    expect(futureValue.organizationCount).toBeGreaterThanOrEqual(20);
+    expect(futureValue.futureValuePct).toBeGreaterThanOrEqual(0);
+    expect(futureValue.topThreeAverage).toBeGreaterThanOrEqual(futureValue.topFiveAverage);
+    expect(futureValue.ageToLevel.evaluatedCount).toBeGreaterThan(0);
+    expect(futureValue.ageToLevel.youngForLevel + futureValue.ageToLevel.onTrack + futureValue.ageToLevel.oldForLevel).toBe(futureValue.ageToLevel.evaluatedCount);
   });
 });

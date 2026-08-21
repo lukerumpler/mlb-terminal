@@ -1,6 +1,7 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
+import { percentile } from '../lib/percentile.js';
 import {
   getStoredPlayerProviderIdentity,
   isUsablePlayerProviderIdentity,
@@ -36,6 +37,22 @@ import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js
 
 const BASE   = apiUrl('/api/mlb');
 export const SEASON = 2026;
+const MLB_SCHEDULE_TIME_ZONE = 'America/New_York';
+
+// MLB's schedule is organized around its Eastern Time baseball day. Using a
+// UTC date here moved the ticker to tomorrow every evening for Arizona and
+// other western users, even while today's games were still in progress.
+export function getMlbScheduleDate(now = new Date()) {
+  const date = now instanceof Date ? now : new Date(now);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: MLB_SCHEDULE_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 // MiLB league IDs for standings calls
 export const MILB_LEAGUES = {
@@ -275,6 +292,19 @@ function requestAbortSignal(timeoutMs, signal) {
   return signal;
 }
 
+function dequeueHighestPriorityRequest() {
+  let selectedIndex = 0;
+  for (let index = 1; index < requestQueue.length; index += 1) {
+    const candidate = requestQueue[index];
+    const selected = requestQueue[selectedIndex];
+    if (candidate.priorityWeight < selected.priorityWeight
+      || (candidate.priorityWeight === selected.priorityWeight && candidate.queueId < selected.queueId)) {
+      selectedIndex = index;
+    }
+  }
+  return requestQueue.splice(selectedIndex, 1)[0];
+}
+
 function pumpRequestQueue() {
   if (queueTimer != null) return;
   const now = Date.now();
@@ -292,8 +322,7 @@ function pumpRequestQueue() {
     return;
   }
 
-  requestQueue.sort((left, right) => left.priorityWeight - right.priorityWeight || left.queueId - right.queueId);
-  const job = requestQueue.shift();
+  const job = dequeueHighestPriorityRequest();
   job.removeQueuedAbortListener?.();
   activeRequests += 1;
   requestStarts.push(now);
@@ -375,6 +404,7 @@ export function __resetMlbClientStateForTests() {
   providerJsonCache.clear();
   providerJsonInFlight.clear();
   teamFinancialsCache.clear();
+  teamScheduleSplitsCache.clear();
   contractClientCache.clear();
   playerBoxscoreSplitsCache.clear();
   if (queueTimer != null) {
@@ -405,8 +435,8 @@ export async function mlb(path, params = {}, {
   screen = 'unknown',
   signal,
 } = {}) {
-  const extraQs = Object.entries(params)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/g, ',')}`)
+  const extraQs = Object.keys(params).sort()
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(String(params[key])).replace(/%2C/g, ',')}`)
     .join('&');
   const url = `${BASE}?path=${encodeURIComponent(path)}${extraQs ? '&' + extraQs : ''}`;
 
@@ -741,6 +771,17 @@ export async function getHandednessSplits(id, season, requestOptions = {}) {
 // PLAYER API
 // ═══════════════════════════════════════════════════════════════════════════
 
+export function isActivePlayerSearchResult(person) {
+  const active = person?.active;
+  if (active === false || active === 0 || ['false', 'n', 'no'].includes(String(active).trim().toLowerCase())) return false;
+  const status = String(person?.rosterStatus ?? person?.statusCode ?? '').trim().toLowerCase();
+  return !['inactive', 'retired', 'released'].includes(status);
+}
+
+export function filterActivePlayerSearchResults(people) {
+  return (Array.isArray(people) ? people : []).filter(isActivePlayerSearchResult);
+}
+
 export async function searchPlayers(query, limit = 12) {
   try {
     // Search both MLB and MiLB players by including all sportIds
@@ -749,7 +790,7 @@ export async function searchPlayers(query, limit = 12) {
       limit,
       sportId: '1,11,12,13,14,15,16,17,5442'
     });
-    return data.people || [];
+    return filterActivePlayerSearchResults(data.people);
   } catch { return []; }
 }
 
@@ -1455,14 +1496,13 @@ function normalizeGame(g) {
   };
 }
 
-export async function getTodaysGames(date, requestOptions = {}) {
-  const d    = date || new Date().toISOString().slice(0, 10);
-  const { ttl = 60_000, ...options } = requestOptions;
+export async function getTodaysGames(date) {
+  const d    = date || getMlbScheduleDate();
   const data = await mlb('/schedule', {
     sportId: 1, date: d,
     hydrate: 'linescore(matchup,runners),team,flags,review,weather',
     language: 'en',
-  }, { ttl, ...options });
+  }, { ttl: 60_000 });
   return (data.dates?.[0]?.games || []).map(normalizeGame);
 }
 
@@ -1562,6 +1602,8 @@ export async function getTeamVenueMetadata(teamId) {
           rightCenter: numberOrNull(fieldInfo.rightCenter),
           rightLine: numberOrNull(fieldInfo.rightLine),
         },
+        city: location.city || null,
+        state: location.stateAbbrev || location.state || null,
         latitude: numberOrNull(location.latitude),
         longitude: numberOrNull(location.longitude),
       } : null,
@@ -1663,6 +1705,102 @@ async function fetchStandings(leagueIds, season = SEASON) {
 
 // MLB: AL (103) + NL (104)
 export const getStandings       = (season = SEASON) => fetchStandings('103,104', season);
+const teamScheduleSnapshotCache = new Map();
+
+export function deriveCompletedGameStreak(games, teamId) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return null;
+  const orderedGames = (Array.isArray(games) ? games : [])
+    .filter(game => String(game?.status?.abstractGameState || '').toLowerCase() === 'final')
+    .filter(game => Number(game?.teams?.home?.team?.id) === id || Number(game?.teams?.away?.team?.id) === id)
+    .sort((left, right) => String(right?.gameDate || '').localeCompare(String(left?.gameDate || '')));
+  let isWin = null;
+  let count = 0;
+  for (const game of orderedGames) {
+    const own = Number(game?.teams?.home?.team?.id) === id ? game.teams?.home : game.teams?.away;
+    const ownScore = own?.score == null || own?.score === '' ? null : Number(own.score);
+    const opponent = own === game?.teams?.home ? game.teams?.away : game.teams?.home;
+    const opponentScore = opponent?.score == null || opponent?.score === '' ? null : Number(opponent.score);
+    if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore) || typeof own?.isWinner !== 'boolean') break;
+    if (isWin == null) isWin = own.isWinner;
+    if (own.isWinner !== isWin) break;
+    count += 1;
+  }
+  return count && isWin != null ? { type: isWin ? 'winning' : 'losing', games: count } : null;
+}
+
+export function buildTeamScheduleSnapshot(games, teamId) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [], streak: null };
+  const numericOrNull = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const completedGames = (Array.isArray(games) ? games : [])
+    .filter(game => String(game?.status?.abstractGameState || '').toLowerCase() === 'final')
+    .filter(game => Number(game?.teams?.home?.team?.id) === id || Number(game?.teams?.away?.team?.id) === id);
+  const buckets = { home: { w: 0, l: 0 }, away: { w: 0, l: 0 }, day: { w: 0, l: 0 }, night: { w: 0, l: 0 } };
+  for (const game of completedGames) {
+    const isHome = Number(game.teams?.home?.team?.id) === id;
+    const own = isHome ? game.teams?.home : game.teams?.away;
+    const won = Boolean(own?.isWinner);
+    const side = isHome ? buckets.home : buckets.away;
+    side[won ? 'w' : 'l'] += 1;
+    const dayNight = String(game.dayNight || '').toLowerCase();
+    const timeBucket = dayNight === 'day' ? buckets.day : dayNight === 'night' ? buckets.night : null;
+    if (timeBucket) timeBucket[won ? 'w' : 'l'] += 1;
+  }
+  const splitRows = [
+    { split: 'Home', ...buckets.home, ops: '—', era: '—' },
+    { split: 'Away', ...buckets.away, ops: '—', era: '—' },
+    { split: 'Day', ...buckets.day, ops: '—', era: '—' },
+    { split: 'Night', ...buckets.night, ops: '—', era: '—' },
+  ].filter(row => row.w + row.l > 0);
+  const recentGames = [...completedGames]
+    .sort((left, right) => String(right?.gameDate || '').localeCompare(String(left?.gameDate || '')))
+    .slice(0, 5)
+    .map(game => {
+      const isHome = Number(game.teams?.home?.team?.id) === id;
+      const own = isHome ? game.teams?.home : game.teams?.away;
+      const opponent = isHome ? game.teams?.away : game.teams?.home;
+      const ownScore = numericOrNull(own?.score);
+      const opponentScore = numericOrNull(opponent?.score);
+      const hasScore = ownScore != null && opponentScore != null;
+      return {
+        gamePk: game.gamePk,
+        gameDate: String(game.gameDate || ''),
+        opponentName: opponent?.team?.name || 'Opponent unavailable',
+        opponentAbbr: opponent?.team?.abbreviation || opponent?.team?.teamCode || '—',
+        location: isHome ? 'vs' : '@',
+        result: hasScore ? (own?.isWinner ? 'W' : 'L') : 'Final',
+        score: hasScore ? `${ownScore}–${opponentScore}` : '—',
+        isWin: hasScore ? Boolean(own?.isWinner) : null,
+      };
+    });
+  return { splitRows, recentGames, streak: deriveCompletedGameStreak(completedGames, id) };
+}
+
+export async function getTeamScheduleSnapshot(teamId, season = SEASON) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [], streak: null };
+  const cacheKey = `${id}:${season}`;
+  const cached = teamScheduleSnapshotCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.snapshot;
+  const today = new Date();
+  const start = new Date(`${season}-03-01T00:00:00Z`);
+  if (start > today) return { splitRows: [], recentGames: [], streak: null };
+  const data = await mlb('/schedule', {
+    sportId: 1,
+    teamId: id,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: today.toISOString().slice(0, 10),
+    gameType: 'R',
+    hydrate: 'linescore',
+    language: 'en',
+  }, { ttl: 5 * 60_000, timeoutMs: 15_000, quietStatuses:[429, 502, 503, 504] });
+  const snapshot = buildTeamScheduleSnapshot((data.dates || []).flatMap(date => date.games || []), id);
+  teamScheduleSnapshotCache.set(cacheKey, { snapshot, expiresAt: Date.now() + 5 * 60_000 });
+  return snapshot;
+}
+
+export function __resetTeamScheduleSnapshotCacheForTests() { teamScheduleSnapshotCache.clear(); }
 const teamScheduleSplitsCache = new Map();
 export async function getTeamScheduleSplits(teamId, season = SEASON) {
   const id = Number(teamId);
@@ -1796,7 +1934,7 @@ export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
 // /stats resource exposes the individual player splits needed for true team
 // leaders and does not require a static roster snapshot.
 export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEASON) {
-  const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'homeRuns';
+  const sortStat = group === 'pitching' ? 'earnedRunAverage' : group === 'fielding' ? 'innings' : 'homeRuns';
   const data = await mlb('/stats', {
     stats: 'season', group, season, sportIds: 1, teamId,
     limit: 100, hydrate: 'person', order: 'desc', sortStat,
@@ -1814,9 +1952,17 @@ export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEA
 // split per team when no teamId is supplied; keeping this in one helper lets
 // every team-facing view use the same authoritative snapshot rather than the
 // older static examples in data.js.
-export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season = SEASON, days = 14) {
-  const endDate = new Date().toISOString().slice(0, 10);
-  const startDate = new Date(Date.now() - Number(days) * 86400000).toISOString().slice(0, 10);
+export function getMlbRecentDateRange(days = 14, now = new Date()) {
+  const parsedDays = Number(days);
+  const requestedDays = Number.isFinite(parsedDays) ? Math.max(1, Math.floor(parsedDays)) : 14;
+  const endDate = getMlbScheduleDate(now);
+  const start = new Date(`${endDate}T12:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() - (requestedDays - 1));
+  return { startDate: start.toISOString().slice(0, 10), endDate };
+}
+
+export async function getTeamRecentPlayerStats(teamId, group = 'hitting', season = SEASON, days = 14, now = new Date()) {
+  const { startDate, endDate } = getMlbRecentDateRange(days, now);
   const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'onBasePlusSlugging';
   const data = await mlb('/stats', {
     stats: 'byDateRange', group, season, sportIds: 1, teamId,
@@ -2356,5 +2502,88 @@ export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
     };
   } catch {
     return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, oaaPercentile:null, leagueTeamCount:0, playerCount:0, playerRows:[] };
+  }
+}
+
+// Team-level running context remains a separate optional request because the
+// full Savant leaderboards are not needed for the first Team Overview paint.
+// `baserunning` measures non-steal extra-base advancement decisions (including
+// advances, holds, and outs). Neither optional input substitutes for the
+// established official MLB stolen-base model when a source is unavailable.
+export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASON) {
+  const unavailable = () => ({
+    status: 'upstream-unavailable',
+    source: 'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards',
+    retrievedAt: new Date().toISOString(),
+    sprintSpeed: null,
+    sprintSpeedPercentile: null,
+    sprintSpeedPopulationCount: 0,
+    extraBasesTakenRuns: null,
+    extraBasesTakenPercentile: null,
+    extraBasesTakenPopulationCount: 0,
+  });
+  try {
+    const [sprintRows, extraBaseRows] = await Promise.all([
+      fetchLeaderboard(`/api/savant?endpoint=sprint_speed_team&year=${year}`, { timeoutMs: 8_000 }),
+      fetchLeaderboard(`/api/savant?endpoint=baserunning&year=${year}`, { timeoutMs: 8_000 }),
+    ]);
+    const targetAbbr = String(teamAbbr || '').toUpperCase();
+    const targetName = canonicalTeamName(teamName || teamAbbr);
+    const matchesTeam = row => {
+      const names = [row?.team_abbr, row?.team_code, row?.team, row?.team_name, row?.entity_name]
+        .filter(Boolean);
+      return names.some(value => {
+        const canonical = canonicalTeamName(value);
+        return String(value).toUpperCase() === targetAbbr
+          || canonical === targetName
+          || targetName.endsWith(` ${canonical}`)
+          || canonical.endsWith(` ${targetName}`);
+      });
+    };
+    const aggregateByTeam = (rows, key) => {
+      const byTeam = new Map();
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const team = canonicalTeamName(row?.team_name || row?.team_abbr || row?.team_code || row?.team || '');
+        const value = Number(row?.[key]);
+        if (!team || !Number.isFinite(value)) return;
+        byTeam.set(team, (byTeam.get(team) || 0) + value);
+      });
+      return [...byTeam.entries()].map(([team, value]) => ({ team, value }));
+    };
+    const rank = (value, rows) => {
+      const values = rows.map(row => row.value).filter(Number.isFinite);
+      return Number.isFinite(value) && values.length ? percentile(value, values, true) : null;
+    };
+    const sprintRow = (Array.isArray(sprintRows) ? sprintRows : []).find(matchesTeam) || null;
+    const extraBaseByTeam = aggregateByTeam(extraBaseRows, 'runner_runs');
+    const extraBaseRow = extraBaseByTeam.find(row => row.team === targetName) || null;
+    const sprintSpeed = Number(sprintRow?.avg_sprint_speed);
+    const extraBasesTakenRuns = Number(extraBaseRow?.value);
+    const sprintSpeedValue = Number.isFinite(sprintSpeed) ? sprintSpeed : null;
+    const extraBasesTakenValue = Number.isFinite(extraBasesTakenRuns) ? extraBasesTakenRuns : null;
+    const metas = [sprintRows, extraBaseRows]
+      .map(rows => Array.isArray(rows) ? rows.__providerMeta || null : null)
+      .filter(Boolean);
+    const freshness = metas.some(meta => meta.freshness === 'stale-cached')
+      ? 'stale-cached'
+      : metas.some(meta => meta.freshness === 'cached')
+        ? 'cached'
+        : 'live';
+    const metricCount = [sprintSpeedValue, extraBasesTakenValue].filter(value => value != null).length;
+    return {
+      status: metricCount === 0 ? 'source-gap' : metricCount === 2 ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'partial',
+      source: 'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards',
+      freshness,
+      cache: metas.some(meta => meta.cache === 'HIT') ? 'HIT' : metas.some(meta => meta.cache === 'STALE') ? 'STALE' : null,
+      retrievedAt: new Date().toISOString(),
+      sprintSpeed: sprintSpeedValue,
+      sprintSpeedPercentile: rank(sprintSpeedValue, (Array.isArray(sprintRows) ? sprintRows : []).map(row => ({ value:Number(row?.avg_sprint_speed) }))),
+      sprintSpeedPopulationCount: (Array.isArray(sprintRows) ? sprintRows : []).map(row => Number(row?.avg_sprint_speed)).filter(Number.isFinite).length,
+      extraBasesTakenRuns: extraBasesTakenValue,
+      extraBasesTakenPercentile: rank(extraBasesTakenValue, extraBaseByTeam),
+      extraBasesTakenPopulationCount: extraBaseByTeam.length,
+    };
+  } catch {
+    return unavailable();
   }
 }

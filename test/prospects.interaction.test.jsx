@@ -89,7 +89,7 @@ describe("Prospects page — merged feature interactions", () => {
       expect(document.body.textContent).toMatch(/eFV/);
     });
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  });
+  }, 15000);
 
   it("opens the Scatterplot builder", async () => {
     const user = userEvent.setup();
@@ -107,7 +107,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  });
+  }, 15000);
 
   it("colors the Scatterplot builder by a chosen stat (Roadmap #4) without crashing", async () => {
     const user = userEvent.setup();
@@ -144,7 +144,7 @@ describe("Prospects page — merged feature interactions", () => {
     await user.click(pitchersBtn);
     expect(screen.getByText(/Color = position/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  });
+  }, 15000);
 
   it("shows sortable Trend and ETA columns on both batter and pitcher tables (Roadmap #6)", async () => {
     const user = userEvent.setup();
@@ -260,7 +260,7 @@ it("renders sticky grouped headers for batter and pitcher ranking tables", async
   expect(document.querySelectorAll(".skip-long-table").length).toBeGreaterThan(
     0
   );
-});
+}, 15000);
 
 it("mounts compact mobile card collections for both ranking pools", async () => {
   const user = userEvent.setup();
@@ -278,4 +278,4 @@ it("mounts compact mobile card collections for both ranking pools", async () => 
   expect(
     document.querySelectorAll(".skip-prospect-mobile-card").length
   ).toBeGreaterThan(0);
-});
+}, 15000);

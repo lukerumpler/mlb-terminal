@@ -2,12 +2,16 @@ import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, laz
 import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
-import { ALERTS, getDailyInsight } from './constants/alerts.js';
+import { getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
+import { deriveTickerStatus, formatTickerGame, getTickerRefreshDelay } from './lib/ticker.js';
+import { getCacheHealth } from './lib/cacheHealthClient.js';
+import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
 import { Panel } from './components/atoms.jsx';
-import LiveScoreTicker, { getTickerPresentation } from './components/LiveScoreTicker.jsx';
+import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
+import { readDefaultTeamPreference, saveDefaultTeamPreference } from './lib/defaultTeamPreference.js';
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
@@ -27,8 +31,7 @@ const SettingsPage     = lazy(() => import('./pages/OtherPages.jsx').then(m => (
 const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
-const UptimeMonitorPage = lazy(() => import('./pages/UptimeMonitorPage.jsx'));
-const TICKER_POLL_INTERVAL_MS = 30_000;
+const PlayerProfilePreviewsPage = lazy(() => import('./pages/PlayerProfilePreviewsPage.jsx'));
 
 function PageLoading() {
   return (
@@ -81,7 +84,6 @@ const TABS = [
   { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
   { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
   { key:'alerts',       icon:'🔔', label:'Alerts',         section:'System' },
-  { key:'uptime',       icon:'⌁', label:'Uptime Monitor', section:'System' },
 ];
 
 const WORKSPACE_GROUPS = [
@@ -126,11 +128,9 @@ const WORKSPACE_GROUPS = [
     label:'Settings',
     section:'System',
     defaultTab:'settings',
-    alertCount: ALERTS.length,
     tabs:[
       { key:'settings', label:'Settings', description:'Appearance, data, and workspace preferences' },
       { key:'alerts', label:'Alerts', description:'Current intelligence and monitoring notices' },
-      { key:'uptime', label:'Uptime Monitor', description:'Production endpoint health and latency history' },
     ],
   },
 ];
@@ -145,25 +145,34 @@ const PRIMARY_TABS = [
   WORKSPACE_GROUPS[3],
 ];
 
-function AlertsWorkspacePanel() {
+function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
   return (
-    <Panel title="Active Alerts" accent={C.rust} badge="Illustrative examples">
+    <Panel title="Active Alerts" accent={C.rust} badge="Live operational sources">
       <div style={sans({ fontSize:10.5, color:C.text3, padding:'8px 14px 0', lineHeight:1.5 })}>
-        Illustrative examples — not a live feed yet.
+        Alerts are derived from current cache telemetry, feed-freshness settings, and workspace preferences. SKIP does not invent player news or transaction events.
       </div>
-      {ALERTS.map((a, i) => (
+      {cacheHealthStatus === 'loading' && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>Reading live operational sources…</div>
+      )}
+      {cacheHealthStatus !== 'loading' && alerts.length === 0 && (
+        <div style={{ padding:'10px 14px', ...sans({ fontSize:11, color:C.text3 }) }}>No active operational alerts right now.</div>
+      )}
+      {alerts.map((a, i) => (
         <div key={i} style={{
           padding:'10px 14px',
-          borderBottom: i < ALERTS.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
-          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' && i < 2 ? C.rustSoft : C.amberSoft,
+          borderBottom: i < alerts.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
+          background: a.type === 'good' ? C.tealSoft : a.type === 'warn' ? C.amberSoft : C.surface2,
         }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.icon} {a.title}</span>
-            <span style={px({ fontSize:10, color:C.text3 })}>{a.date}</span>
+            <span style={sans({ fontSize:12, fontWeight:700, color:a.color })}>{a.title}</span>
+            <span style={px({ fontSize:9, color:C.text3 })}>{a.source}</span>
           </div>
           <div style={sans({ fontSize:11, color:C.text2, lineHeight:1.55 })}>{a.body}</div>
         </div>
       ))}
+      <div style={{ padding:'7px 14px', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2, ...px({ fontSize:9, color:C.text3 }) }}>
+        Cache telemetry: {cacheHealth?.day ? `UTC ${cacheHealth.day}` : 'not yet available'}
+      </div>
     </Panel>
   );
 }
@@ -173,20 +182,26 @@ export default function App() {
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
-  const tickerRefreshInFlight = useRef(false);
-  // 'loading' | 'live' | 'scores' | 'empty' | 'error' — the ticker used to seed itself
+  // 'loading' | 'live' | 'scheduled' | 'final' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
   // fetch failed or returned nothing, next to a pulsing "LIVE" dot. Tracking
   // real status means we only ever show genuinely live data as live.
   const [tickerStatus, setTickerStatus] = useState('loading');
+  const [tickerUpdatedAt, setTickerUpdatedAt] = useState(null);
   const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
+  const [defaultTeamKey, setDefaultTeamKey] = useState(() => readDefaultTeamPreference());
   const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
   const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
   const [recentHistory, setRecentHistory] = useState(() => readRecentHistory());
+  const [cacheHealth, setCacheHealth] = useState(null);
+  const [cacheHealthStatus, setCacheHealthStatus] = useState('loading');
+  const [cacheHealthUpdatedAt, setCacheHealthUpdatedAt] = useState(null);
+  const isolatedPreview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'player-profile';
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
   }, []);
@@ -210,6 +225,9 @@ export default function App() {
       return value;
     });
   }, []);
+  const updateDefaultTeamKey = useCallback((next) => {
+    setDefaultTeamKey(current => saveDefaultTeamPreference(typeof next === 'function' ? next(current) : next, current));
+  }, []);
   const [theme, setTheme] = useState(() => {
     try {
       const saved = localStorage.getItem('skip-theme');
@@ -221,9 +239,49 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('skip-theme', theme); } catch { /* best effort */ }
   }, [theme]);
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 720px)');
+    if (!query) return undefined;
+    const sync = () => setCompactMobile(query.matches);
+    sync();
+    query.addEventListener?.('change', sync);
+    return () => query.removeEventListener?.('change', sync);
+  }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const refreshCacheHealth = useCallback(async () => {
+    setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
+    try {
+      const next = await getCacheHealth();
+      if (!next) throw new Error('Cache telemetry was empty');
+      setCacheHealth(next);
+      setCacheHealthUpdatedAt(Date.now());
+      setCacheHealthStatus('ready');
+    } catch {
+      setCacheHealthStatus('error');
+    }
+  }, []);
+  useEffect(() => {
+    if (isolatedPreview) return undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshCacheHealth();
+    };
+    refreshWhenVisible();
+    const intervalId = window.setInterval(refreshWhenVisible, lowDataMode ? 10 * 60_000 : 5 * 60_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [isolatedPreview, lowDataMode, refreshCacheHealth]);
+  const liveAlerts = useMemo(() => buildOperationalAlerts({
+    cacheHealth,
+    cacheHealthStatus,
+    feedFreshnessSummary,
+    lowDataMode,
+  }), [cacheHealth, cacheHealthStatus, feedFreshnessSummary, lowDataMode]);
+  const alertCount = useMemo(() => countActionableAlerts(liveAlerts), [liveAlerts]);
   const activeWorkspace = useMemo(() => WORKSPACE_GROUPS.find(workspace => workspace.tabs.some(item => item.key === tab)) || null, [tab]);
   const activePrimaryKey = activeWorkspace?.key || tab;
   const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
@@ -311,51 +369,52 @@ export default function App() {
   }, []);
 
   const refreshTicker = useCallback(async () => {
-    if (tickerRefreshInFlight.current) return [];
-    tickerRefreshInFlight.current = true;
-    setTickerStatus(current => ['live', 'scores', 'refreshing', 'stale'].includes(current) ? 'refreshing' : 'loading');
+    setTickerStatus(current => ['live', 'scheduled', 'final', 'stale'].includes(current) ? 'refreshing' : 'loading');
     try {
-      // The shared client queue, upstream cooldown, and Vercel proxy cache remain
-      // authoritative. Zero local TTL only prevents this UI from presenting a
-      // minute-old browser cache as a newly polled score update.
-      const games = await getTodaysGames(undefined, { ttl:0, priority:'core', stage:'ticker', screen:'app-shell' });
-      const presentation = getTickerPresentation(games);
-      setLiveTicker(presentation.ticks);
-      setTickerStatus(presentation.status);
-      return presentation.ticks;
+      const games = await getTodaysGames();
+      if (!games.length) {
+        setLiveTicker([]);
+        setTickerStatus('empty');
+        return 'empty';
+      }
+      const ticks = games.map(formatTickerGame);
+      const nextStatus = deriveTickerStatus(games);
+      setLiveTicker(ticks);
+      setTickerUpdatedAt(Date.now());
+      setTickerStatus(nextStatus);
+      return nextStatus;
     } catch {
-      setTickerStatus(current => ['live', 'scores', 'refreshing', 'stale'].includes(current) ? 'stale' : 'error');
-      return [];
-    } finally {
-      tickerRefreshInFlight.current = false;
+      setTickerStatus(current => current === 'live' || current === 'refreshing' ? 'stale' : 'error');
+      return 'stale';
     }
   }, []);
   useEffect(() => {
-    let refreshTimer = null;
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refreshTicker();
+    if (isolatedPreview) return undefined;
+    let disposed = false;
+    let timerId = null;
+    let nextRefreshAt = 0;
+    const refreshAndSchedule = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      refreshTicker().then(status => {
+        if (disposed || document.visibilityState === 'hidden') return;
+        const delay = getTickerRefreshDelay(status, { lowDataMode });
+        nextRefreshAt = Date.now() + delay;
+        timerId = window.setTimeout(refreshAndSchedule, delay);
+      });
     };
-    const startPolling = () => {
-      if (refreshTimer !== null) window.clearInterval(refreshTimer);
-      refreshWhenVisible();
-      if (document.visibilityState === 'visible') refreshTimer = window.setInterval(refreshWhenVisible, TICKER_POLL_INTERVAL_MS);
+    const refreshWhenDue = () => {
+      if (document.visibilityState !== 'hidden' || Date.now() < nextRefreshAt) return;
+      if (timerId != null) window.clearTimeout(timerId);
+      refreshAndSchedule();
     };
-    const syncVisibility = () => {
-      if (document.visibilityState === 'visible') startPolling();
-      else if (refreshTimer !== null) {
-        window.clearInterval(refreshTimer);
-        refreshTimer = null;
-      }
-    };
-    startPolling();
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', syncVisibility);
+    refreshAndSchedule();
+    document.addEventListener('visibilitychange', refreshWhenDue);
     return () => {
-      if (refreshTimer !== null) window.clearInterval(refreshTimer);
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', syncVisibility);
+      disposed = true;
+      if (timerId != null) window.clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', refreshWhenDue);
     };
-  }, [refreshTicker]);
+  }, [isolatedPreview, lowDataMode, refreshTicker]);
 
   return (
     <>
@@ -389,25 +448,28 @@ export default function App() {
 
         {/* Nav */}
         <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
-          {PRIMARY_TABS.map((t, i) => (
+          {PRIMARY_TABS.map((t, i) => {
+            const workspaceAlertCount = t.key === 'settings-workspace' ? alertCount : t.alertCount;
+            return (
             <React.Fragment key={t.key}>
             {(i === 0 || PRIMARY_TABS[i - 1].section !== t.section) && (
               <div className="skip-nav-section" aria-hidden="true">{t.section}</div>
             )}
-            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.alertCount ? `${t.label}: ${t.alertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
+            <button ref={i === 0 ? mobileNavFirstItemRef : undefined} title={t.label} aria-label={t.key === 'settings-workspace' ? `${t.label}: ${workspaceAlertCount} active alerts` : undefined} onClick={() => { setTab(t.defaultTab || t.key); setMobileNavOpen(false); }} aria-current={activePrimaryKey===t.key ? 'page' : undefined}
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
-              {t.alertCount > 0 && (
+              {t.key === 'settings-workspace' && (
                 <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
-                  <span role="img" aria-label={`${t.alertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
-                  <span aria-hidden="true">{t.alertCount}</span>
+                  <span role="img" aria-label={`${workspaceAlertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
+                  {workspaceAlertCount > 0 && <span aria-hidden="true">{workspaceAlertCount}</span>}
                 </span>
               )}
-              {activePrimaryKey === t.key && <div style={{ marginLeft:'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
+              {activePrimaryKey === t.key && <div style={{ marginLeft:t.key === 'settings-workspace' ? 4 : 'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}
             </button>
             </React.Fragment>
-          ))}
+            );
+          })}
 
         </nav>
 
@@ -448,10 +510,24 @@ export default function App() {
           <div style={{ height:7, width:7, borderRadius:'50%', background:C.teal, animation:'pulse 1.6s ease-in-out infinite' }} />
         </div>
 
+        <nav className="skip-mobile-workspace-switcher" aria-label="Quick workspace switcher" aria-hidden={!compactMobile}>
+          {PRIMARY_TABS.map(workspace => {
+            const selected = activePrimaryKey === workspace.key;
+            const quickAlertCount = workspace.key === 'settings-workspace' ? alertCount : 0;
+            return (
+              <button key={workspace.key} type="button" tabIndex={compactMobile ? undefined : -1} aria-current={selected ? 'page' : undefined} onClick={() => { setTab(workspace.defaultTab || workspace.key); setMobileNavOpen(false); }}>
+                <span aria-hidden="true">{workspace.icon}</span>
+                <span>{workspace.label}</span>
+                {workspace.key === 'settings-workspace' && quickAlertCount > 0 && <strong aria-label={`${quickAlertCount} active alerts`}>{quickAlertCount}</strong>}
+              </button>
+            );
+          })}
+        </nav>
+
         {/* Scrollable content */}
         <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
-          {activeWorkspace && (
+          {!isolatedPreview && activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
               <div className="skip-workspace-subtabs-copy">
                 <span>{activeWorkspace.label} workspace</span>
@@ -467,10 +543,12 @@ export default function App() {
             </nav>
           )}
 
-          <div id={`skip-workspace-panel-${tab}`} role={activeWorkspace ? 'tabpanel' : undefined} aria-label={activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
-            <PageErrorBoundary resetKey={tab}>
+          <div id={`skip-workspace-panel-${tab}`} role={!isolatedPreview && activeWorkspace ? 'tabpanel' : undefined} aria-label={!isolatedPreview && activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
+            <PageErrorBoundary resetKey={isolatedPreview ? 'player-profile-preview' : tab}>
               <Suspense fallback={<PageLoading />}>
-              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
+              {isolatedPreview && <PlayerProfilePreviewsPage />}
+              {!isolatedPreview && <>
+              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} defaultTeamKey={defaultTeamKey} />}
               {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
               {tab === 'draft'        && <DraftPage />}
@@ -481,15 +559,15 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} />}
-              {tab === 'alerts'       && <AlertsWorkspacePanel />}
-              {tab === 'uptime'       && <UptimeMonitorPage />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
+              </>}
               </Suspense>
             </PageErrorBoundary>
           </div>
         </div>
 
-        <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />
+        {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
       </div>
 
       <style>{`
@@ -532,6 +610,7 @@ export default function App() {
           .skip-long-table table thead .skip-table-group-row + tr th { top:24px; }
         }
 
+        @keyframes scrollx { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         @keyframes pulse   { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
         @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
@@ -562,9 +641,17 @@ export default function App() {
           *[style*="animation"] { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
         }
         @media (max-width:720px) {
+          .skip-mobile-workspace-switcher { display:flex; align-items:center; gap:6px; min-height:43px; padding:6px 10px; overflow-x:auto; overscroll-behavior-x:contain; border-bottom:1px solid ${C.border}; background:${C.surface}; scrollbar-width:none; }
+          .skip-mobile-workspace-switcher::-webkit-scrollbar { display:none; }
+          .skip-mobile-workspace-switcher button { flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; min-height:30px; padding:5px 8px; border:1px solid ${C.border}; border-radius:999px; background:${C.surface2}; color:${C.text3}; cursor:pointer; font:800 9px/1 'DM Mono',monospace; letter-spacing:.03em; white-space:nowrap; }
+          .skip-mobile-workspace-switcher button[aria-current="page"] { border-color:${C.tealMid}; background:${C.tealSoft}; color:${C.teal}; }
+          .skip-mobile-workspace-switcher button strong { display:inline-grid; place-items:center; min-width:15px; height:15px; padding:0 3px; border-radius:999px; background:${C.rustSoft}; color:${C.rust}; font:800 8px/1 'DM Mono',monospace; }
           .skip-workspace-subtabs { align-items:stretch; flex-direction:column; gap:9px; padding:9px; }
           .skip-workspace-subtabs-controls { width:100%; overflow-x:auto; padding-bottom:1px; }
           .skip-workspace-subtabs-controls button { flex:0 0 auto; min-height:32px; }
+        }
+        @media (min-width:721px) {
+          .skip-mobile-workspace-switcher { display:none; }
         }
       `}</style>
     </div>

@@ -48,6 +48,20 @@ import { C, WARM_TOOLTIP } from "../constants/colors.js";
 
 const TT = { ...WARM_TOOLTIP, wrapperStyle: { zIndex: 9999 } };
 
+export function hasRenderableStrengthBenchmark(
+  data = [],
+  showLeagueBenchmark = false
+) {
+  return (
+    showLeagueBenchmark &&
+    data.length > 0 &&
+    data.every(
+      row =>
+        row?.leagueAverage != null && Number.isFinite(Number(row.leagueAverage))
+    )
+  );
+}
+
 export function OffenseRadar({ data, accent }) {
   return (
     <ResponsiveContainer width="100%" height={196}>
@@ -80,7 +94,11 @@ export function OffenseRadar({ data, accent }) {
   );
 }
 
-export function StrengthRadar({ data, accent }) {
+export function StrengthRadar({ data, accent, showLeagueBenchmark = false }) {
+  const shouldRenderLeagueBenchmark = hasRenderableStrengthBenchmark(
+    data,
+    showLeagueBenchmark
+  );
   return (
     <ResponsiveContainer width="100%" height={196}>
       <RadarChart
@@ -98,8 +116,22 @@ export function StrengthRadar({ data, accent }) {
           tickLine={false}
         />
         <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+        {shouldRenderLeagueBenchmark && (
+          <Radar
+            dataKey="leagueAverage"
+            name="MLB average benchmark"
+            stroke={C.text3}
+            fill="transparent"
+            fillOpacity={0}
+            strokeDasharray="4 3"
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        )}
         <Radar
           dataKey="val"
+          name="Selected team percentile"
           stroke={accent}
           fill={accent}
           fillOpacity={0.15}
@@ -107,7 +139,13 @@ export function StrengthRadar({ data, accent }) {
           dot={{ r: 2.5, fill: accent }}
           isAnimationActive={false}
         />
-        <Tooltip {...TT} formatter={v => [v, "Score"]} />
+        <Tooltip
+          {...TT}
+          formatter={(v, name) => [
+            v == null ? "Unavailable" : `${Number(v).toFixed(0)}th percentile`,
+            name,
+          ]}
+        />
       </RadarChart>
     </ResponsiveContainer>
   );
@@ -452,7 +490,19 @@ function DivisionalWarTooltip({ active, payload }) {
   );
 }
 
-export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
+export function getDivisionalWarFill(
+  row,
+  selectedTeam = "",
+  selectedTeamAccent = C.teal
+) {
+  return row?.team === selectedTeam ? selectedTeamAccent : C.purple;
+}
+
+export function DivisionalWarChart({
+  data = [],
+  selectedTeam = "",
+  selectedTeamAccent = C.teal,
+}) {
   if (!data.length) {
     return (
       <div
@@ -526,7 +576,7 @@ export function DivisionalWarChart({ data = [], selectedTeam = "" }) {
           {data.map(row => (
             <Cell
               key={row.team}
-              fill={row.team === selectedTeam ? C.teal : C.purple}
+              fill={getDivisionalWarFill(row, selectedTeam, selectedTeamAccent)}
             />
           ))}
           <LabelList

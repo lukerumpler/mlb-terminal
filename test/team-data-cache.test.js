@@ -11,6 +11,7 @@ import {
   buildBattedBallProfile,
   buildPitchArsenalRows,
   buildLiveRadarData,
+  MLB_LEAGUE_COMPARISON_TEAM_COUNT,
   buildLiveRunDiffData,
   buildOrganizationProspectDepthChart,
   deriveBaserunningGrade,
@@ -81,12 +82,51 @@ describe("team data cache and freshness helpers", () => {
       "Run Diff",
     ]);
     expect(data.strengthData.map(row => row.axis)).toContain("Pitching");
+    expect(data.hasLeagueBenchmark).toBe(false);
+    expect(data.strengthData.every(row => row.leagueAverage == null)).toBe(true);
     expect(
       buildLiveRadarData({ team: {}, liveTeamData: null }).offenseData
     ).toEqual([]);
     expect(
       buildLiveRadarData({ team: {}, liveTeamData: null }).strengthData
     ).toEqual([]);
+  });
+
+  it("adds the league-average benchmark only for a complete current 30-team aggregate pool", () => {
+    const byAbbr = Object.fromEntries(Array.from({ length: MLB_LEAGUE_COMPARISON_TEAM_COUNT }, (_, index) => {
+      const value = index + 1;
+      return [`T${value}`, {
+        standings:{ diff:value - 15 },
+        hitting:{ ops:.680 + value / 1000, homeRuns:70 + value, stolenBases:20 + value, avg:.220 + value / 1000, slg:.360 + value / 1000, obp:.290 + value / 1000 },
+        pitching:{ era:5 - value / 100, whip:1.4 - value / 1000 },
+      }];
+    }));
+    const data = buildLiveRadarData({
+      team:{ ops:.710, hr:100, sb:50, avg:.250, slg:.390, obp:.320, era:4, whip:1.2 },
+      liveTeamData:{ byAbbr },
+      runDiff:0,
+    });
+    expect(data.leagueTeamCount).toBe(MLB_LEAGUE_COMPARISON_TEAM_COUNT);
+    expect(data.hasLeagueBenchmark).toBe(true);
+    expect(data.strengthData).toHaveLength(6);
+    expect(data.strengthData.every(row => Number.isFinite(row.leagueAverage))).toBe(true);
+  });
+
+  it("withholds the league benchmark when a complete population lacks an axis value", () => {
+    const byAbbr = Object.fromEntries(Array.from({ length: MLB_LEAGUE_COMPARISON_TEAM_COUNT }, (_, index) => {
+      const value = index + 1;
+      return [`T${value}`, {
+        hitting:{ ops:.700 + value / 1000, homeRuns:90 + value, stolenBases:30 + value, avg:.230 + value / 1000 },
+        pitching:{ era:4.8 - value / 100, whip:index === 0 ? null : 1.3 - value / 1000 },
+      }];
+    }));
+    const data = buildLiveRadarData({
+      team:{ ops:.720, hr:102, sb:55, avg:.250, era:4, whip:1.18 },
+      liveTeamData:{ byAbbr },
+    });
+    expect(data.leagueTeamCount).toBe(MLB_LEAGUE_COMPARISON_TEAM_COUNT);
+    expect(data.hasLeagueBenchmark).toBe(false);
+    expect(data.strengthData.find(row => row.axis === 'Command')?.leagueAverage).toBeNull();
   });
 
   it("derives transparent Defense, Depth, and Future Value values only from available roster/prospect inputs", () => {
@@ -109,7 +149,7 @@ describe("team data cache and freshness helpers", () => {
     });
     expect(populated.coveragePct).toBe(100);
     expect(populated.redundancyPct).toBe(0);
-    expect(populated.defensePct).toBe(80);
+    expect(populated).toMatchObject({ defensePct: null, defenseStatus: 'awaiting-statcast' });
     expect(populated.depthPct).toBe(100);
     expect(populated.futureValuePct).not.toBeNull();
     expect(populated.prospectCount).toBeGreaterThan(0);
@@ -118,6 +158,7 @@ describe("team data cache and freshness helpers", () => {
       liveDataMode: "live",
       teamAbbr: "LAD",
       oaaPercentile: 100,
+      oaaPopulationCount: 30,
       players: {
         hitting: Array.from({ length: 2 }, (_, index) => ({ position: ["C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"][index % 8], stat: { plateAppearances: 100 } })),
         pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
@@ -139,7 +180,7 @@ describe("team data cache and freshness helpers", () => {
         { stolenBases: 30, caughtStealing: 0 },
       ],
     });
-    expect(baserunning).toMatchObject({ attempts: 25, volumePercentile: 33, efficiencyPercentile: 67, percentile: 50 });
+    expect(baserunning).toMatchObject({ attempts: 25, volumePercentile: 33, efficiencyPercentile: 67, percentile: 52, status: 'volume-fallback' });
     expect(deriveBaserunningGrade({ stolenBases: 20, caughtStealing: null, comparisonRows: [] }).percentile).toBeNull();
 
     const futureValue = deriveOrganizationFutureValue("LAD");
@@ -283,6 +324,25 @@ describe("team data cache and freshness helpers", () => {
       { pitch_type: "FF", release_speed: 96 },
     ]);
     expect(saveCacheFn).toHaveBeenCalledWith("LAD", 2026, result.snapshot);
+  });
+
+  it("uses verified team batted-ball rows before issuing large per-hitter contact rollups", async () => {
+    const getPlayerContactPointsFn = vi.fn();
+    const directBattedRows = [{ launch_speed: 101, xwoba: 0.412 }];
+    const result = await resolveTeamSavantSnapshot({
+      teamAbbr: "LAD",
+      season: 2026,
+      cached: null,
+      hitters: [{ id: 11 }, { id: 12 }],
+      pitchers: [],
+      getTeamExitVelocityFn: vi.fn().mockResolvedValue([]),
+      getTeamBattedBallsFn: vi.fn().mockResolvedValue(directBattedRows),
+      getPlayerContactPointsFn,
+    });
+    expect(getPlayerContactPointsFn).not.toHaveBeenCalled();
+    expect(result.source).toContain("verified team batted-ball query");
+    expect(result.snapshot.exitVelocityRows).toEqual(directBattedRows);
+    expect(result.snapshot.battedBallRows).toEqual(directBattedRows);
   });
 
   it("falls back to verified player rows when the direct team query is empty", async () => {

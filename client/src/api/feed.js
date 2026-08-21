@@ -19,14 +19,14 @@ function cacheGet(key) {
   const hit = _cache.get(key);
   if (!hit) return null;
   const now = Date.now();
-  if (hit.expiresAt > now || hit.staleUntil > now) return hit;
+  if (hit.staleUntil > now) return hit;
   _cache.delete(key);
   return null;
 }
 
 function cacheSet(key, data) {
   const now = Date.now();
-  const entry = { data, retrievedAt: now, expiresAt: now + CACHE_TTL_MS, staleUntil: now + STALE_TTL_MS };
+  const entry = { data, retrievedAt: now, expiresAt: now + CACHE_TTL_MS, staleUntil: now + STALE_TTL_MS, retryAfter: 0 };
   _cache.set(key, entry);
   return entry;
 }
@@ -45,11 +45,18 @@ function requestedKinds(handles = []) {
   ];
 }
 
-async function fetchNews(kind, n, handle = null) {
-  const key = `${handle ? `handle:${handle}` : kind}:${n}`;
+async function fetchNews(kind, n, handle = null, team = null) {
+  const normalizedTeam = team ? String(team).trim().toUpperCase() : null;
+  const key = `${handle ? `handle:${handle}` : normalizedTeam ? `team:${normalizedTeam}` : kind}:${n}`;
   const cached = cacheGet(key);
-  if (cached) {
-    return { ...cached.data, status: cached.expiresAt > Date.now() ? 'cached' : 'cached-fallback', ageSeconds: Math.round((Date.now() - cached.retrievedAt) / 1000) };
+  const now = Date.now();
+  if (cached?.expiresAt > now) {
+    return { ...cached.data, status: 'cached', ageSeconds: Math.round((now - cached.retrievedAt) / 1000) };
+  }
+  // A stale snapshot may be shown while revalidation occurs, but failures
+  // must not turn the five-minute page cadence into repeated upstream calls.
+  if (cached?.retryAfter > now) {
+    return { ...cached.data, status: 'cached-fallback', freshness: 'stale-cached', ageSeconds: Math.round((now - cached.retrievedAt) / 1000), reason: 'revalidation-cooldown' };
   }
 
   const pending = _inFlight.get(key);
@@ -59,23 +66,27 @@ async function fetchNews(kind, n, handle = null) {
     try {
       const query = handle
         ? `handle=${encodeURIComponent(handle)}&n=${n}`
-        : `kind=${encodeURIComponent(kind)}&n=${n}`;
+        : normalizedTeam
+          ? `team=${encodeURIComponent(normalizedTeam)}&n=${n}`
+          : `kind=${encodeURIComponent(kind)}&n=${n}`;
       const response = await fetch(apiUrl(`/api/news?${query}`), {
         signal: AbortSignal.timeout(14_000),
       });
       const data = await response.json();
       if (!response.ok && !data?.items?.length) {
-        return { handle: handle || kind, items: [], sourceStatuses: data?.sourceStatuses ?? [], sources: data?.sources ?? [], status: 'unavailable', error: data?.error || `HTTP ${response.status}` };
+        return { handle: handle || normalizedTeam || kind, items: [], sourceStatuses: data?.sourceStatuses ?? [], sources: data?.sources ?? [], status: 'unavailable', error: data?.error || `HTTP ${response.status}` };
       }
       const entry = cacheSet(key, data);
       if (data?.status !== 'unavailable' && data?.items?.length) recordFeedSuccess('intel-feed');
       return { ...data, ageSeconds: Math.round((Date.now() - entry.retrievedAt) / 1000) };
     } catch (error) {
-      const stale = cacheGet(key);
-      if (stale) {
-        return { ...stale.data, status: 'cached-fallback', freshness: 'stale-cached', ageSeconds: Math.round((Date.now() - stale.retrievedAt) / 1000), reason: error?.message || 'network-error' };
+      // Keep the stale entry captured before the request. Calling cacheGet()
+      // here can be too late if a concurrent cleanup invalidates the key.
+      if (cached?.staleUntil > Date.now()) {
+        cached.retryAfter = Date.now() + CACHE_TTL_MS;
+        return { ...cached.data, status: 'cached-fallback', freshness: 'stale-cached', ageSeconds: Math.round((Date.now() - cached.retrievedAt) / 1000), reason: error?.message || 'network-error' };
       }
-      return { handle: handle || kind, items: [], sourceStatuses: [], sources: [], status: 'unavailable', error: error?.message || 'News request failed' };
+      return { handle: handle || normalizedTeam || kind, items: [], sourceStatuses: [], sources: [], status: 'unavailable', error: error?.message || 'News request failed' };
     }
   })();
 
@@ -91,6 +102,20 @@ async function fetchNews(kind, n, handle = null) {
 export async function fetchFeed(handle, n = 10) {
   const result = await fetchNews(kindForHandles([handle]), n, handle);
   return { ...result, handle };
+}
+
+/**
+ * Team news deliberately uses the existing resilient news endpoint. The
+ * server selects an official club RSS feed first, retains 15-minute fresh and
+ * 24-hour stale snapshots, and exposes source status to the UI. This request
+ * is initiated only when the Team News workspace is opened.
+ */
+export async function fetchTeamNews(teamAbbr, n = 8) {
+  const team = String(teamAbbr || '').trim().toUpperCase();
+  if (!/^[A-Z]{2,3}$/.test(team)) {
+    return { handle: team || 'team', items: [], sourceStatuses: [], sources: [], status: 'unavailable', freshness: 'unavailable', error: 'A valid MLB team is required' };
+  }
+  return fetchNews('mlb', n, null, team);
 }
 
 /**
