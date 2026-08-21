@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback, memo, lazy, S
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, MLB_PIPELINE_FARM_SYSTEM_RANKINGS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines, getProspectAgeForLevelContext } from '../engine/skip.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamSavantMetrics, getTeamSavantOaa, getTeamSavantRunning, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSnapshot, getTeamSavantMetrics, getTeamSavantOaa, getTeamSavantRunning, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { RosterInsightsTableSkeleton, TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -1241,8 +1241,9 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
   });
 }
 
-function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
-  const [selTeam,setSelTeam]=useState(DEFAULT_OVERVIEW_TEAM_KEY);
+function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultTeamKey = DEFAULT_OVERVIEW_TEAM_KEY }) {
+  const initialTeamKey = TEAMS[defaultTeamKey] ? defaultTeamKey : DEFAULT_OVERVIEW_TEAM_KEY;
+  const [selTeam,setSelTeam]=useState(initialTeamKey);
   const [overviewView, setOverviewView] = useState('briefing');
   const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
@@ -1272,6 +1273,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [pdfExportState, setPdfExportState] = useState('idle');
   const [splitTab,setSplitTab]=useState('home');
   const [teamSplitRows, setTeamSplitRows] = useState([]);
+  const [teamRecentGames, setTeamRecentGames] = useState([]);
   const [teamSplitsState, setTeamSplitsState] = useState('idle');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
@@ -1280,15 +1282,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
-  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentByDays:{} });
-  const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.updatedAt || null);
-  const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON) ? 'cached' : 'loading');
+  const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentByDays:{} });
+  const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.updatedAt || null);
+  const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [hotStreakDays, setHotStreakDays] = useState(15);
   const [hotStreakRows, setHotStreakRows] = useState(() => {
-    const cached = readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data;
+    const cached = readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data;
     return cached?.recentByDays?.[15] || { hitting:[], pitching:[] };
   });
-  const [hotStreakState, setHotStreakState] = useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data?.recentByDays?.[15] ? 'cached' : 'loading');
+  const [hotStreakState, setHotStreakState] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data?.recentByDays?.[15] ? 'cached' : 'loading');
   const [teamExitVelocityRows, setTeamExitVelocityRows] = useState([]);
   const [teamExitVelocitySource, setTeamExitVelocitySource] = useState('');
   const [teamExitVelocityState, setTeamExitVelocityState] = useState('idle');
@@ -1665,14 +1667,17 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     if (overviewView !== 'operations') return undefined;
     let alive = true;
     setTeamSplitRows([]);
+    setTeamRecentGames([]);
     setTeamSplitsState('loading');
-    getTeamScheduleSplits(teamBase?.id, CURRENT_SEASON).then(rows => {
+    getTeamScheduleSnapshot(teamBase?.id, CURRENT_SEASON).then(snapshot => {
       if (!alive) return;
-      setTeamSplitRows(Array.isArray(rows) ? rows : []);
+      setTeamSplitRows(Array.isArray(snapshot?.splitRows) ? snapshot.splitRows : []);
+      setTeamRecentGames(Array.isArray(snapshot?.recentGames) ? snapshot.recentGames : []);
       setTeamSplitsState('ready');
     }).catch(() => {
       if (!alive) return;
       setTeamSplitRows([]);
+      setTeamRecentGames([]);
       setTeamSplitsState('unavailable');
     });
     return () => { alive = false; };
@@ -2668,6 +2673,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             <div style={px({fontSize:15,fontWeight:800,color:C.text})}>{teamVenueMetadata.venue.name || team.name}</div>
             <div style={sans({fontSize:9,color:C.text3})}>{teamVenueMetadata.freshness === 'stale-cached' ? 'Verified cached snapshot' : 'Verified venue metadata'}</div>
           </div>
+          {team.abbr === 'SD' && <div style={{margin:'0 14px 9px',padding:'8px 10px',borderLeft:`3px solid ${teamAccent}`,borderRadius:4,background:`color-mix(in srgb, ${teamAccent} 7%, ${C.surface2})`,...sans({fontSize:10.5,color:C.text2,lineHeight:1.45})}}><strong style={{color:teamAccent}}>Petco Park context.</strong> Padres home venue{teamVenueMetadata.venue.city ? ` · ${teamVenueMetadata.venue.city}${teamVenueMetadata.venue.state ? `, ${teamVenueMetadata.venue.state}` : ''}` : ''}. Capacity, playing surface, roof, and outfield dimensions below come directly from the verified MLB venue record.</div>}
           <div className="skip-balanced-grid" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
             {[
               ['Capacity', teamVenueMetadata.venue.capacity == null ? '—' : teamVenueMetadata.venue.capacity.toLocaleString()],
@@ -2678,6 +2684,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <div style={sans({padding:'8px 14px 10px',fontSize:9,color:C.text4,lineHeight:1.4})}>Wall distances: LF {teamVenueMetadata.venue.dimensions?.leftLine ?? '—'} · LCF {teamVenueMetadata.venue.dimensions?.leftCenter ?? '—'} · CF {teamVenueMetadata.venue.dimensions?.center ?? '—'} · RCF {teamVenueMetadata.venue.dimensions?.rightCenter ?? '—'} · RF {teamVenueMetadata.venue.dimensions?.rightLine ?? '—'} ft. Altitude, wall height, orientation, and park factors are not shown without a verified source.</div>
         </> : <OverviewEmptyState status={teamVenueState === 'loading' ? 'Loading' : teamVenueState === 'source-gap' ? 'Source gap' : 'Unavailable'} message="Ballpark metadata" detail="Official MLB venue metadata is not available for this team right now. No static park values are substituted." />}
+      </Panel>}
+
+      {overviewView === 'operations' && <Panel title={`${team.name} Recent Results`} accent={teamAccent} badge={teamSplitsState === 'loading' ? 'Loading MLB' : teamSplitsState === 'unavailable' ? 'Unavailable' : 'Official MLB schedule'}>
+        {teamSplitsState === 'loading' ? <OverviewEmptyState status="Loading" message="Recent completed games" detail="Loading official MLB regular-season results." /> : teamRecentGames.length ? <>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
+            {teamRecentGames.map((game, index) => <a key={`${game.gamePk || index}-${game.gameDate}`} href={game.gamePk ? `https://www.mlb.com/gameday/${game.gamePk}` : undefined} target="_blank" rel="noreferrer" aria-label={`${game.result} ${game.score} ${game.location} ${game.opponentName}; open official MLB Gameday`} style={{padding:'10px 12px',borderRight:index < teamRecentGames.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',textDecoration:'none',color:C.text,background:game.isWin === true ? C.tealSoft : game.isWin === false ? C.rustSoft : C.surface}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:6}}><span style={px({fontSize:10,fontWeight:800,color:game.isWin === true ? C.teal : game.isWin === false ? C.rust : C.text3})}>{game.result}</span><span style={px({fontSize:9,color:C.text4})}>{game.gameDate ? new Date(game.gameDate).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '—'}</span></div>
+              <div style={sans({marginTop:5,fontSize:11.5,fontWeight:800,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'})}>{game.location} {game.opponentAbbr}</div>
+              <div style={px({marginTop:3,fontSize:12,fontWeight:800,color:C.text2})}>{game.score}</div>
+            </a>)}
+          </div>
+          <div style={sans({padding:'8px 14px 10px',fontSize:9.5,color:C.text3,lineHeight:1.45})}>Five most recent completed regular-season games. Results and scores come from the official MLB schedule; this card loads only when Operations is opened and shares its single cached schedule request with Splits Dashboard.</div>
+        </> : <OverviewEmptyState status={teamSplitsState === 'unavailable' ? 'Unavailable' : 'No completed games'} message="Recent completed games" detail="The official MLB schedule did not return completed regular-season results for the selected team. No inferred results are shown." />}
       </Panel>}
 
       {overviewView === 'briefing' && <section className="skip-overview-deferred-analysis-section" aria-labelledby="team-overview-detailed-analysis-title">
