@@ -298,8 +298,8 @@ describe('Team Overview compact navigation', () => {
 
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Unavailable: verified roster coverage is not available/i);
-    expect(screen.getByText(/Defense uses roster coverage and, when available, Statcast OAA/i)).toBeInTheDocument();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/comparable Baseball Savant OAA and verified roster coverage are required/i);
+    expect(screen.getByText(/Defense is OAA-first and receives a performance grade only with comparable Statcast coverage/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open organization prospect depth chart' }));
     const dialog = screen.getByRole('dialog', { name: /organization depth/i });

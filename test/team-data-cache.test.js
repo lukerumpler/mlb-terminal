@@ -109,7 +109,7 @@ describe("team data cache and freshness helpers", () => {
     });
     expect(populated.coveragePct).toBe(100);
     expect(populated.redundancyPct).toBe(0);
-    expect(populated.defensePct).toBe(80);
+    expect(populated).toMatchObject({ defensePct: null, defenseStatus: 'awaiting-statcast' });
     expect(populated.depthPct).toBe(100);
     expect(populated.futureValuePct).not.toBeNull();
     expect(populated.prospectCount).toBeGreaterThan(0);
@@ -118,6 +118,7 @@ describe("team data cache and freshness helpers", () => {
       liveDataMode: "live",
       teamAbbr: "LAD",
       oaaPercentile: 100,
+      oaaPopulationCount: 30,
       players: {
         hitting: Array.from({ length: 2 }, (_, index) => ({ position: ["C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"][index % 8], stat: { plateAppearances: 100 } })),
         pitching: Array.from({ length: 18 }, () => ({ position: "P", stat: { inningsPitched: 10 } })),
@@ -139,7 +140,7 @@ describe("team data cache and freshness helpers", () => {
         { stolenBases: 30, caughtStealing: 0 },
       ],
     });
-    expect(baserunning).toMatchObject({ attempts: 25, volumePercentile: 33, efficiencyPercentile: 67, percentile: 50 });
+    expect(baserunning).toMatchObject({ attempts: 25, volumePercentile: 33, efficiencyPercentile: 67, percentile: 52, status: 'volume-fallback' });
     expect(deriveBaserunningGrade({ stolenBases: 20, caughtStealing: null, comparisonRows: [] }).percentile).toBeNull();
 
     const futureValue = deriveOrganizationFutureValue("LAD");

@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, resolveMetricProviderStatus } from '../client/src/pages/OverviewPage.jsx';
+import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, deriveBaserunningGrade, deriveFrontOfficeCoverageGrades, deriveOrganizationFutureValue, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, resolveMetricProviderStatus } from '../client/src/pages/OverviewPage.jsx';
 
 describe('Front Office Overall grade', () => {
   it('weights current performance and applies the approved capped organization-outlook nudge', () => {
@@ -100,5 +100,53 @@ describe('Front Office Overall grade', () => {
     fireEvent.keyDown(overallButton, { key: 'Escape' });
     expect(onActiveLabelChange).toHaveBeenLastCalledWith(null);
     expect(overallButton).toHaveFocus();
+  });
+});
+
+describe('Front Office targeted facet integrity', () => {
+  it('requires a meaningful steal-attempt sample and favors rate-normalized opportunity plus success efficiency', () => {
+    const insufficient = deriveBaserunningGrade({ stolenBases: 4, caughtStealing: 2, plateAppearances: 240 });
+    expect(insufficient).toMatchObject({ percentile: null, status: 'insufficient-sample', attempts: 6, minimumAttempts: 8 });
+
+    const qualified = deriveBaserunningGrade({
+      stolenBases: 20,
+      caughtStealing: 4,
+      plateAppearances: 600,
+      comparisonRows: [
+        { stolenBases: 12, caughtStealing: 4, plateAppearances: 600 },
+        { stolenBases: 18, caughtStealing: 8, plateAppearances: 600 },
+        { stolenBases: 25, caughtStealing: 10, plateAppearances: 600 },
+      ],
+    });
+    expect(qualified).toMatchObject({ status: 'verified-rate', attempts: 24, opportunityMetric: 'stolen bases per 600 PA' });
+    expect(qualified.percentile).toBeGreaterThan(qualified.volumePercentile);
+  });
+
+  it('withholds a defense performance grade until comparable Statcast OAA is present, then makes OAA the primary signal', () => {
+    const players = {
+      hitting: [
+        { position: 'C', stat: { plateAppearances: 80 } }, { position: '1B', stat: { plateAppearances: 80 } },
+        { position: '2B', stat: { plateAppearances: 80 } }, { position: '3B', stat: { plateAppearances: 80 } },
+        { position: 'SS', stat: { plateAppearances: 80 } }, { position: 'LF', stat: { plateAppearances: 80 } },
+        { position: 'CF', stat: { plateAppearances: 80 } }, { position: 'RF', stat: { plateAppearances: 80 } },
+      ],
+      pitching: [{ position: 'P', stat: { inningsPitched: 40 } }, { position: 'P', stat: { inningsPitched: 40 } }],
+    };
+    const awaitingOaa = deriveFrontOfficeCoverageGrades({ players, liveDataMode: 'live', teamAbbr: 'LAD' });
+    expect(awaitingOaa).toMatchObject({ defensePct: null, defenseStatus: 'awaiting-statcast', depthStatus: 'verified' });
+
+    const verified = deriveFrontOfficeCoverageGrades({ players, liveDataMode: 'live', teamAbbr: 'LAD', oaaPercentile: 90, oaaPopulationCount: 30 });
+    expect(verified).toMatchObject({ defenseStatus: 'verified', oaaPercentile: 90, oaaPopulationCount: 30, workloadCoveragePct: 100 });
+    expect(verified.defensePct).toBeGreaterThan(80);
+    expect(verified.depthPct).toBeGreaterThan(verified.rosterDepthPct);
+  });
+
+  it('uses only a comparable multi-prospect SKIP snapshot for future value and exposes the separate quality tiers', () => {
+    const futureValue = deriveOrganizationFutureValue('LAD');
+    expect(futureValue).toMatchObject({ status: 'snapshot-complete' });
+    expect(futureValue.prospectCount).toBeGreaterThanOrEqual(5);
+    expect(futureValue.organizationCount).toBeGreaterThanOrEqual(20);
+    expect(futureValue.futureValuePct).toBeGreaterThanOrEqual(0);
+    expect(futureValue.topThreeAverage).toBeGreaterThanOrEqual(futureValue.topFiveAverage);
   });
 });
