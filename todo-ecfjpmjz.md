@@ -108,3 +108,8 @@
 - [x] Exercise the real League comparison workspace, mobile navigation drawer, and fixed ticker at 375px after the new CSS changes; desktop and mobile browser audits both passed with no horizontal overflow, the drawer opened, the League table rendered, and the ticker stayed within the viewport.
 - [x] Add and run focused regression coverage for the mobile-specific layout contract; `test/mobile-layout.test.js` passed all 3 assertions for safe-area clearance, touch targets, and scroll navigation.
 - [x] Save and publish a mobile optimization checkpoint and record its version ID.
+
+- [x] Add a compact mobile bottom navigation bar for quick access to the most-used workspaces; added five thumb-friendly destinations for Overview, Talent, League, Intelligence, and Notes.
+- [x] Add condensed comparison cards before the full comparison table on small screens; cards show rank, team, division, selected metric, and W-L record for the top six filtered rows while the full table remains available below.
+- [x] Add touch swipe gestures for moving between workspaces on mobile, with guarded interactive-target detection, a 64px horizontal threshold, vertical-scroll protection, and five-workspace bounds.
+- [x] Add regression coverage, validate desktop/mobile behavior, and publish the mobile workspace release; focused tests passed 8/8, the full suite passed 642/645 with 3 skips on rerun, TypeScript and production build passed, and the browser audit verified mobile cards/navigation/swipe plus desktop hiding.

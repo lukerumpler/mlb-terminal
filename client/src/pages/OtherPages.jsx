@@ -1121,7 +1121,28 @@ function LeaguePage() {
           <button type="button" aria-label={`Reverse cross-team comparison sort; currently ${comparisonSortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={()=>setComparisonSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{comparisonSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
           {(comparisonSearch || comparisonDivision !== 'all') && <button type="button" onClick={()=>{setComparisonSearch('');setComparisonDivision('all')}} style={{height:28,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text3,fontSize:9.5,fontWeight:700,cursor:'pointer'}}>Clear filters</button>}
         </div>
-        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
+        {!comparisonLoading && comparisonRows.length > 0 && (
+          <div className="skip-mobile-comparison-cards" aria-label={`Mobile condensed comparison cards sorted by ${comparisonMetricConfig.label}`}>
+            {comparisonRows.slice(0, 6).map((row, index) => {
+              const value = comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString();
+              return (
+                <article key={row.id} className="skip-mobile-comparison-card" data-testid="mobile-comparison-card">
+                  <div className="skip-mobile-comparison-rank">#{index + 1}</div>
+                  <div className="skip-mobile-comparison-card-main">
+                    <strong>{row.name}</strong>
+                    <span>{row.division}</span>
+                  </div>
+                  <div className="skip-mobile-comparison-card-stat">
+                    <strong>{value}</strong>
+                    <span>{comparisonMetricConfig.label}</span>
+                  </div>
+                  <div className="skip-mobile-comparison-record">{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div data-horizontal-scroll style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
       </Panel>
       </div>
 
