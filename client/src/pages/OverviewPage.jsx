@@ -501,8 +501,9 @@ export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
 }
 
 export function deriveBaserunningGrade({ stolenBases, caughtStealing, plateAppearances, comparisonRows = [], minimumAttempts = 8, sprintSpeedPercentile = null, extraBasesTakenPercentile = null } = {}) {
-  const sprintPct = Number.isFinite(Number(sprintSpeedPercentile)) ? Number(sprintSpeedPercentile) : null;
-  const extraBasesPct = Number.isFinite(Number(extraBasesTakenPercentile)) ? Number(extraBasesTakenPercentile) : null;
+  const toOptionalPercentile = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const sprintPct = toOptionalPercentile(sprintSpeedPercentile);
+  const extraBasesPct = toOptionalPercentile(extraBasesTakenPercentile);
   const statcastInputCount = [sprintPct, extraBasesPct].filter(value => value != null).length;
   const sb = Number(stolenBases);
   const cs = Number(caughtStealing);
@@ -1852,7 +1853,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       setTeamRunningState(data?.status === 'live' || data?.status === 'cached' || data?.status === 'partial' ? 'ready' : 'unavailable');
     }).catch(() => {
       if (!alive) return;
-      setTeamRunningData({ status:'upstream-unavailable', source:'Baseball Savant team sprint-speed and extra-bases-taken leaderboards', retrievedAt:new Date().toISOString() });
+      setTeamRunningData({ status:'upstream-unavailable', source:'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards', retrievedAt:new Date().toISOString() });
       setTeamRunningState('unavailable');
     });
     return () => { alive = false; };
@@ -1868,7 +1869,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       setTeamFieldingDataMode('cached');
       setTeamFieldingUpdatedAt(cached?.updatedAt || null);
     }
-    if (cached && !shouldRefreshDailyCache(cached)) return () => { alive = false; };
+    if (cachedRows.length && cached && !shouldRefreshDailyCache(cached)) return () => { alive = false; };
     setTeamFieldingDataMode('loading');
     getTeamPlayerStats(teamBase.id, 'fielding', CURRENT_SEASON).then(rows => {
       if (!alive) return;
@@ -2328,7 +2329,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       ? 'Official MLB player fielding-inning coverage has not been loaded; it is context only and does not change this defense grade.'
       : `Official MLB player fielding rows cover ${nonPitcherInnings.toFixed(1)} non-pitcher innings (${defensiveInningCoveragePct}% of ${expectedDefensiveInnings.toFixed(0)} expected position innings across ${Number(team.w || 0) + Number(team.l || 0)} club games; ${defensiveInningRowCount} rows; ${formatVerifiedTimestamp(teamFieldingUpdatedAt)}). This is coverage context only, not a defense-performance input.`;
     const sbModelDetail = `${baserunning.modelWeights?.stolenBaseModel ?? 100}% verified stolen-base model (${baserunning.opportunityMetric}: ${Math.round(baserunning.volumePercentile)}th percentile; steal success: ${(baserunning.successRate * 100).toFixed(1)}%, ${Math.round(baserunning.efficiencyPercentile)}th percentile; ${baserunning.attempts} attempts)`;
-    const statcastRunningDetail = baserunning.statcastInputCount === 0
+    const statcastRunningDetail = teamRunningState === 'loading'
+      ? 'Optional Statcast sprint-speed and extra-bases-taken inputs are loading; the current result remains 100% on the verified stolen-base model until those source rows return.'
+      : baserunning.statcastInputCount === 0
       ? 'Optional Statcast sprint-speed and extra-bases-taken inputs were unavailable, so the verified stolen-base model remains 100% of the result.'
       : `${baserunning.sprintSpeedPercentile != null ? `${baserunning.modelWeights.sprintSpeed}% team sprint speed (${teamRunningData?.sprintSpeed?.toFixed(1)} ft/s; ${Math.round(baserunning.sprintSpeedPercentile)}th percentile)` : ''}${baserunning.sprintSpeedPercentile != null && baserunning.extraBasesTakenPercentile != null ? '; ' : ''}${baserunning.extraBasesTakenPercentile != null ? `${baserunning.modelWeights.extraBasesTaken}% extra-bases-taken run value (${teamRunningData?.extraBasesTakenRuns?.toFixed(1)} runs; ${Math.round(baserunning.extraBasesTakenPercentile)}th percentile)` : ''}. Baseball Savant team running leaderboards · ${formatVerifiedTimestamp(teamRunningData?.retrievedAt)}.`;
     const ageToLevelDetail = prospectAgeToLevel?.evaluatedCount
@@ -2370,7 +2373,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       defensePct,defenseCoveragePct,defenseStatus,oaaPercentile,oaaPopulationCount,depthPct,depthStatus,rosterDepthPct,farmSystemRank,farmSystemPct,futureValuePct,fieldingPositions,fieldingPlayerCount,pitcherCount,activePlayers,prospectCount,prospectTopThreeAverage,prospectTopFiveAverage,prospectTopThreePercentile,prospectTopFivePercentile,prospectOrganizationCount,prospectAgeToLevel,workloadCoveragePct,nonPitcherInnings,expectedDefensiveInnings,defensiveInningCoveragePct,
       frontOfficeGradeRows,frontOfficeOverall,overall:frontOfficeOverall.grade,
     };
-  },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, teamRunningData, teamFieldingRows, teamFieldingDataMode, teamFieldingUpdatedAt, rd]);
+  },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, teamRunningData, teamRunningState, teamFieldingRows, teamFieldingDataMode, teamFieldingUpdatedAt, rd]);
 
   const executivePercentiles = useMemo(() => {
     const runDiff = D.offenseData.find(row => row.axis === 'Run Diff')?.val ?? null;

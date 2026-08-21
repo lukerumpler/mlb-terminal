@@ -2486,13 +2486,12 @@ export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
 // Team-level running context remains a separate optional request because the
 // full Savant leaderboards are not needed for the first Team Overview paint.
 // `baserunning` measures non-steal extra-base advancement decisions (including
-// advances, holds, and outs); `baserunning_run_value` adds the Savant combined
-// running value for disclosure only. Neither substitutes for the established
-// official MLB stolen-base model when a source is unavailable.
+// advances, holds, and outs). Neither optional input substitutes for the
+// established official MLB stolen-base model when a source is unavailable.
 export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASON) {
   const unavailable = () => ({
     status: 'upstream-unavailable',
-    source: 'Baseball Savant team sprint-speed and extra-bases-taken leaderboards',
+    source: 'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards',
     retrievedAt: new Date().toISOString(),
     sprintSpeed: null,
     sprintSpeedPercentile: null,
@@ -2500,13 +2499,11 @@ export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASO
     extraBasesTakenRuns: null,
     extraBasesTakenPercentile: null,
     extraBasesTakenPopulationCount: 0,
-    baserunningRunValue: null,
   });
   try {
-    const [sprintRows, extraBaseRows, runValueRows] = await Promise.all([
+    const [sprintRows, extraBaseRows] = await Promise.all([
       fetchLeaderboard(`/api/savant?endpoint=sprint_speed_team&year=${year}`, { timeoutMs: 8_000 }),
       fetchLeaderboard(`/api/savant?endpoint=baserunning&year=${year}`, { timeoutMs: 8_000 }),
-      fetchLeaderboard(`/api/savant?endpoint=baserunning_run_value&year=${year}`, { timeoutMs: 8_000 }),
     ]);
     const targetAbbr = String(teamAbbr || '').toUpperCase();
     const targetName = canonicalTeamName(teamName || teamAbbr);
@@ -2537,16 +2534,12 @@ export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASO
     };
     const sprintRow = (Array.isArray(sprintRows) ? sprintRows : []).find(matchesTeam) || null;
     const extraBaseByTeam = aggregateByTeam(extraBaseRows, 'runner_runs');
-    const runValueByTeam = aggregateByTeam(runValueRows, 'runner_runs_tot');
     const extraBaseRow = extraBaseByTeam.find(row => row.team === targetName) || null;
-    const runValueRow = runValueByTeam.find(row => row.team === targetName) || null;
     const sprintSpeed = Number(sprintRow?.avg_sprint_speed);
     const extraBasesTakenRuns = Number(extraBaseRow?.value);
-    const baserunningRunValue = Number(runValueRow?.value);
     const sprintSpeedValue = Number.isFinite(sprintSpeed) ? sprintSpeed : null;
     const extraBasesTakenValue = Number.isFinite(extraBasesTakenRuns) ? extraBasesTakenRuns : null;
-    const runValue = Number.isFinite(baserunningRunValue) ? baserunningRunValue : null;
-    const metas = [sprintRows, extraBaseRows, runValueRows]
+    const metas = [sprintRows, extraBaseRows]
       .map(rows => Array.isArray(rows) ? rows.__providerMeta || null : null)
       .filter(Boolean);
     const freshness = metas.some(meta => meta.freshness === 'stale-cached')
@@ -2554,10 +2547,10 @@ export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASO
       : metas.some(meta => meta.freshness === 'cached')
         ? 'cached'
         : 'live';
-    const metricCount = [sprintSpeedValue, extraBasesTakenValue, runValue].filter(value => value != null).length;
+    const metricCount = [sprintSpeedValue, extraBasesTakenValue].filter(value => value != null).length;
     return {
-      status: metricCount === 0 ? 'source-gap' : metricCount === 3 ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'partial',
-      source: 'Baseball Savant team sprint-speed and extra-bases-taken leaderboards',
+      status: metricCount === 0 ? 'source-gap' : metricCount === 2 ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'partial',
+      source: 'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards',
       freshness,
       cache: metas.some(meta => meta.cache === 'HIT') ? 'HIT' : metas.some(meta => meta.cache === 'STALE') ? 'STALE' : null,
       retrievedAt: new Date().toISOString(),
@@ -2567,7 +2560,6 @@ export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASO
       extraBasesTakenRuns: extraBasesTakenValue,
       extraBasesTakenPercentile: rank(extraBasesTakenValue, extraBaseByTeam),
       extraBasesTakenPopulationCount: extraBaseByTeam.length,
-      baserunningRunValue: runValue,
     };
   } catch {
     return unavailable();

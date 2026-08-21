@@ -226,8 +226,6 @@ const ENDPOINTS = {
     `https://baseballsavant.mlb.com/leaderboard/sprint-speed-team?season=${y}&team=&csv=true`,
   baserunning: y =>
     `https://baseballsavant.mlb.com/leaderboard/baserunning?type=team&year=${y}&csv=true`,
-  baserunning_run_value: y =>
-    `https://baseballsavant.mlb.com/leaderboard/baserunning-run-value?type=team&year=${y}&csv=true`,
   oaa: y =>
     `https://baseballsavant.mlb.com/leaderboard/outs_above_average?type=Batter&year=${y}&team=&range=year&min=1&pos=&roles=&viz=Show&csv=true`,
   pitch_arsenal: y =>

@@ -11404,5 +11404,5 @@
 - [x] Add grade-model integrity regressions, validate desktop and mobile Front Office Evaluation behavior, and publish the enhancement.
 
 - [x] Audit available verified sprint-speed, extra-base-taken, defensive-inning, and prospect age-to-level source fields and their coverage limits.
-- [ ] Add source-aware baserunning, defensive-inning, and prospect age-to-level context to the Front Office evaluation without fabricating missing metrics.
-- [ ] Add integrity regression coverage, validate desktop and mobile grading details, and publish the enhancement.
+- [x] Add source-aware baserunning, defensive-inning, and prospect age-to-level context to the Front Office evaluation without fabricating missing metrics.
+- [x] Add integrity regression coverage, validate desktop and mobile grading details, and publish the enhancement.
