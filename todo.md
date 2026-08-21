@@ -24,4 +24,4 @@
 - [x] Pause Intel Feed auto-refresh polling while the document is hidden and resume promptly on return
 - [x] Eliminate in-place roster sorting in Overview’s Savant snapshot selection to preserve state immutability
 - [x] Implement and test only high-confidence reliability or performance improvements
-- [ ] Run complete validation, document residual risks, and publish the optimization pass
+- [x] Run complete validation, document residual risks, and publish the optimization pass
