@@ -84,3 +84,8 @@
 
 - [x] Inspect the current project for reproducible bugs, validation failures, runtime warnings, and high-risk code paths; identified string-keyed team-stat lookups and Vercel tRPC URL-shape fragility as actionable risks, while browser logs showed no current runtime errors.
 - [x] Implement targeted debugging and code-quality improvements, add regression coverage, and validate; comparison rows now support numeric/string provider IDs, anonymous tRPC auth detection handles Vercel/Express path shapes, focused routing/comparison/player tests, TypeScript, and production build pass. Checkpoint publication remains next.
+
+- [x] Add loading skeletons and smooth reduced-motion-aware transitions for player-profile switching and cross-team comparison views; reused profile/comparison skeletons, added transition classes, and honored `prefers-reduced-motion`.
+- [x] Add source-backed recent game highlights/news context to player profiles with loading and unavailable states; added `PlayerNewsPanel` using the resilient feed API and fixed the existing TeamNewsPanel React hook import contract.
+- [x] Add an AI-powered natural-language MLB query bar for player-stat and team-comparison questions, with safe structured results and regression coverage; added server-side `ai.query`, source-constrained JSON output, graceful provider fallback, and input validation coverage.
+- [x] Validate all three features and publish a checkpoint; focused page/routing/player regressions, AI contract test, type checking, production build, and visual dashboard review passed.

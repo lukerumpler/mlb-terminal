@@ -226,6 +226,43 @@ export const appRouter = router({
             aiRosterInsightsInFlight.delete(key);
         }
       }),
+    query: publicProcedure
+      .input(z.object({ query: z.string().trim().min(2).max(240), context: z.record(z.string(), z.unknown()).default({}) }))
+      .mutation(async ({ input }) => {
+        try {
+          const response = await invokeLLM({
+            model: "gpt-5-mini",
+            messages: [
+              { role: "system", content: "You are SKIP, a precise MLB intelligence query interpreter. Use only the supplied context. Never invent a statistic. If the requested value is absent, say it is unavailable. Return a concise answer suitable for a dashboard." },
+              { role: "user", content: JSON.stringify(input) },
+            ],
+            maxTokens: 300,
+            responseFormat: {
+              type: "json_schema",
+              json_schema: {
+                name: "mlb_query_answer",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    answer: { type: "string" },
+                    intent: { type: "string", enum: ["player_stat", "team_comparison", "unavailable"] },
+                    metric: { type: "string" },
+                    confidence: { type: "string", enum: ["verified", "unavailable"] },
+                  },
+                  required: ["answer", "intent", "metric", "confidence"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const content = response.choices[0]?.message?.content;
+          if (typeof content !== "string") throw new Error("MLB query response was empty");
+          return JSON.parse(content);
+        } catch (error) {
+          return { answer: "The AI query service is unavailable. Use the visible filters and tables to inspect verified MLB data.", intent: "unavailable", metric: "", confidence: "unavailable", error: error instanceof Error ? error.message : String(error) };
+        }
+      }),
   }),
 
   // TODO: add feature routers here, e.g.

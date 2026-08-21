@@ -27,6 +27,8 @@ import ScoutingGradesPreview from '../components/ScoutingGradesPreview.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
+import PlayerNewsPanel from '../components/PlayerNewsPanel.jsx';
+import NaturalLanguageMlbQuery from '../components/NaturalLanguageMlbQuery.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
 import PlayerPhoto from '../components/PlayerPhoto.jsx';
@@ -1838,7 +1840,9 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
 
       {player && derived && !loading && (
         <>
-          <PlayerProfile player={player} derived={derived} boxscoreStatus={boxscoreStatus} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
+          <div className="skip-profile-view-transition">
+          <PlayerProfile player={player} derived={derived} boxscoreStatus={boxscoreStatus} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer}           />
+          </div>
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -2394,6 +2398,8 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
             <div className="skip-profile-tab-grid splits-grid">
               <ReconciliationPanel player={player} />
               <BoxscoreSplitPanel player={player} />
+              <PlayerNewsPanel player={p} accent={teamAccent} />
+              <NaturalLanguageMlbQuery accent={teamAccent} context={{ view:'player profile', player:p?.fullName || 'Selected player', team:p?.currentTeam?.name || 'Free Agent', position:p?.primaryPosition?.abbreviation || 'Unavailable', stats:{ ops:s?.ops ?? null, avg:s?.avg ?? null, homeRuns:s?.homeRuns ?? null, era:s?.era ?? null, strikeouts:s?.strikeouts ?? null }, recentTrend:recentPerformanceSummary?.label || 'Unavailable' }} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
               <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
