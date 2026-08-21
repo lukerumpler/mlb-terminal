@@ -1252,11 +1252,19 @@
 .skip-team-hot-streak-heading div > span { color:var(--teal,#157a6e); font:800 7.5px/1 'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
 .skip-team-hot-streak-heading strong { color:var(--text2,#4b443a); font:800 10px/1.15 'Plus Jakarta Sans',sans-serif; }
 .skip-team-hot-streak-heading > span { color:var(--text4,#9c8570); font:700 7px/1.2 'DM Mono',monospace; letter-spacing:.035em; text-align:right; }
+.skip-team-hot-streak-controls { align-items:flex-end; min-width:0; }
+.skip-team-hot-streak-controls label { display:flex; align-items:center; gap:4px; color:var(--text4,#9c8570); font:800 7px/1 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+.skip-team-hot-streak-controls label > span { color:var(--text4,#9c8570); }
+.skip-team-hot-streak-controls select { min-height:24px; border:1px solid var(--teal-mid,#89c9bc); border-radius:4px; background:var(--surface,#fffdf9); color:var(--teal,#157a6e); padding:2px 18px 2px 6px; font:800 8px/1 'DM Mono',monospace; cursor:pointer; }
+.skip-team-hot-streak-controls select:focus-visible { outline:2px solid color-mix(in srgb,var(--teal,#157a6e) 42%,transparent); outline-offset:2px; }
+.skip-team-hot-streak-controls > span { max-width:132px; color:var(--text4,#9c8570); font:700 7px/1.2 'DM Mono',monospace; letter-spacing:.035em; text-align:right; }
 .skip-team-hot-streak-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 8px; }
 .skip-team-hot-streak-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:5px; min-width:0; padding:4px 0; border-bottom:1px solid color-mix(in srgb,var(--border-light,#e2ddd3) 70%,transparent); }
 .skip-team-hot-streak-row strong { color:var(--text,#24211d); font:800 11px/1 'DM Mono',monospace; }
 .skip-team-hot-streak-unavailable { color:var(--text4,#9c8570); font:500 9px/1.4 'Plus Jakarta Sans',sans-serif; }
 @media (max-width:720px) {
   .skip-team-hot-streak-grid { grid-template-columns:1fr; gap:0; }
-  .skip-team-hot-streak-heading > span { max-width:120px; }
+  .skip-team-hot-streak-heading { align-items:flex-start; }
+  .skip-team-hot-streak-controls { align-items:flex-end; }
+  .skip-team-hot-streak-controls > span { max-width:104px; }
 }

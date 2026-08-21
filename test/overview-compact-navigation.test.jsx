@@ -73,8 +73,20 @@ describe('Team Overview compact navigation', () => {
     saveTeamPlayersCache(119, 2026, {
       hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 500, homeRuns: 24, avg: .300, ops: .950, rbi: 74, stolenBases: 18 } }],
       pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '180.0', era: 2.75, strikeOuts: 190, whip: 1.01, wins: 16, saves: 0 } }],
-      recentHitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 28, homeRuns: 5, ops: .998 } }],
-      recentPitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '8.0', era: 1.50, strikeOuts: 12 } }],
+      recentByDays: {
+        7: {
+          hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 12, homeRuns: 3, ops: .998 } }],
+          pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '4.0', era: 1.50, strikeOuts: 7 } }],
+        },
+        15: {
+          hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 28, homeRuns: 5, ops: .998 } }],
+          pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '8.0', era: 1.50, strikeOuts: 12 } }],
+        },
+        30: {
+          hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 44, homeRuns: 8, ops: .960 } }],
+          pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '14.0', era: 1.80, strikeOuts: 21 } }],
+        },
+      },
     });
     const { container } = render(<OverviewPage />);
 
@@ -83,9 +95,19 @@ describe('Team Overview compact navigation', () => {
     expect(screen.getAllByText('Verified Pitcher').length).toBeGreaterThan(0);
     expect(screen.getByText('AVG · 50 PA+')).toBeInTheDocument();
     expect(screen.getByText('ERA · 10 IP+')).toBeInTheDocument();
-    expect(screen.getByText('14-day hot streak')).toBeInTheDocument();
+    expect(screen.getByText('15-day hot streak')).toBeInTheDocument();
     expect(screen.getByText('OPS · 20 PA+')).toBeInTheDocument();
     expect(screen.getByText('ERA · 5 IP+')).toBeInTheDocument();
+    const rangeSelect = screen.getByLabelText('Select hot-streak date range');
+    expect(rangeSelect).toHaveValue('15');
+    fireEvent.change(rangeSelect, { target: { value: '7' } });
+    expect(await screen.findByText('7-day hot streak')).toBeInTheDocument();
+    expect(screen.getByText('OPS · 10 PA+')).toBeInTheDocument();
+    expect(screen.getByText('ERA · 3 IP+')).toBeInTheDocument();
+    fireEvent.change(rangeSelect, { target: { value: '30' } });
+    expect(await screen.findByText('30-day hot streak')).toBeInTheDocument();
+    expect(screen.getByText('OPS · 40 PA+')).toBeInTheDocument();
+    expect(screen.getAllByText('ERA · 10 IP+').length).toBeGreaterThan(1);
     fireEvent.click(screen.getAllByRole('button', { name: 'Open Verified Hitter player profile from season batting leaders' })[0]);
     expect(onOpenPlayer).toHaveBeenCalledWith(expect.objectContaining({ detail: { id: 518692, fullName: 'Verified Hitter' } }));
     expect(container.querySelector('img[src*="/people/518692/headshot/67/current"]')).toBeInTheDocument();

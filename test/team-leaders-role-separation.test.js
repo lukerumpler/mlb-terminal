@@ -52,9 +52,9 @@ describe('Team Leaders role separation', () => {
     expect(leaders.pitching.find(row => row.cat === 'WHIP')).toMatchObject({ eligibility: '10 IP+' });
   });
 
-  it('builds the 14-day hot-streak group from separately qualified official hitter and pitcher rows', () => {
-    const hotHitter = { ...qualifiedHitter, stat: { ...qualifiedHitter.stat, plateAppearances: 24, ops: '.998', homeRuns: 5 } };
-    const hotPitcher = { ...qualifiedPitcher, stat: { ...qualifiedPitcher.stat, inningsPitched: '6.0', era: '1.50', strikeOuts: 12 } };
+  it('builds the 15-day hot-streak group from separately qualified official hitter and pitcher rows', () => {
+    const hotHitter = { ...qualifiedHitter, stat: { ...qualifiedHitter.stat, plateAppearances: 48, ops: '.998', homeRuns: 5 } };
+    const hotPitcher = { ...qualifiedPitcher, stat: { ...qualifiedPitcher.stat, inningsPitched: '12.0', era: '1.50', strikeOuts: 12 } };
     const ineligibleHotHitter = { ...qualifiedHitter, id: 6, name: 'Small Sample Hitter', stat: { ...qualifiedHitter.stat, plateAppearances: 8, ops: '1.500', homeRuns: 4 } };
     const ineligibleHotPitcher = { ...qualifiedPitcher, id: 7, name: 'Small Sample Pitcher', stat: { ...qualifiedPitcher.stat, inningsPitched: '2.0', era: '0.00', strikeOuts: 8 } };
 
@@ -63,5 +63,20 @@ describe('Team Leaders role separation', () => {
     expect(leaders.available).toBe(true);
     expect(leaders.batting).toMatchObject([{ cat: 'OPS', player: 'Verified Hitter', eligibility: '20 PA+' }, { cat: 'HR', player: 'Verified Hitter' }]);
     expect(leaders.pitching).toMatchObject([{ cat: 'ERA', player: 'Verified Pitcher', eligibility: '5 IP+' }, { cat: 'K', player: 'Verified Pitcher' }]);
+  });
+
+  it('changes rate eligibility with the selected official hot-streak period without mixing player types', () => {
+    const hitter = { ...qualifiedHitter, stat: { ...qualifiedHitter.stat, plateAppearances: 12, ops: '.910', homeRuns: 2 } };
+    const pitcher = { ...qualifiedPitcher, stat: { ...qualifiedPitcher.stat, inningsPitched: '4.0', era: '2.25', strikeOuts: 7 } };
+
+    const sevenDay = getHotStreakLeaders([hitter], [pitcher], 7);
+    const thirtyDay = getHotStreakLeaders([hitter], [pitcher], 30);
+
+    expect(sevenDay.days).toBe(7);
+    expect(sevenDay.batting[0]).toMatchObject({ eligibility: '10 PA+', player: 'Verified Hitter' });
+    expect(sevenDay.pitching[0]).toMatchObject({ eligibility: '3 IP+', player: 'Verified Pitcher' });
+    expect(thirtyDay.days).toBe(30);
+    expect(thirtyDay.batting[0]).toMatchObject({ eligibility: '40 PA+', player: '—' });
+    expect(thirtyDay.pitching[0]).toMatchObject({ eligibility: '10 IP+', player: '—' });
   });
 });
