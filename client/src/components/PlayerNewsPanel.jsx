@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { Panel, SkeletonRows } from './atoms.jsx';
 import { fetchFeed } from '../api/feed.js';

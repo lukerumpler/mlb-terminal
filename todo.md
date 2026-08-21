@@ -11414,3 +11414,8 @@
 - [x] Audit Intelligence workspace metric inputs, source states, calculation reuse, and Front Office evaluation connections.
 - [x] Optimize verified metric reuse and source-aware Intelligence explanations without creating unsupported metrics.
 - [x] Add regressions, validate desktop/mobile Intelligence interactions, and publish the metric-integration optimization.
+
+- [x] Inventory all repository and shared-project branches, releases, and unmerged candidate changes.
+- [x] Evaluate and integrate the strongest compatible branch improvements without overwriting verified functionality or data-provenance safeguards.
+- [x] Add a bounded, source-safe cache and in-flight request reuse to the synchronized AI query integration.
+- [x] Optimize the combined release, run the full validation gate, and publish the branch-integration checkpoint.

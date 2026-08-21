@@ -12,6 +12,29 @@ const aiRosterInsightsCache = new Map<
   { data: unknown; expiresAt: number }
 >();
 const aiRosterInsightsInFlight = new Map<string, Promise<unknown>>();
+const AI_QUERY_CACHE_TTL_MS = 2 * 60_000;
+const AI_QUERY_MAX_CONTEXT_CHARS = 12_000;
+type AiQueryResult = {
+  answer: string;
+  intent: "player_stat" | "team_comparison" | "unavailable";
+  metric: string;
+  confidence: "verified" | "unavailable";
+  error?: string;
+};
+const aiQueryCache = new Map<string, { data: AiQueryResult; expiresAt: number }>();
+const aiQueryInFlight = new Map<string, Promise<AiQueryResult>>();
+
+export function __resetAiQueryCacheForTests() {
+  aiQueryCache.clear();
+  aiQueryInFlight.clear();
+}
+
+function stableContextStringify(value: unknown): string {
+  if (value == null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableContextStringify).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableContextStringify(record[key])}`).join(",")}}`;
+}
 
 function buildRosterInsightsFallback(input: {
   team?: Record<string, unknown>;
@@ -229,38 +252,67 @@ export const appRouter = router({
     query: publicProcedure
       .input(z.object({ query: z.string().trim().min(2).max(240), context: z.record(z.string(), z.unknown()).default({}) }))
       .mutation(async ({ input }) => {
-        try {
-          const response = await invokeLLM({
-            model: "gpt-5-mini",
-            messages: [
-              { role: "system", content: "You are SKIP, a precise MLB intelligence query interpreter. Use only the supplied context. Never invent a statistic. If the requested value is absent, say it is unavailable. Return a concise answer suitable for a dashboard." },
-              { role: "user", content: JSON.stringify(input) },
-            ],
-            maxTokens: 300,
-            responseFormat: {
-              type: "json_schema",
-              json_schema: {
-                name: "mlb_query_answer",
-                strict: true,
-                schema: {
-                  type: "object",
-                  properties: {
-                    answer: { type: "string" },
-                    intent: { type: "string", enum: ["player_stat", "team_comparison", "unavailable"] },
-                    metric: { type: "string" },
-                    confidence: { type: "string", enum: ["verified", "unavailable"] },
+        const serializedContext = stableContextStringify(input.context);
+        const unavailable = (error?: unknown): AiQueryResult => ({
+          answer: "The AI query service is unavailable. Use the visible filters and tables to inspect verified MLB data.",
+          intent: "unavailable",
+          metric: "",
+          confidence: "unavailable",
+          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+        });
+        if (serializedContext.length > AI_QUERY_MAX_CONTEXT_CHARS) return unavailable();
+        const key = `${input.query.trim().toLowerCase()}\u0000${serializedContext}`;
+        const cached = aiQueryCache.get(key);
+        if (cached && cached.expiresAt > Date.now()) return cached.data;
+        if (cached) aiQueryCache.delete(key);
+        const existing = aiQueryInFlight.get(key);
+        if (existing) return existing;
+
+        const request = (async (): Promise<AiQueryResult> => {
+          try {
+            const response = await invokeLLM({
+              model: "gpt-5-mini",
+              messages: [
+                { role: "system", content: "You are SKIP, a precise MLB intelligence query interpreter. Use only the supplied context. Never invent a statistic. If the requested value is absent, say it is unavailable. Return a concise answer suitable for a dashboard." },
+                { role: "user", content: JSON.stringify(input) },
+              ],
+              maxTokens: 300,
+              responseFormat: {
+                type: "json_schema",
+                json_schema: {
+                  name: "mlb_query_answer",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      answer: { type: "string" },
+                      intent: { type: "string", enum: ["player_stat", "team_comparison", "unavailable"] },
+                      metric: { type: "string" },
+                      confidence: { type: "string", enum: ["verified", "unavailable"] },
+                    },
+                    required: ["answer", "intent", "metric", "confidence"],
+                    additionalProperties: false,
                   },
-                  required: ["answer", "intent", "metric", "confidence"],
-                  additionalProperties: false,
                 },
               },
-            },
-          });
-          const content = response.choices[0]?.message?.content;
-          if (typeof content !== "string") throw new Error("MLB query response was empty");
-          return JSON.parse(content);
-        } catch (error) {
-          return { answer: "The AI query service is unavailable. Use the visible filters and tables to inspect verified MLB data.", intent: "unavailable", metric: "", confidence: "unavailable", error: error instanceof Error ? error.message : String(error) };
+            });
+            const content = response.choices[0]?.message?.content;
+            if (typeof content !== "string") throw new Error("MLB query response was empty");
+            return JSON.parse(content) as AiQueryResult;
+          } catch (error) {
+            return unavailable(error);
+          }
+        })();
+        aiQueryInFlight.set(key, request);
+        try {
+          const result = await request;
+          if (result.confidence === "verified") {
+            aiQueryCache.set(key, { data: result, expiresAt: Date.now() + AI_QUERY_CACHE_TTL_MS });
+            if (aiQueryCache.size > 100) aiQueryCache.delete(aiQueryCache.keys().next().value!);
+          }
+          return result;
+        } finally {
+          if (aiQueryInFlight.get(key) === request) aiQueryInFlight.delete(key);
         }
       }),
   }),
