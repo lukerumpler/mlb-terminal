@@ -30,8 +30,8 @@ export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamS
   const standingsRows = Object.entries(standings || {}).flatMap(([divisionName, rows]) => (rows || []).map(team => ({ ...team, division:divisionName })));
   const standingsById = new Map(standingsRows.map(team => [String(team.id), team]));
   const rows = Object.values(teams || {}).map(team => {
-    const hitting = teamStats.hitting?.[team.id] || {};
-    const pitching = teamStats.pitching?.[team.id] || {};
+    const hitting = teamStats.hitting?.[team.id] ?? teamStats.hitting?.[String(team.id)] ?? {};
+    const pitching = teamStats.pitching?.[team.id] ?? teamStats.pitching?.[String(team.id)] ?? {};
     const standing = standingsById.get(String(team.id)) || {};
     const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : null;
     const value = Number(raw);

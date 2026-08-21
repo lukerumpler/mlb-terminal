@@ -54,6 +54,7 @@ describe("Cross-team comparison helpers", () => {
     expect(rows.map(row => row.name)).toEqual(["Alpha Club", "Beta Club"]);
     expect(rows.map(row => row.value)).toEqual([.820, .740]);
     expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }, { id:2 }] }, teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 } }, pitching:{} }, metric:"ops", direction:"asc" }).map(row => row.name)).toEqual(["Beta Club", "Alpha Club"]);
+    expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }] }, teamStats:{ hitting:{ "1":{ ops:.910 } }, pitching:{} }, metric:"ops" })[0].value).toBe(.910);
   });
 });
 
