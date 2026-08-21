@@ -13,3 +13,8 @@
 - [x] Review production build, dependency, accessibility, and test-quality signals for verified release gaps
 - [x] Implement and test only high-impact, evidence-based fixes discovered during the audit
 - [x] Run final release validation, checkpoint, and report the master optimization result
+- [x] Trace the current Playoff Odds and Team WAR provenance, fallback eligibility, and unavailable-state behavior
+- [x] Replace unsupported unavailable metric displays with transparent verified or calculated values only where the available data supports them
+- [x] Correct Team Leaders player-photo cropping so official headshots keep faces centered and visible
+- [x] Add regression coverage and validate the affected metric and photo presentation paths
+- [x] Publish and report the metric-availability and photo-framing fixes

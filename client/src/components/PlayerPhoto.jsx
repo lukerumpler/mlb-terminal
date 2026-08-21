@@ -42,5 +42,8 @@ export default function PlayerPhoto({ id, name, size = 96, alt = name || '', var
   }
 
   const source = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/${verifiedId}/headshot/67/current`;
-  return <img src={source} onError={() => setFailed(true)} alt={alt} loading="lazy" style={{ ...baseStyle, objectFit:'cover', objectPosition:'center top' }} />;
+  // The Team Leaders card is the only avatar surface. A slight vertical
+  // center offset retains the face and chin in its square crop instead of
+  // pinning the source image to the top and trimming the lower face.
+  return <img src={source} onError={() => setFailed(true)} alt={alt} loading="lazy" style={{ ...baseStyle, objectFit:'cover', objectPosition:avatar ? 'center 35%' : 'center top' }} />;
 }

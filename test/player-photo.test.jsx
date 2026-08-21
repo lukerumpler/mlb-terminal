@@ -18,6 +18,14 @@ describe('PlayerPhoto', () => {
     );
   });
 
+  it('centers the Team Leaders avatar crop lower than the portrait crop so the lower face remains visible', () => {
+    const { rerender } = render(<PlayerPhoto id={518692} name="Mookie Betts" alt="Mookie Betts" variant="avatar" size={22} />);
+    expect(screen.getByRole('img', { name: 'Mookie Betts' })).toHaveStyle({ objectPosition: 'center 35%' });
+
+    rerender(<PlayerPhoto id={518692} name="Mookie Betts" alt="Mookie Betts" />);
+    expect(screen.getByRole('img', { name: 'Mookie Betts' })).toHaveStyle({ objectPosition: 'center top' });
+  });
+
   it('uses safe initials rather than an unverified portrait URL when the player ID is unavailable', () => {
     render(<PlayerPhoto id={null} name="Unknown Prospect" alt="Unknown Prospect" variant="avatar" size={22} />);
     expect(screen.getByRole('img', { name: 'Unknown Prospect' })).toHaveTextContent('UP');

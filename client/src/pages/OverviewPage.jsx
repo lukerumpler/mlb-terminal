@@ -1597,28 +1597,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (!alive) return;
       setTeamModelData(data);
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
-      if (data?.playoffOdds != null && data.playoffOdds !== '' && Number.isFinite(Number(data.playoffOdds))) {
-        setSecondaryPlayoffOddsData(null);
-        setSecondaryPlayoffOddsState('idle');
-        return;
-      }
-      setSecondaryPlayoffOddsState('loading');
-      getSecondaryPlayoffOdds(teamBase?.abbr).then(secondary => {
-        if (!alive) return;
-        setSecondaryPlayoffOddsData(secondary);
-        setSecondaryPlayoffOddsState(secondary?.found ? 'ready' : 'unavailable');
-      }).catch(() => {
-        if (!alive) return;
-        setSecondaryPlayoffOddsData(null);
-        setSecondaryPlayoffOddsState('unavailable');
-      });
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
   }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
   useEffect(() => {
-    const selectedStanding = liveTeamData?.byId?.[teamBase?.id]?.standings || liveTeamData?.byAbbr?.[teamBase?.abbr]?.standings;
-    const hasVerifiedSelectedStanding = Number.isFinite(Number(selectedStanding?.w)) && Number.isFinite(Number(selectedStanding?.l));
-    if (overviewView !== 'performance' && hasVerifiedSelectedStanding) return undefined;
     let alive = true;
     setCalculatedIntelligence(null);
     setCalculatedIntelligenceState(teamBase?.id ? 'loading' : 'idle');
@@ -1630,7 +1612,22 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       if (alive) setCalculatedIntelligenceState('unavailable');
     });
     return () => { alive = false; };
-  }, [overviewView, liveTeamData, teamBase?.id, teamBase?.abbr, mlbRetryToken]);
+  }, [teamBase?.id, mlbRetryToken]);
+  useEffect(() => {
+    let alive = true;
+    setSecondaryPlayoffOddsData(null);
+    setSecondaryPlayoffOddsState(teamBase?.abbr ? 'loading' : 'idle');
+    getSecondaryPlayoffOdds(teamBase?.abbr).then(secondary => {
+      if (!alive) return;
+      setSecondaryPlayoffOddsData(secondary);
+      setSecondaryPlayoffOddsState(secondary?.found ? 'ready' : 'unavailable');
+    }).catch(() => {
+      if (!alive) return;
+      setSecondaryPlayoffOddsData(null);
+      setSecondaryPlayoffOddsState('unavailable');
+    });
+    return () => { alive = false; };
+  }, [teamBase?.abbr]);
 
   useEffect(() => {
     if (overviewView !== 'performance') return undefined;
@@ -1726,6 +1723,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const hasCalculatedWarProxy = calculatedWarProxy != null;
   const teamWarIsCalculated = !hasProviderTeamWar && hasCalculatedWarProxy;
   const teamWarValue = hasProviderTeamWar ? providerTeamWar.toFixed(1) : hasCalculatedWarProxy ? calculatedWarProxy.toFixed(1) : 'Unavailable';
+  const teamWarHeadlineLabel = teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR';
+  const teamWarHeadlineTitle = teamWarIsCalculated
+    ? 'Calculated from verified MLB standings: Pythagorean expected 162-game wins minus a fixed 48-win replacement baseline. This is not FanGraphs Team WAR.'
+    : teamWarValue === 'Unavailable' ? 'No verified provider response or safe calculated proxy is currently available.' : undefined;
   const divisionWarData = useMemo(() => (Array.isArray(teamModelData?.divisionTeams) ? teamModelData.divisionTeams : [])
     .filter(row => row?.team && row?.totalWAR != null)
     .map(row => ({
@@ -2223,14 +2224,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         {overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
         {overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
-          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',fmtWinPct(team.pct)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue],['Team WAR',teamWarValue]].map(([l,v],i)=>(
-            <div key={i} title={v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined} style={{textAlign:'center',minWidth:0}}>
+          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',fmtWinPct(team.pct)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue], [teamWarHeadlineLabel,teamWarValue,teamWarHeadlineTitle]].map(([l,v,title],i)=>(
+            <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined)} style={{textAlign:'center',minWidth:0}}>
               <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
         </div>
         <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
+        {teamWarIsCalculated && <div role="status" data-testid="team-war-proxy-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>WAR proxy · MLB verified standings · calculated, not FanGraphs Team WAR</div>}
         {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 

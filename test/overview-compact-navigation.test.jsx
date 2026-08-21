@@ -125,7 +125,7 @@ describe('Team Overview compact navigation', () => {
     });
   });
 
-  it('defers calculated-intelligence standings work until Performance is explicitly opened', async () => {
+  it('loads one cached/coalesced calculated-intelligence result for the briefing WAR proxy without requesting FanGraphs', async () => {
     window.localStorage.clear();
     const teamSnapshot = {
       standings: { w: 75, l: 51, pct: 0.595, rs: 627, ra: 485, diff: 142 },
@@ -136,12 +136,17 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/intelligence-calculations'))).toBe(false);
+    await waitFor(() => {
+      expect(fetch.mock.calls.filter(([url]) => String(url).includes('/api/intelligence-calculations'))).toHaveLength(1);
+    });
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
 
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     await waitFor(() => {
       expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/intelligence-calculations'))).toBe(true);
+      expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
     });
+    expect(fetch.mock.calls.filter(([url]) => String(url).includes('/api/intelligence-calculations'))).toHaveLength(1);
     window.localStorage.clear();
   });
 
