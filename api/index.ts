@@ -1,1 +1,6 @@
-export { default, normalizeServerlessRequestUrl } from "../server/vercel-handler";
+import handler, {
+  normalizeServerlessRequestUrl,
+} from "../server/vercel-handler";
+
+export { normalizeServerlessRequestUrl };
+export default handler;
