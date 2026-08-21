@@ -75,7 +75,7 @@ describe('Team Overview compact navigation', () => {
     window.localStorage.clear();
     const onOpenPlayer = vi.fn();
     window.addEventListener('skip-open-player', onOpenPlayer);
-    saveTeamPlayersCache(119, 2026, {
+    saveTeamPlayersCache(135, 2026, {
       hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 500, homeRuns: 24, avg: .300, ops: .950, rbi: 74, stolenBases: 18 } }],
       pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '180.0', era: 2.75, strikeOuts: 190, whip: 1.01, wins: 16, saves: 0 } }],
       recentByDays: {
@@ -155,12 +155,12 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    const teamNewsCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes('/api/news?team=LAD&n=8'));
+    const teamNewsCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes('/api/news?team=SD&n=8'));
     expect(teamNewsCalls()).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Team News' }));
     await waitFor(() => expect(teamNewsCalls()).toHaveLength(1));
-    expect(screen.getByRole('tabpanel', { name: 'Los Angeles Dodgers headlines' })).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: 'San Diego Padres headlines' })).toBeInTheDocument();
   });
 
   it('loads one cached/coalesced calculated-intelligence result for the briefing WAR proxy without requesting FanGraphs', async () => {
@@ -170,7 +170,7 @@ describe('Team Overview compact navigation', () => {
       hitting: { ops: 0.765, obp: 0.337, slg: 0.428, avg: 0.259, homeRuns: 156, stolenBases: 47 },
       pitching: { era: 3.69, whip: 1.16, strikeOuts: 1088 },
     };
-    saveTeamAggregateCache({ byAbbr: { LAD: teamSnapshot }, byId: { 119: teamSnapshot } }, 2026);
+    saveTeamAggregateCache({ byAbbr: { SD: teamSnapshot }, byId: { 135: teamSnapshot } }, 2026);
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
@@ -194,7 +194,7 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     const completedGameSplitCalls = () => fetch.mock.calls.filter(([url]) => {
       const value = String(url);
-      return value.includes('path=%2Fschedule') && value.includes('teamId=119') && value.includes('startDate=');
+      return value.includes('path=%2Fschedule') && value.includes('teamId=135') && value.includes('startDate=');
     });
     expect(completedGameSplitCalls()).toHaveLength(0);
 
@@ -210,7 +210,7 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     const venueCalls = () => fetch.mock.calls.filter(([url]) => {
       const value = String(url);
-      return value.includes('path=%2Fteams%2F119') && value.includes('hydrate=venue');
+      return value.includes('path=%2Fteams%2F135') && value.includes('hydrate=venue');
     });
     expect(venueCalls()).toHaveLength(0);
 
@@ -243,8 +243,8 @@ describe('Team Overview compact navigation', () => {
       hitting: { ops: 0.765, obp: 0.337, slg: 0.428, avg: 0.259, homeRuns: 156, stolenBases: 47 },
       pitching: { era: 3.69, whip: 1.16, strikeOuts: 1088 },
     };
-    saveTeamAggregateCache({ byAbbr: { LAD: teamSnapshot }, byId: { 119: teamSnapshot } }, 2026);
-    saveTeamPlayersCache(119, 2026, {
+    saveTeamAggregateCache({ byAbbr: { SD: teamSnapshot }, byId: { 135: teamSnapshot } }, 2026);
+    saveTeamPlayersCache(135, 2026, {
       hitting: [{ id: 1, name: 'Verified Hitter', position: 'OF', stat: { ops: 0.9, plateAppearances: 200 } }],
       pitching: [{ id: 2, name: 'Verified Pitcher', position: 'SP', stat: { era: 3, inningsPitched: 50 } }],
     });
@@ -276,7 +276,7 @@ describe('Team Overview compact navigation', () => {
 
   it('clears a prior club’s Performance Statcast summary before the newly selected club can load', async () => {
     window.localStorage.clear();
-    saveTeamSavantSummaryCache('LAD', 2026, {
+    saveTeamSavantSummaryCache('SD', 2026, {
       status: 'live',
       source: 'Baseball Savant · verified team summary',
       expectedWOBA: 0.456,

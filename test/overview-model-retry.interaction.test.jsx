@@ -17,10 +17,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
     getStandings: vi.fn(async () =>
       feedAttempt > 0
         ? {
-            LAD: [
+            SD: [
               {
-                id: 119,
-                abbr: "LAD",
+                id: 135,
+                abbr: "SD",
                 w: 73,
                 l: 48,
                 pct: 0.603,
@@ -35,10 +35,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
     getAllTeamStats: vi.fn(async group =>
       partialAggregate && group === "hitting"
         ? {
-            119: {
-              teamId: 119,
-              teamAbbr: "LAD",
-              teamName: "Los Angeles Dodgers",
+            135: {
+              teamId: 135,
+              teamAbbr: "SD",
+              teamName: "San Diego Padres",
               ops: 0.802,
               homeRuns: 98,
               era: 2.98,
@@ -49,10 +49,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
           }
         : feedAttempt > 0
         ? {
-            119: {
-              teamId: 119,
-              teamAbbr: "LAD",
-              teamName: "Los Angeles Dodgers",
+            135: {
+              teamId: 135,
+              teamAbbr: "SD",
+              teamName: "San Diego Padres",
               ops: 0.802,
               homeRuns: 98,
               era: 2.98,
@@ -183,10 +183,10 @@ describe("Team Overview model source and retry interaction", () => {
     saveTeamAggregateCache(
       {
         byAbbr: {
-          LAD: {
+          SD: {
             standings: {
-              id: 119,
-              abbr: "LAD",
+              id: 135,
+              abbr: "SD",
               w: 73,
               l: 48,
               pct: 0.603,
@@ -194,15 +194,15 @@ describe("Team Overview model source and retry interaction", () => {
               ra: 464,
               diff: 142,
             },
-            hitting: { teamId: 119, teamAbbr: "LAD", ops: 0.802 },
-            pitching: { teamId: 119, teamAbbr: "LAD", era: 2.98 },
+            hitting: { teamId: 135, teamAbbr: "SD", ops: 0.802 },
+            pitching: { teamId: 135, teamAbbr: "SD", era: 2.98 },
           },
         },
         byId: {},
       },
       2026
     );
-    saveTeamPlayersCache(119, 2026, {
+    saveTeamPlayersCache(135, 2026, {
       hitting: [{ id: 1, name: "Cached hitter" }],
       pitching: [{ id: 2, name: "Cached pitcher" }],
     });
@@ -273,7 +273,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("filters the roster table by player name and reverses the active metric sort", async () => {
     const user = userEvent.setup();
-    saveTeamPlayersCache(119, 2026, {
+    saveTeamPlayersCache(135, 2026, {
       hitting: [
         { id: 1, name: "Sample Hitter", position: "CF", stat: { ops: 0.912, plateAppearances: 180 } },
         { id: 2, name: "Other Batter", position: "RF", stat: { ops: 0.801, plateAppearances: 150 } },
@@ -412,7 +412,7 @@ describe("Team Overview model source and retry interaction", () => {
 
     await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
-    expect(screen.getByText(/LAD highlighted/i)).toBeInTheDocument();
+    expect(screen.getByText(/SD highlighted/i)).toBeInTheDocument();
     const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
     expect(exactValuesTable).toHaveTextContent("LAD");
     expect(exactValuesTable).toHaveTextContent("+31.4");

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetProviderJsonCacheForTests } from '../client/src/api/mlb.js';
 
-const modelKey = 'skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=LAD&season=2026';
+const modelKey = 'skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=SD&season=2026';
 const aggregateKey = 'skip-fangraphs-aggregate-snapshot-v1:/api/fangraphs-models?mode=aggregate&season=2026';
 
 function jsonResponse(data, status = 200) {

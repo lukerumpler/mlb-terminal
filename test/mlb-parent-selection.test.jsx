@@ -57,7 +57,7 @@ describe('MLB parent team selection routing', () => {
     const teamSelect = await screen.findByRole('combobox', { name: 'Select team' });
     const minorLeagueButton = screen.getByRole('button', { name: /minor league/i });
 
-    expect(teamSelect).toHaveValue('lad');
+    expect(teamSelect).toHaveValue('sd');
     expect(minorLeagueButton).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
 
