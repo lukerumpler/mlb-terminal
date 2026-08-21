@@ -13,3 +13,9 @@ The current development logs showed no browser-console exceptions or recurring c
 ## Desktop Verification
 
 Desktop inspection confirmed the Team Overview remains stable and compact after the fixes. The isolated Player Profile preview displays its explicit non-live fixture label, no live ticker, and independently testable module controls.
+
+## Merged Optimization and Mobile Verification
+
+During this pass, a compatible shared performance update was reconciled and fully revalidated. Team Overview now defers the large defensive OAA payload to Performance and multi-season financial history to Operations; initial briefing load stays limited to core verified data. Global cache telemetry uses a five-minute normal cadence or ten-minute Low Data cadence. The official ticker uses visibility-aware adaptive refresh scheduling and follows reduced-motion preferences.
+
+At 375 pixels, the Team Overview maintained readable workspace controls, the compact executive strip, and the adaptive official ticker. The isolated preview remained provider-free and did not display the ticker, while its fixture-state controls and media workflow stacked without horizontal overflow.
