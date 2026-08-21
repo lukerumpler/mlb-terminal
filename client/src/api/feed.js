@@ -15,11 +15,13 @@ const STALE_TTL_MS = 30 * 60 * 1_000;
 const _cache = new Map();
 const _inFlight = new Map();
 
-function cacheGet(key) {
+function cacheGet(key, { allowStale = false } = {}) {
   const hit = _cache.get(key);
   if (!hit) return null;
   const now = Date.now();
-  if (hit.expiresAt > now || hit.staleUntil > now) return hit;
+  if (hit.expiresAt > now) return hit;
+  if (allowStale && hit.staleUntil > now) return hit;
+  if (hit.staleUntil > now) return null;
   _cache.delete(key);
   return null;
 }
@@ -71,7 +73,7 @@ async function fetchNews(kind, n, handle = null) {
       if (data?.status !== 'unavailable' && data?.items?.length) recordFeedSuccess('intel-feed');
       return { ...data, ageSeconds: Math.round((Date.now() - entry.retrievedAt) / 1000) };
     } catch (error) {
-      const stale = cacheGet(key);
+      const stale = cacheGet(key, { allowStale: true });
       if (stale) {
         return { ...stale.data, status: 'cached-fallback', freshness: 'stale-cached', ageSeconds: Math.round((Date.now() - stale.retrievedAt) / 1000), reason: error?.message || 'network-error' };
       }
