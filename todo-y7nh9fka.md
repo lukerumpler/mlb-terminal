@@ -242,3 +242,10 @@
 - [x] Update imports and add regression coverage for the modular boundary contracts.
 - [x] Run type checks, linting, focused and supported full tests, production build, and responsive Player Profile validation.
 - [x] Save a live checkpoint for the validated Player Profile modularization.
+
+- [x] Map the current executive briefing, Team workspace view boundaries, and existing component preview conventions.
+- [x] Replace the large briefing block with a compact persistent executive summary displayed across Briefing, Performance, Roster, and Operations tabs.
+- [x] Add isolated previews for extracted Player Profile media and boxscore/reconciliation feature modules with safe representative states.
+- [x] Add regression coverage for compact cross-tab briefing placement and isolated preview availability.
+- [x] Run type checks, linting, focused and supported full tests, production build, and desktop/mobile validation.
+- [x] Save a live checkpoint for the compact Team briefing and feature-module preview improvements.

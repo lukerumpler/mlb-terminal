@@ -740,16 +740,33 @@ function TeamLeaderProfileLink({ row, color, group }) {
   </button>;
 }
 
-function ExecutivePercentileMarker({ label, percentile: value, population }) {
+function ExecutivePercentileMarker({ label, percentile: value, population, compact = false }) {
   const percentileValue = Number(value);
   if (!Number.isFinite(percentileValue)) return null;
   const clamped = Math.max(0, Math.min(100, percentileValue));
   const rank = percentileLabel(clamped);
+  if (compact) return <span className="skip-executive-percentile is-compact" aria-label={`${label}: ${rank} percentile among ${population}`}><span>League</span><strong>P{rank}</strong></span>;
   return <div className="skip-executive-percentile" aria-label={`${label}: ${rank} percentile among ${population}`}>
     <span className="skip-executive-percentile-label">League percentile</span>
     <span className="skip-executive-percentile-track" aria-hidden="true"><i style={{ left:`${clamped}%` }} /></span>
     <strong>{rank}</strong>
   </div>;
+}
+
+export function CompactExecutiveBriefing({ rd, ops, era, executivePercentiles, activeView, onOpenPerformance, onOpenProspects }) {
+  const signals = [
+    { label:'Posture', value:rd == null ? 'Pending' : rd > 0 ? 'Contending' : 'Run support', detail:rd == null ? 'Run diff pending' : `${rd > 0 ? '+' : ''}${rd} RD`, marker:executivePercentiles?.posture, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, action:onOpenPerformance, destination:'Performance' },
+    { label:'Signal', value:ops == null ? 'Pending' : ops >= .750 ? 'Offense' : era != null && era <= 3.50 ? 'Prevention' : 'Balanced', detail:ops == null ? 'Aggregates loading' : `OPS ${fmtScorebookRate(ops)} · ERA ${formatTeamMetric(era,2)}`, marker:executivePercentiles?.best, color:ops >= .750 ? C.amber : C.navy, action:onOpenPerformance, destination:'Performance' },
+    { label:'Next', value:'Prospect depth', detail:'Review future value', color:C.purple, action:onOpenProspects, destination:'Prospects' },
+  ];
+  return <section id="team-overview-briefing" role="region" className="skip-compact-executive-briefing" aria-labelledby="team-overview-briefing-title" data-active-view={activeView}>
+    <div className="skip-compact-executive-title"><span>Executive</span><strong id="team-overview-briefing-title">Front Office Read</strong></div>
+    <div className="skip-compact-executive-signals" role="list">
+      {signals.map(signal => <button key={signal.label} type="button" onClick={signal.action} className="skip-compact-executive-signal" aria-label={`Open ${signal.destination}: ${signal.label}`}>
+        <span>{signal.label}</span><strong style={{color:signal.color}}>{signal.value}</strong><small>{signal.detail}</small>{signal.marker && <ExecutivePercentileMarker {...signal.marker} compact />}
+      </button>)}
+    </div>
+  </section>;
 }
 
 function getBattedBall() { return null; }
@@ -2323,6 +2340,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
       </nav>
 
+      <CompactExecutiveBriefing
+        rd={rd}
+        ops={team.ops}
+        era={team.era}
+        executivePercentiles={executivePercentiles}
+        activeView={overviewView}
+        onOpenPerformance={() => openExecutiveDestination('performance', 'team-overview-performance')}
+        onOpenProspects={() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))}
+      />
+
       {overviewView === 'roster' && mlbParentReadyForAffiliate && affiliateId && affiliateId !== String(team.id) && <Panel title="Minor-League Affiliate Overview" accent={C.teal} badge={affiliateOverviewState==='loading'?'Loading…':affiliateOverviewState==='identity-ready'?'Live MLB identity · stats loading':affiliateOverviewState==='ready'?'Live MLB Stats API':'Source unavailable'}>
         <div style={{display:'flex',gap:6,padding:'8px 12px',borderBottom:`1px solid ${C.borderLight}`,flexWrap:'wrap'}}>
           {[['overview','Overview'],['standings','Standings'],['schedule','Schedule']].map(([key,label])=><button key={key} type="button" onClick={()=>setAffiliateTab(key)} style={{border:0,borderBottom:`2px solid ${affiliateTab===key?C.teal:'transparent'}`,background:'transparent',color:affiliateTab===key?C.teal:C.text3,padding:'6px 8px',cursor:'pointer',...px({fontSize:9,fontWeight:800,letterSpacing:'.06em',textTransform:'uppercase'})}}>{label}</button>)}
@@ -2430,32 +2457,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <div style={sans({padding:'8px 14px 10px',fontSize:9,color:C.text4,lineHeight:1.4})}>Wall distances: LF {teamVenueMetadata.venue.dimensions?.leftLine ?? '—'} · LCF {teamVenueMetadata.venue.dimensions?.leftCenter ?? '—'} · CF {teamVenueMetadata.venue.dimensions?.center ?? '—'} · RCF {teamVenueMetadata.venue.dimensions?.rightCenter ?? '—'} · RF {teamVenueMetadata.venue.dimensions?.rightLine ?? '—'} ft. Altitude, wall height, orientation, and park factors are not shown without a verified source.</div>
         </> : <OverviewEmptyState status={teamVenueState === 'loading' ? 'Loading' : teamVenueState === 'source-gap' ? 'Source gap' : 'Unavailable'} message="Ballpark metadata" detail="Official MLB venue metadata is not available for this team right now. No static park values are substituted." />}
       </Panel>}
-
-      {overviewView === 'briefing' && <section id="team-overview-briefing" role="tabpanel" className="skip-overview-executive-briefing" aria-labelledby="team-overview-briefing-title">
-        <div className="skip-overview-executive-heading">
-          <div>
-            <span>Executive briefing</span>
-            <h2 id="team-overview-briefing-title">Front Office Read</h2>
-          </div>
-          <p>Decision-ready summary.</p>
-        </div>
-        <div className="skip-overview-executive-grid">
-          {[
-            {label:'Current posture', value:rd == null ? 'Data pending' : rd > 0 ? 'Contending profile' : 'Needs run support', detail:rd == null ? 'Run differential unavailable' : `${rd > 0 ? '+' : ''}${rd} run differential`, marker:executivePercentiles.posture, color:rd == null ? C.text3 : rd > 0 ? C.teal : C.rust, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
-            {label:'Best signal', value:team.ops == null ? 'Data pending' : team.ops >= .750 ? 'Offensive leverage' : team.era != null && team.era <= 3.50 ? 'Run prevention' : 'Balanced evaluation', detail:team.ops == null ? 'Waiting on team aggregates' : `OPS ${fmtScorebookRate(team.ops)} · ERA ${formatTeamMetric(team.era,2)}`, marker:executivePercentiles.best, color:team.ops >= .750 ? C.amber : C.navy, destination:'Performance workspace', action:() => openExecutiveDestination('performance', 'team-overview-performance')},
-            {label:'Next question', value:'Prospect depth', detail:'Review future value and ETA', color:C.purple, destination:'Organization depth', action:() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))},
-          ].map((item, i) => (
-            <button key={item.label} type="button" className="skip-overview-executive-item" onClick={item.action} aria-label={`Open ${item.destination}: ${item.label}`} style={{borderRight:i<2?`0.5px solid ${C.borderLight}`:'none'}}>
-              <div style={sans({fontSize:9.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6})}>{item.label}</div>
-              <div style={sans({fontSize:15,fontWeight:800,color:item.color,lineHeight:1.2})}>{item.value}</div>
-              <div style={sans({fontSize:10,color:C.text3,marginTop:6,lineHeight:1.4})}>{item.detail}</div>
-              {item.marker && <ExecutivePercentileMarker {...item.marker} />}
-              <span className="skip-overview-executive-item-link">Open {item.destination} →</span>
-            </button>
-          ))}
-        </div>
-        <a className="skip-overview-analysis-link" href="#team-overview-detailed-analysis">Continue to detailed team cards ↓</a>
-      </section>}
 
       {overviewView === 'briefing' && <section className="skip-overview-deferred-analysis-section" aria-labelledby="team-overview-detailed-analysis-title">
         <div className="skip-overview-deferred-analysis-intro">
