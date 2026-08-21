@@ -2269,7 +2269,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               <h1 style={{ ...sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1}), marginTop:3 }}>{team.name || 'Season overview'}</h1>
             </div>
           </div>
-          <div style={sans({fontSize:11,color:C.text3,marginTop:6})}>Season overview · a live snapshot of performance, leverage, and roster context.</div>
+          <div style={sans({fontSize:11,color:C.text3,marginTop:6})}><span>Season overview</span><span aria-hidden="true"> · </span>a live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('csv')} aria-label="Download current team data as CSV"

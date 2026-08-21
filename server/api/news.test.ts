@@ -142,6 +142,19 @@ describe("resilient /api/news route", () => {
     expect((second.body as { freshness: string }).freshness).toBe("cached");
   });
 
+  it("maps an MLB abbreviation to the official club RSS path before using league fallbacks", async () => {
+    const fetchMock = vi.fn(async () => new Response(rss("Dodgers club headline"), {
+      status: 200,
+      headers: { "content-type": "application/rss+xml" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = response();
+    await newsHandler(request("/api/news?team=LAD&n=2", "198.51.100.44"), result);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://www.mlb.com/dodgers/feeds/news/rss.xml");
+    expect(result.body).toMatchObject({ status: "tier-1", source: "MLB.com dodgers club feed" });
+  });
+
   it("serves a stale verified snapshot when every live source fails after expiry", async () => {
     vi.useFakeTimers();
     const fetchMock = vi

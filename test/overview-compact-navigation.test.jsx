@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
+import { __resetFeedClientStateForTests } from '../client/src/api/feed.js';
 import { saveTeamAggregateCache, saveTeamPlayersCache, saveTeamSavantSummaryCache } from '../client/src/lib/teamDataCache.js';
 
 describe('Team Overview compact navigation', () => {
@@ -11,6 +12,7 @@ describe('Team Overview compact navigation', () => {
     vi.restoreAllMocks();
     __resetMlbClientStateForTests();
     __resetFanGraphsLocalSnapshotForTests();
+    __resetFeedClientStateForTests();
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -26,6 +28,7 @@ describe('Team Overview compact navigation', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    __resetFeedClientStateForTests();
   });
 
   it('opens on a concise briefing and exposes dense sections through compact view controls', async () => {
@@ -140,6 +143,18 @@ describe('Team Overview compact navigation', () => {
     await waitFor(() => {
       expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
     });
+  });
+
+  it('defers the official club-news request until Team News is explicitly opened', async () => {
+    render(<OverviewPage />);
+
+    await screen.findByRole('button', { name: 'Briefing' });
+    const teamNewsCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes('/api/news?team=LAD&n=8'));
+    expect(teamNewsCalls()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Team News' }));
+    await waitFor(() => expect(teamNewsCalls()).toHaveLength(1));
+    expect(screen.getByRole('tabpanel', { name: 'Los Angeles Dodgers headlines' })).toBeInTheDocument();
   });
 
   it('loads one cached/coalesced calculated-intelligence result for the briefing WAR proxy without requesting FanGraphs', async () => {
