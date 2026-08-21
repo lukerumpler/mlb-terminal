@@ -29,4 +29,20 @@ describe("Vercel API routing", () => {
     expect(source).toContain("isAnonymousAuthMe");
     expect(source).toContain("result: { data: { json: null } }");
   });
+
+  it("gives uptime monitoring dedicated serverless entries outside the heavyweight catch-all", () => {
+    const dashboardSource = readFileSync(
+      resolve(process.cwd(), "api/uptime-monitor.ts"),
+      "utf8"
+    );
+    const scheduledSource = readFileSync(
+      resolve(process.cwd(), "api/scheduled/daily-uptime-monitor.ts"),
+      "utf8"
+    );
+
+    expect(dashboardSource).toContain('from "../server/api/uptime-monitor"');
+    expect(dashboardSource).toContain("serveUptimeMonitorDashboard");
+    expect(scheduledSource).toContain('from "../../server/api/uptime-monitor"');
+    expect(scheduledSource).toContain("scheduledDailyUptimeMonitor");
+  });
 });
