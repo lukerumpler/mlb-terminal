@@ -1,6 +1,24 @@
 const LIVE_STATUS_CODES = new Set(['I', 'M']);
 const FINAL_STATUS_CODES = new Set(['F', 'O']);
 
+export const TICKER_SCROLL_DURATION_SECONDS = 180;
+export const TICKER_REFRESH_MS = Object.freeze({
+  live: 120_000,
+  scheduled: 300_000,
+  final: 900_000,
+  empty: 900_000,
+  stale: 300_000,
+  error: 300_000,
+  loading: 120_000,
+});
+
+export function getTickerRefreshDelay(status, { lowDataMode = false } = {}) {
+  const base = TICKER_REFRESH_MS[status] ?? TICKER_REFRESH_MS.loading;
+  if (!lowDataMode) return base;
+  if (status === 'live') return 180_000;
+  return Math.max(base, 600_000);
+}
+
 function normalizedStatus(game) {
   return String(game?.status || '').trim();
 }

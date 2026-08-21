@@ -4,7 +4,7 @@ import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
-import { deriveTickerStatus, formatTickerGame } from './lib/ticker.js';
+import { deriveTickerStatus, formatTickerGame, getTickerRefreshDelay } from './lib/ticker.js';
 import { getCacheHealth } from './lib/cacheHealthClient.js';
 import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
 import { Panel } from './components/atoms.jsx';
@@ -263,13 +263,13 @@ export default function App() {
       if (document.visibilityState !== 'hidden') refreshCacheHealth();
     };
     refreshWhenVisible();
-    const intervalId = window.setInterval(refreshWhenVisible, 60_000);
+    const intervalId = window.setInterval(refreshWhenVisible, lowDataMode ? 10 * 60_000 : 5 * 60_000);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [isolatedPreview, refreshCacheHealth]);
+  }, [isolatedPreview, lowDataMode, refreshCacheHealth]);
   const liveAlerts = useMemo(() => buildOperationalAlerts({
     cacheHealth,
     cacheHealthStatus,
@@ -363,39 +363,53 @@ export default function App() {
     };
   }, []);
 
-  const refreshTicker = useCallback(() => {
+  const refreshTicker = useCallback(async () => {
     setTickerStatus(current => ['live', 'scheduled', 'final', 'stale'].includes(current) ? 'refreshing' : 'loading');
-    return getTodaysGames().then(games => {
+    try {
+      const games = await getTodaysGames();
       if (!games.length) {
         setLiveTicker([]);
         setTickerStatus('empty');
-        return [];
+        return 'empty';
       }
       const ticks = games.map(formatTickerGame);
+      const nextStatus = deriveTickerStatus(games);
       setLiveTicker(ticks);
       setTickerUpdatedAt(Date.now());
-      setTickerStatus(deriveTickerStatus(games));
-      return ticks;
-    }).catch(() => {
+      setTickerStatus(nextStatus);
+      return nextStatus;
+    } catch {
       setTickerStatus(current => current === 'live' || current === 'refreshing' ? 'stale' : 'error');
-      return [];
-    });
+      return 'stale';
+    }
   }, []);
   useEffect(() => {
     if (isolatedPreview) return undefined;
-    const refreshWhenVisible = () => {
-      if (document.visibilityState !== 'hidden') refreshTicker();
+    let disposed = false;
+    let timerId = null;
+    let nextRefreshAt = 0;
+    const refreshAndSchedule = () => {
+      if (disposed || document.visibilityState === 'hidden') return;
+      refreshTicker().then(status => {
+        if (disposed || document.visibilityState === 'hidden') return;
+        const delay = getTickerRefreshDelay(status, { lowDataMode });
+        nextRefreshAt = Date.now() + delay;
+        timerId = window.setTimeout(refreshAndSchedule, delay);
+      });
     };
-    refreshWhenVisible();
-    const refreshIntervalId = window.setInterval(refreshWhenVisible, 90_000);
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshWhenDue = () => {
+      if (document.visibilityState !== 'hidden' || Date.now() < nextRefreshAt) return;
+      if (timerId != null) window.clearTimeout(timerId);
+      refreshAndSchedule();
+    };
+    refreshAndSchedule();
+    document.addEventListener('visibilitychange', refreshWhenDue);
     return () => {
-      window.clearInterval(refreshIntervalId);
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      disposed = true;
+      if (timerId != null) window.clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', refreshWhenDue);
     };
-  }, [isolatedPreview, refreshTicker]);
+  }, [isolatedPreview, lowDataMode, refreshTicker]);
 
   return (
     <>

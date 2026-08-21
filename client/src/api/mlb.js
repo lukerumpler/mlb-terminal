@@ -403,6 +403,7 @@ export function __resetMlbClientStateForTests() {
   providerJsonCache.clear();
   providerJsonInFlight.clear();
   teamFinancialsCache.clear();
+  teamScheduleSplitsCache.clear();
   contractClientCache.clear();
   playerBoxscoreSplitsCache.clear();
   if (queueTimer != null) {
