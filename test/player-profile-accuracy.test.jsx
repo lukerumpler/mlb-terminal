@@ -8,6 +8,8 @@ import {
   buildSavantPercentileAxes,
   normalizeSprayPoint,
   buildRecentGameSeries,
+  buildRecentPerformanceSeries,
+  summarizeRecentPerformance,
   buildAdvancedMetricTrendSeries,
   MetricSparkline,
 } from "../client/src/pages/PlayersPage.jsx";
@@ -333,6 +335,19 @@ describe("player profile data accuracy guards", () => {
     expect(
       MetricSparkline({ values: [0.8], tone: "#168c7a" }).props.className
     ).toBe("skip-summary-sparkline-unavailable");
+  });
+
+  it("builds labeled recent-performance points and classifies hot streaks by metric direction", () => {
+    const series = buildRecentPerformanceSeries({ recentGames: [
+      { date:'2026-08-20', opponent:'ATL', batting:{ ops:0.920 } },
+      { date:'2026-08-19', opponent:'SF', batting:{ ops:0.840 } },
+      { date:'2026-08-18', opponent:'ARI', batting:{ ops:0.760 } },
+      { date:'2026-08-17', opponent:'COL', batting:{ ops:0.700 } },
+    ] }, { metric:'ops', limit:4 });
+    expect(series.map(point => point.label)).toEqual(['08-17', '08-18', '08-19', '08-20']);
+    expect(series.map(point => point.value)).toEqual([0.7, 0.76, 0.84, 0.92]);
+    expect(summarizeRecentPerformance(series).label).toBe('Hot streak');
+    expect(summarizeRecentPerformance([{ value:4.5 }, { value:4.2 }, { value:3.1 }], { lowerIsBetter:true }).label).toBe('Hot streak');
   });
 
   it("normalizes only explicit provider WAR and wRC+ fields", () => {

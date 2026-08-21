@@ -47,3 +47,31 @@ export function buildRecentGameSeries(boxscoreSplits, metric = 'ops', limit = 10
     return raw == null || raw === '' ? null : Number(raw);
   }).filter(Number.isFinite).reverse();
 }
+
+export function buildRecentPerformanceSeries(boxscoreSplits, { metric = 'ops', group = 'batting', limit = 10 } = {}) {
+  const games = Array.isArray(boxscoreSplits?.recentGames) ? boxscoreSplits.recentGames : [];
+  return games.slice(0, limit).map((game, index) => {
+    const stat = game?.[group] || {};
+    const raw = stat?.[metric];
+    const value = raw == null || raw === '' ? null : Number(raw);
+    if (!Number.isFinite(value)) return null;
+    const date = String(game?.date || '').slice(0, 10);
+    return {
+      game: index + 1,
+      label: date ? date.slice(5) : `G${index + 1}`,
+      opponent: game?.opponent || game?.team?.name || 'Opponent unavailable',
+      value,
+    };
+  }).filter(Boolean).reverse().map((point, index) => ({ ...point, game: index + 1 }));
+}
+
+export function summarizeRecentPerformance(series = [], { lowerIsBetter = false } = {}) {
+  const values = (Array.isArray(series) ? series : []).map(point => Number(point?.value)).filter(Number.isFinite);
+  if (values.length < 3) return { status:'unavailable', label:'Not enough verified games', delta:null, average:null };
+  const window = Math.max(1, Math.floor(values.length / 3));
+  const early = values.slice(0, window).reduce((sum, value) => sum + value, 0) / window;
+  const recent = values.slice(-window).reduce((sum, value) => sum + value, 0) / window;
+  const delta = recent - early;
+  const improving = lowerIsBetter ? delta <= 0 : delta >= 0;
+  return { status:'verified', label:improving ? 'Hot streak' : 'Cooling trend', delta, average:values.reduce((sum, value) => sum + value, 0) / values.length };
+}

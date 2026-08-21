@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../client/src/App.jsx";
+import { buildCrossTeamComparisonRows } from "../client/src/pages/OtherPages.jsx";
 
 beforeEach(() => {
   cleanup();
@@ -33,6 +34,28 @@ async function goToTab(user, label, waitForText) {
   }
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
+
+describe("Cross-team comparison helpers", () => {
+  it("filters by team and division and sorts the selected verified metric", () => {
+    const teams = {
+      one: { id:1, name:"Alpha Club", abbr:"ALP" },
+      two: { id:2, name:"Beta Club", abbr:"BET" },
+      three: { id:3, name:"Gamma Club", abbr:"GAM" },
+    };
+    const rows = buildCrossTeamComparisonRows({
+      teams,
+      standings:{ East:[{ id:1, wins:80, losses:50 }, { id:2, wins:70, losses:60 }], West:[{ id:3, wins:65, losses:65 }] },
+      teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 }, 3:{ ops:.790 } }, pitching:{} },
+      metric:"ops",
+      search:"club",
+      division:"East",
+      direction:"desc",
+    });
+    expect(rows.map(row => row.name)).toEqual(["Alpha Club", "Beta Club"]);
+    expect(rows.map(row => row.value)).toEqual([.820, .740]);
+    expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }, { id:2 }] }, teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 } }, pitching:{} }, metric:"ops", direction:"asc" }).map(row => row.name)).toEqual(["Beta Club", "Alpha Club"]);
+  });
+});
 
 describe("Draft page", () => {
   it("searches the draft class pool without crashing", async () => {

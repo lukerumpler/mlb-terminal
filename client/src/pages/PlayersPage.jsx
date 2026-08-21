@@ -37,7 +37,7 @@ import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, down
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 import { buildHandednessComparison } from '../features/player-profile/handedness.js';
-import { buildRecentGameSeries } from '../features/player-profile/boxscore.js';
+import { buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance } from '../features/player-profile/boxscore.js';
 
 export {
   buildPlayerHighlightSearches, buildPlayerVideoLinks, loadPlayerPlaylists,
@@ -45,7 +45,7 @@ export {
 } from '../features/player-profile/media.js';
 export { buildHandednessComparison } from '../features/player-profile/handedness.js';
 export {
-  BOXSCORE_PAGE_SIZE, boxscorePresetStorageKey, buildRecentGameSeries,
+  BOXSCORE_PAGE_SIZE, boxscorePresetStorageKey, buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance,
   filterAndSortBoxscoreGames, readBoxscoreFilterPresets, saveBoxscoreFilterPresets,
 } from '../features/player-profile/boxscore.js';
 export { BoxscoreSplitPanel, ReconciliationPanel } from '../features/player-profile/PlayerBoxscorePanels.jsx';
@@ -1468,6 +1468,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [favorites, setFavorites] = useState(() => readPlayerFavorites());
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
+  const [boxscoreStatus, setBoxscoreStatus] = useState('idle');
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
@@ -1573,20 +1574,30 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         onCoreReady: core => {
           if (mountedRef.current && pickSeqRef.current === mySeq) {
             setPlayer(core);
+            setBoxscoreStatus(core?.boxscoreSplits ? 'ready' : 'loading');
             setLoading(false);
             setSwitchingPlayerName(null);
           }
         },
         onImportantReady: important => {
-          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(important);
+            if (important?.boxscoreSplits) setBoxscoreStatus('ready');
+          }
         },
         onOptionalReady: optional => {
-          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(optional);
+            setBoxscoreStatus(optional?.boxscoreSplits ? 'ready' : 'unavailable');
+          }
         },
       });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
-      if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
+      if (mountedRef.current && pickSeqRef.current === mySeq) {
+        setPlayer(data);
+        setBoxscoreStatus(data?.boxscoreSplits ? 'ready' : 'unavailable');
+      }
     } catch (err) {
       if (err?.name !== 'AbortError' && mountedRef.current && pickSeqRef.current === mySeq) {
         setError(humanizePlayerLoadError(err, person.fullName));
@@ -1647,14 +1658,17 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   useEffect(() => {
     if (!player || boxscoreRetryToken === 0) return undefined;
     let alive = true;
+    setBoxscoreStatus('loading');
     getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
       .then(boxscoreSplits => {
         if (alive) {
           setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+          setBoxscoreStatus(boxscoreSplits ? 'ready' : 'unavailable');
           window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider: 'boxscore', message: 'MLB boxscore data refreshed.' } }));
         }
       })
       .catch(() => {
+        if (alive) setBoxscoreStatus('unavailable');
         if (alive) window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'boxscore', message: 'MLB boxscore data could not be refreshed. The previous verified state remains visible.' } }));
       });
     return () => { alive = false; };
@@ -2047,6 +2061,8 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
   const opsDelta = Number.isFinite(currentOps) && Number.isFinite(priorOps) ? currentOps - priorOps : null;
   const statcastValue = player.savant?.est_woba ?? player.savant?.avg_hit_speed ?? null;
   const recentOpsSeries = buildRecentGameSeries(player.boxscoreSplits, 'ops', 10);
+  const recentPerformanceSeries = buildRecentPerformanceSeries(player.boxscoreSplits, { metric: player.isPitcher ? 'era' : 'ops', group: player.isPitcher ? 'pitching' : 'batting', limit: 10 });
+  const recentPerformanceSummary = summarizeRecentPerformance(recentPerformanceSeries, { lowerIsBetter: player.isPitcher });
   const statcastPopulation = player.savant?.est_woba != null
     ? (player.statcastPopulation || []).map(row => row?.est_woba)
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
@@ -2599,6 +2615,26 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
           </Panel>
 
           <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
+
+          <Panel title={player.isPitcher ? 'Recent ERA / Hot Streak' : 'Recent OPS / Hot Streak'} accent={C.teal} badge={boxscoreStatus === 'loading' ? 'Loading' : recentPerformanceSummary.status === 'verified' ? recentPerformanceSummary.label : 'Unavailable'}>
+            {boxscoreStatus === 'loading' ? <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>Loading verified recent game performance…</div> : recentPerformanceSeries.length >= 3 ? (
+              <div style={{ padding:'7px 6px 4px' }} role="img" aria-label={`Verified recent ${player.isPitcher ? 'ERA' : 'OPS'} trend across ${recentPerformanceSeries.length} games`}>
+                <ResponsiveContainer width="100%" height={118}>
+                  <LineChart data={recentPerformanceSeries} margin={{ top:8, right:12, bottom:0, left:2 }}>
+                    <CartesianGrid stroke={C.borderLight} vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize:8.5, fill:C.text3 }} axisLine={false} tickLine={false} />
+                    <YAxis reversed={player.isPitcher} tick={{ fontSize:8.5, fill:C.text3 }} axisLine={false} tickLine={false} width={30} domain={['auto','auto']} />
+                    <Tooltip {...TT} labelFormatter={(label, payload) => payload?.[0]?.payload?.opponent ? `${label} · vs ${payload[0].payload.opponent}` : label} formatter={value => [Number(value).toFixed(player.isPitcher ? 2 : 3), player.isPitcher ? 'ERA' : 'OPS']} />
+                    <Line isAnimationActive={false} dataKey="value" name={player.isPitcher ? 'ERA' : 'OPS'} stroke={C.teal} strokeWidth={2.2} dot={{ r:3, fill:C.teal }} type="monotone" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'2px 8px 4px' }}>
+                  <span style={px({ fontSize:9, fontWeight:800, color:recentPerformanceSummary.label === 'Hot streak' ? C.teal : C.rust })}>{recentPerformanceSummary.label}</span>
+                  <span style={px({ fontSize:8.5, color:C.text4 })}>{recentPerformanceSeries.length} verified games · {player.isPitcher ? 'lower is better' : 'higher is better'}</span>
+                </div>
+              </div>
+            ) : <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>Recent verified {player.isPitcher ? 'ERA' : 'OPS'} game data is unavailable or below the three-game chart minimum.</div>}
+          </Panel>
 
           {/* Career OPS/ERA sparkline */}
           {sparkData.length > 1 && (
