@@ -40,7 +40,7 @@ describe('Team Overview compact navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     expect(screen.getByText('Divisional WAR Comparison')).toBeInTheDocument();
     expect(screen.getByText('Batted Ball Profile')).toBeInTheDocument();
-    expect(screen.queryByText('Front Office Read')).not.toBeInTheDocument();
+    expect(screen.getByText('Front Office Read')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Roster' }));
     expect(screen.getByText('AI Scout Insights')).toBeInTheDocument();
@@ -52,16 +52,13 @@ describe('Team Overview compact navigation', () => {
     expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
   });
 
-  it('keeps the executive briefing ahead of the detailed card workspace on first load', async () => {
+  it('keeps the compact executive briefing ahead of the detailed card workspace on first load', async () => {
     render(<OverviewPage />);
 
-    const briefing = await screen.findByRole('tabpanel', { name: 'Front Office Read' });
-    const continueLink = screen.getByRole('link', { name: /continue to detailed team cards/i });
+    const briefing = await screen.findByRole('region', { name: 'Front Office Read' });
     const detailedCardsHeading = screen.getByRole('heading', { name: 'Detailed team cards' });
     const teamLeaders = screen.getByText('Team Leaders');
 
-    expect(briefing).toContainElement(continueLink);
-    expect(continueLink).toHaveAttribute('href', '#team-overview-detailed-analysis');
     expect(briefing.compareDocumentPosition(detailedCardsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(detailedCardsHeading.compareDocumentPosition(teamLeaders) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -116,21 +113,19 @@ describe('Team Overview compact navigation', () => {
     window.localStorage.clear();
   });
 
-  it('uses all Executive Briefing items as direct workspace shortcuts', async () => {
+  it('keeps all compact Executive Briefing items as direct workspace shortcuts across views', async () => {
     const onNavigate = vi.fn();
     window.addEventListener('skip-navigate', onNavigate);
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: current posture/i }));
+    fireEvent.click(screen.getByRole('button', { name: /open performance: posture/i }));
     expect(screen.getByText('Offensive Profile')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
-    fireEvent.click(screen.getByRole('button', { name: /open performance workspace: best signal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /open performance: signal/i }));
     expect(screen.getByText('Run Differential — 2026')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Briefing' }));
-    fireEvent.click(screen.getByRole('button', { name: /open organization depth: next question/i }));
+    fireEvent.click(screen.getByRole('button', { name: /open prospects: next/i }));
     expect(onNavigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { tab: 'prospects' } }));
     window.removeEventListener('skip-navigate', onNavigate);
   });

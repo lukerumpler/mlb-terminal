@@ -30,6 +30,7 @@ const SettingsPage     = lazy(() => import('./pages/OtherPages.jsx').then(m => (
 const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
+const PlayerProfilePreviewsPage = lazy(() => import('./pages/PlayerProfilePreviewsPage.jsx'));
 
 function PageLoading() {
   return (
@@ -393,6 +394,8 @@ export default function App() {
     };
   }, [refreshTicker]);
 
+  const isolatedPreview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'player-profile';
+
   return (
     <>
     <div className="skip-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:C.bg, fontFamily:"'Plus Jakarta Sans', sans-serif", color:C.text }}>
@@ -504,7 +507,7 @@ export default function App() {
         {/* Scrollable content */}
         <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
-          {activeWorkspace && (
+          {!isolatedPreview && activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
               <div className="skip-workspace-subtabs-copy">
                 <span>{activeWorkspace.label} workspace</span>
@@ -520,9 +523,11 @@ export default function App() {
             </nav>
           )}
 
-          <div id={`skip-workspace-panel-${tab}`} role={activeWorkspace ? 'tabpanel' : undefined} aria-label={activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
-            <PageErrorBoundary resetKey={tab}>
+          <div id={`skip-workspace-panel-${tab}`} role={!isolatedPreview && activeWorkspace ? 'tabpanel' : undefined} aria-label={!isolatedPreview && activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
+            <PageErrorBoundary resetKey={isolatedPreview ? 'player-profile-preview' : tab}>
               <Suspense fallback={<PageLoading />}>
+              {isolatedPreview && <PlayerProfilePreviewsPage />}
+              {!isolatedPreview && <>
               {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
               {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
@@ -536,6 +541,7 @@ export default function App() {
               {tab === 'follows'      && <FollowListPage />}
               {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
               {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
+              </>}
               </Suspense>
             </PageErrorBoundary>
           </div>
