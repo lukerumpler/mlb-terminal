@@ -18,6 +18,7 @@ const loadFullPlayer = vi.fn();
 vi.mock("../client/src/api/mlb.js", () => ({
   searchPlayers: (...args) => searchPlayers(...args),
   loadFullPlayer: (...args) => loadFullPlayer(...args),
+  filterActivePlayerSearchResults: people => (Array.isArray(people) ? people : []).filter(person => person?.active !== false),
 }));
 
 const { default: PlayersPage } = await import(
@@ -287,6 +288,19 @@ describe("PlayersPage — player comparison and race conditions", () => {
     expect(await screen.findByRole("heading", { name: /Keyboard Player/ })).toBeInTheDocument();
     expect(loadFullPlayer).toHaveBeenCalledWith(expect.objectContaining({ id: 44, fullName: "Keyboard Player" }), expect.anything(), expect.anything());
   });
+  it("excludes known inactive players from visible search results", async () => {
+    const user = userEvent.setup();
+    searchPlayers.mockResolvedValue([
+      { id: 81, fullName: "Inactive Search Result", active: false, currentTeam: { name: "Former Club" }, primaryPosition: { abbreviation: "OF" } },
+      { id: 82, fullName: "Active Search Result", active: true, currentTeam: { name: "Chicago Cubs" }, primaryPosition: { abbreviation: "CF" } },
+    ]);
+    render(<PlayersPage />);
+    const input = screen.getByPlaceholderText(/Search any MLB player/i);
+    await user.type(input, "Search Result");
+    expect(await screen.findByRole("option", { name: "Open Active Search Result profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Open Inactive Search Result profile" })).toBeNull();
+    expect(screen.getByText(/1 matching player/i)).toBeInTheDocument();
+  });
 
   it("moves through player search results with arrow keys and opens the active result with Enter", async () => {
     const user = userEvent.setup();
@@ -324,10 +338,10 @@ describe("PlayersPage — player comparison and race conditions", () => {
     const input = screen.getByPlaceholderText(/Search any MLB player/i);
     await user.type(input, "No Match");
 
-    expect(await screen.findByText(/No verified player matches found for “No Match”/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No active verified player matches found for “No Match”/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear player search" }));
     expect(input).toHaveValue("");
-    expect(screen.queryByText(/No verified player matches found/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No active verified player matches found/i)).not.toBeInTheDocument();
   });
 
   it("loads the requested player profile when navigation enters from another workspace", async () => {

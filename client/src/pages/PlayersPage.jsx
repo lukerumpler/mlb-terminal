@@ -8,7 +8,7 @@ import {
 import { C, px, sans, WARM_TOOLTIP } from '../constants/colors.js';
 import { SEASON, TEAMS } from '../constants/data.js';
 import { SKIP_QUOTES } from '../constants/alerts.js';
-import { searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
+import { filterActivePlayerSearchResults, searchPlayers, loadFullPlayer, getPlayerBoxscoreSplits } from '../api/mlb.js';
 import {
   computeKPIs, decisionScore, verdict, verdictColor,
   archetype, getStrengths, getRisks, getRecommendation, computeAMD,
@@ -21,21 +21,36 @@ import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
 import { recordRecentView } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
-import { buildReconciliationRows, buildDataQualityPayload, downloadDataQualityExport } from '../lib/dataQuality.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
 import ScoutingGradesPreview from '../components/ScoutingGradesPreview.jsx';
 import ContactHeatmap from '../components/ContactHeatmap.jsx';
 import RadarCard from '../components/RadarCard.jsx';
 import PlayerComparisonModal from '../components/PlayerComparisonModal.jsx';
+import PlayerNewsPanel from '../components/PlayerNewsPanel.jsx';
+import NaturalLanguageMlbQuery from '../components/NaturalLanguageMlbQuery.jsx';
 import { fmt, fmtIP, fmtDollar, clamp8 } from '../lib/formatting.js';
-import { placeholderColors } from '../lib/theme.js';
 import { percentile, percentileColor, percentileLabel } from '../lib/percentile.js';
+import PlayerPhoto from '../components/PlayerPhoto.jsx';
+import { PlayerMediaPanel } from '../features/player-profile/PlayerMediaPanel.jsx';
+import { BoxscoreSplitPanel, ReconciliationPanel } from '../features/player-profile/PlayerBoxscorePanels.jsx';
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation, getSurchargeBand } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
-import { useLowDataMode } from '../lib/lowData.js';
 import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
+import { buildHandednessComparison } from '../features/player-profile/handedness.js';
+import { buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance } from '../features/player-profile/boxscore.js';
+
+export {
+  buildPlayerHighlightSearches, buildPlayerVideoLinks, loadPlayerPlaylists,
+  normalizeEmbeddableVideoUrl, savePlayerPlaylists, shouldLoadPlayerVideoThumbnail,
+} from '../features/player-profile/media.js';
+export { buildHandednessComparison } from '../features/player-profile/handedness.js';
+export {
+  BOXSCORE_PAGE_SIZE, boxscorePresetStorageKey, buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance,
+  filterAndSortBoxscoreGames, readBoxscoreFilterPresets, saveBoxscoreFilterPresets,
+} from '../features/player-profile/boxscore.js';
+export { BoxscoreSplitPanel, ReconciliationPanel } from '../features/player-profile/PlayerBoxscorePanels.jsx';
 
 const VISUAL_QA_PLAYERS = [
   { id: 660271, name: 'Shohei Ohtani', team: 'LAD' },
@@ -76,232 +91,8 @@ function pctBar(pct, color) {
 const TT = { ...WARM_TOOLTIP, wrapperStyle:{ zIndex:9999 } };
 
 /* ─── Module-scope helpers ────────────────────────────────────────── */
-/* ─── Player photo ────────────────────────────────────────────────── */
-function PlayerPhoto({ id, name, size = 96 }) {
-  const [err, setErr] = useState(false);
-  const lowDataMode = useLowDataMode();
-  // This component isn't remounted per-player (no `key` on it in the
-  // parent), so state persists across different players searched in the
-  // same session. Without this, one player's photo failing to load
-  // (broken/missing MLB image, network hiccup) would leave `err` stuck at
-  // true forever — every player searched afterward would show the fallback
-  // placeholder even if their real photo would have loaded fine.
-  useEffect(() => { setErr(false); }, [id]);
-  const primary = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_426,q_auto:best/v1/people/${id}/headshot/67/current`;
-  const h = Math.round(size * 1.25);
-  const cx = size / 2;
-  const { bg: phBg, fg: phFg } = placeholderColors();
-  const fallback = `data:image/svg+xml,${encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + h + '" viewBox="0 0 ' + size + ' ' + h + '">' +
-    '<rect width="' + size + '" height="' + h + '" rx="10" fill="' + phBg + '"/>' +
-    '<circle cx="' + cx + '" cy="' + Math.round(h * 0.30) + '" r="' + Math.round(size * 0.22) + '" fill="' + phFg + '"/>' +
-    '<ellipse cx="' + cx + '" cy="' + Math.round(h * 0.88) + '" rx="' + Math.round(size * 0.32) + '" ry="' + Math.round(h * 0.22) + '" fill="' + phFg + '"/>' +
-    '</svg>'
-  )}`;
-  return (
-    <img src={err || lowDataMode ? fallback : primary} onError={() => setErr(true)} alt={name} loading="lazy"
-      style={{ width:size, height:h, borderRadius:10, objectFit:'cover', objectPosition:'center top',
-        border:`1px solid ${C.border}`, flexShrink:0, background:C.surface2, display:'block' }} />
-  );
-}
 
-/* ─── Source-safe player video discovery ──────────────────────────── */
-// These are search destinations, not fabricated individual video records. Each
-// card opens a live result page owned by MLB or YouTube, while the official MLB
-// headshot supplies a stable visual preview without pretending it is a frame
-// from a particular clip.
-export function buildPlayerVideoLinks({ id, fullName, teamName, teamAbbreviation } = {}) {
-  const name = String(fullName || '').trim();
-  if (!name) return [];
-  const teamContext = [teamAbbreviation, teamName].filter(Boolean).join(' ');
-  const youtubeQuery = `${name}${teamContext ? ` ${teamContext}` : ''} baseball MLB`;
-  const thumbnail = id
-    ? `https://img.mlbstatic.com/mlb-photos/image/upload/c_fill,w_640,h_360,g_face,q_auto:best/v1/people/${id}/headshot/67/current`
-    : null;
-  return [
-    {
-      id: 'mlb',
-      source: 'MLB',
-      label: 'MLB Video Search',
-      href: `https://www.mlb.com/video/search?query=${encodeURIComponent(name)}`,
-      thumbnail,
-      query: name,
-      description: `Official MLB video search for ${name}: highlights, interviews, and team coverage when available.`,
-    },
-    {
-      id: 'youtube',
-      source: 'YouTube',
-      label: 'YouTube Search',
-      href: `https://www.youtube.com/results?search_query=${encodeURIComponent(youtubeQuery)}`,
-      thumbnail,
-      query: youtubeQuery,
-      description: `YouTube search for ${name}: highlights, interviews, analysis, and related baseball coverage.`,
-    },
-  ];
-}
-
-export function shouldLoadPlayerVideoThumbnail({ saveData = false, thumbnail } = {}) {
-  return !saveData && Boolean(thumbnail);
-}
-
-export function buildPlayerHighlightSearches({ fullName, teamName, teamAbbreviation } = {}) {
-  const name = String(fullName || '').trim();
-  if (!name) return [];
-  const context = [teamAbbreviation, teamName].filter(Boolean).join(' ');
-  const base = `${name}${context ? ` ${context}` : ''} baseball MLB`;
-  return [
-    { id:'power', label:'Home run & extra-base plays', query:`${base} home run highlights` },
-    { id:'contact', label:'Contact & hard-hit plays', query:`${base} batting highlights hard hit` },
-    { id:'defense', label:'Defensive highlights', query:`${base} defensive highlights` },
-    { id:'pitching', label:'Strikeout & pitch-sequencing plays', query:`${base} strikeout pitching highlights` },
-  ].map(item => ({ ...item, href:`https://www.youtube.com/results?search_query=${encodeURIComponent(item.query)}` }));
-}
-
-function PlayerVideoThumbnail({ item, playerName, accent }) {
-  const [imageError, setImageError] = useState(false);
-  const [saveData, setSaveData] = useState(false);
-  const lowDataMode = useLowDataMode();
-  useEffect(() => { setImageError(false); }, [item.thumbnail]);
-  useEffect(() => {
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    if (connection?.saveData) setSaveData(true);
-  }, []);
-  const initials = playerName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'MLB';
-  const canLoadThumbnail = !lowDataMode && shouldLoadPlayerVideoThumbnail({ saveData, thumbnail:item.thumbnail });
-  const tooltipId = `video-tooltip-${item.id}`;
-  return (
-    <div className="skip-video-thumbnail-wrap" style={{ position:'relative', minWidth:0 }}>
-      <a href={item.href} target="_blank" rel="noreferrer noopener"
-        aria-label={`${item.label} for ${playerName}`}
-        aria-describedby={tooltipId}
-        title={item.description}
-        className="skip-video-thumbnail"
-        style={{ display:'block', position:'relative', minWidth:0, borderRadius:8, overflow:'hidden', border:`0.5px solid ${C.border}`, background:C.surface2, textDecoration:'none' }}>
-
-      <div style={{ position:'relative', aspectRatio:'16 / 9', overflow:'hidden', background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})` }}>
-        {canLoadThumbnail && !imageError ? (
-          <img src={item.thumbnail} alt="" loading="lazy" decoding="async" fetchPriority="low" width="640" height="360" onError={() => setImageError(true)}
-            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'center 20%', display:'block', filter:'saturate(.8)' }} />
-        ) : (
-          <div aria-hidden="true" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', ...px({ fontSize:26, fontWeight:800, color:accent }) }}>{initials}</div>
-        )}
-        <div aria-hidden="true" style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(15,23,42,.05), rgba(15,23,42,.72))' }} />
-        <div aria-hidden="true" style={{ position:'absolute', left:10, bottom:9, width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,.92)', color:accent, fontSize:14, paddingLeft:2, boxShadow:'0 2px 8px rgba(0,0,0,.18)' }}>▶</div>
-        <span style={{ position:'absolute', right:8, top:7, padding:'3px 6px', borderRadius:4, background:'rgba(15,23,42,.72)', ...px({ fontSize:8.5, fontWeight:800, color:'#fff', letterSpacing:'.05em', textTransform:'uppercase' }) }}>{item.source}</span>
-      </div>
-      <div style={{ padding:'8px 9px 9px' }}>
-        <div style={sans({ fontSize:10.5, fontWeight:800, color:C.text, lineHeight:1.25 })}>{item.label}</div>
-        <div style={sans({ fontSize:8.5, color:C.text4, marginTop:3, lineHeight:1.35 })}>Opens live search results · source-safe</div>
-      </div>
-      </a>
-      <div id={tooltipId} role="tooltip" className="skip-video-tooltip">{item.description}</div>
-    </div>
-  );
-}
-
-export function normalizeEmbeddableVideoUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    let videoId = null;
-    if (url.hostname === 'youtu.be') videoId = url.pathname.slice(1).split('/')[0];
-    if (url.hostname.endsWith('youtube.com')) {
-      if (url.pathname === '/watch') videoId = url.searchParams.get('v');
-      if (url.pathname.startsWith('/embed/')) videoId = url.pathname.split('/')[2];
-      if (url.pathname.startsWith('/shorts/')) videoId = url.pathname.split('/')[2];
-    }
-    if (!videoId || !/^[A-Za-z0-9_-]{6,}$/.test(videoId)) return null;
-    return { videoId, watchUrl:`https://www.youtube.com/watch?v=${videoId}`, embedUrl:`https://www.youtube.com/embed/${videoId}` };
-  } catch { return null; }
-}
-
-export function loadPlayerPlaylists(playerId) {
-  if (!playerId || typeof localStorage === 'undefined') return [{ id:'my-highlights', name:'My Highlights', clips:[] }];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(`skip-player-playlists:${playerId}`) || 'null');
-    return Array.isArray(parsed) && parsed.length ? parsed : [{ id:'my-highlights', name:'My Highlights', clips:[] }];
-  } catch { return [{ id:'my-highlights', name:'My Highlights', clips:[] }]; }
-}
-
-export function savePlayerPlaylists(playerId, playlists) {
-  if (!playerId || typeof localStorage === 'undefined') return;
-  localStorage.setItem(`skip-player-playlists:${playerId}`, JSON.stringify(playlists));
-}
-
-function PlayerVideoPanel({ player, profile, accent }) {
-  const playerName = profile?.fullName || `${profile?.useName || profile?.firstName || ''} ${profile?.useLastName || profile?.lastName || ''}`.trim();
-  const playerId = player?.id || profile?.id;
-  const highlightSearches = buildPlayerHighlightSearches({ fullName:playerName, teamName:profile?.currentTeam?.name, teamAbbreviation:profile?.currentTeam?.abbreviation });
-  const items = buildPlayerVideoLinks({ id:playerId, fullName:playerName, teamName:profile?.currentTeam?.name, teamAbbreviation:profile?.currentTeam?.abbreviation });
-  const [playlists, setPlaylists] = useState(() => loadPlayerPlaylists(playerId));
-  const [activePlaylistId, setActivePlaylistId] = useState('my-highlights');
-  const [clipUrl, setClipUrl] = useState('');
-  const [clipTitle, setClipTitle] = useState('');
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [selectedClip, setSelectedClip] = useState(null);
-  const [clipError, setClipError] = useState('');
-  useEffect(() => {
-    setPlaylists(loadPlayerPlaylists(playerId));
-    setActivePlaylistId('my-highlights');
-    setSelectedClip(null);
-  }, [playerId]);
-  const activePlaylist = playlists.find(list => list.id === activePlaylistId) || playlists[0];
-  const updatePlaylists = next => { setPlaylists(next); savePlayerPlaylists(playerId, next); };
-  const addClip = () => {
-    const normalized = normalizeEmbeddableVideoUrl(clipUrl);
-    if (!normalized) { setClipError('Paste a verified YouTube watch, short, or embed URL.'); return; }
-    const clip = { id:`${normalized.videoId}-${Date.now()}`, title:clipTitle.trim() || `${playerName} highlight`, ...normalized };
-    const next = playlists.map(list => list.id === activePlaylist.id ? { ...list, clips:[...list.clips, clip] } : list);
-    updatePlaylists(next); setSelectedClip(clip); setClipUrl(''); setClipTitle(''); setClipError('');
-  };
-  const createPlaylist = () => {
-    const name = newPlaylistName.trim();
-    if (!name) return;
-    const list = { id:`playlist-${Date.now()}`, name, clips:[] };
-    updatePlaylists([...playlists, list]); setActivePlaylistId(list.id); setNewPlaylistName('');
-  };
-  const removeClip = clipId => updatePlaylists(playlists.map(list => ({ ...list, clips:list.clips.filter(clip => clip.id !== clipId) })));
-  const moveClip = (clipId, direction) => updatePlaylists(playlists.map(list => {
-    if (list.id !== activePlaylist?.id) return list;
-    const index = list.clips.findIndex(clip => clip.id === clipId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= list.clips.length) return list;
-    const clips = [...list.clips];
-    [clips[index], clips[target]] = [clips[target], clips[index]];
-    return { ...list, clips };
-  }));
-  return (
-    <Panel title="Player Video" accent={accent} badge="Playlists + Player">
-      <div style={{ padding:'10px 12px 11px' }}>
-        {selectedClip ? (
-          <div style={{ marginBottom:10, border:`0.5px solid ${C.border}`, borderRadius:7, overflow:'hidden', background:'#0f172a' }}>
-            <iframe title={selectedClip.title} src={selectedClip.embedUrl} style={{ display:'block', width:'100%', aspectRatio:'16 / 9', border:0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-            <div style={{ padding:'7px 9px', ...sans({ fontSize:10, fontWeight:700, color:'#fff' }) }}>{selectedClip.title}</div>
-          </div>
-        ) : (
-          <div style={{ padding:'10px', marginBottom:10, border:`0.5px dashed ${C.border}`, borderRadius:7, background:C.surface2, ...sans({ fontSize:9.5, color:C.text3, lineHeight:1.45 }) }}>Paste a verified YouTube clip URL below to watch it here and save it to a playlist.</div>
-        )}
-        <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) 130px auto', gap:5, alignItems:'center' }}>
-          <input aria-label="Verified YouTube clip URL" value={clipUrl} onChange={e=>setClipUrl(e.target.value)} placeholder="Paste YouTube URL" style={{ minWidth:0, padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }} />
-          <input aria-label="Clip title" value={clipTitle} onChange={e=>setClipTitle(e.target.value)} placeholder="Clip title" style={{ minWidth:0, padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }} />
-          <button onClick={addClip} style={{ padding:'7px 9px', border:0, borderRadius:5, background:accent, color:'#fff', cursor:'pointer', fontSize:10, fontWeight:800 }}>Save clip</button>
-        </div>
-        {clipError && <div role="alert" style={sans({ fontSize:9.5, color:C.rust, marginTop:5 })}>{clipError}</div>}
-        <div style={{ display:'flex', gap:5, alignItems:'center', marginTop:10, flexWrap:'wrap' }}>
-          <select aria-label="Active playlist" value={activePlaylist?.id || ''} onChange={e=>setActivePlaylistId(e.target.value)} style={{ padding:'6px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }}>
-            {playlists.map(list => <option key={list.id} value={list.id}>{list.name} ({list.clips.length})</option>)}
-          </select>
-          <input aria-label="New playlist name" value={newPlaylistName} onChange={e=>setNewPlaylistName(e.target.value)} placeholder="New playlist" style={{ width:120, padding:'6px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface, color:C.text, fontSize:10 }} />
-          <button onClick={createPlaylist} style={{ padding:'6px 8px', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.text2, cursor:'pointer', fontSize:10, fontWeight:700 }}>Create</button>
-        </div>
-        {activePlaylist?.clips.length ? <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:8 }}>{activePlaylist.clips.map((clip, index) => <div key={clip.id} style={{ display:'flex', gap:6, alignItems:'center', padding:'6px 8px', border:`0.5px solid ${C.borderLight}`, borderRadius:5 }}><button onClick={()=>setSelectedClip(clip)} style={{ flex:1, border:0, background:'transparent', color:C.text, textAlign:'left', cursor:'pointer', fontSize:10, fontWeight:700 }}>{clip.title}</button><button aria-label={`Move ${clip.title} up`} disabled={index === 0} onClick={()=>moveClip(clip.id, -1)} style={{ border:0, background:'transparent', color:index === 0 ? C.text4 : C.text2, cursor:index === 0 ? 'not-allowed' : 'pointer', fontSize:11 }}>↑</button><button aria-label={`Move ${clip.title} down`} disabled={index === activePlaylist.clips.length - 1} onClick={()=>moveClip(clip.id, 1)} style={{ border:0, background:'transparent', color:index === activePlaylist.clips.length - 1 ? C.text4 : C.text2, cursor:index === activePlaylist.clips.length - 1 ? 'not-allowed' : 'pointer', fontSize:11 }}>↓</button><button aria-label={`Remove ${clip.title}`} onClick={()=>removeClip(clip.id)} style={{ border:0, background:'transparent', color:C.rust, cursor:'pointer', fontSize:12 }}>×</button></div>)}</div> : <div style={sans({ fontSize:9.5, color:C.text4, marginTop:8 })}>No saved clips in this playlist yet.</div>}
-        {items.length ? <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.borderLight}` }}><div style={sans({ fontSize:9.5, fontWeight:800, color:C.text2, textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 })}>Highlight search shortcuts</div><div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:5 }}>{highlightSearches.map(item => <a key={item.id} href={item.href} target="_blank" rel="noreferrer noopener" aria-label={`Search ${item.label} for ${playerName}`} style={{ display:'block', padding:'7px 8px', border:`0.5px solid ${C.border}`, borderRadius:6, background:C.surface2, color:C.text2, textDecoration:'none' }}><span style={px({ fontSize:9, fontWeight:800, color:accent, marginRight:5 })}>↗</span><span style={sans({ fontSize:9.5, fontWeight:700 })}>{item.label}</span></a>)}</div></div> : null}
-        <div style={{ marginTop:8, ...sans({ fontSize:8.5, color:C.text4, lineHeight:1.4 }) }}>Only verified YouTube URLs are embedded. Search shortcuts open source results; SKIP does not invent clip records.</div>
-      </div>
-    </Panel>
-  );
-}
+const PlayerVideoPanel = PlayerMediaPanel;
 
 /* ─── Empty state ─────────────────────────────────────────────────── */
 const QUICK_PLAYERS = [
@@ -433,44 +224,6 @@ function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
 }
 
 
-// Coerce to a finite number, falling back to `def` only when the value is
-// genuinely missing/invalid — unlike `parseFloat(x||def)||def`, this does NOT
-// mistake a real value of 0 (e.g. 0 stolen bases, 0 K/9 in a tiny sample) for "missing".
-function sumNumeric(rows, key) {
-  return rows.reduce((total, row) => {
-    const value = Number(row?.stat?.[key]);
-    return Number.isFinite(value) ? total + value : total;
-  }, 0);
-}
-
-export function buildHandednessComparison(payload, mode = 'season') {
-  const sourceRows = mode === 'career' ? payload?.careerRows : payload?.rows;
-  const rows = Array.isArray(sourceRows) ? sourceRows : [];
-  return ['LHP', 'RHP'].map(side => {
-    const sideRows = rows.filter(row => row?.side === side);
-    if (!sideRows.length) return { side, stat: null };
-    const atBats = sumNumeric(sideRows, 'atBats');
-    const hits = sumNumeric(sideRows, 'hits');
-    const walks = sumNumeric(sideRows, 'baseOnBalls');
-    const hbp = sumNumeric(sideRows, 'hitByPitch');
-    const sacFlies = sumNumeric(sideRows, 'sacFlies');
-    const plateAppearances = sumNumeric(sideRows, 'plateAppearances') || atBats + walks + hbp + sacFlies;
-    const totalBases = hits + sumNumeric(sideRows, 'doubles') + (2 * sumNumeric(sideRows, 'triples')) + (3 * sumNumeric(sideRows, 'homeRuns'));
-    const avg = atBats ? hits / atBats : null;
-    const obp = (hits + walks + hbp) && plateAppearances ? (hits + walks + hbp) / plateAppearances : null;
-    const slg = atBats ? totalBases / atBats : null;
-    return { side, stat: {
-      atBats, hits, plateAppearances, homeRuns: sumNumeric(sideRows, 'homeRuns'),
-      avg, obp, slg, ops: avg == null || obp == null || slg == null ? null : obp + slg,
-      strikeoutRate: plateAppearances ? (sumNumeric(sideRows, 'strikeOuts') / plateAppearances) * 100 : null,
-    } };
-  });
-}
-
-function numOr(val, def) {
-  const n = parseFloat(val);
-  return Number.isFinite(n) ? n : def;
-}
 
 // Profile metrics must never turn a missing live value into a plausible-looking
 // number. MLB/Savant CSVs contain both empty strings and numeric zeroes, so the
@@ -495,6 +248,11 @@ export function savantField(row, aliases) {
     }
   }
   return undefined;
+}
+
+function numOr(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 // Pure — no hooks, no rendering — so it can be reused anywhere the same
@@ -1712,6 +1470,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [favorites, setFavorites] = useState(() => readPlayerFavorites());
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
+  const [boxscoreStatus, setBoxscoreStatus] = useState('idle');
   const [compareOpen, setCompareOpen] = useState(false);
   const timerRef = useRef(null);
   const latestQueryRef = useRef('');
@@ -1764,7 +1523,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         // slower request can otherwise resolve after a newer one and
         // clobber its results with stale data.
         if (mountedRef.current && latestQueryRef.current === q) {
-          const matches = Array.isArray(r) ? r : [];
+          const matches = filterActivePlayerSearchResults(r);
           setResults(matches);
           setActiveResultIndex(-1);
           setSearchStatus(matches.length ? 'ready' : 'empty');
@@ -1817,20 +1576,30 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         onCoreReady: core => {
           if (mountedRef.current && pickSeqRef.current === mySeq) {
             setPlayer(core);
+            setBoxscoreStatus(core?.boxscoreSplits ? 'ready' : 'loading');
             setLoading(false);
             setSwitchingPlayerName(null);
           }
         },
         onImportantReady: important => {
-          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(important);
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(important);
+            if (important?.boxscoreSplits) setBoxscoreStatus('ready');
+          }
         },
         onOptionalReady: optional => {
-          if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(optional);
+          if (mountedRef.current && pickSeqRef.current === mySeq) {
+            setPlayer(optional);
+            setBoxscoreStatus(optional?.boxscoreSplits ? 'ready' : 'unavailable');
+          }
         },
       });
       // Only commit if no newer pick has started since — same reasoning as
       // onInput above, applied to the click path instead of the typing one.
-      if (mountedRef.current && pickSeqRef.current === mySeq) setPlayer(data);
+      if (mountedRef.current && pickSeqRef.current === mySeq) {
+        setPlayer(data);
+        setBoxscoreStatus(data?.boxscoreSplits ? 'ready' : 'unavailable');
+      }
     } catch (err) {
       if (err?.name !== 'AbortError' && mountedRef.current && pickSeqRef.current === mySeq) {
         setError(humanizePlayerLoadError(err, person.fullName));
@@ -1891,14 +1660,17 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   useEffect(() => {
     if (!player || boxscoreRetryToken === 0) return undefined;
     let alive = true;
+    setBoxscoreStatus('loading');
     getPlayerBoxscoreSplits(player.id, player.currentTeam?.id, SEASON)
       .then(boxscoreSplits => {
         if (alive) {
           setPlayer(current => current ? { ...current, boxscoreSplits } : current);
+          setBoxscoreStatus(boxscoreSplits ? 'ready' : 'unavailable');
           window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider: 'boxscore', message: 'MLB boxscore data refreshed.' } }));
         }
       })
       .catch(() => {
+        if (alive) setBoxscoreStatus('unavailable');
         if (alive) window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider: 'boxscore', message: 'MLB boxscore data could not be refreshed. The previous verified state remains visible.' } }));
       });
     return () => { alive = false; };
@@ -2023,7 +1795,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         <div aria-live="polite" aria-atomic="true" style={{ minHeight:18, padding:'4px 2px 0', ...sans({ fontSize:10, color:C.text3 }) }}>
           {searchStatus === 'searching' && 'Searching verified MLB and MiLB player records…'}
           {searchStatus === 'ready' && `${results.length} matching player${results.length === 1 ? '' : 's'} — use Up and Down arrows to navigate, then press Enter to open the profile.${activeResultIndex >= 0 ? ` ${activeResultIndex + 1} of ${results.length} selected.` : ''}`}
-          {searchStatus === 'empty' && `No verified player matches found for “${query.trim()}”.`}
+          {searchStatus === 'empty' && `No active verified player matches found for “${query.trim()}”.`}
           {searchStatus === 'error' && 'Player search is temporarily unavailable. Please try again.'}
         </div>
         {results.length > 0 && (
@@ -2055,7 +1827,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
           Loading verified profile data{switchingPlayerName ? ` for ${switchingPlayerName}` : ''}…
         </div>
       )}
-      {loading && !player && <PlayerProfileSkeleton />}
+      {loading && <PlayerProfileSkeleton />}
       {player?.extrasLoading && <PlayerProfileHydrationSkeleton />}
       {error && (
         <div role="alert" style={{ textAlign:'center', padding:24, color:C.rust, fontSize:12,
@@ -2066,9 +1838,11 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
         <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} />
       )}
 
-      {player && derived && (
+      {player && derived && !loading && (
         <>
-          <PlayerProfile player={player} derived={derived} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer} />
+          <div className="skip-profile-view-transition">
+          <PlayerProfile player={player} derived={derived} boxscoreStatus={boxscoreStatus} isFavorite={favorites.some(item => String(item.id) === String(player.id))} onToggleFavorite={() => toggleFavorite(player)} onCompare={() => setCompareOpen(true)} onSwitchPlayer={pickPlayer}           />
+          </div>
           {compareOpen && (
             <PlayerComparisonModal
               primary={player}
@@ -2182,158 +1956,6 @@ function ContractPanel({ contractData: ct, loading = false }) {
 /* ═══════════════════════════════════════════════════════════════════
    PLAYER PROFILE — full intelligence layout
 ═══════════════════════════════════════════════════════════════════ */
-function ProfileStatusState({ status = 'Unavailable', message, detail }) {
-  return <div className="skip-overview-empty-state" role="status"><span className="skip-overview-empty-mark" aria-hidden="true">—</span><div className="skip-overview-empty-copy"><span className="skip-overview-empty-status">{status}</span><strong>{message}</strong><span>{detail}</span></div></div>;
-}
-function formatBoxscoreRate(value, digits = 3) {
-  return value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits);
-}
-export function ReconciliationPanel({ player }) {
-  const isPitcher = Boolean(player?.isPitcher);
-  const boxscore = player?.boxscoreSplits;
-  const aggregate = player?.stats || {};
-  const boxscoreRows = isPitcher ? (boxscore?.pitching || []) : (boxscore?.batting || []);
-  const all = boxscoreRows.find(row => row.label === 'All');
-  const rows = buildReconciliationRows({ aggregate, boxscore: all, isPitcher });
-  const payload = buildDataQualityPayload({ player, rows, context: 'Player Profile reconciliation' });
-  const hasBoxscore = boxscore?.status === 'live' && Boolean(all);
-  const filenameBase = `skip-${String(player?.fullName || player?.name || 'player').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'player'}-reconciliation-${player?.statSeason || 'current'}`;
-  return (
-    <Panel title="Aggregate vs Boxscore Reconciliation" accent={C.purple} badge={hasBoxscore ? 'Verified comparison' : 'Unavailable'}>
-      <div className="skip-reconciliation-toolbar">
-        <div className="skip-reconciliation-copy">Compares MLB season aggregates with the most recent official boxscore window. Variances are shown, not silently corrected.</div>
-        <div className="skip-reconciliation-actions">
-          <button type="button" onClick={() => downloadDataQualityExport(payload, 'csv', filenameBase)} disabled={!rows.length}>CSV</button>
-          <button type="button" onClick={() => downloadDataQualityExport(payload, 'json', filenameBase)} disabled={!rows.length}>JSON</button>
-        </div>
-      </div>
-      {!hasBoxscore ? (
-        <div className="skip-reconciliation-empty" role="status">
-          <strong>Boxscore comparison unavailable</strong>
-          <span>{boxscore?.reason || 'No verified official boxscore window is available for this player.'}</span>
-        </div>
-      ) : (
-        <>
-          <div className="skip-long-table"><table className="skip-profile-splits-table skip-reconciliation-table"><thead><tr><th>Metric</th><th>Aggregate</th><th>Boxscore</th><th>Variance</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.metric}><td>{row.metric}</td><td>{row.aggregate == null ? '—' : row.aggregate}</td><td>{row.boxscore == null ? '—' : row.boxscore}</td><td>{row.variance == null ? '—' : row.variance > 0 ? `+${row.variance}` : row.variance}</td><td><span className={`skip-reconciliation-status is-${row.status}`}>{row.status === 'match' ? 'Match' : row.status === 'variance' ? 'Variance' : 'Incomplete'}</span></td></tr>)}</tbody></table></div>
-          <div className="skip-profile-source-strip">Aggregate: {payload.sources.aggregate.source} · retrieved {payload.sources.aggregate.retrievedAt ? new Date(payload.sources.aggregate.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'} · Boxscores: {payload.sources.boxscore.source} · retrieved {payload.sources.boxscore.retrievedAt ? new Date(payload.sources.boxscore.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-export function filterAndSortBoxscoreGames(games, { date = '', team = '', sort = 'date-desc' } = {}) {
-  const normalizedTeam = String(team || '').trim().toLowerCase();
-  return (Array.isArray(games) ? games : [])
-    .filter(game => {
-      const gameDate = String(game?.date || '').slice(0, 10);
-      const opponent = String(game?.opponent || '').toLowerCase();
-      return (!date || gameDate === date) && (!normalizedTeam || opponent.includes(normalizedTeam));
-    })
-    .sort((a, b) => {
-      const dateA = String(a?.date || '');
-      const dateB = String(b?.date || '');
-      const teamA = String(a?.opponent || '').toLowerCase();
-      const teamB = String(b?.opponent || '').toLowerCase();
-      if (sort === 'team-asc') return teamA.localeCompare(teamB);
-      if (sort === 'team-desc') return teamB.localeCompare(teamA);
-      return sort === 'date-asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
-    });
-}
-
-export const BOXSCORE_PAGE_SIZE = 5;
-export function boxscorePresetStorageKey(playerId) { return `skip-boxscore-filter-presets:${playerId || 'unknown'}`; }
-export function readBoxscoreFilterPresets(playerId) {
-  if (!playerId || typeof localStorage === 'undefined') return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(boxscorePresetStorageKey(playerId)) || '[]');
-    return Array.isArray(parsed) ? parsed.filter(preset => preset && preset.name) : [];
-  } catch { return []; }
-}
-export function saveBoxscoreFilterPresets(playerId, presets) {
-  if (!playerId || typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(boxscorePresetStorageKey(playerId), JSON.stringify(presets)); } catch { /* best effort */ }
-}
-
-export function BoxscoreSplitPanel({ player }) {
-  const data = player?.boxscoreSplits;
-  const isPitcher = Boolean(player?.isPitcher);
-  const rows = isPitcher ? (data?.pitching || []) : (data?.batting || []);
-  const [dateFilter, setDateFilter] = useState('');
-  const [teamFilter, setTeamFilter] = useState('');
-  const [sortOrder, setSortOrder] = useState('date-desc');
-  const [page, setPage] = useState(0);
-  const [presetName, setPresetName] = useState('');
-  const [presets, setPresets] = useState([]);
-  const [activePresetId, setActivePresetId] = useState('');
-  const recentGames = useMemo(() => filterAndSortBoxscoreGames(data?.recentGames, { date: dateFilter, team: teamFilter, sort: sortOrder }), [data?.recentGames, dateFilter, teamFilter, sortOrder]);
-  const pageCount = Math.max(1, Math.ceil(recentGames.length / BOXSCORE_PAGE_SIZE));
-  const pagedGames = recentGames.slice(page * BOXSCORE_PAGE_SIZE, (page + 1) * BOXSCORE_PAGE_SIZE);
-  useEffect(() => {
-    setPresets(readBoxscoreFilterPresets(player?.id));
-    setActivePresetId('');
-    setPage(0);
-  }, [player?.id]);
-  useEffect(() => { setPage(0); }, [dateFilter, teamFilter, sortOrder]);
-  const savePreset = () => {
-    const name = presetName.trim();
-    if (!name || !player?.id) return;
-    const next = [...presets.filter(preset => preset.name.toLowerCase() !== name.toLowerCase()), { id: `preset-${Date.now()}`, name, date: dateFilter, team: teamFilter, sort: sortOrder }].slice(-12);
-    setPresets(next); saveBoxscoreFilterPresets(player.id, next); setPresetName('');
-  };
-  const applyPreset = preset => {
-    if (!preset) return;
-    setDateFilter(preset.date || ''); setTeamFilter(preset.team || ''); setSortOrder(preset.sort || 'date-desc'); setActivePresetId(preset.id || '');
-  };
-  const deletePreset = presetId => {
-    const next = presets.filter(preset => preset.id !== presetId);
-    setPresets(next); saveBoxscoreFilterPresets(player?.id, next); if (activePresetId === presetId) setActivePresetId('');
-  };
-  const title = isPitcher ? 'Boxscore ERA Splits' : 'Boxscore OPS Splits';
-  const detail = isPitcher
-    ? 'Earned runs and innings are aggregated from official MLB game boxscores in the recent sample.'
-    : 'At-bats, walks, hit-by-pitch, sacrifice flies, and total bases are aggregated from official MLB game boxscores in the recent sample.';
-  if (!data || data.status === 'loading') {
-    return <Panel title={title} accent={C.teal} badge="Loading"><ProfileStatusState status="Loading" message="Checking official boxscores" detail="The player profile is retrieving the current verified game sample." /></Panel>;
-  }
-  if (data.status !== 'live' || !rows.length) {
-    return <Panel title={title} accent={C.teal} badge="Unavailable"><ProfileStatusState message={title} detail={data?.reason || 'No verified official MLB boxscore rows are available for this player.'} /></Panel>;
-  }
-  return <Panel title={title} accent={C.teal} badge={`${data.games} games`}>
-    <div className="skip-profile-source-strip">{data.source} · {data.windowLabel || 'Recent completed games'} · retrieved {data.retrievedAt ? new Date(data.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : 'not retrieved'}</div>
-    <div className="skip-data-controls" aria-label="MLB boxscore game filters">
-      <label>Date<input type="date" value={dateFilter} onChange={event => setDateFilter(event.target.value)} /></label>
-      <label>Team<input type="search" value={teamFilter} onChange={event => setTeamFilter(event.target.value)} placeholder="Search opponent" /></label>
-      <label>Sort<select value={sortOrder} onChange={event => setSortOrder(event.target.value)}><option value="date-desc">Newest date</option><option value="date-asc">Oldest date</option><option value="team-asc">Team A–Z</option><option value="team-desc">Team Z–A</option></select></label>
-      {(dateFilter || teamFilter) && <button type="button" onClick={() => { setDateFilter(''); setTeamFilter(''); setActivePresetId(''); }}>Clear</button>}
-      <div className="skip-boxscore-presets" aria-label="Saved boxscore filter presets">
-        <input aria-label="Preset name" value={presetName} onChange={event => setPresetName(event.target.value)} placeholder="Preset name" />
-        <button type="button" onClick={savePreset} disabled={!presetName.trim()}>SAVE PRESET</button>
-        {presets.length > 0 && <select aria-label="Apply saved preset" value={activePresetId} onChange={event => applyPreset(presets.find(preset => preset.id === event.target.value))}><option value="">Apply preset…</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>}
-        {activePresetId && <button type="button" onClick={() => deletePreset(activePresetId)}>DELETE PRESET</button>}
-      </div>
-    </div>
-    <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th>Split</th><th>G</th>{isPitcher ? <><th>GS</th><th>IP</th><th>ER</th><th>K</th><th>BB</th><th>ERA</th><th>WHIP</th></> : <><th>PA</th><th>AB</th><th>H</th><th>HR</th><th>BB</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th></>}</tr></thead><tbody>{rows.map(row => <tr key={row.label}><td>{row.label}</td><td>{row.games}</td>{isPitcher ? <><td>{row.gamesStarted || '—'}</td><td>{row.inningsPitched ? row.inningsPitched.toFixed(1) : '—'}</td><td>{row.earnedRuns || '—'}</td><td>{row.strikeOuts || '—'}</td><td>{row.walksAllowed || '—'}</td><td>{formatBoxscoreRate(row.era, 2)}</td><td>{formatBoxscoreRate(row.whip, 3)}</td></> : <><td>{row.plateAppearances || '—'}</td><td>{row.atBats || '—'}</td><td>{row.hits || '—'}</td><td>{row.homeRuns || '—'}</td><td>{row.walks || '—'}</td><td>{formatBoxscoreRate(row.avg)}</td><td>{formatBoxscoreRate(row.obp)}</td><td>{formatBoxscoreRate(row.slg)}</td><td>{formatBoxscoreRate(row.ops)}</td></>}</tr>)}</tbody></table></div>
-    {recentGames.length > 0 && <div className="skip-recent-boxscore-games" aria-label="Recent MLB boxscore games">
-      <div className="skip-profile-panel-note">Filtered recent games: {recentGames.length} · Page {Math.min(page + 1, pageCount)} of {pageCount}</div>
-      <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr><th>Date</th><th>Opponent</th><th>{isPitcher ? 'ERA' : 'OPS'}</th></tr></thead><tbody>{pagedGames.map(game => <tr key={game.gamePk || `${game.date}-${game.opponent}`}><td>{game.date ? new Date(game.date).toLocaleDateString() : '—'}</td><td>{game.opponent || 'Team unavailable'}</td><td>{formatBoxscoreRate(isPitcher ? game.pitching?.era : game.batting?.ops, isPitcher ? 2 : 3)}</td></tr>)}</tbody></table></div>
-      <div className="skip-boxscore-pagination" aria-label="Boxscore table pagination">
-        <button type="button" onClick={() => setPage(current => Math.max(0, current - 1))} disabled={page === 0}>PREVIOUS</button>
-        <span>Page {Math.min(page + 1, pageCount)} / {pageCount}</span>
-        <button type="button" onClick={() => setPage(current => Math.min(pageCount - 1, current + 1))} disabled={page >= pageCount - 1}>NEXT</button>
-      </div>
-    </div>}
-    <div className="skip-profile-panel-note">{detail} Values remain unavailable when the official boxscore does not supply the required denominator.</div>
-  </Panel>;
-}
-export function buildRecentGameSeries(boxscoreSplits, metric = 'ops', limit = 10) {
-  const games = Array.isArray(boxscoreSplits?.recentGames) ? boxscoreSplits.recentGames : [];
-  return games.slice(0, limit).map(game => {
-    const raw = game?.batting?.[metric];
-    return raw == null || raw === '' ? null : Number(raw);
-  }).filter(Number.isFinite).reverse();
-}
-
 export function MetricSparkline({ values, tone }) {
   const numeric = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
   if (numeric.length < 2) return <div className="skip-summary-sparkline-unavailable">Last 10 games unavailable</div>;
@@ -2351,7 +1973,7 @@ export function MetricSparkline({ values, tone }) {
   );
 }
 
-function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
+function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavorite = false, onToggleFavorite, onCompare, onSwitchPlayer }) {
   const visualQaOptions = VISUAL_QA_PLAYERS.some(candidate => String(candidate.id) === String(player.id))
     ? VISUAL_QA_PLAYERS
     : [{ id:player.id, name:player.profile?.fullName || 'Current player', team:player.profile?.currentTeam?.abbreviation || '—' }, ...VISUAL_QA_PLAYERS];
@@ -2443,6 +2065,8 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
   const opsDelta = Number.isFinite(currentOps) && Number.isFinite(priorOps) ? currentOps - priorOps : null;
   const statcastValue = player.savant?.est_woba ?? player.savant?.avg_hit_speed ?? null;
   const recentOpsSeries = buildRecentGameSeries(player.boxscoreSplits, 'ops', 10);
+  const recentPerformanceSeries = buildRecentPerformanceSeries(player.boxscoreSplits, { metric: player.isPitcher ? 'era' : 'ops', group: player.isPitcher ? 'pitching' : 'batting', limit: 10 });
+  const recentPerformanceSummary = summarizeRecentPerformance(recentPerformanceSeries, { lowerIsBetter: player.isPitcher });
   const statcastPopulation = player.savant?.est_woba != null
     ? (player.statcastPopulation || []).map(row => row?.est_woba)
     : (player.statcastPopulation || []).map(row => row?.avg_hit_speed);
@@ -2610,7 +2234,7 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
     <>
       <Breadcrumbs items={breadcrumbItems} accent={teamAccent} />
       {/* ══ HERO ══════════════════════════════════════════════════════════ */}
-      <div className="skip-player-hero" style={{ background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:12,
+      <div className="skip-player-hero" style={{ '--team-accent':teamAccent, background:`linear-gradient(110deg, color-mix(in srgb, ${teamAccent} 9%, ${C.surface}), ${C.surface} 48%)`, border:`1px solid color-mix(in srgb, ${teamAccent} 28%, ${C.border})`, borderTop:`3px solid ${teamAccent}`, borderRadius:12,
         display:'flex', alignItems:'stretch', overflow:'hidden', overflowX:'auto' }}>
 
         {/* Visually-hidden page heading — this page has no semantic <h1>-<h6>
@@ -2643,7 +2267,7 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
               {p.useLastName || p.lastName || p.fullName}
             </div>
             <div style={{display:'flex',alignItems:'center',gap:7,marginTop:5,minWidth:0}}>
-              <TeamLogo abbr={p.currentTeam?.abbreviation} size={24} />
+              <span className="skip-profile-team-logo-mark"><TeamLogo abbr={p.currentTeam?.abbreviation} size={32} /></span>
               <div style={sans({ fontSize:11, color:teamAccent, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:180 })}>
                 {p.currentTeam?.name || 'Free Agent'} · {p.primaryPosition?.abbreviation || '—'}
               </div>
@@ -2774,6 +2398,8 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
             <div className="skip-profile-tab-grid splits-grid">
               <ReconciliationPanel player={player} />
               <BoxscoreSplitPanel player={player} />
+              <PlayerNewsPanel player={p} accent={teamAccent} />
+              <NaturalLanguageMlbQuery accent={teamAccent} context={{ view:'player profile', player:p?.fullName || 'Selected player', team:p?.currentTeam?.name || 'Free Agent', position:p?.primaryPosition?.abbreviation || 'Unavailable', stats:{ ops:s?.ops ?? null, avg:s?.avg ?? null, homeRuns:s?.homeRuns ?? null, era:s?.era ?? null, strikeouts:s?.strikeouts ?? null }, recentTrend:recentPerformanceSummary?.label || 'Unavailable' }} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
               <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
@@ -2995,6 +2621,26 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
           </Panel>
 
           <DefensiveIntel pos={p?.primaryPosition?.abbreviation} />
+
+          <Panel title={player.isPitcher ? 'Recent ERA / Hot Streak' : 'Recent OPS / Hot Streak'} accent={C.teal} badge={boxscoreStatus === 'loading' ? 'Loading' : recentPerformanceSummary.status === 'verified' ? recentPerformanceSummary.label : 'Unavailable'}>
+            {boxscoreStatus === 'loading' ? <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>Loading verified recent game performance…</div> : recentPerformanceSeries.length >= 3 ? (
+              <div style={{ padding:'7px 6px 4px' }} role="img" aria-label={`Verified recent ${player.isPitcher ? 'ERA' : 'OPS'} trend across ${recentPerformanceSeries.length} games`}>
+                <ResponsiveContainer width="100%" height={118}>
+                  <LineChart data={recentPerformanceSeries} margin={{ top:8, right:12, bottom:0, left:2 }}>
+                    <CartesianGrid stroke={C.borderLight} vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize:8.5, fill:C.text3 }} axisLine={false} tickLine={false} />
+                    <YAxis reversed={player.isPitcher} tick={{ fontSize:8.5, fill:C.text3 }} axisLine={false} tickLine={false} width={30} domain={['auto','auto']} />
+                    <Tooltip {...TT} labelFormatter={(label, payload) => payload?.[0]?.payload?.opponent ? `${label} · vs ${payload[0].payload.opponent}` : label} formatter={value => [Number(value).toFixed(player.isPitcher ? 2 : 3), player.isPitcher ? 'ERA' : 'OPS']} />
+                    <Line isAnimationActive={false} dataKey="value" name={player.isPitcher ? 'ERA' : 'OPS'} stroke={C.teal} strokeWidth={2.2} dot={{ r:3, fill:C.teal }} type="monotone" />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'2px 8px 4px' }}>
+                  <span style={px({ fontSize:9, fontWeight:800, color:recentPerformanceSummary.label === 'Hot streak' ? C.teal : C.rust })}>{recentPerformanceSummary.label}</span>
+                  <span style={px({ fontSize:8.5, color:C.text4 })}>{recentPerformanceSeries.length} verified games · {player.isPitcher ? 'lower is better' : 'higher is better'}</span>
+                </div>
+              </div>
+            ) : <div role="status" style={sans({ padding:'22px 12px', textAlign:'center', fontSize:10, color:C.text3 })}>Recent verified {player.isPitcher ? 'ERA' : 'OPS'} game data is unavailable or below the three-game chart minimum.</div>}
+          </Panel>
 
           {/* Career OPS/ERA sparkline */}
           {sparkData.length > 1 && (

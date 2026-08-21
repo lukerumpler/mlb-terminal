@@ -7,9 +7,8 @@ import {
   isFanGraphsProviderBlockedResponse,
 } from "../server/api/fangraphs-models.js";
 
-const root = path.resolve(import.meta.dirname, "..");
 const overviewSource = readFileSync(
-  path.join(root, "client/src/pages/OverviewPage.jsx"),
+  path.resolve(import.meta.dirname, "../client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 

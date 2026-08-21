@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, TEAMS } from '../constants/data.js';
-import { searchPlayers } from '../api/mlb.js';
+import { filterActivePlayerSearchResults, searchPlayers } from '../api/mlb.js';
 import { routeNaturalLanguageSearch } from '../api/naturalSearch.js';
 import { openPlayerProfile, openTeamOverview } from '../lib/navigation.js';
 import { clearSearchAnalytics, getSearchShortcutHint, getTopSearchQueries, recordSearchQuery, SEARCH_ANALYTICS_EVENT } from '../lib/searchAnalytics.js';
@@ -104,7 +104,7 @@ export default function CommandPalette({ onNavigate, onOpenProspect, onClose }) 
     if (result.intent === 'player') {
       try {
         const people = await searchPlayers(result.entity || q, 5);
-        const person = people?.[0];
+        const person = filterActivePlayerSearchResults(people)?.[0];
         if (!person?.id) {
           setAiState('error');
           setAiMessage(`No verified player match was found for “${result.entity || q}”.`);

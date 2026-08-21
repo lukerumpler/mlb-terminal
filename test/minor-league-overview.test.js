@@ -11,13 +11,12 @@ import {
   sortTeamsByLeagueDivisionName,
 } from "../client/src/constants/data.js";
 
-const root = path.resolve(import.meta.dirname, "..");
 const overviewSource = readFileSync(
-  path.join(root, "client/src/pages/OverviewPage.jsx"),
+  path.resolve(import.meta.dirname, "../client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 const mlbSource = readFileSync(
-  path.join(root, "client/src/api/mlb.js"),
+  path.resolve(import.meta.dirname, "../client/src/api/mlb.js"),
   "utf8"
 );
 

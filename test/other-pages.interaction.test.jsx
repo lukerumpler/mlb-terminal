@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../client/src/App.jsx";
+import { buildComparisonMetricSummary, buildCrossTeamComparisonRows } from "../client/src/pages/OtherPages.jsx";
 
 beforeEach(() => {
   cleanup();
@@ -33,6 +34,38 @@ async function goToTab(user, label, waitForText) {
   }
   await screen.findByText(waitForText, {}, { timeout: 8000 });
 }
+
+describe("Cross-team comparison helpers", () => {
+  it("filters by team and division and sorts the selected verified metric", () => {
+    const teams = {
+      one: { id:1, name:"Alpha Club", abbr:"ALP" },
+      two: { id:2, name:"Beta Club", abbr:"BET" },
+      three: { id:3, name:"Gamma Club", abbr:"GAM" },
+    };
+    const rows = buildCrossTeamComparisonRows({
+      teams,
+      standings:{ East:[{ id:1, wins:80, losses:50 }, { id:2, wins:70, losses:60 }], West:[{ id:3, wins:65, losses:65 }] },
+      teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 }, 3:{ ops:.790 } }, pitching:{} },
+      metric:"ops",
+      search:"club",
+      division:"East",
+      direction:"desc",
+    });
+    expect(rows.map(row => row.name)).toEqual(["Alpha Club", "Beta Club"]);
+    expect(rows.map(row => row.value)).toEqual([.820, .740]);
+    expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }, { id:2 }] }, teamStats:{ hitting:{ 1:{ ops:.820 }, 2:{ ops:.740 } }, pitching:{} }, metric:"ops", direction:"asc" }).map(row => row.name)).toEqual(["Beta Club", "Alpha Club"]);
+    expect(buildCrossTeamComparisonRows({ teams, standings:{ East:[{ id:1 }] }, teamStats:{ hitting:{ "1":{ ops:.910 } }, pitching:{} }, metric:"ops" })[0].value).toBe(.910);
+  });
+
+  it("excludes missing comparison metrics while preserving real zeroes and lower-is-better logic", () => {
+    expect(buildComparisonMetricSummary([
+      ["HR", "0", "5", 0, 5],
+      ["OPS", "—", ".900", null, .9],
+      ["K", "20", "10", 20, 10, true],
+      ["BB", "12", "12", 12, 12],
+    ])).toMatchObject({ compared:3, firstWins:0, secondWins:2, ties:1, unavailable:1, secondLabels:["HR", "K"] });
+  });
+});
 
 describe("Draft page", () => {
   it("searches the draft class pool without crashing", async () => {
@@ -127,9 +160,11 @@ describe("Intelligence page", () => {
     const user = userEvent.setup();
     await goToTab(user, "Intelligence", /Player Comparison Engine/i);
     const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
-    expect(provenance).toHaveTextContent("MLB Stats API comparison lookup");
-    expect(provenance).toHaveTextContent("Fetched when players are compared");
-    expect(provenance).toHaveTextContent("SKIP model snapshot; not a live provider feed");
+    expect(provenance).toHaveTextContent(/MLB Stats API.*on demand/i);
+    expect(provenance).toHaveTextContent(/Retrieved only when compared/i);
+    expect(provenance).toHaveTextContent(/Reference snapshots; not live feeds or Team Overview grades/i);
+    expect(screen.getAllByText("Reference snapshot").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText(/Reference snapshots preserve original SKIP research examples/i)).toBeInTheDocument();
   });
 
   it("rejects comparing a player against themselves", async () => {
@@ -241,6 +276,7 @@ describe("League page", () => {
     await goToTab(user, "League", /standings|leaders/i);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
   });
+
 });
 
 describe("Follow List page", () => {

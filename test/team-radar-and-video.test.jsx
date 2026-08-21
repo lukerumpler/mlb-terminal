@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTeamStrengthData,
   deriveTeamPlayerRollups,
+  getStrengthRadarBenchmarkCaption,
 } from "../client/src/pages/OverviewPage.jsx";
 import {
   buildPlayerVideoLinks,
@@ -10,6 +11,7 @@ import {
   loadPlayerPlaylists,
   savePlayerPlaylists,
 } from "../client/src/pages/PlayersPage.jsx";
+import { hasRenderableStrengthBenchmark } from "../client/src/components/OverviewCharts.jsx";
 
 describe("team strength radar data", () => {
   it("derives verified baserunning and position-depth rollups from player rows", () => {
@@ -80,6 +82,38 @@ describe("team strength radar data", () => {
         command: "not available",
       })
     ).toEqual([{ axis: "Offense", val: 92 }]);
+  });
+
+  it("renders the dashed league benchmark only when every displayed axis has a documented average", () => {
+    const complete = [
+      { axis: "Offense", val: 90, leagueAverage: 50 },
+      { axis: "Pitching", val: 82, leagueAverage: 50 },
+    ];
+    expect(hasRenderableStrengthBenchmark(complete, true)).toBe(true);
+    expect(
+      hasRenderableStrengthBenchmark(
+        [...complete, { axis: "Command", val: 73, leagueAverage: null }],
+        true
+      )
+    ).toBe(false);
+    expect(hasRenderableStrengthBenchmark(complete, false)).toBe(false);
+  });
+
+  it("labels the dashed benchmark with its documented 30-team MLB aggregate population", () => {
+    expect(
+      getStrengthRadarBenchmarkCaption({
+        hasLeagueBenchmark: true,
+        leagueTeamCount: 30,
+        radarSource: "MLB Stats API team aggregates",
+      })
+    ).toContain("dashed: MLB average benchmark · current documented 30-team aggregate pool");
+    expect(
+      getStrengthRadarBenchmarkCaption({
+        hasLeagueBenchmark: false,
+        leagueTeamCount: 29,
+        radarSource: "MLB Stats API team aggregates",
+      })
+    ).toContain("benchmark unavailable");
   });
 });
 

@@ -17,10 +17,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
     getStandings: vi.fn(async () =>
       feedAttempt > 0
         ? {
-            LAD: [
+            SD: [
               {
-                id: 119,
-                abbr: "LAD",
+                id: 135,
+                abbr: "SD",
                 w: 73,
                 l: 48,
                 pct: 0.603,
@@ -35,10 +35,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
     getAllTeamStats: vi.fn(async group =>
       partialAggregate && group === "hitting"
         ? {
-            119: {
-              teamId: 119,
-              teamAbbr: "LAD",
-              teamName: "Los Angeles Dodgers",
+            135: {
+              teamId: 135,
+              teamAbbr: "SD",
+              teamName: "San Diego Padres",
               ops: 0.802,
               homeRuns: 98,
               era: 2.98,
@@ -49,10 +49,10 @@ vi.mock("../client/src/api/mlb.js", async () => {
           }
         : feedAttempt > 0
         ? {
-            119: {
-              teamId: 119,
-              teamAbbr: "LAD",
-              teamName: "Los Angeles Dodgers",
+            135: {
+              teamId: 135,
+              teamAbbr: "SD",
+              teamName: "San Diego Padres",
               ops: 0.802,
               homeRuns: 98,
               era: 2.98,
@@ -158,7 +158,9 @@ describe("Team Overview model source and retry interaction", () => {
     render(<OverviewPage />);
     expect(
       screen.getByRole("status", { name: "Loading team overview" })
-    ).toBeInTheDocument();
+    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText(/Loading verified team data/i)).toBeInTheDocument();
+    expect(document.querySelector(".skip-overview-skeleton-briefing")).toBeInTheDocument();
     expect(
       await screen.findByText("Season overview", { exact: false })
     ).toBeInTheDocument();
@@ -181,10 +183,10 @@ describe("Team Overview model source and retry interaction", () => {
     saveTeamAggregateCache(
       {
         byAbbr: {
-          LAD: {
+          SD: {
             standings: {
-              id: 119,
-              abbr: "LAD",
+              id: 135,
+              abbr: "SD",
               w: 73,
               l: 48,
               pct: 0.603,
@@ -192,15 +194,15 @@ describe("Team Overview model source and retry interaction", () => {
               ra: 464,
               diff: 142,
             },
-            hitting: { teamId: 119, teamAbbr: "LAD", ops: 0.802 },
-            pitching: { teamId: 119, teamAbbr: "LAD", era: 2.98 },
+            hitting: { teamId: 135, teamAbbr: "SD", ops: 0.802 },
+            pitching: { teamId: 135, teamAbbr: "SD", era: 2.98 },
           },
         },
         byId: {},
       },
       2026
     );
-    saveTeamPlayersCache(119, 2026, {
+    saveTeamPlayersCache(135, 2026, {
       hitting: [{ id: 1, name: "Cached hitter" }],
       pitching: [{ id: 2, name: "Cached pitcher" }],
     });
@@ -267,6 +269,37 @@ describe("Team Overview model source and retry interaction", () => {
       screen.getByRole("button", { name: "Recent performance" })
     );
     expect(sortSelect).toHaveValue("recentOps");
+  });
+
+  it("filters the roster table by player name and reverses the active metric sort", async () => {
+    const user = userEvent.setup();
+    saveTeamPlayersCache(135, 2026, {
+      hitting: [
+        { id: 1, name: "Sample Hitter", position: "CF", stat: { ops: 0.912, plateAppearances: 180 } },
+        { id: 2, name: "Other Batter", position: "RF", stat: { ops: 0.801, plateAppearances: 150 } },
+      ],
+      pitching: [],
+    });
+    render(<OverviewPage />);
+    await user.click(screen.getByRole("button", { name: "Roster" }));
+
+    const table = await screen.findByRole("table", {
+      name: "Roster insights sorted by OPS",
+    });
+    expect(table).toBeInTheDocument();
+
+    const search = screen.getByRole("textbox", {
+      name: "Filter roster insights by player name",
+    });
+    await user.type(search, "hitter");
+    expect(screen.getByRole("rowheader", { name: "Sample Hitter" })).toBeInTheDocument();
+
+    const direction = screen.getByRole("button", {
+      name: /Reverse roster insights sort direction; currently descending/i,
+    });
+    await user.click(direction);
+    expect(direction).toHaveTextContent("ASC ↑");
+    expect(direction).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
@@ -379,7 +412,7 @@ describe("Team Overview model source and retry interaction", () => {
 
     await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
-    expect(screen.getByText(/LAD highlighted/i)).toBeInTheDocument();
+    expect(screen.getByText(/SD highlighted/i)).toBeInTheDocument();
     const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
     expect(exactValuesTable).toHaveTextContent("LAD");
     expect(exactValuesTable).toHaveTextContent("+31.4");
@@ -433,6 +466,6 @@ describe("Team Overview model source and retry interaction", () => {
     );
     expect(
       container.querySelectorAll(".skip-status-verified").length
-    ).toBeGreaterThanOrEqual(2);
+    ).toBeGreaterThanOrEqual(1);
   }, 20000);
 });

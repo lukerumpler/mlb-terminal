@@ -14,15 +14,55 @@ import {
 } from '../components/atoms.jsx';
 import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
-import { fmt } from '../lib/formatting.js';
+import { fmt, fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
+import { downloadMlbStandingsCsv } from '../lib/csvExports.js';
+import { openPlayerProfile, openTab } from '../lib/navigation.js';
 import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
+import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
+import NaturalLanguageMlbQuery from '../components/NaturalLanguageMlbQuery.jsx';
 
 // FIX: Global tooltip config — z-index 9999 prevents clip behind sibling panels
 const TT = {
   ...WARM_TOOLTIP,
   wrapperStyle: { zIndex: 9999 },
 };
+
+export function buildComparisonMetricSummary(rows = []) {
+  const summary = { compared:0, firstWins:0, secondWins:0, ties:0, unavailable:0, firstLabels:[], secondLabels:[] };
+  for (const [label,,, firstValue, secondValue, lowerIsBetter] of Array.isArray(rows) ? rows : []) {
+    if (!Number.isFinite(firstValue) || !Number.isFinite(secondValue)) {
+      summary.unavailable += 1;
+      continue;
+    }
+    summary.compared += 1;
+    if (firstValue === secondValue) {
+      summary.ties += 1;
+    } else if (lowerIsBetter ? firstValue < secondValue : firstValue > secondValue) {
+      summary.firstWins += 1;
+      summary.firstLabels.push(label);
+    } else {
+      summary.secondWins += 1;
+      summary.secondLabels.push(label);
+    }
+  }
+  return summary;
+}
+
+export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamStats = { hitting:{}, pitching:{} }, metric = 'ops', search = '', division = 'all', direction = 'desc' } = {}) {
+  const standingsRows = Object.entries(standings || {}).flatMap(([divisionName, rows]) => (rows || []).map(team => ({ ...team, division:divisionName })));
+  const standingsById = new Map(standingsRows.map(team => [String(team.id), team]));
+  const rows = Object.values(teams || {}).map(team => {
+    const hitting = teamStats.hitting?.[team.id] ?? teamStats.hitting?.[String(team.id)] ?? {};
+    const pitching = teamStats.pitching?.[team.id] ?? teamStats.pitching?.[String(team.id)] ?? {};
+    const standing = standingsById.get(String(team.id)) || {};
+    const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : null;
+    const value = Number(raw);
+    return { id:team.id, abbr:team.abbr, name:team.name, division:standing.division || 'Division unavailable', value:Number.isFinite(value) ? value : null, wins:standing.wins, losses:standing.losses };
+  }).filter(row => row.value != null);
+  const query = String(search || '').trim().toLowerCase();
+  return rows.filter(row => (!query || `${row.name} ${row.abbr}`.toLowerCase().includes(query)) && (division === 'all' || row.division === division)).sort((a, b) => direction === 'asc' ? a.value - b.value : b.value - a.value);
+}
 
 // Module-scope, not defined inside DraftMoversPanel: a component defined
 // inside another component's render body gets a brand-new function identity
@@ -749,11 +789,16 @@ function LeaguePage() {
   const [teamStats,   setTeamStats]   = useState({ hitting:{}, pitching:{} });
   const [gamesLoading,setGamesLoading]= useState(true);
   const [stdLoading,  setStdLoading]  = useState(true);
+  const [standingsRetrievedAt, setStandingsRetrievedAt] = useState(null);
 
   // Static leaderboard state (Statcast-enriched data)
   const [lbTab,    setLbTab]    = useState('hitting');
   const [lbSort,   setLbSort]   = useState('ops');
   const [lbFilter, setLbFilter] = useState('all');
+  const [comparisonMetric, setComparisonMetric] = useState('ops');
+  const [comparisonSearch, setComparisonSearch] = useState('');
+  const [comparisonDivision, setComparisonDivision] = useState('all');
+  const [comparisonSortDirection, setComparisonSortDirection] = useState('desc');
 
   const liveHitterRows = useMemo(() => {
     const byId = new Map();
@@ -814,9 +859,21 @@ function LeaguePage() {
 
   const lbTeams = ['all', ...new Set(liveHitterRows.map(r => r.team).filter(Boolean))].sort();
 
+  const comparisonRows = useMemo(() => buildCrossTeamComparisonRows({ teams:TEAMS, standings, teamStats, metric:comparisonMetric, search:comparisonSearch, division:comparisonDivision, direction:comparisonSortDirection }), [comparisonDivision, comparisonMetric, comparisonSearch, comparisonSortDirection, standings, teamStats]);
+  const comparisonLoading = stdLoading && !Object.keys(teamStats.hitting || {}).length && !Object.keys(teamStats.pitching || {}).length;
+  const comparisonDivisions = ['all', ...new Set(Object.keys(standings || {}))];
+  const comparisonMetricConfig = {
+    ops:{ label:'Team OPS', digits:3, suffix:'', group:'hitting' },
+    era:{ label:'Team ERA', digits:2, suffix:'', group:'pitching' },
+    hr:{ label:'Home Runs', digits:0, suffix:'', group:'hitting' },
+    runs:{ label:'Runs Scored', digits:0, suffix:'', group:'hitting' },
+    runsAllowed:{ label:'Runs Allowed', digits:0, suffix:'', group:'pitching' },
+    winPct:{ label:'Win %', digits:3, suffix:'', group:'standings' },
+  }[comparisonMetric];
+
   const HIT_COLS = [
-    { key:'avg',  label:'AVG', fmt:v=>v.toFixed(3).replace('0.','.') },
-    { key:'ops',  label:'OPS', fmt:v=>v.toFixed(3).replace('0','') },
+    { key:'avg',  label:'AVG', fmt:fmtScorebookRate },
+    { key:'ops',  label:'OPS', fmt:fmtScorebookRate },
     { key:'hr',   label:'HR',  fmt:v=>String(v) },
     { key:'rbi',  label:'RBI', fmt:v=>String(v) },
     { key:'sb',   label:'SB',  fmt:v=>String(v) },
@@ -855,7 +912,7 @@ function LeaguePage() {
     const hitting = Object.values(teamStats.hitting).filter(s => s.ops != null);
     const pitching = Object.values(teamStats.pitching).filter(s => s.era != null);
     return {
-      avgOps: hitting.length ? (hitting.reduce((sum, s) => sum + Number(s.ops), 0) / hitting.length).toFixed(3) : '—',
+      avgOps: hitting.length ? fmtScorebookRate(hitting.reduce((sum, s) => sum + Number(s.ops), 0) / hitting.length) : '—',
       avgEra: pitching.length ? (pitching.reduce((sum, s) => sum + Number(s.era), 0) / pitching.length).toFixed(2) : '—',
       homeRuns: hitting.length ? hitting.reduce((sum, s) => sum + Number(s.homeRuns || 0), 0).toLocaleString() : '—',
     };
@@ -882,7 +939,10 @@ function LeaguePage() {
           getStandings(), getAllLeaders(), getAllTeamStats('hitting'), getAllTeamStats('pitching'),
         ]);
         if (alive) {
-          if (std.status === 'fulfilled') setStandings(std.value);
+          if (std.status === 'fulfilled') {
+            setStandings(std.value);
+            setStandingsRetrievedAt(Date.now());
+          }
           if (ldr.status === 'fulfilled') setLeaders(ldr.value);
           setTeamStats({
             hitting: hitting.status === 'fulfilled' ? hitting.value : {},
@@ -897,6 +957,12 @@ function LeaguePage() {
 
   const hasStandings = Object.keys(standings).length > 0;
   const hasLeaders   = Object.keys(leaders).length > 0;
+  const handleStandingsExport = () => downloadMlbStandingsCsv({
+    standings,
+    source: 'MLB Stats API',
+    retrievedAt: standingsRetrievedAt,
+    formatWinPct,
+  });
 
   function gameStatusLabel(g) {
     if (g.statusCode === 'F' || g.status === 'Final') return 'Final';
@@ -981,7 +1047,12 @@ function LeaguePage() {
         <div style={{ padding:'10px 14px' }}><SkeletonRows count={6} height={26} /></div>
       )}
       {!stdLoading && hasStandings && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12 }}>
+        <section aria-label="Official MLB standings">
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginBottom:8}}>
+            <span style={sans({fontSize:10,color:C.text3})}>Official MLB standings · {standingsRetrievedAt ? `retrieved ${new Date(standingsRetrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : 'retrieval time unavailable'}</span>
+            <button type="button" onClick={handleStandingsExport} aria-label="Download MLB standings CSV with W–L and WIN%" style={{minHeight:28,padding:'5px 8px',border:`1px solid ${C.tealMid}`,borderRadius:6,background:C.tealSoft,color:C.teal,cursor:'pointer',...px({fontSize:8.5,fontWeight:800,letterSpacing:'.04em'})}}>EXPORT STANDINGS CSV</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12 }}>
           {Object.entries(standings).map(([div, teams]) => (
             <Panel key={div} title={div} accent={C.navy}>
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -1010,7 +1081,7 @@ function LeaguePage() {
                       </td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:teamColor || C.teal }) }}>{t.w}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{t.l}</td>
-                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{(t.pct||0).toFixed(3)}</td>
+                      <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:11, color:C.text }) }}>{fmtWinPct(t.pct)}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.gb === '-' || !t.gb ? '—' : t.gb}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.l10||'—'}</td>
                       <td style={{ padding:'5px 8px', textAlign:'right', ...px({ fontSize:10, color:C.text3 }) }}>{t.rs||'—'}</td>
@@ -1022,15 +1093,34 @@ function LeaguePage() {
               </table>
             </Panel>
           ))}
-        </div>
+          </div>
+        </section>
       )}
       {!stdLoading && !hasStandings && (
         <Panel title="Standings" accent={C.navy} badge="Unavailable">
           <div style={{padding:'16px 14px',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             Official MLB standings are unavailable right now. Static snapshots are intentionally hidden so stale records are not presented as current.
           </div>
+          <div style={{padding:'0 14px 14px'}}>
+            <button type="button" disabled aria-label="Download MLB standings CSV with W–L and WIN%" style={{minHeight:28,padding:'5px 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface2,color:C.text4,cursor:'not-allowed',...px({fontSize:8.5,fontWeight:800,letterSpacing:'.04em'})}}>EXPORT STANDINGS CSV</button>
+          </div>
         </Panel>
       )}
+
+      <div className="skip-comparison-view-transition">
+      <NaturalLanguageMlbQuery accent={C.teal} title="Ask the comparison engine" context={{ view:'cross-team comparison', metric:comparisonMetricConfig.label, division:comparisonDivision, search:comparisonSearch || 'all teams', visibleTeams:comparisonRows.slice(0, 30).map(row => ({ name:row.name, division:row.division, value:row.value, wins:row.wins, losses:row.losses })) }} />
+      <Panel title="Cross-Team Comparison" accent={C.teal} badge={comparisonRows.length ? `${comparisonRows.length} verified teams` : 'Unavailable'}>
+        <div style={{padding:'8px 14px 4px',...sans({fontSize:10,color:C.text3,lineHeight:1.4})}}>Compare current-season team performance side-by-side using the same metric, division, and search filters. Missing provider values remain excluded.</div>
+        <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',padding:'8px 14px'}}>
+          <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Metric</span><select aria-label="Cross-team comparison metric" value={comparisonMetric} onChange={event=>{setComparisonMetric(event.target.value);setComparisonSortDirection(event.target.value === 'era' ? 'asc' : 'desc')}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}}>{Object.entries({ops:'Team OPS',era:'Team ERA',hr:'Home Runs',runs:'Runs Scored',runsAllowed:'Runs Allowed',winPct:'Win %'}).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+          <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Division</span><select aria-label="Cross-team comparison division" value={comparisonDivision} onChange={event=>setComparisonDivision(event.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}}>{comparisonDivisions.map(value=><option key={value} value={value}>{value === 'all' ? 'All divisions' : value}</option>)}</select></label>
+          <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Team</span><input aria-label="Filter cross-team comparison by team" value={comparisonSearch} onChange={event=>setComparisonSearch(event.target.value)} placeholder="Search team" style={{height:30,width:140,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}} /></label>
+          <button type="button" aria-label={`Reverse cross-team comparison sort; currently ${comparisonSortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={()=>setComparisonSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{comparisonSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
+          {(comparisonSearch || comparisonDivision !== 'all') && <button type="button" onClick={()=>{setComparisonSearch('');setComparisonDivision('all')}} style={{height:28,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text3,fontSize:9.5,fontWeight:700,cursor:'pointer'}}>Clear filters</button>}
+        </div>
+        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
+      </Panel>
+      </div>
 
       {/* ── Stat charts row ── */}
       <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
@@ -1046,15 +1136,15 @@ function LeaguePage() {
               <BarChart data={opsSorted} layout="vertical" margin={{ top:2,right:40,bottom:2,left:4 }}>
                 <CartesianGrid stroke={C.borderLight} horizontal={false}/>
                 <XAxis type="number" domain={[opsMin,opsMax]}
-                  tickFormatter={v=>(v/1000).toFixed(3).replace('0.','. ')}
+                  tickFormatter={v=>fmtScorebookRate(v/1000)}
                   tick={{ fontSize:10,fill:C.text3 }} axisLine={false} tickLine={false}/>
                 <YAxis type="category" dataKey="team"
                   tick={{ fontSize:11,fill:C.text2,fontFamily:"'DM Mono',monospace",fontWeight:600 }}
                   width={38} axisLine={false} tickLine={false}/>
-                <Tooltip {...TT} formatter={v=>[(v/1000).toFixed(3),'OPS']}/>
+                <Tooltip {...TT} formatter={v=>[fmtScorebookRate(v/1000),'OPS']}/>
                 <Bar isAnimationActive={false} dataKey="ops" fill={C.amber} radius={[0,3,3,0]} maxBarSize={20}
                   label={{ position:'right',fontSize:10,fill:C.amberDark,fontFamily:"'DM Mono',monospace",
-                    formatter:v=>(v/1000).toFixed(3).replace('0.','.')}}/>
+                    formatter:v=>fmtScorebookRate(v/1000)}}/>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1393,18 +1483,19 @@ function IntelligencePage() {
         ? ` (using ${r1.season}/${r2.season} data)` : '';
       // Display a real 0 as "0", not "—" (em dash is reserved for genuinely missing data)
       const dash = (v) => (v === null || v === undefined || v === '') ? '—' : v;
+      const finiteOrNull = value => Number.isFinite(Number(value)) ? Number(value) : null;
       if (mountedRef.current) setCompData({
-        n1: r1.name, n2: r2.name, seasonNote,
+        n1: r1.name, n2: r2.name, id1:r1.id, id2:r2.id, seasonNote, retrievedAt:new Date().toISOString(),
         rows: [
-          ['AVG', fmt(s1.avg),           fmt(s2.avg),           parseFloat(s1.avg)||0,       parseFloat(s2.avg)||0],
-          ['OBP', fmt(s1.obp),           fmt(s2.obp),           parseFloat(s1.obp)||0,       parseFloat(s2.obp)||0],
-          ['SLG', fmt(s1.slg),           fmt(s2.slg),           parseFloat(s1.slg)||0,       parseFloat(s2.slg)||0],
-          ['OPS', fmt(s1.ops),           fmt(s2.ops),           parseFloat(s1.ops)||0,       parseFloat(s2.ops)||0],
-          ['HR',  dash(s1.homeRuns),     dash(s2.homeRuns),     parseInt(s1.homeRuns)||0,    parseInt(s2.homeRuns)||0],
-          ['RBI', dash(s1.rbi),          dash(s2.rbi),          parseInt(s1.rbi)||0,         parseInt(s2.rbi)||0],
-          ['SB',  dash(s1.stolenBases),  dash(s2.stolenBases),  parseInt(s1.stolenBases)||0, parseInt(s2.stolenBases)||0],
-          ['K',   dash(s1.strikeOuts),   dash(s2.strikeOuts),   parseInt(s1.strikeOuts)||0,  parseInt(s2.strikeOuts)||0, true],
-          ['BB',  dash(s1.baseOnBalls),  dash(s2.baseOnBalls),  parseInt(s1.baseOnBalls)||0, parseInt(s2.baseOnBalls)||0],
+          ['AVG', fmt(s1.avg),           fmt(s2.avg),           finiteOrNull(s1.avg),          finiteOrNull(s2.avg)],
+          ['OBP', fmt(s1.obp),           fmt(s2.obp),           finiteOrNull(s1.obp),          finiteOrNull(s2.obp)],
+          ['SLG', fmt(s1.slg),           fmt(s2.slg),           finiteOrNull(s1.slg),          finiteOrNull(s2.slg)],
+          ['OPS', fmt(s1.ops),           fmt(s2.ops),           finiteOrNull(s1.ops),          finiteOrNull(s2.ops)],
+          ['HR',  dash(s1.homeRuns),     dash(s2.homeRuns),     finiteOrNull(s1.homeRuns),     finiteOrNull(s2.homeRuns)],
+          ['RBI', dash(s1.rbi),          dash(s2.rbi),          finiteOrNull(s1.rbi),          finiteOrNull(s2.rbi)],
+          ['SB',  dash(s1.stolenBases),  dash(s2.stolenBases),  finiteOrNull(s1.stolenBases),  finiteOrNull(s2.stolenBases)],
+          ['K',   dash(s1.strikeOuts),   dash(s2.strikeOuts),   finiteOrNull(s1.strikeOuts),   finiteOrNull(s2.strikeOuts), true],
+          ['BB',  dash(s1.baseOnBalls),  dash(s2.baseOnBalls),  finiteOrNull(s1.baseOnBalls),  finiteOrNull(s2.baseOnBalls)],
         ],
       });
     } catch (err) {
@@ -1441,14 +1532,15 @@ function IntelligencePage() {
     ['Freddie Freeman 1B LAD',12,'Low','Clean history, optimal workload management',C.teal],
     ['Zack Wheeler RHP PHI',14,'Low','Durable profile, consistent mechanics',C.teal],
   ];
+  const comparisonSummary = useMemo(() => buildComparisonMetricSummary(compData?.rows), [compData?.rows]);
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <div className="skip-profile-source-strip" role="region" aria-label="Intelligence data provenance">
         <span className="skip-profile-source-title">DATA PROVENANCE</span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot is-ready" aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">MLB Stats API comparison lookup</span></span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">Fetched when players are compared</span></span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">SKIP model snapshot; not a live provider feed</span></span>
+        <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compData ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">{compData ? 'MLB Stats API comparison lookup' : 'MLB Stats API · on demand'}</span></span>
+        <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compLoading ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">{compLoading ? 'Retrieving selected players' : compData ? `Retrieved ${new Date(compData.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}` : 'Retrieved only when compared'}</span></span>
+        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">Reference snapshots; not live feeds or Team Overview grades</span></span>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
 
@@ -1494,8 +1586,9 @@ function IntelligencePage() {
                   </thead>
                   <tbody>
                     {compData.rows.map(([m,v1,v2,n1,n2,lowerIsBetter],i,arr)=>{
-                      const p1Wins = lowerIsBetter ? (n1>0 && n1<n2) : n1>n2;
-                      const p2Wins = lowerIsBetter ? (n2>0 && n2<n1) : n2>n1;
+                      const isComparable = Number.isFinite(n1) && Number.isFinite(n2);
+                      const p1Wins = isComparable && (lowerIsBetter ? n1<n2 : n1>n2);
+                      const p2Wins = isComparable && (lowerIsBetter ? n2<n1 : n2>n1);
                       return (
                       <tr key={m} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}>
                         <td style={{ padding:'6px 10px', ...sans({ fontSize:12, color:C.text2 }) }}>{m}</td>
@@ -1507,12 +1600,26 @@ function IntelligencePage() {
                   </tbody>
                 </table>
               </div>
+              <div style={{ padding:'9px 14px 11px', borderTop:`0.5px solid ${C.borderLight}`, display:'flex', flexDirection:'column', gap:7 }}>
+                <div style={sans({ fontSize:10, color:C.text2, lineHeight:1.45 })}>
+                  {comparisonSummary.compared
+                    ? `${compData.n1} leads ${comparisonSummary.firstWins} of ${comparisonSummary.compared} comparable season metrics${comparisonSummary.firstLabels.length ? ` (${comparisonSummary.firstLabels.join(', ')})` : ''}; ${compData.n2} leads ${comparisonSummary.secondWins}${comparisonSummary.secondLabels.length ? ` (${comparisonSummary.secondLabels.join(', ')})` : ''}.`
+                    : 'No comparable verified season metrics were returned for this comparison.'}
+                  {comparisonSummary.unavailable ? ` ${comparisonSummary.unavailable} metric${comparisonSummary.unavailable === 1 ? ' was' : 's were'} unavailable and excluded.` : ''}
+                </div>
+                <div style={sans({ fontSize:9, color:C.text4, lineHeight:1.4 })}>This readout compares returned season totals only. It does not infer player value, injury risk, team fit, Statcast performance, or Front Office grades.</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  <button type="button" onClick={() => openPlayerProfile(compData.id1, compData.n1)} style={{ height:28, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:5, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Open {compData.n1.split(' ').slice(-1)[0]} profile</button>
+                  <button type="button" onClick={() => openPlayerProfile(compData.id2, compData.n2)} style={{ height:28, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:5, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Open {compData.n2.split(' ').slice(-1)[0]} profile</button>
+                  <button type="button" onClick={() => openTab('overview')} style={{ height:28, padding:'0 9px', border:`1px solid ${C.border}`, borderRadius:5, background:C.surface3, color:C.text2, cursor:'pointer', ...px({ fontSize:9, fontWeight:800 }) }}>Review team evaluation inputs</button>
+                </div>
+              </div>
             </>
           )}
         </Panel>
 
         {/* Injury risk — FIX: bar transition added, consistent layout */}
-        <Panel title="Injury Risk Model" accent={C.rust} badge="SKIP Model">
+        <Panel title="Injury Risk Model" accent={C.rust} badge="Reference snapshot">
           {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
             <div key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none', padding:'7px 14px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1531,7 +1638,7 @@ function IntelligencePage() {
         </Panel>
 
         {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="SKIP Model">
+        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
               <thead>
@@ -1558,7 +1665,7 @@ function IntelligencePage() {
         </Panel>
 
         {/* Pitcher projections */}
-        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="SKIP Model">
+        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="Reference snapshot">
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:340 }}>
               <thead>
@@ -1584,8 +1691,9 @@ function IntelligencePage() {
           </div>
         </Panel>
       </div>
+      <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Reference snapshots preserve original SKIP research examples. They are not automatically refreshed with provider data, do not alter selected-team metrics, and do not feed Front Office grades. Use the comparison engine or player profiles for verified current-season player data.</div>
       {/* ── Trade Value Simulator ── */}
-      <Panel title="Trade Value Simulator" accent={C.purple} badge="SKIP Model">
+      <Panel title="Trade Value Simulator" accent={C.purple} badge="Reference scenario">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
           {/* Side A */}
           <div style={{ padding:'14px', borderRight:`0.5px solid ${C.border}` }}>
@@ -1648,7 +1756,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1689,6 +1797,17 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
           )}
         </div>
       </Panel>
+      <Panel title="Team Workspace Default" accent={C.teal}>
+        <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, flexWrap:'wrap' }}>
+          <div style={{ flex:'1 1 250px' }}>
+            <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Default Team Overview</div>
+            <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>Choose the club that opens when you start a new Team Overview session. This preference is saved only in this browser; it does not change team data or shared workspace defaults.</div>
+          </div>
+          <select aria-label="Default Team Overview" value={defaultTeamKey} onChange={event => updateDefaultTeamKey?.(event.target.value)} style={{ flex:'0 1 240px', minWidth:200, height:34, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, fontSize:11, fontWeight:700, cursor:'pointer' }}>
+            {Object.entries(TEAMS).sort(([,left],[,right]) => left.name.localeCompare(right.name)).map(([key, team]) => <option key={key} value={key}>{team.name}{key === 'sd' ? ' · Product default' : ''}</option>)}
+          </select>
+        </div>
+      </Panel>
       <Panel title="Performance & Data Use" accent={C.teal}>
         <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:14 }}>
           <div>
@@ -1707,24 +1826,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
-      <Panel title="Uptime Monitor Configuration" badge="Dedicated branch" accent={C.teal}>
-        <div style={{ padding:'10px 14px 4px', ...sans({ fontSize:11, color:C.text3, lineHeight:1.5 }) }}>
-          Four fixed production targets are recorded with explicit pass/fail status, millisecond latency, and UTC timestamps. The project-owned daily job runs at 09:00 UTC after deployment and schedule activation.
-        </div>
-        {[
-          ['MLB API health','https://mlb-terminal.vercel.app/api/health'],
-          ['MLB Terminal','https://mlb-terminal.vercel.app/'],
-          ['SKIP platform','https://skipbasebal-mm6hz9ps.manus.space'],
-          ['lukerumpler.com','https://lukerumpler.com'],
-        ].map(([label, endpoint], index, rows) => <div key={endpoint} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'8px 14px', borderBottom:index < rows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none' }}>
-          <span style={sans({ fontSize:11, fontWeight:700, color:C.text2 })}>{label}</span>
-          <span style={px({ fontSize:9, color:C.text3, textAlign:'right', overflowWrap:'anywhere' })}>{endpoint}</span>
-        </div>)}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'10px 14px', borderTop:`0.5px solid ${C.borderLight}`, background:C.surface2 }}>
-          <span style={px({ fontSize:9.5, color:C.teal, fontWeight:800, letterSpacing:'.05em' })}>DAILY · 09:00 UTC · 2XX–3XX PASS</span>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'uptime' } }))} style={{ padding:'6px 9px', border:`1px solid ${C.tealMid}`, borderRadius:6, background:C.tealSoft, color:C.teal, cursor:'pointer', ...px({ fontSize:9.5, fontWeight:800 }) }}>Open Monitor</button>
-        </div>
-      </Panel>
+      <CacheHealthDashboard health={cacheHealth} status={cacheHealthStatus} updatedAt={cacheHealthUpdatedAt} onRefresh={refreshCacheHealth} />
       <Panel title="Roster Insight Defaults" accent={C.teal}>
         <div style={{padding:'10px 14px 4px',...sans({fontSize:11,color:C.text3,lineHeight:1.45})}}>Set the minimum sample size used by default when roster insights open. Higher thresholds reduce small-sample outliers.</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:0,marginTop:6}}>

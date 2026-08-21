@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetProviderJsonCacheForTests } from '../client/src/api/mlb.js';
 
-const modelKey = 'skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=LAD&season=2026';
+const modelKey = 'skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=SD&season=2026';
 const aggregateKey = 'skip-fangraphs-aggregate-snapshot-v1:/api/fangraphs-models?mode=aggregate&season=2026';
 
 function jsonResponse(data, status = 200) {
@@ -83,11 +83,30 @@ describe('rendered FanGraphs local fallback', () => {
     }));
 
     render(<OverviewPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
     expect(await screen.findByText('>99%')).toBeInTheDocument();
     expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/PlayoffStatus secondary odds · last verified/i);
-    expect(screen.getByText(/Playoff odds: PlayoffStatus · secondary/i)).toBeInTheDocument();
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
+  });
+
+  it('fills the briefing headline with a transparent daily MLB WAR proxy when FanGraphs remains deferred', async () => {
+    vi.stubGlobal('fetch', vi.fn(async url => {
+      if (String(url).includes('/api/playoffstatus-odds')) return jsonResponse({ found:true, source:'PlayoffStatus', playoffOddsDisplay:'>99%', freshness:'cached', retrievedAt:'2026-08-21T03:09:43.508Z', lastVerifiedAt:'2026-08-21T03:09:43.508Z' });
+      if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
+        source:'MLB Stats API', provenance:'calculated-from-verified-standings', freshness:'calculated',
+        metrics:{ wins:77, losses:51, runsScored:640, runsAllowed:495, calculatedWarProxy:51.7 },
+      });
+      if (String(url).includes('/api/fangraphs-models')) return jsonResponse({ error:'FanGraphs should remain deferred' }, 502);
+      return jsonResponse({});
+    }));
+
+    render(<OverviewPage />);
+
+    expect(await screen.findByText('>99%')).toBeInTheDocument();
+    expect(screen.getByText('51.7')).toBeInTheDocument();
+    expect(screen.getByText('WAR Proxy')).toBeInTheDocument();
+    expect(screen.getByTestId('team-war-proxy-verification')).toHaveTextContent(/MLB verified standings · calculated, not FanGraphs Team WAR/i);
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
   });
 
 it('does not fabricate playoff odds when FanGraphs is unavailable while retaining clearly labeled MLB pace and WAR proxies', async () => {
@@ -105,7 +124,7 @@ it('does not fabricate playoff odds when FanGraphs is unavailable while retainin
 
     expect((await screen.findAllByText('Unavailable')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('51.2').length).toBeGreaterThan(0);
-    expect(screen.getByText('WAR Proxy')).toBeInTheDocument();
+    expect(screen.getAllByText('WAR Proxy').length).toBeGreaterThan(0);
     expect(screen.getByText('Pythag W')).toBeInTheDocument();
     expect(screen.getByText('Pythag L')).toBeInTheDocument();
     expect(screen.getAllByText('91.2').length).toBeGreaterThan(0);
