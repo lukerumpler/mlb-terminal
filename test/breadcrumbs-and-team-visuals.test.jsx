@@ -35,4 +35,9 @@ describe("team accent derivation", () => {
     expect(getTeamAccent(null)).toBe(C.amber);
     expect(getTeamAccent({ color: "   " }, "#123456")).toBe("#123456");
   });
+
+  it("uses a display-safe Padres brown for small dashboard text and accents", () => {
+    expect(getTeamAccent({ abbr: "SD", color: "#2F241D" })).toBe("#78502D");
+    expect(getTeamAccent("SD")).toBe("#78502D");
+  });
 });

@@ -2214,7 +2214,7 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
     <>
       <Breadcrumbs items={breadcrumbItems} accent={teamAccent} />
       {/* ══ HERO ══════════════════════════════════════════════════════════ */}
-      <div className="skip-player-hero" style={{ background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:12,
+      <div className="skip-player-hero" style={{ '--team-accent':teamAccent, background:`linear-gradient(110deg, color-mix(in srgb, ${teamAccent} 9%, ${C.surface}), ${C.surface} 48%)`, border:`1px solid color-mix(in srgb, ${teamAccent} 28%, ${C.border})`, borderTop:`3px solid ${teamAccent}`, borderRadius:12,
         display:'flex', alignItems:'stretch', overflow:'hidden', overflowX:'auto' }}>
 
         {/* Visually-hidden page heading — this page has no semantic <h1>-<h6>
@@ -2247,7 +2247,7 @@ function PlayerProfile({ player, derived, isFavorite = false, onToggleFavorite, 
               {p.useLastName || p.lastName || p.fullName}
             </div>
             <div style={{display:'flex',alignItems:'center',gap:7,marginTop:5,minWidth:0}}>
-              <TeamLogo abbr={p.currentTeam?.abbreviation} size={24} />
+              <span className="skip-profile-team-logo-mark"><TeamLogo abbr={p.currentTeam?.abbreviation} size={32} /></span>
               <div style={sans({ fontSize:11, color:teamAccent, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:180 })}>
                 {p.currentTeam?.name || 'Free Agent'} · {p.primaryPosition?.abbreviation || '—'}
               </div>

@@ -25,6 +25,7 @@ import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
 import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
+import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -57,6 +58,7 @@ const OVERVIEW_VIEW_OPTIONS = [
   { id: 'briefing', label: 'Briefing', detail: 'Core signals' },
   { id: 'performance', label: 'Performance', detail: 'Models & field play' },
   { id: 'roster', label: 'Roster', detail: 'Players & affiliates' },
+  { id: 'news', label: 'Team News', detail: 'Club headlines' },
   { id: 'operations', label: 'Operations', detail: 'Context & schedule' },
 ];
 
@@ -2243,12 +2245,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
       {/* ── Selector + headline ── */}
       <div className="overview-command-header" style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
           <div>
-          <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}>
-            <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={30} />
-            <div style={px({fontSize:10,fontWeight:700,color:teamAccent,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
+          <div className="skip-overview-team-brand" style={{'--team-accent':teamAccent}}>
+            <span className="skip-overview-team-logo-mark"><TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={38} /></span>
+            <div>
+              <div style={px({fontSize:10,fontWeight:800,color:teamAccent,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
+              <h1 style={{ ...sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1}), marginTop:3 }}>{team.name || 'Season overview'}</h1>
+            </div>
           </div>
-          <h1 style={{ ...sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1}), borderLeft:`3px solid ${teamAccent}`, paddingLeft:9 }}>Season overview</h1>
-          <div style={sans({fontSize:11,color:C.text3,marginTop:5})}>A live snapshot of performance, leverage, and roster context.</div>
+          <div style={sans({fontSize:11,color:C.text3,marginTop:6})}>Season overview · a live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('csv')} aria-label="Download current team data as CSV"
@@ -2269,7 +2273,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         </div>
       <div className="overview-team-context" style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
-          <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={22} />
+          <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
           <span className="sr-only">Select team</span>
           <select aria-label="Select team" value={selTeam} onChange={e=>{ const key=e.target.value; const selected=TEAMS[key]; setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateControlsOpen(false); setAffiliateLevelFilter('all'); setSelTeam(key); if (selected) recordRecentView({ type:'team', abbr:selected.abbr, label:selected.name, secondary:selected.div || 'Team overview' }); }}
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
@@ -2322,6 +2326,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           })}
         </div>
       </nav>
+
+      {overviewView === 'news' && <TeamNewsPanel team={team} accent={teamAccent} />}
 
       {overviewView === 'roster' && mlbParentReadyForAffiliate && affiliateId && affiliateId !== String(team.id) && <Panel title="Minor-League Affiliate Overview" accent={C.teal} badge={affiliateOverviewState==='loading'?'Loading…':affiliateOverviewState==='identity-ready'?'Live MLB identity · stats loading':affiliateOverviewState==='ready'?'Live MLB Stats API':'Source unavailable'}>
         <div style={{display:'flex',gap:6,padding:'8px 12px',borderBottom:`1px solid ${C.borderLight}`,flexWrap:'wrap'}}>

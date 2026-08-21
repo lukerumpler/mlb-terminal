@@ -18,3 +18,9 @@
 - [x] Correct Team Leaders player-photo cropping so official headshots keep faces centered and visible
 - [x] Add regression coverage and validate the affected metric and photo presentation paths
 - [x] Publish and report the metric-availability and photo-framing fixes
+- [ ] Inspect team visual tokens, profile composition, existing news contracts, and low-contrast color usage
+- [ ] Strengthen selected-team visual identity on Team Overview and player profiles without obscuring verified data
+- [ ] Add a sourced Team News view to Team Overview with clear provider and freshness states
+- [ ] Improve readable contrast for team palettes, including Padres brown, across the new and affected team-context elements
+- [ ] Add regression coverage and validate responsive desktop/mobile rendering
+- [ ] Publish and report the team-context visual improvements

@@ -32,6 +32,14 @@ const NITTER_HOSTS = [
   "https://nitter.net",
   "https://nitter.1d4.us",
 ];
+const TEAM_FEED_SLUGS = Object.freeze({
+  ARI: "dbacks", ATH: "athletics", ATL: "braves", BAL: "orioles", BOS: "redsox",
+  CHC: "cubs", CIN: "reds", CLE: "guardians", COL: "rockies", CWS: "whitesox",
+  DET: "tigers", HOU: "astros", KC: "royals", LAA: "angels", LAD: "dodgers",
+  MIA: "marlins", MIL: "brewers", MIN: "twins", NYM: "mets", NYY: "yankees",
+  OAK: "athletics", PHI: "phillies", PIT: "pirates", SD: "padres", SEA: "mariners",
+  SF: "giants", STL: "cardinals", TB: "rays", TEX: "rangers", TOR: "bluejays", WSH: "nationals",
+});
 
 const cache = new Map();
 const inFlight = new Map();
@@ -41,7 +49,10 @@ function source(tier, key, label, url, kind) {
 }
 
 function teamSlug(value) {
-  const slug = String(value || "")
+  const raw = String(value || "").trim();
+  const abbr = raw.toUpperCase();
+  if (TEAM_FEED_SLUGS[abbr]) return TEAM_FEED_SLUGS[abbr];
+  const slug = raw
     .trim()
     .toLowerCase();
   return /^[a-z0-9-]{2,32}$/.test(slug) ? slug : null;

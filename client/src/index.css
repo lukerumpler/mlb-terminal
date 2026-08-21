@@ -287,6 +287,8 @@
 .skip-overview-page { gap:12px !important; }
 .skip-overview-page .overview-command-header { padding-bottom:0 !important; }
 .skip-overview-page .overview-team-context { gap:16px !important; }
+.skip-overview-team-brand { display:flex; align-items:center; gap:10px; min-width:0; }
+.skip-overview-team-logo-mark { display:inline-grid; place-items:center; width:48px; height:48px; flex:0 0 48px; border:1px solid color-mix(in srgb, var(--team-accent,#b87812) 38%, var(--border,#d8d2c8)); border-radius:11px; background:linear-gradient(145deg, color-mix(in srgb, var(--team-accent,#b87812) 15%, var(--surface,#fffdf8)), var(--surface,#fffdf8)); box-shadow:inset 0 1px 0 rgba(255,255,255,.72); }
 .skip-overview-view-rail { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid var(--border-light,#e2ddd3); border-radius:8px; background:linear-gradient(90deg, color-mix(in srgb, var(--surface2,#faf9f5) 86%, transparent), color-mix(in srgb, var(--amber-soft,#fff3d6) 38%, transparent)); }
 .skip-overview-view-copy { display:flex; flex-direction:column; gap:2px; flex:0 0 auto; min-width:126px; color:var(--text4,#9c8570); font:700 8px/1.2 'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
 .skip-overview-view-copy strong { color:var(--text2,#4b443a); font:700 10px/1.2 'Plus Jakarta Sans',sans-serif; letter-spacing:0; text-transform:none; }
@@ -328,6 +330,23 @@
 .skip-overview-analysis-link { align-self:flex-start; display:inline-block; margin-top:8px; color:var(--teal,#157a6e); font:800 9px/1 'DM Mono',monospace; letter-spacing:.05em; text-decoration:none; text-transform:uppercase; }
 .skip-overview-analysis-link:hover { text-decoration:underline; text-underline-offset:3px; }
 .skip-overview-analysis-link:focus-visible { outline:2px solid color-mix(in srgb, var(--teal,#157a6e) 35%, transparent); outline-offset:4px; }
+.skip-team-news-workspace { min-width:0; }
+.skip-team-news-intro { display:flex; align-items:end; justify-content:space-between; gap:16px; padding:12px 14px 10px; border-bottom:1px solid var(--border-light,#e2ddd3); background:linear-gradient(120deg, color-mix(in srgb, var(--surface2,#faf9f5) 88%, transparent), color-mix(in srgb, var(--amber-soft,#fff3d6) 32%, transparent)); }
+.skip-team-news-intro span { display:block; color:var(--text4,#9c8570); font:800 8px/1.2 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }
+.skip-team-news-intro strong { display:block; margin-top:4px; color:var(--text,#24211d); font:800 17px/1.1 'Plus Jakarta Sans',sans-serif; letter-spacing:-.025em; }
+.skip-team-news-intro p { max-width:390px; margin:0; color:var(--text3,#756d62); font:500 9.5px/1.45 'Plus Jakarta Sans',sans-serif; text-align:right; }
+.skip-team-news-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--border-light,#e2ddd3); }
+.skip-team-news-item { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; min-width:0; padding:12px 14px; background:var(--surface,#fffdf8); color:inherit; text-decoration:none; transition:background-color 160ms cubic-bezier(.23,1,.32,1), transform 160ms cubic-bezier(.23,1,.32,1); }
+.skip-team-news-item:hover { background:color-mix(in srgb, var(--teal-soft,#e7f5f0) 42%, var(--surface,#fffdf8)); transform:translateY(-1px); }
+.skip-team-news-item:focus-visible { outline:2px solid var(--teal,#157a6e); outline-offset:-2px; }
+.skip-team-news-item-copy { min-width:0; }
+.skip-team-news-meta { display:flex; gap:7px; flex-wrap:wrap; color:var(--text4,#9c8570); font:800 8px/1.2 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+.skip-team-news-meta span { color:var(--teal,#157a6e); }
+.skip-team-news-item strong { display:block; margin-top:5px; color:var(--text,#24211d); font:750 12px/1.32 'Plus Jakarta Sans',sans-serif; }
+.skip-team-news-item p { display:-webkit-box; overflow:hidden; margin:5px 0 0; color:var(--text3,#756d62); font:500 9.5px/1.42 'Plus Jakarta Sans',sans-serif; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.skip-team-news-empty { display:flex; flex-direction:column; gap:4px; padding:24px 14px; color:var(--text3,#756d62); font:500 10px/1.5 'Plus Jakarta Sans',sans-serif; }
+.skip-team-news-empty strong { color:var(--text2,#4b443a); font-weight:800; }
+.skip-team-news-provenance { padding:8px 14px 10px; border-top:1px solid var(--border-light,#e2ddd3); font:500 8.5px/1.4 'Plus Jakarta Sans',sans-serif; }
 .skip-overview-deferred-analysis-intro { margin-top:32px; }
 .skip-overview-deferred-analysis { scroll-margin-top:24px; }
 .overview-responsive-grid.overview-decision-row.skip-overview-deferred-analysis { align-items:start; }
@@ -357,8 +376,10 @@
 }
 .skip-profile-photo-glow {
   position: absolute; z-index: 0; width: 96px; height: 42px; bottom: -3px;
-  border-radius: 50%; background: radial-gradient(ellipse, rgba(212,154,53,.22), transparent 68%); filter: blur(4px);
+  border-radius: 50%; background:radial-gradient(ellipse, color-mix(in srgb, var(--team-accent,#d49a35) 26%, transparent), transparent 68%); filter: blur(4px);
 }
+.skip-player-hero .skip-profile-photo-frame img { border-color:color-mix(in srgb, var(--team-accent,#d49a35) 52%, transparent) !important; }
+.skip-profile-team-logo-mark { display:inline-grid; place-items:center; width:40px; height:40px; flex:0 0 40px; border:1px solid color-mix(in srgb, var(--team-accent,#d49a35) 36%, var(--border,#d8d2c8)); border-radius:10px; background:color-mix(in srgb, var(--team-accent,#d49a35) 12%, var(--surface,#fffdf8)); }
 .skip-profile-kpi { transition: background 160ms var(--profile-ease), transform 160ms var(--profile-ease), box-shadow 160ms var(--profile-ease); }
 .skip-profile-kpi:hover, .skip-profile-kpi:focus-visible {
   background: color-mix(in srgb, #d49a35 10%, transparent) !important;
@@ -393,6 +414,10 @@
   .skip-profile-primary-column, .skip-profile-secondary-column, .skip-profile-tertiary-column { padding-top: 16px; }
   .skip-profile-selection { align-items: flex-start !important; }
   .skip-profile-selection span:last-child { line-height: 1.35; }
+  .skip-overview-team-logo-mark { width:44px; height:44px; flex-basis:44px; }
+  .skip-team-news-intro { align-items:flex-start; flex-direction:column; gap:7px; }
+  .skip-team-news-intro p { max-width:none; text-align:left; }
+  .skip-team-news-list { grid-template-columns:1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   .skip-profile-photo-frame img, .skip-profile-kpi, .skip-profile-metric-row { transition: none; }
