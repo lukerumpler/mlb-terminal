@@ -44,5 +44,6 @@
 - [x] Add targeted Operations and Settings UI regressions covering recent results, Petco Park context, and the saved default-team control when browser automation is unavailable
 - [x] Finalize an attachment-guidance note that distinguishes this release’s adopted checks from deferred Vercel/PR and development-toolchain remediation
 - [x] Save a checkpoint and deliver the verified Padres Operations and preference release report
-- [ ] Save the validated Padres Operations and default-team-preference release checkpoint
-- [ ] Deliver the final Padres Operations and preference release report
+- [x] Save the validated Padres Operations and default-team-preference release checkpoint
+- [x] Deliver the final Padres Operations and preference release report
+- [x] Deliver the user-facing Padres Operations and preference release report
