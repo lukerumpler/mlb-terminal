@@ -106,6 +106,18 @@ function pctToGrade(p) {
   if (p >= 30) return 'C+'; return 'C';
 }
 
+const EMPTY_TEAM_PLAYER_SNAPSHOT = Object.freeze({ hitting:[], pitching:[], recentByDays:{} });
+
+// Player rows and optional provider metrics arrive asynchronously. Keep their
+// team identity at the boundary so a prior team's cache cannot briefly affect a
+// newly selected club's evaluation while the next verified snapshot hydrates.
+export function isCurrentTeamSource(sourceTeamId, selectedTeamId) {
+  return sourceTeamId != null && selectedTeamId != null && Number(sourceTeamId) === Number(selectedTeamId);
+}
+export function scopeTeamPlayerSnapshot(players, sourceTeamId, selectedTeamId) {
+  return isCurrentTeamSource(sourceTeamId, selectedTeamId) ? (players || EMPTY_TEAM_PLAYER_SNAPSHOT) : EMPTY_TEAM_PLAYER_SNAPSHOT;
+}
+
 export const FRONT_OFFICE_GRADE_POINTS = Object.freeze({
   'A+': 4.3, A: 4.0, 'A-': 3.7, 'B+': 3.3, B: 3.0, 'B-': 2.7,
   'C+': 2.3, C: 2.0, 'C-': 1.7, 'D+': 1.3, D: 1.0, 'D-': 0.7, F: 0,
@@ -1265,9 +1277,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const [teamOaaData, setTeamOaaData] = useState(null);
   const [teamRunningData, setTeamRunningData] = useState(null);
   const [teamRunningState, setTeamRunningState] = useState('idle');
-  const [teamFieldingRows, setTeamFieldingRows] = useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data?.fielding || []);
-  const [teamFieldingDataMode, setTeamFieldingDataMode] = useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.data?.fielding?.length ? 'cached' : 'idle');
-  const [teamFieldingUpdatedAt, setTeamFieldingUpdatedAt] = useState(() => readTeamPlayersCache(TEAMS[DEFAULT_OVERVIEW_TEAM_KEY]?.id, CURRENT_SEASON)?.updatedAt || null);
+  const [teamFieldingRows, setTeamFieldingRows] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data?.fielding || []);
+  const [teamFieldingDataMode, setTeamFieldingDataMode] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data?.fielding?.length ? 'cached' : 'idle');
+  const [teamFieldingUpdatedAt, setTeamFieldingUpdatedAt] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.updatedAt || null);
+  const [teamFieldingTeamId, setTeamFieldingTeamId] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data?.fielding?.length ? TEAMS[initialTeamKey]?.id : null);
   const [futureValueModalOpen, setFutureValueModalOpen] = useState(false);
   const [pendingAffiliate, setPendingAffiliate] = useState(null);
   const overviewRef = useRef(null);
@@ -1284,6 +1297,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
   const [liveTeamPlayers,setLiveTeamPlayers]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data || { hitting:[], pitching:[], recentByDays:{} });
+  const [liveTeamPlayersTeamId, setLiveTeamPlayersTeamId] = useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.data ? TEAMS[initialTeamKey]?.id : null);
   const [teamPlayersUpdatedAt,setTeamPlayersUpdatedAt]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON)?.updatedAt || null);
   const [teamPlayersDataMode,setTeamPlayersDataMode]=useState(() => readTeamPlayersCache(TEAMS[initialTeamKey]?.id, CURRENT_SEASON) ? 'cached' : 'loading');
   const [hotStreakDays, setHotStreakDays] = useState(15);
@@ -1582,8 +1596,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   // brown) would fail contrast as text against a themed background, but read
   // fine as a bar fill or a 3px accent strip.
   const teamAccent = getTeamAccent(team);
-  const teamRollups = useMemo(() => deriveTeamPlayerRollups(liveTeamPlayers), [liveTeamPlayers]);
-  const rosterInsights = useMemo(() => buildRosterInsights(team, liveTeamPlayers), [team, liveTeamPlayers]);
+  const scopedTeamPlayers = useMemo(() => scopeTeamPlayerSnapshot(liveTeamPlayers, liveTeamPlayersTeamId, teamBase?.id), [liveTeamPlayers, liveTeamPlayersTeamId, teamBase?.id]);
+  const teamRollups = useMemo(() => deriveTeamPlayerRollups(scopedTeamPlayers), [scopedTeamPlayers]);
+  const rosterInsights = useMemo(() => buildRosterInsights(team, scopedTeamPlayers), [team, scopedTeamPlayers]);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiInsightsState, setAiInsightsState] = useState('idle');
   const aiInsightsRequestKeyRef = useRef(null);
@@ -1683,7 +1698,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     });
     return () => { alive = false; };
   }, [overviewView, teamBase?.id, mlbRetryToken]);
-  const rosterSavantKey = useMemo(() => buildRosterSavantKey(liveTeamPlayers), [liveTeamPlayers]);
+  const rosterSavantKey = useMemo(() => buildRosterSavantKey(scopedTeamPlayers), [scopedTeamPlayers]);
   useEffect(() => {
     if (overviewView !== 'performance') return undefined;
     let alive = true;
@@ -1714,10 +1729,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     setTeamPitchArsenalData(null);
     setTeamSavantSource('');
     setTeamSavantState('loading');
-    const hitters = (liveTeamPlayers.hitting || [])
+    const hitters = (scopedTeamPlayers.hitting || [])
       .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
       .slice(0, 12);
-    const pitchers = (liveTeamPlayers.pitching || [])
+    const pitchers = (scopedTeamPlayers.pitching || [])
       .sort((a, b) => (Number(b?.stat?.inningsPitched || b?.stat?.ip) || 0) - (Number(a?.stat?.inningsPitched || a?.stat?.ip) || 0))
       .slice(0, 12);
     resolveTeamSavantSnapshot({
@@ -1835,9 +1850,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     let alive = true;
     setTeamOaaData(null);
     getTeamSavantOaa(teamBase?.abbr, teamBase?.name, CURRENT_SEASON).then(data => {
-      if (alive) setTeamOaaData(data);
+      if (alive) setTeamOaaData({ ...data, teamAbbr:teamBase?.abbr || '' });
     }).catch(() => {
-      if (alive) setTeamOaaData({ status:'upstream-unavailable', source:'Baseball Savant Statcast OAA leaderboard', retrievedAt:new Date().toISOString(), oaa:null, playerCount:0, playerRows:[] });
+      if (alive) setTeamOaaData({ status:'upstream-unavailable', source:'Baseball Savant Statcast OAA leaderboard', retrievedAt:new Date().toISOString(), oaa:null, playerCount:0, playerRows:[], teamAbbr:teamBase?.abbr || '' });
     });
     return () => { alive = false; };
   }, [overviewView, evaluationActiveLabel, teamBase?.abbr, teamBase?.name, savantRetryToken]);
@@ -1849,11 +1864,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     setTeamRunningState('loading');
     getTeamSavantRunning(teamBase?.abbr, teamBase?.name, CURRENT_SEASON).then(data => {
       if (!alive) return;
-      setTeamRunningData(data);
+      setTeamRunningData({ ...data, teamAbbr:teamBase?.abbr || '' });
       setTeamRunningState(data?.status === 'live' || data?.status === 'cached' || data?.status === 'partial' ? 'ready' : 'unavailable');
     }).catch(() => {
       if (!alive) return;
-      setTeamRunningData({ status:'upstream-unavailable', source:'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards', retrievedAt:new Date().toISOString() });
+      setTeamRunningData({ status:'upstream-unavailable', source:'Baseball Savant team sprint-speed and player extra-bases-taken leaderboards', retrievedAt:new Date().toISOString(), teamAbbr:teamBase?.abbr || '' });
       setTeamRunningState('unavailable');
     });
     return () => { alive = false; };
@@ -1868,6 +1883,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       setTeamFieldingRows(cachedRows);
       setTeamFieldingDataMode('cached');
       setTeamFieldingUpdatedAt(cached?.updatedAt || null);
+      setTeamFieldingTeamId(teamBase.id);
     }
     if (cachedRows.length && cached && !shouldRefreshDailyCache(cached)) return () => { alive = false; };
     setTeamFieldingDataMode('loading');
@@ -1883,6 +1899,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       setTeamFieldingRows(verifiedRows);
       setTeamFieldingDataMode('live');
       setTeamFieldingUpdatedAt(snapshot?.updatedAt || Date.now());
+      setTeamFieldingTeamId(teamBase.id);
     }).catch(() => {
       if (alive && !cachedRows.length) setTeamFieldingDataMode('unavailable');
     });
@@ -1891,8 +1908,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
 
   const rosterInsightKey = useMemo(() => JSON.stringify({
     team: { name:team.name, abbr:team.abbr, w:team.w, l:team.l, pct:team.pct, rs:team.rs, ra:team.ra, ops:team.ops, hr:team.hr, era:team.era, whip:team.whip, k:team.k, sb:team.sb },
-    roster: { hitting:liveTeamPlayers.hitting.slice(0, 12), pitching:liveTeamPlayers.pitching.slice(0, 12) },
-  }), [team.name, team.abbr, team.w, team.l, team.pct, team.rs, team.ra, team.ops, team.hr, team.era, team.whip, team.k, team.sb, liveTeamPlayers]);
+    roster: { hitting:scopedTeamPlayers.hitting.slice(0, 12), pitching:scopedTeamPlayers.pitching.slice(0, 12) },
+  }), [team.name, team.abbr, team.w, team.l, team.pct, team.rs, team.ra, team.ops, team.hr, team.era, team.whip, team.k, team.sb, scopedTeamPlayers]);
 
   useEffect(() => {
     if (overviewView !== 'roster') return undefined;
@@ -1902,8 +1919,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       hasInsights: Boolean(aiInsights),
       inFlightKey: aiInsightsRequestKeyRef.current,
       requestKey,
-      hitterCount: liveTeamPlayers.hitting?.length || 0,
-      pitcherCount: liveTeamPlayers.pitching?.length || 0,
+      hitterCount: scopedTeamPlayers.hitting?.length || 0,
+      pitcherCount: scopedTeamPlayers.pitching?.length || 0,
     })) return;
     let alive = true;
     aiInsightsRequestKeyRef.current = requestKey;
@@ -1914,8 +1931,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         whip: team.whip, k: team.k, sb: team.sb,
       },
       roster: {
-        hitting: liveTeamPlayers.hitting.slice(0, 12),
-        pitching: liveTeamPlayers.pitching.slice(0, 12),
+        hitting: scopedTeamPlayers.hitting.slice(0, 12),
+        pitching: scopedTeamPlayers.pitching.slice(0, 12),
       },
     };
     setAiInsightsState('loading');
@@ -1930,7 +1947,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(error => { if (alive && error?.name !== 'AbortError') setAiInsightsState('error'); });
     return () => { alive = false; controller.abort(); };
-  }, [overviewView, liveTeamData, rosterInsightKey, rosterInsightsRetryToken, liveTeamPlayers.hitting?.length, liveTeamPlayers.pitching?.length]);
+  }, [overviewView, liveTeamData, rosterInsightKey, rosterInsightsRetryToken, scopedTeamPlayers.hitting?.length, scopedTeamPlayers.pitching?.length]);
   const displayedInsights = aiInsights || rosterInsights;
   const finiteMetric = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const providerPlayoffOdds = resolveVerifiedPlayoffOdds(teamModelData?.playoffOdds);
@@ -2010,13 +2027,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       ? `local cached ${freshnessLabel(teamModelData?.retrievedAt)}`
       : freshnessLabel(teamModelData?.retrievedAt);
   const rosterPositions = useMemo(() => [...new Set([
-    ...(liveTeamPlayers.hitting || []).map(row => row.position),
-    ...(liveTeamPlayers.pitching || []).map(row => row.position),
-  ].filter(Boolean))].sort(), [liveTeamPlayers]);
+    ...(scopedTeamPlayers.hitting || []).map(row => row.position),
+    ...(scopedTeamPlayers.pitching || []).map(row => row.position),
+  ].filter(Boolean))].sort(), [scopedTeamPlayers]);
   const rosterSortOption = ROSTER_SORT_OPTIONS.find(item => item.key === rosterSort) || ROSTER_SORT_OPTIONS[0];
   const activeMinimum = rosterSortOption.group === 'hitting' ? minBattingPa : rosterSortOption.group === 'pitching' ? minPitchingIp : 0;
   const rosterHasFilters = Boolean(rosterPlayerQuery || selectedRosterPositions.length || minBattingPa || minPitchingIp || rosterQuickFilter !== 'all' || activeRosterPreset);
-  const filteredRosterRows = useMemo(() => buildRosterRows(liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery), [liveTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery]);
+  const filteredRosterRows = useMemo(() => buildRosterRows(scopedTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery), [scopedTeamPlayers, selectedRosterPositions, rosterSort, minBattingPa, minPitchingIp, rosterSortDirection, rosterPlayerQuery]);
   const applyRosterPreset = preset => {
     setRosterQuickFilter(null);
     setSelectedRosterPositions(preset.positions);
@@ -2044,11 +2061,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     setLiveTeamDataMode(cachedAggregate ? 'cached' : 'loading');
     const cachedPlayers = readTeamPlayersCache(teamBase.id, CURRENT_SEASON);
     setLiveTeamPlayers(cachedPlayers?.data || { hitting:[], pitching:[], recentByDays:{} });
+    setLiveTeamPlayersTeamId(cachedPlayers?.data ? teamBase.id : null);
     setTeamPlayersUpdatedAt(cachedPlayers?.updatedAt || null);
     setTeamPlayersDataMode(cachedPlayers ? 'cached' : 'loading');
     setTeamFieldingRows(cachedPlayers?.data?.fielding || []);
     setTeamFieldingDataMode(cachedPlayers?.data?.fielding?.length ? 'cached' : 'idle');
     setTeamFieldingUpdatedAt(cachedPlayers?.data?.fielding?.length ? cachedPlayers.updatedAt || null : null);
+    setTeamFieldingTeamId(cachedPlayers?.data?.fielding?.length ? teamBase.id : null);
     setLiveTeamError(false);
     setTeamPlayersLoading(true);
     setTeamPlayersError(false);
@@ -2160,6 +2179,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           ? saveTeamPlayersCache(teamBase.id, CURRENT_SEASON, nextPlayers)
           : cachedPlayers;
         setLiveTeamPlayers(nextPlayers);
+        setLiveTeamPlayersTeamId(teamBase.id);
         setTeamPlayersUpdatedAt(snapshot?.updatedAt || null);
         setTeamPlayersDataMode(snapshot ? (receivedVerifiedRows ? 'live' : 'cached') : 'error');
         setTeamPlayersError(bothFailed && !cachedPlayers);
@@ -2292,6 +2312,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
 
   const D=useMemo(()=>{
     const liveRadar = buildLiveRadarData({ team, liveTeamData, runDiff: rd });
+    const selectedTeamAbbr = String(team.abbr || '').toUpperCase();
+    const scopedOaaData = String(teamOaaData?.teamAbbr || '').toUpperCase() === selectedTeamAbbr ? teamOaaData : null;
+    const scopedRunningData = String(teamRunningData?.teamAbbr || '').toUpperCase() === selectedTeamAbbr ? teamRunningData : null;
+    const scopedFieldingRows = isCurrentTeamSource(teamFieldingTeamId, team.id) ? teamFieldingRows : [];
+    const scopedFieldingDataMode = isCurrentTeamSource(teamFieldingTeamId, team.id) ? teamFieldingDataMode : 'idle';
     const records = Object.values(liveTeamData?.byAbbr || {});
     const hittingRecords = records.map(row => row?.hitting).filter(Boolean);
     const pitchingRecords = records.map(row => row?.pitching).filter(Boolean);
@@ -2310,30 +2335,31 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       caughtStealing:teamRollups.caughtStealing,
       plateAppearances:teamRollups.plateAppearances,
       comparisonRows:hittingRecords,
-      sprintSpeedPercentile:teamRunningData?.sprintSpeedPercentile,
-      extraBasesTakenPercentile:teamRunningData?.extraBasesTakenPercentile,
+      sprintSpeedPercentile:scopedRunningData?.sprintSpeedPercentile,
+      extraBasesTakenPercentile:scopedRunningData?.extraBasesTakenPercentile,
     });
     const speedPct = baserunning.percentile;
     const frontOfficeCoverage = deriveFrontOfficeCoverageGrades({
-      players:liveTeamPlayers,
-      fieldingRows:teamFieldingRows,
-      fieldingDataMode:teamFieldingDataMode,
+      players:scopedTeamPlayers,
+      fieldingRows:scopedFieldingRows,
+      fieldingDataMode:scopedFieldingDataMode,
       teamGames:(Number(team.w) || 0) + (Number(team.l) || 0),
       liveDataMode:liveTeamDataMode,
       teamAbbr:team.abbr,
-      oaaPercentile:teamOaaData?.oaaPercentile,
-      oaaPopulationCount:teamOaaData?.leagueTeamCount,
+      oaaPercentile:scopedOaaData?.oaaPercentile,
+      oaaPopulationCount:scopedOaaData?.leagueTeamCount,
     });
     const { defensePct, defenseCoveragePct, defenseStatus, oaaPercentile, oaaPopulationCount, depthPct, depthStatus, rosterDepthPct, farmSystemRank, farmSystemPct, futureValuePct, fieldingPositions, fieldingPlayerCount, pitcherCount, activePlayers, prospectCount, prospectTopThreeAverage, prospectTopFiveAverage, prospectTopThreePercentile, prospectTopFivePercentile, prospectOrganizationCount, prospectAgeToLevel, workloadCoveragePct, nonPitcherInnings, expectedDefensiveInnings, defensiveInningCoveragePct, defensiveInningRowCount } = frontOfficeCoverage;
     const defensiveInningContext = defensiveInningCoveragePct == null
       ? 'Official MLB player fielding-inning coverage has not been loaded; it is context only and does not change this defense grade.'
       : `Official MLB player fielding rows cover ${nonPitcherInnings.toFixed(1)} non-pitcher innings (${defensiveInningCoveragePct}% of ${expectedDefensiveInnings.toFixed(0)} expected position innings across ${Number(team.w || 0) + Number(team.l || 0)} club games; ${defensiveInningRowCount} rows; ${formatVerifiedTimestamp(teamFieldingUpdatedAt)}). This is coverage context only, not a defense-performance input.`;
     const sbModelDetail = `${baserunning.modelWeights?.stolenBaseModel ?? 100}% verified stolen-base model (${baserunning.opportunityMetric}: ${Math.round(baserunning.volumePercentile)}th percentile; steal success: ${(baserunning.successRate * 100).toFixed(1)}%, ${Math.round(baserunning.efficiencyPercentile)}th percentile; ${baserunning.attempts} attempts)`;
-    const statcastRunningDetail = teamRunningState === 'loading'
+    const scopedRunningState = scopedRunningData ? teamRunningState : evaluationActiveLabel === 'Baserunning' ? 'loading' : 'idle';
+    const statcastRunningDetail = scopedRunningState === 'loading'
       ? 'Optional Statcast sprint-speed and extra-bases-taken inputs are loading; the current result remains 100% on the verified stolen-base model until those source rows return.'
       : baserunning.statcastInputCount === 0
       ? 'Optional Statcast sprint-speed and extra-bases-taken inputs were unavailable, so the verified stolen-base model remains 100% of the result.'
-      : `${baserunning.sprintSpeedPercentile != null ? `${baserunning.modelWeights.sprintSpeed}% team sprint speed (${teamRunningData?.sprintSpeed?.toFixed(1)} ft/s; ${Math.round(baserunning.sprintSpeedPercentile)}th percentile)` : ''}${baserunning.sprintSpeedPercentile != null && baserunning.extraBasesTakenPercentile != null ? '; ' : ''}${baserunning.extraBasesTakenPercentile != null ? `${baserunning.modelWeights.extraBasesTaken}% extra-bases-taken run value (${teamRunningData?.extraBasesTakenRuns?.toFixed(1)} runs; ${Math.round(baserunning.extraBasesTakenPercentile)}th percentile)` : ''}. Baseball Savant team running leaderboards · ${formatVerifiedTimestamp(teamRunningData?.retrievedAt)}.`;
+      : `${baserunning.sprintSpeedPercentile != null ? `${baserunning.modelWeights.sprintSpeed}% team sprint speed (${scopedRunningData?.sprintSpeed?.toFixed(1)} ft/s; ${Math.round(baserunning.sprintSpeedPercentile)}th percentile)` : ''}${baserunning.sprintSpeedPercentile != null && baserunning.extraBasesTakenPercentile != null ? '; ' : ''}${baserunning.extraBasesTakenPercentile != null ? `${baserunning.modelWeights.extraBasesTaken}% extra-bases-taken run value (${scopedRunningData?.extraBasesTakenRuns?.toFixed(1)} runs; ${Math.round(baserunning.extraBasesTakenPercentile)}th percentile)` : ''}. Baseball Savant team running leaderboards · ${formatVerifiedTimestamp(scopedRunningData?.retrievedAt)}.`;
     const ageToLevelDetail = prospectAgeToLevel?.evaluatedCount
       ? `Age-to-level context for ${prospectAgeToLevel.evaluatedCount} represented SKIP snapshot prospects: ${prospectAgeToLevel.youngForLevel} young-for-level, ${prospectAgeToLevel.onTrack} on track (within one year), and ${prospectAgeToLevel.oldForLevel} old-for-level. It reuses SKIP’s level baselines and is descriptive context, not a separate grade input.`
       : 'Age-to-level context is unavailable because the represented SKIP prospect snapshot has no usable age and level pairs.';
@@ -2373,7 +2399,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       defensePct,defenseCoveragePct,defenseStatus,oaaPercentile,oaaPopulationCount,depthPct,depthStatus,rosterDepthPct,farmSystemRank,farmSystemPct,futureValuePct,fieldingPositions,fieldingPlayerCount,pitcherCount,activePlayers,prospectCount,prospectTopThreeAverage,prospectTopFiveAverage,prospectTopThreePercentile,prospectTopFivePercentile,prospectOrganizationCount,prospectAgeToLevel,workloadCoveragePct,nonPitcherInnings,expectedDefensiveInnings,defensiveInningCoveragePct,
       frontOfficeGradeRows,frontOfficeOverall,overall:frontOfficeOverall.grade,
     };
-  },[team, liveTeamData, liveTeamDataMode, teamRollups, teamOaaData, teamRunningData, teamRunningState, teamFieldingRows, teamFieldingDataMode, teamFieldingUpdatedAt, rd]);
+  },[team, liveTeamData, liveTeamDataMode, teamRollups, scopedTeamPlayers, teamOaaData, teamRunningData, teamRunningState, teamFieldingRows, teamFieldingDataMode, teamFieldingTeamId, teamFieldingUpdatedAt, evaluationActiveLabel, rd]);
 
   const executivePercentiles = useMemo(() => {
     const runDiff = D.offenseData.find(row => row.axis === 'Run Diff')?.val ?? null;
@@ -2405,12 +2431,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   // team. Memoized on selTeam to match the `D` useMemo above.
   const { splits, leaders, hotStreakLeaders, bb, arsenal, fo } = useMemo(() => ({
     splits:  teamSplitRows,
-    leaders: getLeaders(liveTeamPlayers.hitting, liveTeamPlayers.pitching, teamLeaderEligibility),
+    leaders: getLeaders(scopedTeamPlayers.hitting, scopedTeamPlayers.pitching, teamLeaderEligibility),
     hotStreakLeaders: getHotStreakLeaders(hotStreakRows.hitting, hotStreakRows.pitching, hotStreakDays),
     bb:      teamBattedBallData,
     arsenal: teamPitchArsenalData,
     fo:      getFrontOffice(team),
-  }), [team, liveTeamPlayers, hotStreakRows, hotStreakDays, teamBattedBallData, teamPitchArsenalData, teamSplitRows, teamLeaderEligibility]);
+  }), [team, scopedTeamPlayers, hotStreakRows, hotStreakDays, teamBattedBallData, teamPitchArsenalData, teamSplitRows, teamLeaderEligibility]);
   const evBins = useMemo(() => buildExitVelocityBins(teamExitVelocityRows), [teamExitVelocityRows]);
   const contactAllowed = useMemo(() => {
     const rows = teamBattedBallAgainstRows;
@@ -2441,13 +2467,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         : teamSavantDisplayData?.status === 'live' || teamSavantState === 'ready'
           ? 'verified'
           : 'unavailable';
-  const oaaHealthStatus = teamOaaData?.freshness === 'stale-cached'
+  const selectedTeamOaaData = String(teamOaaData?.teamAbbr || '').toUpperCase() === String(team.abbr || '').toUpperCase() ? teamOaaData : null;
+  const oaaHealthStatus = selectedTeamOaaData?.freshness === 'stale-cached'
     ? 'cached-fallback'
-    : teamOaaData?.freshness === 'cached'
+    : selectedTeamOaaData?.freshness === 'cached'
       ? 'cached'
-      : teamOaaData?.status === 'live'
+      : selectedTeamOaaData?.status === 'live'
         ? 'verified'
-        : teamOaaData?.status === 'upstream-unavailable'
+        : selectedTeamOaaData?.status === 'upstream-unavailable'
           ? 'unavailable'
           : 'coverage-gap';
   const organizationProspectDepth = useMemo(() => buildOrganizationProspectDepthChart(team.abbr), [team.abbr]);
@@ -3167,7 +3194,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
               </div>
             )) : <div style={sans({padding:'20px 14px',fontSize:10,color:C.text3})}>Roster rows are still loading.</div>}
             <div style={sans({padding:'8px 14px',fontSize:9,color:C.text4,lineHeight:1.4})}>Verified player-count coverage from the current MLB season feed. The map below uses separately returned Baseball Savant OAA and does not claim starter or backup depth.</div>
-            <DefensiveOaaFieldMap playerRows={teamOaaData?.playerRows} status={oaaHealthStatus === 'loading' ? 'loading' : oaaHealthStatus} source={teamOaaData?.source} />
+            <DefensiveOaaFieldMap playerRows={selectedTeamOaaData?.playerRows} status={oaaHealthStatus === 'loading' ? 'loading' : oaaHealthStatus} source={selectedTeamOaaData?.source} />
           </Panel>
         </div>
       </div>

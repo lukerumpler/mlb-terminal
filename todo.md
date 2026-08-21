@@ -11406,3 +11406,7 @@
 - [x] Audit available verified sprint-speed, extra-base-taken, defensive-inning, and prospect age-to-level source fields and their coverage limits.
 - [x] Add source-aware baserunning, defensive-inning, and prospect age-to-level context to the Front Office evaluation without fabricating missing metrics.
 - [x] Add integrity regression coverage, validate desktop and mobile grading details, and publish the enhancement.
+
+- [x] Audit the complete Front Office Evaluation section for calculation integrity, deferred-request behavior, provider fallbacks, and responsive-detail issues.
+- [x] Repair verified Front Office defects and optimize data, rendering, and accessibility behavior without fabricating baseball metrics.
+- [x] Add regression coverage, complete desktop/mobile validation, and publish the Front Office optimization release.

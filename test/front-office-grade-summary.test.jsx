@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, deriveBaserunningGrade, deriveFrontOfficeCoverageGrades, deriveOrganizationFutureValue, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, resolveMetricProviderStatus } from '../client/src/pages/OverviewPage.jsx';
+import { buildFrontOfficeEvaluationViewModel, buildFrontOfficeGradeSummary, deriveBaserunningGrade, deriveFrontOfficeCoverageGrades, deriveOrganizationFutureValue, FrontOfficeGradeCards, FrontOfficeScoreRingPreview, getEvaluationPresentation, isCurrentTeamSource, resolveMetricProviderStatus, scopeTeamPlayerSnapshot } from '../client/src/pages/OverviewPage.jsx';
 
 describe('Front Office Overall grade', () => {
   it('weights current performance and applies the approved capped organization-outlook nudge', () => {
@@ -64,6 +64,15 @@ describe('Front Office Overall grade', () => {
     expect(resolveMetricProviderStatus(null, 'provider-blocked')).toBe('coverage-gap');
     expect(resolveMetricProviderStatus(undefined, 'unavailable')).toBe('coverage-gap');
     expect(resolveMetricProviderStatus(0, 'cached')).toBe('cached');
+  });
+
+  it('withholds a prior-team roster snapshot until the selected team has a matching verified cache or response', () => {
+    const priorTeamRows = { hitting: [{ id: 1, name: 'Prior club hitter' }], pitching: [], recentByDays: {} };
+    expect(isCurrentTeamSource(135, 135)).toBe(true);
+    expect(isCurrentTeamSource(135, 119)).toBe(false);
+    expect(isCurrentTeamSource(null, 119)).toBe(false);
+    expect(scopeTeamPlayerSnapshot(priorTeamRows, 135, 119)).toEqual({ hitting: [], pitching: [], recentByDays: {} });
+    expect(scopeTeamPlayerSnapshot(priorTeamRows, 135, 135)).toBe(priorTeamRows);
   });
 
   it('offers a query-parameter-isolated ScoreRing that preserves the canonical grade, scale, and calculation detail', () => {
