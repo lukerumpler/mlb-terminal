@@ -2,7 +2,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OverviewPage, { getTeamLeaderHitterPaMinimum } from '../client/src/pages/OverviewPage.jsx';
-import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests } from '../client/src/api/mlb.js';
+import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests, __resetTeamScheduleSnapshotCacheForTests } from '../client/src/api/mlb.js';
 import { __resetFeedClientStateForTests } from '../client/src/api/feed.js';
 import { saveTeamAggregateCache, saveTeamPlayersCache, saveTeamSavantSummaryCache } from '../client/src/lib/teamDataCache.js';
 
@@ -12,6 +12,7 @@ describe('Team Overview compact navigation', () => {
     vi.restoreAllMocks();
     __resetMlbClientStateForTests();
     __resetFanGraphsLocalSnapshotForTests();
+    __resetTeamScheduleSnapshotCacheForTests();
     __resetFeedClientStateForTests();
     vi.stubGlobal(
       'fetch',
@@ -29,6 +30,7 @@ describe('Team Overview compact navigation', () => {
     cleanup();
     vi.restoreAllMocks();
     __resetFeedClientStateForTests();
+    __resetTeamScheduleSnapshotCacheForTests();
   });
 
   it('opens on a concise briefing and exposes dense sections through compact view controls', async () => {

@@ -1669,7 +1669,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1708,6 +1708,17 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
               <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
             </button>
           )}
+        </div>
+      </Panel>
+      <Panel title="Team Workspace Default" accent={C.teal}>
+        <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, flexWrap:'wrap' }}>
+          <div style={{ flex:'1 1 250px' }}>
+            <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Default Team Overview</div>
+            <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>Choose the club that opens when you start a new Team Overview session. This preference is saved only in this browser; it does not change team data or shared workspace defaults.</div>
+          </div>
+          <select aria-label="Default Team Overview" value={defaultTeamKey} onChange={event => updateDefaultTeamKey?.(event.target.value)} style={{ flex:'0 1 240px', minWidth:200, height:34, padding:'0 9px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, fontSize:11, fontWeight:700, cursor:'pointer' }}>
+            {Object.entries(TEAMS).sort(([,left],[,right]) => left.name.localeCompare(right.name)).map(([key, team]) => <option key={key} value={key}>{team.name}{key === 'sd' ? ' · Product default' : ''}</option>)}
+          </select>
         </div>
       </Panel>
       <Panel title="Performance & Data Use" accent={C.teal}>

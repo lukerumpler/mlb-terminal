@@ -11,6 +11,7 @@ import { Panel } from './components/atoms.jsx';
 import LiveScoreTicker from './components/LiveScoreTicker.jsx';
 import { readLowDataMode, setLowDataMode } from './lib/lowData.js';
 import { readFeedFreshnessSettings, saveFeedFreshnessSettings, readFeedSuccesses, summarizeFeedFreshness } from './lib/feedFreshness.js';
+import { readDefaultTeamPreference, saveDefaultTeamPreference } from './lib/defaultTeamPreference.js';
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
@@ -192,6 +193,7 @@ export default function App() {
   const [tickerStatus, setTickerStatus] = useState('loading');
   const [tickerUpdatedAt, setTickerUpdatedAt] = useState(null);
   const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
+  const [defaultTeamKey, setDefaultTeamKey] = useState(() => readDefaultTeamPreference());
   const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
   const [feedFreshnessSuccesses, setFeedFreshnessSuccesses] = useState(() => readFeedSuccesses());
@@ -222,6 +224,9 @@ export default function App() {
       saveRosterDefaults(value);
       return value;
     });
+  }, []);
+  const updateDefaultTeamKey = useCallback((next) => {
+    setDefaultTeamKey(current => saveDefaultTeamPreference(typeof next === 'function' ? next(current) : next, current));
   }, []);
   const [theme, setTheme] = useState(() => {
     try {
@@ -543,7 +548,7 @@ export default function App() {
               <Suspense fallback={<PageLoading />}>
               {isolatedPreview && <PlayerProfilePreviewsPage />}
               {!isolatedPreview && <>
-              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} />}
+              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} defaultTeamKey={defaultTeamKey} />}
               {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
               {tab === 'prospects'    && <ProspectsPage />}
               {tab === 'draft'        && <DraftPage />}
@@ -554,7 +559,7 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
               {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
               </>}
               </Suspense>

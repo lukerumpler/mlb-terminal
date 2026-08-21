@@ -32,3 +32,17 @@
 - [x] Set San Diego Padres as the default Team Overview and refine its readable team treatment
 - [x] Add regression coverage and validate Padres desktop and mobile views
 - [x] Publish and report the Padres-default Overview release
+- [x] Inspect existing venue, Settings, schedule, cache, and provenance contracts for the requested additions
+- [x] Add verified Petco Park and stadium context to the Padres Operations workspace
+- [x] Add a sourced Padres recent-games card using official completed schedule results
+- [x] Add a persistent user-selected default-team option to Settings and apply it safely at Team Overview startup
+- [x] Add regression coverage and validate desktop/mobile Operations, recent-games, and default-preference workflows
+- [x] Publish and report the verified Padres Operations and preference release
+- [x] Record relevant attachment guidance separately: keep production audit checks in the release gate and defer Vercel/PR and development-toolchain remediation to dedicated work
+- [x] Reconcile and preserve the shared complete-population radar benchmark through the Padres Operations release
+- [x] Add an App-level regression proving a stored default-team preference becomes the initial Team Overview selection
+- [x] Add targeted Operations and Settings UI regressions covering recent results, Petco Park context, and the saved default-team control when browser automation is unavailable
+- [x] Finalize an attachment-guidance note that distinguishes this release’s adopted checks from deferred Vercel/PR and development-toolchain remediation
+- [x] Save a checkpoint and deliver the verified Padres Operations and preference release report
+- [ ] Save the validated Padres Operations and default-team-preference release checkpoint
+- [ ] Deliver the final Padres Operations and preference release report

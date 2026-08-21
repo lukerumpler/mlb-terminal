@@ -1601,6 +1601,8 @@ export async function getTeamVenueMetadata(teamId) {
           rightCenter: numberOrNull(fieldInfo.rightCenter),
           rightLine: numberOrNull(fieldInfo.rightLine),
         },
+        city: location.city || null,
+        state: location.stateAbbrev || location.state || null,
         latitude: numberOrNull(location.latitude),
         longitude: numberOrNull(location.longitude),
       } : null,
@@ -1702,6 +1704,80 @@ async function fetchStandings(leagueIds, season = SEASON) {
 
 // MLB: AL (103) + NL (104)
 export const getStandings       = (season = SEASON) => fetchStandings('103,104', season);
+const teamScheduleSnapshotCache = new Map();
+
+export function buildTeamScheduleSnapshot(games, teamId) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [] };
+  const numericOrNull = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  const completedGames = (Array.isArray(games) ? games : [])
+    .filter(game => String(game?.status?.abstractGameState || '').toLowerCase() === 'final')
+    .filter(game => Number(game?.teams?.home?.team?.id) === id || Number(game?.teams?.away?.team?.id) === id);
+  const buckets = { home: { w: 0, l: 0 }, away: { w: 0, l: 0 }, day: { w: 0, l: 0 }, night: { w: 0, l: 0 } };
+  for (const game of completedGames) {
+    const isHome = Number(game.teams?.home?.team?.id) === id;
+    const own = isHome ? game.teams?.home : game.teams?.away;
+    const won = Boolean(own?.isWinner);
+    const side = isHome ? buckets.home : buckets.away;
+    side[won ? 'w' : 'l'] += 1;
+    const dayNight = String(game.dayNight || '').toLowerCase();
+    const timeBucket = dayNight === 'day' ? buckets.day : dayNight === 'night' ? buckets.night : null;
+    if (timeBucket) timeBucket[won ? 'w' : 'l'] += 1;
+  }
+  const splitRows = [
+    { split: 'Home', ...buckets.home, ops: '—', era: '—' },
+    { split: 'Away', ...buckets.away, ops: '—', era: '—' },
+    { split: 'Day', ...buckets.day, ops: '—', era: '—' },
+    { split: 'Night', ...buckets.night, ops: '—', era: '—' },
+  ].filter(row => row.w + row.l > 0);
+  const recentGames = [...completedGames]
+    .sort((left, right) => String(right?.gameDate || '').localeCompare(String(left?.gameDate || '')))
+    .slice(0, 5)
+    .map(game => {
+      const isHome = Number(game.teams?.home?.team?.id) === id;
+      const own = isHome ? game.teams?.home : game.teams?.away;
+      const opponent = isHome ? game.teams?.away : game.teams?.home;
+      const ownScore = numericOrNull(own?.score);
+      const opponentScore = numericOrNull(opponent?.score);
+      const hasScore = ownScore != null && opponentScore != null;
+      return {
+        gamePk: game.gamePk,
+        gameDate: String(game.gameDate || ''),
+        opponentName: opponent?.team?.name || 'Opponent unavailable',
+        opponentAbbr: opponent?.team?.abbreviation || opponent?.team?.teamCode || '—',
+        location: isHome ? 'vs' : '@',
+        result: hasScore ? (own?.isWinner ? 'W' : 'L') : 'Final',
+        score: hasScore ? `${ownScore}–${opponentScore}` : '—',
+        isWin: hasScore ? Boolean(own?.isWinner) : null,
+      };
+    });
+  return { splitRows, recentGames };
+}
+
+export async function getTeamScheduleSnapshot(teamId, season = SEASON) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [] };
+  const cacheKey = `${id}:${season}`;
+  const cached = teamScheduleSnapshotCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.snapshot;
+  const today = new Date();
+  const start = new Date(`${season}-03-01T00:00:00Z`);
+  if (start > today) return { splitRows: [], recentGames: [] };
+  const data = await mlb('/schedule', {
+    sportId: 1,
+    teamId: id,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: today.toISOString().slice(0, 10),
+    gameType: 'R',
+    hydrate: 'linescore',
+    language: 'en',
+  }, { ttl: 5 * 60_000, timeoutMs: 15_000, quietStatuses:[429, 502, 503, 504] });
+  const snapshot = buildTeamScheduleSnapshot((data.dates || []).flatMap(date => date.games || []), id);
+  teamScheduleSnapshotCache.set(cacheKey, { snapshot, expiresAt: Date.now() + 5 * 60_000 });
+  return snapshot;
+}
+
+export function __resetTeamScheduleSnapshotCacheForTests() { teamScheduleSnapshotCache.clear(); }
 const teamScheduleSplitsCache = new Map();
 export async function getTeamScheduleSplits(teamId, season = SEASON) {
   const id = Number(teamId);
