@@ -275,6 +275,24 @@ const LEVEL_INFO = {
 };
 function levelInfo(level) { return LEVEL_INFO[level] || LEVEL_INFO.AA; }
 
+// Reuses the same level baselines that inform the FV and risk calculations.
+// This is a descriptive context layer, not another FV adjustment: a positive
+// gap means a prospect is older than SKIP's typical age for the listed level.
+export function getProspectAgeForLevelContext(prospect) {
+  if (!prospect) return null;
+  const info = levelInfo(prospect.level);
+  const age = Number(prospect.age);
+  if (!Number.isFinite(age)) return null;
+  const ageGap = age - info.ageBaseline;
+  return {
+    age,
+    level: prospect.level || 'AA',
+    ageBaseline: info.ageBaseline,
+    ageGap,
+    bucket: ageGap < -1 ? 'young-for-level' : ageGap > 1 ? 'old-for-level' : 'on-track',
+  };
+}
+
 // Batters and pitchers are ranked on one shared Top-100 board (a batter's
 // `rank` and a pitcher's `rank` are positions in the same combined list,
 // not two separate 1-N sequences) — so the board-position curve always

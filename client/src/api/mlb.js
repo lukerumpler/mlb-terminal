@@ -1,6 +1,7 @@
 // SKIP — MLB + MiLB Stats API Client
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
+import { percentile } from '../lib/percentile.js';
 import {
   getStoredPlayerProviderIdentity,
   isUsablePlayerProviderIdentity,
@@ -1835,7 +1836,7 @@ export async function getTeamStats(teamId, group = 'hitting', season = SEASON) {
 // /stats resource exposes the individual player splits needed for true team
 // leaders and does not require a static roster snapshot.
 export async function getTeamPlayerStats(teamId, group = 'hitting', season = SEASON) {
-  const sortStat = group === 'pitching' ? 'earnedRunAverage' : 'homeRuns';
+  const sortStat = group === 'pitching' ? 'earnedRunAverage' : group === 'fielding' ? 'innings' : 'homeRuns';
   const data = await mlb('/stats', {
     stats: 'season', group, season, sportIds: 1, teamId,
     limit: 100, hydrate: 'person', order: 'desc', sortStat,
@@ -2403,5 +2404,96 @@ export async function getTeamSavantOaa(teamAbbr, teamName = '', year = SEASON) {
     };
   } catch {
     return { status: 'upstream-unavailable', source: 'Baseball Savant Statcast OAA leaderboard', retrievedAt: new Date().toISOString(), oaa: null, oaaPercentile:null, leagueTeamCount:0, playerCount:0, playerRows:[] };
+  }
+}
+
+// Team-level running context remains a separate optional request because the
+// full Savant leaderboards are not needed for the first Team Overview paint.
+// `baserunning` measures non-steal extra-base advancement decisions (including
+// advances, holds, and outs); `baserunning_run_value` adds the Savant combined
+// running value for disclosure only. Neither substitutes for the established
+// official MLB stolen-base model when a source is unavailable.
+export async function getTeamSavantRunning(teamAbbr, teamName = '', year = SEASON) {
+  const unavailable = () => ({
+    status: 'upstream-unavailable',
+    source: 'Baseball Savant team sprint-speed and extra-bases-taken leaderboards',
+    retrievedAt: new Date().toISOString(),
+    sprintSpeed: null,
+    sprintSpeedPercentile: null,
+    sprintSpeedPopulationCount: 0,
+    extraBasesTakenRuns: null,
+    extraBasesTakenPercentile: null,
+    extraBasesTakenPopulationCount: 0,
+    baserunningRunValue: null,
+  });
+  try {
+    const [sprintRows, extraBaseRows, runValueRows] = await Promise.all([
+      fetchLeaderboard(`/api/savant?endpoint=sprint_speed_team&year=${year}`, { timeoutMs: 8_000 }),
+      fetchLeaderboard(`/api/savant?endpoint=baserunning&year=${year}`, { timeoutMs: 8_000 }),
+      fetchLeaderboard(`/api/savant?endpoint=baserunning_run_value&year=${year}`, { timeoutMs: 8_000 }),
+    ]);
+    const targetAbbr = String(teamAbbr || '').toUpperCase();
+    const targetName = canonicalTeamName(teamName || teamAbbr);
+    const matchesTeam = row => {
+      const names = [row?.team_abbr, row?.team_code, row?.team, row?.team_name, row?.entity_name]
+        .filter(Boolean);
+      return names.some(value => {
+        const canonical = canonicalTeamName(value);
+        return String(value).toUpperCase() === targetAbbr
+          || canonical === targetName
+          || targetName.endsWith(` ${canonical}`)
+          || canonical.endsWith(` ${targetName}`);
+      });
+    };
+    const aggregateByTeam = (rows, key) => {
+      const byTeam = new Map();
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const team = canonicalTeamName(row?.team_name || row?.team_abbr || row?.team_code || row?.team || '');
+        const value = Number(row?.[key]);
+        if (!team || !Number.isFinite(value)) return;
+        byTeam.set(team, (byTeam.get(team) || 0) + value);
+      });
+      return [...byTeam.entries()].map(([team, value]) => ({ team, value }));
+    };
+    const rank = (value, rows) => {
+      const values = rows.map(row => row.value).filter(Number.isFinite);
+      return Number.isFinite(value) && values.length ? percentile(value, values, true) : null;
+    };
+    const sprintRow = (Array.isArray(sprintRows) ? sprintRows : []).find(matchesTeam) || null;
+    const extraBaseByTeam = aggregateByTeam(extraBaseRows, 'runner_runs');
+    const runValueByTeam = aggregateByTeam(runValueRows, 'runner_runs_tot');
+    const extraBaseRow = extraBaseByTeam.find(row => row.team === targetName) || null;
+    const runValueRow = runValueByTeam.find(row => row.team === targetName) || null;
+    const sprintSpeed = Number(sprintRow?.avg_sprint_speed);
+    const extraBasesTakenRuns = Number(extraBaseRow?.value);
+    const baserunningRunValue = Number(runValueRow?.value);
+    const sprintSpeedValue = Number.isFinite(sprintSpeed) ? sprintSpeed : null;
+    const extraBasesTakenValue = Number.isFinite(extraBasesTakenRuns) ? extraBasesTakenRuns : null;
+    const runValue = Number.isFinite(baserunningRunValue) ? baserunningRunValue : null;
+    const metas = [sprintRows, extraBaseRows, runValueRows]
+      .map(rows => Array.isArray(rows) ? rows.__providerMeta || null : null)
+      .filter(Boolean);
+    const freshness = metas.some(meta => meta.freshness === 'stale-cached')
+      ? 'stale-cached'
+      : metas.some(meta => meta.freshness === 'cached')
+        ? 'cached'
+        : 'live';
+    const metricCount = [sprintSpeedValue, extraBasesTakenValue, runValue].filter(value => value != null).length;
+    return {
+      status: metricCount === 0 ? 'source-gap' : metricCount === 3 ? (freshness === 'stale-cached' ? 'cached' : 'live') : 'partial',
+      source: 'Baseball Savant team sprint-speed and extra-bases-taken leaderboards',
+      freshness,
+      cache: metas.some(meta => meta.cache === 'HIT') ? 'HIT' : metas.some(meta => meta.cache === 'STALE') ? 'STALE' : null,
+      retrievedAt: new Date().toISOString(),
+      sprintSpeed: sprintSpeedValue,
+      sprintSpeedPercentile: rank(sprintSpeedValue, (Array.isArray(sprintRows) ? sprintRows : []).map(row => ({ value:Number(row?.avg_sprint_speed) }))),
+      sprintSpeedPopulationCount: (Array.isArray(sprintRows) ? sprintRows : []).map(row => Number(row?.avg_sprint_speed)).filter(Number.isFinite).length,
+      extraBasesTakenRuns: extraBasesTakenValue,
+      extraBasesTakenPercentile: rank(extraBasesTakenValue, extraBaseByTeam),
+      extraBasesTakenPopulationCount: extraBaseByTeam.length,
+      baserunningRunValue: runValue,
+    };
+  } catch {
+    return unavailable();
   }
 }

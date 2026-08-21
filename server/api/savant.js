@@ -222,6 +222,12 @@ const ENDPOINTS = {
     `https://baseballsavant.mlb.com/leaderboard/bat-tracking?attackZone=&batSide=&contactType=&count=&csv=true&handedness=&minSwings=1&minGroupSwings=1&pitchType=&seasonStart=${y}&seasonEnd=${y}&team=&type=batter`,
   sprint_speed: y =>
     `https://baseballsavant.mlb.com/sprint_speed_leaderboard?year=${y}&position=&team=&min=0&csv=true`,
+  sprint_speed_team: y =>
+    `https://baseballsavant.mlb.com/leaderboard/sprint-speed-team?season=${y}&team=&csv=true`,
+  baserunning: y =>
+    `https://baseballsavant.mlb.com/leaderboard/baserunning?type=team&year=${y}&csv=true`,
+  baserunning_run_value: y =>
+    `https://baseballsavant.mlb.com/leaderboard/baserunning-run-value?type=team&year=${y}&csv=true`,
   oaa: y =>
     `https://baseballsavant.mlb.com/leaderboard/outs_above_average?type=Batter&year=${y}&team=&range=year&min=1&pos=&roles=&viz=Show&csv=true`,
   pitch_arsenal: y =>
