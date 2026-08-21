@@ -69,8 +69,8 @@ describe('Team Overview compact navigation', () => {
   it('uses stable cached roster IDs for Team Leader portraits while keeping the visible player name as context', async () => {
     window.localStorage.clear();
     saveTeamPlayersCache(119, 2026, {
-      hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { homeRuns: 24, avg: .300, ops: .950, stolenBases: 18 } }],
-      pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { era: 2.75, strikeOuts: 190, whip: 1.01 } }],
+      hitting: [{ id: 518692, name: 'Verified Hitter', position: 'OF', stat: { plateAppearances: 500, homeRuns: 24, avg: .300, ops: .950, rbi: 74, stolenBases: 18 } }],
+      pitching: [{ id: 605483, name: 'Verified Pitcher', position: 'SP', stat: { inningsPitched: '180.0', era: 2.75, strikeOuts: 190, whip: 1.01, wins: 16, saves: 0 } }],
     });
     const { container } = render(<OverviewPage />);
 

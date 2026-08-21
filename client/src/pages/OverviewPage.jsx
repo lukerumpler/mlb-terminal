@@ -639,33 +639,59 @@ function getSplits() {
   return [];
 }
 
-function formatLeaderValue(value, digits = 0) {
+function formatLeaderValue(value, digits = 0, scorebookRate = false) {
   if (value == null || value === '') return '—';
   const number = Number(value);
-  return Number.isFinite(number) ? number.toFixed(digits) : String(value);
+  if (!Number.isFinite(number)) return String(value);
+  return scorebookRate ? fmtScorebookRate(number, digits) : number.toFixed(digits);
 }
 
 function formatPanelMetric(value, suffix = '') {
   return value == null || value === '' ? '—' : `${value}${suffix}`;
 }
 
-function getLeaders(hittingRows = [], pitchingRows = []) {
-  const top = (rows, key, direction = 'desc') => [...rows]
-    .filter(row => Number.isFinite(Number(row.stat?.[key])))
+export function isHittingLeaderRow(row) {
+  const plateAppearances = Number(row?.stat?.plateAppearances ?? row?.stat?.pa);
+  const inningsPitched = Number(row?.stat?.inningsPitched ?? row?.stat?.ip);
+  return Number.isFinite(plateAppearances) && plateAppearances > 0 && !(Number.isFinite(inningsPitched) && inningsPitched > 0);
+}
+
+export function isPitchingLeaderRow(row) {
+  const inningsPitched = Number(row?.stat?.inningsPitched ?? row?.stat?.ip);
+  const plateAppearances = Number(row?.stat?.plateAppearances ?? row?.stat?.pa);
+  return Number.isFinite(inningsPitched) && inningsPitched > 0 && !(Number.isFinite(plateAppearances) && plateAppearances > 0);
+}
+
+export function getLeaders(hittingRows = [], pitchingRows = []) {
+  const top = (rows, key, direction = 'desc', rowFilter = () => true) => [...rows]
+    .filter(row => rowFilter(row) && Number.isFinite(Number(row.stat?.[key])))
     .sort((a, b) => direction === 'asc'
       ? Number(a.stat[key]) - Number(b.stat[key])
       : Number(b.stat[key]) - Number(a.stat[key]))[0] || null;
-  const hit = (cat, key, digits = 0, direction = 'desc') => {
-    const row = top(hittingRows, key, direction);
-    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
+  const rateEligiblePitcher = row => isPitchingLeaderRow(row) && Number(row?.stat?.inningsPitched ?? row?.stat?.ip) >= 10;
+  const hit = (cat, key, digits = 0, direction = 'desc', scorebookRate = false) => {
+    const row = top(hittingRows, key, direction, isHittingLeaderRow);
+    return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits, scorebookRate) : '—' };
   };
-  const pit = (cat, key, digits = 0, direction = 'desc') => {
-    const row = top(pitchingRows, key, direction);
+  const pit = (cat, key, digits = 0, direction = 'desc', useRateQualifier = false) => {
+    const row = top(pitchingRows, key, direction, useRateQualifier ? rateEligiblePitcher : isPitchingLeaderRow);
     return { cat, player: row?.name || '—', playerId: row?.id ?? null, val: row ? formatLeaderValue(row.stat[key], digits) : '—' };
   };
   return {
-    batting: [hit('HR', 'homeRuns'), hit('AVG', 'avg', 3), hit('OPS', 'ops', 3), hit('SB', 'stolenBases')],
-    pitching: [pit('ERA', 'era', 2, 'asc'), pit('K', 'strikeOuts'), pit('WHIP', 'whip', 2, 'asc')],
+    batting: [
+      hit('HR', 'homeRuns'),
+      hit('AVG', 'avg', 3, 'desc', true),
+      hit('OPS', 'ops', 3, 'desc', true),
+      hit('RBI', 'rbi'),
+      hit('SB', 'stolenBases'),
+    ],
+    pitching: [
+      pit('ERA', 'era', 2, 'asc', true),
+      pit('K', 'strikeOuts'),
+      pit('WHIP', 'whip', 2, 'asc', true),
+      pit('W', 'wins'),
+      pit('SV', 'saves'),
+    ],
   };
 }
 
@@ -2337,8 +2363,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
         <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
           <div style={{padding:'7px 10px 5px',borderBottom:`0.5px solid ${C.borderLight}`}}>
             <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:5})}>Batting</div>
-            {leaders.batting.slice(0,2).map((row,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
+            {leaders.batting.map((row,i)=>(
+              <div key={row.cat} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:i<leaders.batting.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
                   <span style={{...px({fontSize:10,fontWeight:700,color:C.amber}),background:C.amberSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
                   <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
@@ -2350,8 +2376,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           </div>
           <div style={{padding:'7px 10px 5px'}}>
             <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.rust,marginBottom:5})}>Pitching</div>
-            {leaders.pitching.slice(0,1).map((row,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
+            {leaders.pitching.map((row,i)=>(
+              <div key={row.cat} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:i<leaders.pitching.length-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <div style={{display:'flex',gap:7,alignItems:'center'}}>
                   <span style={{...px({fontSize:10,fontWeight:700,color:C.rust}),background:C.rustSoft,padding:'1px 6px',borderRadius:4,minWidth:30,textAlign:'center'}}>{row.cat}</span>
                   <PlayerPhoto id={row.playerId} name={row.player} alt="" size={22} variant="avatar" />
@@ -2361,6 +2387,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
             ))}
           </div>
+          <div style={sans({padding:'6px 10px 8px',fontSize:8.5,color:C.text4,lineHeight:1.35,borderTop:`0.5px solid ${C.borderLight}`})}>MLB hitting and pitching splits are evaluated separately. AVG and OPS use hitter rows with PA; ERA and WHIP require pitcher rows with 10+ IP.</div>
         </Panel>
 
         <div id="team-overview-front-office-evaluation">

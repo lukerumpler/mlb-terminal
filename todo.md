@@ -11382,3 +11382,7 @@
 - [x] Audit the scrolling ticker’s current values, client data path, and official MLB schedule feed.
 - [x] Replace non-verified ticker content with source-aware official MLB game results and honest loading or unavailable states.
 - [x] Add ticker regression coverage, validate desktop and mobile behavior, and publish the correction.
+
+- [x] Audit Team Leaders category coverage, official MLB source rows, and existing hitter-pitcher stat mapping.
+- [x] Expand the Team Leaders card with verified batting and pitching leader categories protected by role-specific stat guards.
+- [x] Add data-separation regression coverage, validate desktop and mobile layouts, and publish the enhancement.
