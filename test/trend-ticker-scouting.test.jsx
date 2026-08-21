@@ -61,10 +61,10 @@ describe("verified trend snapshots", () => {
 });
 
 describe("ticker and scouting preview contracts", () => {
-  it("uses explicit refresh states without an in-process interval", () => {
+  it("uses explicit refresh states with a bounded periodic official refresh", () => {
     expect(appSource).toContain("const refreshTicker = useCallback");
     expect(appSource).toContain("<LiveScoreTicker status={tickerStatus}");
-    expect(appSource).not.toContain("setInterval(refresh, 30_000");
+    expect(appSource).toContain("setInterval(refreshTicker, 90_000)");
   });
 
   it("renders loading, empty, error, stale, and updating states with retry behavior", () => {
@@ -73,7 +73,7 @@ describe("ticker and scouting preview contracts", () => {
     expect(screen.getByRole("status", { hidden: true })).toBeInTheDocument();
     rerender(<LiveScoreTicker status="empty" />);
     expect(
-      screen.getByText("No games in progress right now.")
+      screen.getByText("No MLB games on the official schedule today.")
     ).toBeInTheDocument();
     rerender(<LiveScoreTicker status="error" onRetry={retry} />);
     screen.getByRole("button", { name: "RETRY" }).click();
@@ -83,7 +83,7 @@ describe("ticker and scouting preview contracts", () => {
     rerender(
       <LiveScoreTicker status="refreshing" ticks={["LAD 3, SD 1 (▲6)"]} />
     );
-    expect(screen.getByText("UPDATING")).toBeInTheDocument();
+    expect(screen.getByLabelText("UPDATING ticker · MLB Stats API")).toBeInTheDocument();
   });
 
   it("shows a verified trend arrow only when a baseline-derived trend is present", () => {

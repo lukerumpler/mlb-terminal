@@ -36,6 +36,22 @@ import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js
 
 const BASE   = apiUrl('/api/mlb');
 export const SEASON = 2026;
+const MLB_SCHEDULE_TIME_ZONE = 'America/New_York';
+
+// MLB's schedule is organized around its Eastern Time baseball day. Using a
+// UTC date here moved the ticker to tomorrow every evening for Arizona and
+// other western users, even while today's games were still in progress.
+export function getMlbScheduleDate(now = new Date()) {
+  const date = now instanceof Date ? now : new Date(now);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: MLB_SCHEDULE_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 // MiLB league IDs for standings calls
 export const MILB_LEAGUES = {
@@ -1467,7 +1483,7 @@ function normalizeGame(g) {
 }
 
 export async function getTodaysGames(date) {
-  const d    = date || new Date().toISOString().slice(0, 10);
+  const d    = date || getMlbScheduleDate();
   const data = await mlb('/schedule', {
     sportId: 1, date: d,
     hydrate: 'linescore(matchup,runners),team,flags,review,weather',

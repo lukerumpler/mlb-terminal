@@ -11378,3 +11378,7 @@
 - [x] Audit the existing Team Overview loading states, skeleton component, styles, and associated regression coverage.
 - [x] Add an accessible animated Team Overview skeleton that mirrors the initial information hierarchy without presenting placeholder values as data.
 - [x] Validate desktop and mobile loading states, reduced-motion behavior, and full release quality before publication.
+
+- [x] Audit the scrolling ticker’s current values, client data path, and official MLB schedule feed.
+- [x] Replace non-verified ticker content with source-aware official MLB game results and honest loading or unavailable states.
+- [x] Add ticker regression coverage, validate desktop and mobile behavior, and publish the correction.

@@ -4,6 +4,7 @@ import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { getDailyInsight } from './constants/alerts.js';
 import { getTodaysGames } from './api/mlb.js';
+import { deriveTickerStatus, formatTickerGame } from './lib/ticker.js';
 import { getCacheHealth } from './lib/cacheHealthClient.js';
 import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
 import { Panel } from './components/atoms.jsx';
@@ -183,11 +184,12 @@ export default function App() {
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const [liveTicker, setLiveTicker] = useState([]);
-  // 'loading' | 'live' | 'empty' | 'error' — the ticker used to seed itself
+  // 'loading' | 'live' | 'scheduled' | 'final' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
   // fetch failed or returned nothing, next to a pulsing "LIVE" dot. Tracking
   // real status means we only ever show genuinely live data as live.
   const [tickerStatus, setTickerStatus] = useState('loading');
+  const [tickerUpdatedAt, setTickerUpdatedAt] = useState(null);
   const [rosterDefaults, setRosterDefaults] = useState(() => loadRosterDefaults());
   const [lowDataMode, setLowDataModeState] = useState(() => readLowDataMode());
   const [feedFreshnessSettings, setFeedFreshnessSettings] = useState(() => readFeedFreshnessSettings());
@@ -352,23 +354,17 @@ export default function App() {
   }, []);
 
   const refreshTicker = useCallback(() => {
-    setTickerStatus(current => current === 'live' ? 'refreshing' : 'loading');
+    setTickerStatus(current => ['live', 'scheduled', 'final', 'stale'].includes(current) ? 'refreshing' : 'loading');
     return getTodaysGames().then(games => {
       if (!games.length) {
         setLiveTicker([]);
         setTickerStatus('empty');
         return [];
       }
-      const ticks = games.map(g => {
-        const sc = g.away.runs != null
-          ? `${g.away.abbr} ${g.away.runs}, ${g.home.abbr} ${g.home.runs}`
-          : `${g.away.abbr} vs ${g.home.abbr}`;
-        const status = g.status === 'Final' ? '(F)' : g.inning
-          ? `(${g.inningHalf === 'top' ? '▲' : '▼'}${g.inning})` : '(Pre)';
-        return `${sc} ${status}`;
-      });
+      const ticks = games.map(formatTickerGame);
       setLiveTicker(ticks);
-      setTickerStatus('live');
+      setTickerUpdatedAt(Date.now());
+      setTickerStatus(deriveTickerStatus(games));
       return ticks;
     }).catch(() => {
       setTickerStatus(current => current === 'live' || current === 'refreshing' ? 'stale' : 'error');
@@ -378,9 +374,11 @@ export default function App() {
   useEffect(() => {
     refreshTicker();
     const refreshWhenVisible = () => { if (document.visibilityState === 'visible') refreshTicker(); };
+    const refreshIntervalId = window.setInterval(refreshTicker, 90_000);
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
+      window.clearInterval(refreshIntervalId);
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
@@ -534,7 +532,7 @@ export default function App() {
           </div>
         </div>
 
-        <LiveScoreTicker status={tickerStatus} ticks={liveTicker} onRetry={refreshTicker} />
+        <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />
       </div>
 
       <style>{`
