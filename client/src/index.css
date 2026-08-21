@@ -1325,3 +1325,36 @@
   .skip-team-hot-streak-controls { align-items:flex-end; }
   .skip-team-hot-streak-controls > span { max-width:104px; }
 }
+
+/* Mobile command-center ergonomics: reserve space for the fixed scoreboard, keep
+   primary controls thumb-friendly, and make horizontal navigation intentional. */
+@media (max-width:720px) {
+  .skip-content {
+    padding-bottom:calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+  .skip-mobile-workspace-switcher {
+    scroll-snap-type:x proximity;
+    overscroll-behavior-x:contain;
+    padding-left:12px;
+    padding-right:24px;
+  }
+  .skip-mobile-workspace-switcher button {
+    min-height:36px;
+    scroll-snap-align:start;
+  }
+  .skip-overview-page select,
+  .skip-overview-page button,
+  .skip-overview-page input {
+    min-height:38px;
+  }
+  .skip-overview-page .skip-overview-view-button {
+    min-height:38px;
+    padding-inline:12px;
+  }
+  .skip-overview-page .overview-team-context {
+    gap:8px !important;
+  }
+  .skip-ticker-shell {
+    min-height:calc(36px + env(safe-area-inset-bottom)) !important;
+  }
+}

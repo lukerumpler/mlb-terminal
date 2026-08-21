@@ -101,3 +101,10 @@
 - [x] Align the correct production deployment after verification; GitHub main was reconciled through PR #19, Vercel deployment status passed, and lukerumpler.com now serves the current Padres-first interface.
 
 - [x] Synchronize the approved latest managed release into GitHub main/Vercel production and verify lukerumpler.com matches it; custom-domain reload now shows the current managed layout and API endpoints return HTTP 200.
+
+- [x] Audit mobile layouts and controls across overview, League comparison, navigation, and fixed ticker at narrow widths; reviewed the 375px overview, verified the League workspace controls and no horizontal overflow, and identified bottom ticker clearance and touch-target improvements.
+- [x] Implement validated mobile usability improvements, add regression coverage, run validation, and publish the result; added safe-area bottom clearance, larger touch targets, scroll-snap navigation, and passed focused/full tests, TypeScript, and production build.
+
+- [x] Exercise the real League comparison workspace, mobile navigation drawer, and fixed ticker at 375px after the new CSS changes; desktop and mobile browser audits both passed with no horizontal overflow, the drawer opened, the League table rendered, and the ticker stayed within the viewport.
+- [x] Add and run focused regression coverage for the mobile-specific layout contract; `test/mobile-layout.test.js` passed all 3 assertions for safe-area clearance, touch targets, and scroll navigation.
+- [x] Save and publish a mobile optimization checkpoint and record its version ID.
