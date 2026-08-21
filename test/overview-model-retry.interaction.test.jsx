@@ -466,6 +466,6 @@ describe("Team Overview model source and retry interaction", () => {
     );
     expect(
       container.querySelectorAll(".skip-status-verified").length
-    ).toBeGreaterThanOrEqual(2);
+    ).toBeGreaterThanOrEqual(1);
   }, 20000);
 });

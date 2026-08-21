@@ -26,6 +26,7 @@ import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
+import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -673,6 +674,17 @@ export const TEAM_LEADER_ELIGIBILITY = Object.freeze({
   }),
 });
 
+export const TEAM_LEADER_EVERYDAY_PA_PER_GAME = 3.5;
+export const TEAM_LEADER_EVERYDAY_PA_SHARE = 0.33;
+
+export function getTeamLeaderHitterPaMinimum(team = {}) {
+  const wins = Number(team?.w);
+  const losses = Number(team?.l);
+  const gamesPlayed = wins + losses;
+  if (!Number.isFinite(gamesPlayed) || gamesPlayed <= 0) return null;
+  return Math.ceil(gamesPlayed * TEAM_LEADER_EVERYDAY_PA_PER_GAME * TEAM_LEADER_EVERYDAY_PA_SHARE);
+}
+
 export const HOT_STREAK_RANGE_OPTIONS = Object.freeze([
   Object.freeze({ days: 7, label: '7 days' }),
   Object.freeze({ days: 15, label: '15 days' }),
@@ -717,8 +729,8 @@ function buildLeaderGroups(hittingRows = [], pitchingRows = [], { hitterRatePa, 
   };
 }
 
-export function getLeaders(hittingRows = [], pitchingRows = []) {
-  return buildLeaderGroups(hittingRows, pitchingRows, TEAM_LEADER_ELIGIBILITY.season);
+export function getLeaders(hittingRows = [], pitchingRows = [], eligibility = TEAM_LEADER_ELIGIBILITY.season) {
+  return buildLeaderGroups(hittingRows, pitchingRows, eligibility);
 }
 
 export function getHotStreakLeaders(hittingRows = [], pitchingRows = [], days = 15) {
@@ -1111,7 +1123,7 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
   const [selTeam,setSelTeam]=useState('lad');
   const [overviewView, setOverviewView] = useState('briefing');
-  const [evaluationActiveLabel, setEvaluationActiveLabel] = useState(null);
+  const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
   const [affiliateId, setAffiliateId] = useState('');
@@ -2176,18 +2188,28 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
     };
   }, [D, team.ops, team.era]);
 
+  const teamLeaderEligibility = useMemo(() => ({
+    ...TEAM_LEADER_ELIGIBILITY.season,
+    hitterRatePa: getTeamLeaderHitterPaMinimum(team) ?? TEAM_LEADER_ELIGIBILITY.season.hitterRatePa,
+  }), [team.w, team.l]);
+  const selectedEvaluationGrade = useMemo(() => {
+    const label = evaluationActiveLabel || 'Overall';
+    if (label === 'Overall') return { label, detail:D.frontOfficeOverall.detail };
+    return D.frontOfficeGradeRows.find(row => row.label === label) || { label:'Overall', detail:D.frontOfficeOverall.detail };
+  }, [D.frontOfficeGradeRows, D.frontOfficeOverall, evaluationActiveLabel]);
+
   // These only depend on `team`, but were previously called directly in the
   // render body — every unrelated state change on this page (e.g. clicking
   // a split/arsenal tab) was silently recomputing all five for the same
   // team. Memoized on selTeam to match the `D` useMemo above.
   const { splits, leaders, hotStreakLeaders, bb, arsenal, fo } = useMemo(() => ({
     splits:  teamSplitRows,
-    leaders: getLeaders(liveTeamPlayers.hitting, liveTeamPlayers.pitching),
+    leaders: getLeaders(liveTeamPlayers.hitting, liveTeamPlayers.pitching, teamLeaderEligibility),
     hotStreakLeaders: getHotStreakLeaders(hotStreakRows.hitting, hotStreakRows.pitching, hotStreakDays),
     bb:      teamBattedBallData,
     arsenal: teamPitchArsenalData,
     fo:      getFrontOffice(team),
-  }), [team, liveTeamPlayers, hotStreakRows, hotStreakDays, teamBattedBallData, teamPitchArsenalData, teamSplitRows]);
+  }), [team, liveTeamPlayers, hotStreakRows, hotStreakDays, teamBattedBallData, teamPitchArsenalData, teamSplitRows, teamLeaderEligibility]);
   const evBins = useMemo(() => buildExitVelocityBins(teamExitVelocityRows), [teamExitVelocityRows]);
   const contactAllowed = useMemo(() => {
     const rows = teamBattedBallAgainstRows;
@@ -2474,7 +2496,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
           <p>Leaders, team evaluation, and strength context.</p>
         </div>
         <div id="team-overview-detailed-analysis" className="overview-responsive-grid overview-decision-row skip-overview-deferred-analysis" style={{display:'grid',gridTemplateColumns:'minmax(240px,1fr) minmax(280px,1.15fr)',minHeight:'100%',gap:10,alignItems:'start'}}>
-        <Panel title="Team Leaders" accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
+        <Panel title={`Team Leaders · ${teamLeaderEligibility.hitterRatePa} PA min`} accent={OVERVIEW_ACCENTS.offense} badge={teamPlayersBadge}>
           <div style={{padding:'7px 10px 5px',borderBottom:`0.5px solid ${C.borderLight}`}}>
             <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.amber,marginBottom:5})}>Batting</div>
             {leaders.batting.map((row,i)=>(
@@ -2522,7 +2544,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               ))}
             </div> : <div className="skip-team-hot-streak-unavailable" role="status">No verified {hotStreakDays}-day MLB player-split rows are available. Recent leaders are intentionally hidden.</div>}
           </section>
-          <div style={sans({padding:'6px 10px 8px',fontSize:8.5,color:C.text4,lineHeight:1.35,borderTop:`0.5px solid ${C.borderLight}`})}>Rate-stat requirements appear beside each leader: AVG and OPS use qualifying hitter PA; ERA and WHIP use qualifying pitcher IP. Hitter and pitcher splits remain separate.</div>
+          <div style={sans({padding:'6px 10px 8px',fontSize:8.5,color:C.text4,lineHeight:1.35,borderTop:`0.5px solid ${C.borderLight}`})}>Batting rate minimum: {teamLeaderEligibility.hitterRatePa} PA = ceil(33% × 3.5 PA per game × {Number(team.w || 0) + Number(team.l || 0)} games). AVG and OPS use this team-specific threshold; ERA and WHIP use qualifying pitcher IP. Hitter and pitcher splits remain separate.</div>
         </Panel>
 
         <div id="team-overview-front-office-evaluation">
@@ -2540,12 +2562,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
               </div>
               <div>
                 <div style={sans({fontSize:9.5,fontWeight:700,color:C.rust,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Weaknesses</div>
-                {fo.weaknesses.map(s=>(
+                {fo.weaknesses.length ? fo.weaknesses.map(s=>(
                   <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:5}}>
                     <span style={{color:C.rust,fontSize:11,flexShrink:0,marginTop:1}}>✕</span>
                     <span style={sans({fontSize:10.5,color:C.text2,lineHeight:1.4})}>{s}</span>
                   </div>
-                ))}
+                )) : <div style={sans({fontSize:10,color:C.text4,lineHeight:1.4})}>No material weaknesses surfaced at current thresholds.</div>}
               </div>
             </div>
             <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}} data-evaluation-presentation={evaluationPresentation}>
@@ -2554,7 +2576,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
                 ? <FrontOfficeScoreRingPreview teamName={team.name} grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />
                 : <FrontOfficeGradeCards grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
-                <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}>Defense uses roster coverage and, when available, Statcast OAA (<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />). Baserunning uses steals and success rate; Depth blends roster coverage with a dated MLB Pipeline farm rank. Baseball America is a methodology reference; its subscription-only ranks are not imported.</div>
+                <div data-selected-grade={selectedEvaluationGrade.label} style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}><strong style={{color:C.text3}}>{selectedEvaluationGrade.label} methodology. </strong>{selectedEvaluationGrade.detail}</div>
                 <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>
               </div>
             </div>
@@ -2921,15 +2943,16 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 } }) {
             ) : <OverviewEmptyState message="Opponent contact quality" detail="Baseball Savant did not return verified opponent batted-ball rows for this season." />}
           </Panel>
 
-          {/* Position depth is derived from the verified current-season player rows. */}
-          <Panel title="Position Breakdown" accent={OVERVIEW_ACCENTS.defense} badge={<OverviewSourceBadge status="verified" />}>
+          {/* Player count is derived from verified roster rows; OAA comes from the separately sourced Statcast leaderboard. */}
+          <Panel title="Position Breakdown" accent={OVERVIEW_ACCENTS.defense} badge={<OverviewSourceBadge provider="Savant" status={oaaHealthStatus} />}>
             {teamRollups.positions.length ? teamRollups.positions.slice(0, 8).map((row, index) => (
               <div key={row.position} style={{display:'flex',justifyContent:'space-between',padding:'7px 14px',borderBottom:index<Math.min(teamRollups.positions.length,8)-1?`0.5px solid ${C.borderLight}`:'none'}}>
                 <span style={sans({fontSize:11,color:C.text2})}>{row.position}</span>
                 <span style={px({fontSize:11,fontWeight:700,color:teamAccent})}>{row.players} player{row.players === 1 ? '' : 's'}</span>
               </div>
             )) : <div style={sans({padding:'20px 14px',fontSize:10,color:C.text3})}>Roster rows are still loading.</div>}
-            <div style={sans({padding:'8px 14px',fontSize:9,color:C.text4,lineHeight:1.4})}>Verified player-count depth from the current MLB season feed. OAA remains a separate Statcast coverage gap.</div>
+            <div style={sans({padding:'8px 14px',fontSize:9,color:C.text4,lineHeight:1.4})}>Verified player-count coverage from the current MLB season feed. The map below uses separately returned Baseball Savant OAA and does not claim starter or backup depth.</div>
+            <DefensiveOaaFieldMap playerRows={teamOaaData?.playerRows} status={oaaHealthStatus === 'loading' ? 'loading' : oaaHealthStatus} source={teamOaaData?.source} />
           </Panel>
         </div>
       </div>
