@@ -65,6 +65,11 @@ const OVERVIEW_VIEW_OPTIONS = [
   { id: 'operations', label: 'Operations', detail: 'Context & schedule' },
 ];
 
+export function getInitialOverviewView(search = typeof window === 'undefined' ? '' : window.location.search) {
+  const requested = new URLSearchParams(search || '').get('overviewView');
+  return OVERVIEW_VIEW_OPTIONS.some(option => option.id === requested) ? requested : 'briefing';
+}
+
 // Matches the ResponsiveContainer height of the chart it stands in for, so
 // there's no layout shift when the real chart pops in.
 export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) {
@@ -80,6 +85,21 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
       {detail && (detailIsLong ? <details className="skip-overview-empty-note"><summary>More detail</summary><span className="skip-overview-empty-detail">{detail}</span></details> : <span className="skip-overview-empty-detail">{detail}</span>)}
     </div>
   </div>;
+}
+
+export function derivePetcoParkGameContext(games, teamId = 135) {
+  const id = Number(teamId);
+  const game = (Array.isArray(games) ? games : []).find(candidate => Number(candidate?.home?.id) === id);
+  if (!game) return { status: 'no-game', game: null, opponent: null };
+  const rawStatus = String(game.status || '').toLowerCase();
+  const status = rawStatus.includes('final') ? 'final' : (rawStatus.includes('progress') || rawStatus.includes('live') || game.inning ? 'live' : 'scheduled');
+  return { status, game, opponent: game.away || null };
+}
+
+export function formatLocalGameTime(value) {
+  if (!value) return 'Time unavailable';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, { weekday:'short', hour:'numeric', minute:'2-digit', timeZoneName:'short' }) : 'Time unavailable';
 }
 
 function OverviewSourceBadge({ status, provider, title }) {
@@ -1257,7 +1277,7 @@ export function normalizeMinorLeagueAffiliates(rows, parentTeamId) {
 function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultTeamKey = DEFAULT_OVERVIEW_TEAM_KEY }) {
   const initialTeamKey = TEAMS[defaultTeamKey] ? defaultTeamKey : DEFAULT_OVERVIEW_TEAM_KEY;
   const [selTeam,setSelTeam]=useState(initialTeamKey);
-  const [overviewView, setOverviewView] = useState('briefing');
+  const [overviewView, setOverviewView] = useState(() => getInitialOverviewView());
   const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
@@ -1288,11 +1308,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const [splitTab,setSplitTab]=useState('home');
   const [teamSplitRows, setTeamSplitRows] = useState([]);
   const [teamRecentGames, setTeamRecentGames] = useState([]);
+  const [teamRecentStreak, setTeamRecentStreak] = useState(null);
   const [teamSplitsState, setTeamSplitsState] = useState('idle');
   const [arsenalTab,setArsenalTab]=useState('usage');
   const [todayGames,setTodayGames]=useState([]);
   const [todayGamesState, setTodayGamesState] = useState('loading');
   const [todayGameMetadata, setTodayGameMetadata] = useState({});
+  const [petcoScheduleGame, setPetcoScheduleGame] = useState(null);
+  const [petcoGameMetadata, setPetcoGameMetadata] = useState(null);
+  const [petcoGameMetadataState, setPetcoGameMetadataState] = useState('idle');
   const [liveTeamData,setLiveTeamData]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.data || null);
   const [liveTeamDataUpdatedAt,setLiveTeamDataUpdatedAt]=useState(() => readTeamAggregateCache(CURRENT_SEASON)?.updatedAt || null);
   const [liveTeamDataMode,setLiveTeamDataMode]=useState(() => readTeamAggregateCache(CURRENT_SEASON) ? 'cached' : 'loading');
@@ -1653,16 +1677,68 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     setTodayGamesState('loading');
     getTodaysGames().then(games => {
       if (!alive) return;
-      const visibleGames = (Array.isArray(games) ? games : []).slice(0, 8);
+      const allGames = Array.isArray(games) ? games : [];
+      const visibleGames = allGames.slice(0, 8);
       setTodayGames(visibleGames);
+      setPetcoScheduleGame(allGames.find(game => Number(game?.home?.id) === 135 || Number(game?.away?.id) === 135) || null);
       setTodayGamesState(visibleGames.length ? 'ready' : 'empty');
     }).catch(() => {
       if (!alive) return;
       setTodayGames([]);
+      setPetcoScheduleGame(null);
       setTodayGamesState('unavailable');
     });
     return () => { alive = false; };
   }, [mlbRetryToken]);
+  useEffect(() => {
+    if (overviewView !== 'operations' || Number(teamBase?.id) !== 135) return undefined;
+    let alive = true;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'hidden') return;
+      getTodaysGames().then(games => {
+        if (!alive) return;
+        const allGames = Array.isArray(games) ? games : [];
+        const visibleGames = allGames.slice(0, 8);
+        setTodayGames(visibleGames);
+        setPetcoScheduleGame(allGames.find(game => Number(game?.home?.id) === 135 || Number(game?.away?.id) === 135) || null);
+        setTodayGamesState(visibleGames.length ? 'ready' : 'empty');
+      }).catch(() => {
+        if (alive && !todayGames.length) setTodayGamesState('unavailable');
+      });
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 60_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [overviewView, teamBase?.id, todayGames.length]);
+  const petcoGameContext = useMemo(() => Number(teamBase?.id) === 135 ? derivePetcoParkGameContext(petcoScheduleGame ? [petcoScheduleGame] : [], teamBase.id) : { status:'no-game', game:null, opponent:null }, [petcoScheduleGame, teamBase?.id]);
+  useEffect(() => {
+    if (overviewView !== 'operations' || petcoGameContext.status === 'no-game') {
+      setPetcoGameMetadata(null);
+      setPetcoGameMetadataState('idle');
+      return undefined;
+    }
+    let alive = true;
+    const known = todayGameMetadata?.[petcoGameContext.game?.gamePk];
+    if (known) {
+      setPetcoGameMetadata(known);
+      setPetcoGameMetadataState(known.weather ? 'ready' : 'unavailable');
+      return () => { alive = false; };
+    }
+    setPetcoGameMetadata(null);
+    setPetcoGameMetadataState('loading');
+    getGameFeedMetadata(petcoGameContext.game).then(metadata => {
+      if (!alive) return;
+      setPetcoGameMetadata(metadata || null);
+      setPetcoGameMetadataState(metadata?.weather ? 'ready' : 'unavailable');
+    }).catch(() => {
+      if (alive) setPetcoGameMetadataState('unavailable');
+    });
+    return () => { alive = false; };
+  }, [overviewView, petcoGameContext.status, petcoGameContext.game?.gamePk, todayGameMetadata]);
   useEffect(() => {
     if (overviewView !== 'operations') return undefined;
     let alive = true;
@@ -1684,16 +1760,19 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     let alive = true;
     setTeamSplitRows([]);
     setTeamRecentGames([]);
+    setTeamRecentStreak(null);
     setTeamSplitsState('loading');
     getTeamScheduleSnapshot(teamBase?.id, CURRENT_SEASON).then(snapshot => {
       if (!alive) return;
       setTeamSplitRows(Array.isArray(snapshot?.splitRows) ? snapshot.splitRows : []);
       setTeamRecentGames(Array.isArray(snapshot?.recentGames) ? snapshot.recentGames : []);
+      setTeamRecentStreak(snapshot?.streak?.games ? snapshot.streak : null);
       setTeamSplitsState('ready');
     }).catch(() => {
       if (!alive) return;
       setTeamSplitRows([]);
       setTeamRecentGames([]);
+      setTeamRecentStreak(null);
       setTeamSplitsState('unavailable');
     });
     return () => { alive = false; };
@@ -2716,8 +2795,28 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         </> : <OverviewEmptyState status={teamVenueState === 'loading' ? 'Loading' : teamVenueState === 'source-gap' ? 'Source gap' : 'Unavailable'} message="Ballpark metadata" detail="Official MLB venue metadata is not available for this team right now. No static park values are substituted." />}
       </Panel>}
 
+      {overviewView === 'operations' && team.abbr === 'SD' && <Panel title="Petco Park Game Context" accent={teamAccent} badge={petcoGameContext.status === 'no-game' ? (todayGamesState === 'loading' ? 'Loading MLB' : 'No home game') : petcoGameContext.status === 'live' ? 'Live MLB schedule' : petcoGameContext.status === 'final' ? 'Final' : petcoGameMetadataState === 'ready' ? 'MLB schedule' : petcoGameMetadataState === 'loading' ? 'Loading weather' : 'Scheduled'}>
+        {todayGamesState === 'loading' && !petcoScheduleGame ? <OverviewEmptyState status="Loading" message="Petco Park game context" detail="Checking today’s official MLB schedule for a Padres home game." /> : petcoGameContext.status === 'no-game' ? <OverviewEmptyState status={todayGamesState === 'unavailable' ? 'Unavailable' : 'No Petco game'} message="Petco Park game context" detail={todayGamesState === 'unavailable' ? 'The official MLB schedule is temporarily unavailable, so game time and weather are not shown.' : 'No Padres home game appears on today’s official MLB schedule. Weather is shown only for a scheduled or live Petco Park game.'} /> : <>
+          <div className="skip-balanced-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(132px,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
+            {[
+              ['Opponent', petcoGameContext.opponent?.abbr || petcoGameContext.opponent?.name || '—'],
+              ['Game time', formatLocalGameTime(petcoGameContext.game?.time)],
+              ['Status', petcoGameContext.status === 'live' ? (petcoGameContext.game?.status || 'Live') : petcoGameContext.status === 'final' ? 'Final' : 'Scheduled'],
+              ['Conditions', petcoGameMetadataState === 'loading' ? 'Loading…' : petcoGameMetadata?.weather?.condition || 'Unavailable'],
+              ['Temperature', petcoGameMetadataState === 'loading' ? 'Loading…' : petcoGameMetadata?.weather?.temp == null || petcoGameMetadata?.weather?.temp === '' ? '—' : `${petcoGameMetadata.weather.temp}°`],
+              ['Wind', petcoGameMetadataState === 'loading' ? 'Loading…' : petcoGameMetadata?.weather?.wind || '—'],
+            ].map(([label,value], index) => <div key={label} style={{padding:'9px 10px',borderRight:index % 3 < 2 ? `0.5px solid ${C.borderLight}` : 'none'}}><div style={px({fontSize:13,fontWeight:800,color:value === '—' || value === 'Unavailable' ? C.text3 : C.text})}>{value}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em',marginTop:3})}>{label}</div></div>)}
+          </div>
+          <div style={sans({padding:'8px 14px 10px',fontSize:9,color:C.text3,lineHeight:1.45})}>{petcoGameMetadata?.weather ? `${petcoGameMetadata.source || 'MLB schedule'} · last checked ${petcoGameMetadata.retrievedAt ? new Date(petcoGameMetadata.retrievedAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) : 'now'}.` : petcoGameMetadataState === 'unavailable' ? (petcoGameMetadata?.reason || 'Official MLB weather is not available for this game right now; no alternate weather source is substituted.') : 'The visible Operations view checks the official MLB schedule at most once per minute and pauses while this browser tab is hidden.'}</div>
+        </>}
+      </Panel>}
+
       {overviewView === 'operations' && <Panel title={`${team.name} Recent Results`} accent={teamAccent} badge={teamSplitsState === 'loading' ? 'Loading MLB' : teamSplitsState === 'unavailable' ? 'Unavailable' : 'Official MLB schedule'}>
         {teamSplitsState === 'loading' ? <OverviewEmptyState status="Loading" message="Recent completed games" detail="Loading official MLB regular-season results." /> : teamRecentGames.length ? <>
+          <div style={{padding:'9px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap',borderTop:`0.5px solid ${C.borderLight}`,background:teamRecentStreak?.type === 'winning' ? C.tealSoft : teamRecentStreak?.type === 'losing' ? C.rustSoft : C.surface}}>
+            <div style={sans({fontSize:10,color:C.text3})}>Current completed-game streak</div>
+            <div style={px({fontSize:12,fontWeight:800,color:teamRecentStreak?.type === 'winning' ? C.teal : teamRecentStreak?.type === 'losing' ? C.rust : C.text3})}>{teamRecentStreak ? `${teamRecentStreak.games}-game ${teamRecentStreak.type} streak` : 'Streak unavailable'}</div>
+          </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
             {teamRecentGames.map((game, index) => <a key={`${game.gamePk || index}-${game.gameDate}`} href={game.gamePk ? `https://www.mlb.com/gameday/${game.gamePk}` : undefined} target="_blank" rel="noreferrer" aria-label={`${game.result} ${game.score} ${game.location} ${game.opponentName}; open official MLB Gameday`} style={{padding:'10px 12px',borderRight:index < teamRecentGames.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',textDecoration:'none',color:C.text,background:game.isWin === true ? C.tealSoft : game.isWin === false ? C.rustSoft : C.surface}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:6}}><span style={px({fontSize:10,fontWeight:800,color:game.isWin === true ? C.teal : game.isWin === false ? C.rust : C.text3})}>{game.result}</span><span style={px({fontSize:9,color:C.text4})}>{game.gameDate ? new Date(game.gameDate).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '—'}</span></div>
@@ -2725,7 +2824,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
               <div style={px({marginTop:3,fontSize:12,fontWeight:800,color:C.text2})}>{game.score}</div>
             </a>)}
           </div>
-          <div style={sans({padding:'8px 14px 10px',fontSize:9.5,color:C.text3,lineHeight:1.45})}>Five most recent completed regular-season games. Results and scores come from the official MLB schedule; this card loads only when Operations is opened and shares its single cached schedule request with Splits Dashboard.</div>
+          <div style={sans({padding:'8px 14px 10px',fontSize:9.5,color:C.text3,lineHeight:1.45})}>Five most recent completed regular-season games. The streak stops at the first opposite result or a final game without a verified score. Results and scores come from the official MLB schedule; this card loads only when Operations is opened and shares its single cached schedule request with Splits Dashboard.</div>
         </> : <OverviewEmptyState status={teamSplitsState === 'unavailable' ? 'Unavailable' : 'No completed games'} message="Recent completed games" detail="The official MLB schedule did not return completed regular-season results for the selected team. No inferred results are shown." />}
       </Panel>}
 

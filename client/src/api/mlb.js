@@ -1707,9 +1707,31 @@ async function fetchStandings(leagueIds, season = SEASON) {
 export const getStandings       = (season = SEASON) => fetchStandings('103,104', season);
 const teamScheduleSnapshotCache = new Map();
 
+export function deriveCompletedGameStreak(games, teamId) {
+  const id = Number(teamId);
+  if (!Number.isFinite(id)) return null;
+  const orderedGames = (Array.isArray(games) ? games : [])
+    .filter(game => String(game?.status?.abstractGameState || '').toLowerCase() === 'final')
+    .filter(game => Number(game?.teams?.home?.team?.id) === id || Number(game?.teams?.away?.team?.id) === id)
+    .sort((left, right) => String(right?.gameDate || '').localeCompare(String(left?.gameDate || '')));
+  let isWin = null;
+  let count = 0;
+  for (const game of orderedGames) {
+    const own = Number(game?.teams?.home?.team?.id) === id ? game.teams?.home : game.teams?.away;
+    const ownScore = own?.score == null || own?.score === '' ? null : Number(own.score);
+    const opponent = own === game?.teams?.home ? game.teams?.away : game.teams?.home;
+    const opponentScore = opponent?.score == null || opponent?.score === '' ? null : Number(opponent.score);
+    if (!Number.isFinite(ownScore) || !Number.isFinite(opponentScore) || typeof own?.isWinner !== 'boolean') break;
+    if (isWin == null) isWin = own.isWinner;
+    if (own.isWinner !== isWin) break;
+    count += 1;
+  }
+  return count && isWin != null ? { type: isWin ? 'winning' : 'losing', games: count } : null;
+}
+
 export function buildTeamScheduleSnapshot(games, teamId) {
   const id = Number(teamId);
-  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [] };
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [], streak: null };
   const numericOrNull = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   const completedGames = (Array.isArray(games) ? games : [])
     .filter(game => String(game?.status?.abstractGameState || '').toLowerCase() === 'final')
@@ -1752,18 +1774,18 @@ export function buildTeamScheduleSnapshot(games, teamId) {
         isWin: hasScore ? Boolean(own?.isWinner) : null,
       };
     });
-  return { splitRows, recentGames };
+  return { splitRows, recentGames, streak: deriveCompletedGameStreak(completedGames, id) };
 }
 
 export async function getTeamScheduleSnapshot(teamId, season = SEASON) {
   const id = Number(teamId);
-  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [] };
+  if (!Number.isFinite(id)) return { splitRows: [], recentGames: [], streak: null };
   const cacheKey = `${id}:${season}`;
   const cached = teamScheduleSnapshotCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.snapshot;
   const today = new Date();
   const start = new Date(`${season}-03-01T00:00:00Z`);
-  if (start > today) return { splitRows: [], recentGames: [] };
+  if (start > today) return { splitRows: [], recentGames: [], streak: null };
   const data = await mlb('/schedule', {
     sportId: 1,
     teamId: id,

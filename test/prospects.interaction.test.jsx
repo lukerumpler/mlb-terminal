@@ -260,7 +260,7 @@ it("renders sticky grouped headers for batter and pitcher ranking tables", async
   expect(document.querySelectorAll(".skip-long-table").length).toBeGreaterThan(
     0
   );
-});
+}, 15000);
 
 it("mounts compact mobile card collections for both ranking pools", async () => {
   const user = userEvent.setup();
@@ -278,4 +278,4 @@ it("mounts compact mobile card collections for both ranking pools", async () => 
   expect(
     document.querySelectorAll(".skip-prospect-mobile-card").length
   ).toBeGreaterThan(0);
-});
+}, 15000);

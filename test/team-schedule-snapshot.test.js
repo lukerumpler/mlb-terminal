@@ -31,6 +31,7 @@ describe('official team schedule snapshot', () => {
       expect.objectContaining({ gamePk: 2, location: '@', result: 'L', score: '2–4', opponentAbbr: 'OPP' }),
       expect.objectContaining({ gamePk: 1, location: 'vs', result: 'W', score: '5–3', opponentAbbr: 'OPP' }),
     ]);
+    expect(snapshot.streak).toEqual({ type: 'losing', games: 1 });
   });
 
   it('does not infer an outcome when a completed schedule entry lacks an official score', () => {
@@ -39,5 +40,6 @@ describe('official team schedule snapshot', () => {
     ], 135);
 
     expect(snapshot.recentGames[0]).toEqual(expect.objectContaining({ result: 'Final', score: '—', isWin: null }));
+    expect(snapshot.streak).toBeNull();
   });
 });
