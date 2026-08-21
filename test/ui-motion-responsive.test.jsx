@@ -162,6 +162,8 @@ describe("SKIP motion and responsive UI hooks", () => {
     expect(indexSource).toContain('.skip-compact-executive-briefing');
     expect(appSource).toContain("get('preview') === 'player-profile'");
     expect(appSource).toContain('PlayerProfilePreviewsPage');
+    expect(appSource).toContain('if (isolatedPreview) return undefined;');
+    expect(appSource).toContain('!isolatedPreview && <LiveScoreTicker');
     expect(overviewSource).toContain(
       'className="skip-affiliate-overview-grid skip-balanced-grid"'
     );

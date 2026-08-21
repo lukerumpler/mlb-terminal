@@ -199,6 +199,7 @@ export default function App() {
   const [cacheHealth, setCacheHealth] = useState(null);
   const [cacheHealthStatus, setCacheHealthStatus] = useState('loading');
   const [cacheHealthUpdatedAt, setCacheHealthUpdatedAt] = useState(null);
+  const isolatedPreview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'player-profile';
   const toggleLowDataMode = useCallback(() => {
     setLowDataModeState(current => setLowDataMode(!current));
   }, []);
@@ -257,6 +258,7 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    if (isolatedPreview) return undefined;
     const refreshWhenVisible = () => {
       if (document.visibilityState !== 'hidden') refreshCacheHealth();
     };
@@ -267,7 +269,7 @@ export default function App() {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [refreshCacheHealth, lowDataMode]);
+  }, [isolatedPreview, lowDataMode, refreshCacheHealth]);
   const liveAlerts = useMemo(() => buildOperationalAlerts({
     cacheHealth,
     cacheHealthStatus,
@@ -382,6 +384,7 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
+    if (isolatedPreview) return undefined;
     let disposed = false;
     let timerId = null;
     let nextRefreshAt = 0;
@@ -406,9 +409,7 @@ export default function App() {
       if (timerId != null) window.clearTimeout(timerId);
       document.removeEventListener('visibilitychange', refreshWhenDue);
     };
-  }, [refreshTicker, lowDataMode]);
-
-  const isolatedPreview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'player-profile';
+  }, [isolatedPreview, lowDataMode, refreshTicker]);
 
   return (
     <>
@@ -561,7 +562,7 @@ export default function App() {
           </div>
         </div>
 
-        <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />
+        {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
       </div>
 
       <style>{`

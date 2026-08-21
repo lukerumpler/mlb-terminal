@@ -249,3 +249,9 @@
 - [x] Add regression coverage for compact cross-tab briefing placement and isolated preview availability.
 - [x] Run type checks, linting, focused and supported full tests, production build, and desktop/mobile validation.
 - [x] Save a live checkpoint for the compact Team briefing and feature-module preview improvements.
+
+- [x] Establish a current full-site baseline across runtime logs, production logs, dependencies, request behavior, linting, test health, and bundle output.
+- [x] Diagnose and prioritize reproducible reliability, performance, navigation, accessibility, and user-interface defects across all application workspaces.
+- [x] Implement high-impact fixes with regression coverage while preserving verified-source and unavailable-state behavior.
+- [x] Run type checks, linting, focused and supported full tests, production build, and representative desktop/mobile visual validation.
+- [x] Save a live checkpoint documenting the full-site master debugging pass and remaining external limitations.
