@@ -72,5 +72,10 @@
 - [x] Merge the validated workflow into GitHub main through the protected review path
 - [x] Require the passing GitHub validation and Padres Operations workflow checks before main can merge
 - [x] Delete only the explicitly authorized stale fix/vercel-* remote branches after comparing their history to main; record the diverged-branch exception transparently
-- [ ] Save and report the completed protection, workflow, and cleanup release
+- [x] Save and report the completed protection, workflow, and cleanup release
 - [x] Record that fix/vercel-api-routing was 2 commits ahead and 206 commits behind main at audit, while the other deleted Vercel branches were strictly behind; deletion followed the user’s explicit authorization and did not merge its stale work
+- [x] Inspect the current main protection, manual workflow dispatch capability, remaining CI/reconciliation branch ancestry, and the attached data-source guide
+- [x] Manually dispatch and verify the Padres Operations regression workflow on GitHub main
+- [x] Update main protection to require at least one approving pull-request review while retaining all required checks
+- [x] Delete only remaining CI and reconciliation branches confirmed merged into current main
+- [x] Save and report the final workflow-dispatch, review-protection, and branch-cleanup results
