@@ -382,6 +382,32 @@
 .skip-overview-page .skip-overview-deferred-analysis > .skip-panel { align-self:start !important; height:auto !important; }
 .skip-overview-page .skip-overview-deferred-analysis > .skip-panel > div:last-child { flex:initial !important; }
 .skip-overview-page .skip-overview-deferred-analysis .skip-panel > div:first-child { min-height:0 !important; padding:8px 10px !important; }
+
+/* Overview density hotfix — current markup uses the compact briefing rather
+   than the retired skip-overview-executive-briefing structure. Keep the
+   content-driven briefing and detailed-analysis handoff compact without
+   changing any team data, grading, or source-provenance behavior. */
+.skip-overview-page .skip-compact-executive-briefing {
+  min-height:0;
+  height:auto;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:8px;
+  padding-block:6px;
+}
+.skip-overview-page .skip-compact-executive-signals { align-items:start; }
+.skip-overview-page .skip-compact-executive-signal { min-height:0; align-content:center; padding-block:2px; }
+.skip-overview-page .skip-overview-deferred-analysis-section { margin-top:0; }
+.skip-overview-page .skip-overview-deferred-analysis-intro { margin-top:24px; }
+.skip-overview-page .overview-responsive-grid.overview-decision-row.skip-overview-deferred-analysis {
+  min-height:0 !important;
+  align-items:start !important;
+}
+@media (max-width:720px) {
+  .skip-overview-page .skip-compact-executive-briefing { gap:5px; padding-block:7px; }
+  .skip-overview-page .skip-compact-executive-signal { padding-block:5px; }
+  .skip-overview-page .skip-overview-deferred-analysis-intro { margin-top:24px; }
+}
 .skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); gap:10px !important; }
 .skip-player-page .skip-profile-source-strip { margin-top:0; padding:7px 12px; }
 .skip-player-page .skip-profile-tab-rail { margin-top:0; }
