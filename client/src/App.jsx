@@ -3,7 +3,7 @@ import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { getDailyInsight } from './constants/alerts.js';
-import { getTodaysGames } from './api/mlb.js';
+import { getTodaysGames, getStandings, getSavantData, getTeamModelSources } from './api/mlb.js';
 import { deriveTickerStatus, formatTickerGame, getTickerRefreshDelay } from './lib/ticker.js';
 import { getCacheHealth } from './lib/cacheHealthClient.js';
 import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
@@ -263,18 +263,15 @@ export default function App() {
   const retryProvider = useCallback(async (provider) => {
     const team = TEAMS[defaultTeamKey] || TEAMS.sd;
     if (provider === 'mlb') {
-      const { getTodaysGames, getStandings } = await import('./api/mlb.js');
       await Promise.all([getTodaysGames(), getStandings()]);
       return 'MLB schedule and standings refreshed.';
     }
     if (provider === 'fangraphs') {
-      const { getTeamModelSources } = await import('./api/mlb.js');
       const response = await getTeamModelSources(team?.abbr);
       if (!response?.found) throw new Error(response?.providerBlocked ? 'FanGraphs is currently blocking the provider request.' : 'FanGraphs did not return verified team model data.');
       return 'FanGraphs team model refreshed.';
     }
     if (provider === 'savant') {
-      const { getSavantData } = await import('./api/mlb.js');
       const response = await getSavantData();
       if (!Array.isArray(response) || response.length === 0) throw new Error('Baseball Savant did not return a verified leaderboard response.');
       return 'Baseball Savant leaderboard refreshed.';
