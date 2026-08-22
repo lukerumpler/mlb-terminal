@@ -408,6 +408,22 @@
   .skip-overview-page .skip-compact-executive-signal { padding-block:5px; }
   .skip-overview-page .skip-overview-deferred-analysis-intro { margin-top:24px; }
 }
+
+/* League and Intelligence density audit — keep workspace rhythm aligned with
+   the Overview while allowing unlike panels to keep their natural heights.
+   This avoids empty comparison-panel space without changing tables, models,
+   source states, or user interactions. */
+.skip-league-workspace,
+.skip-intelligence-workspace { gap:10px !important; }
+.skip-league-workspace .skip-balanced-grid,
+.skip-intelligence-primary-grid { align-items:start; gap:10px !important; }
+.skip-league-workspace .skip-balanced-grid > .skip-panel,
+.skip-intelligence-primary-column > .skip-panel { align-self:start; height:auto; }
+.skip-intelligence-primary-column { display:flex; min-width:0; flex-direction:column; gap:10px; }
+.skip-intelligence-primary-column > .skip-panel > div:last-child { flex:initial; }
+@media (max-width:720px) {
+  .skip-intelligence-primary-grid { grid-template-columns:1fr !important; gap:10px !important; }
+}
 .skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); gap:10px !important; }
 .skip-player-page .skip-profile-source-strip { margin-top:0; padding:7px 12px; }
 .skip-player-page .skip-profile-tab-rail { margin-top:0; }

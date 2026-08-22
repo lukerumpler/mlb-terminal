@@ -27,7 +27,7 @@ describe('dashboard card tile alignment', () => {
 
   it('extends balanced alignment to newer peer-card rows without fixed content filler', () => {
     expect(overview).toContain('skip-balanced-grid');
-    expect((otherPages.match(/className="skip-balanced-grid"/g) || []).length).toBeGreaterThanOrEqual(3);
+    expect((otherPages.match(/className="skip-balanced-grid(?:\s[^\"]*)?"/g) || []).length).toBeGreaterThanOrEqual(3);
     expect(styles).toContain('.skip-balanced-grid{align-items:stretch;}');
     expect(styles).toContain('.skip-balanced-grid > .skip-panel{height:100%;}');
     expect(styles).not.toContain('.skip-balanced-grid > .skip-panel > div:last-child{flex:1');

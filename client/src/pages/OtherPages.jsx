@@ -975,7 +975,7 @@ function LeaguePage() {
   function isLive(g) { return g.inning && g.status !== 'Final' && g.statusCode !== 'F'; }
 
   return (
-    <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="page-enter skip-league-workspace" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <StatStrip items={[
         { val:'30',     lbl:'Teams',          sub:'MLB'         },
         { val:gamesLoading ? '…' : String(liveGames.length), lbl:'Games Today', sub:'Live/Final' },
@@ -1265,7 +1265,7 @@ function LeaguePage() {
       </Panel>
 
       {/* ── Stat leaders + trends + injury + farm ── */}
-      <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+      <div className="skip-balanced-grid skip-league-analysis-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
         <Panel title="League Trends 2026" accent={C.amber} badge="Unavailable">
           <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             No verified trend feed is connected. The prior editorial snapshot is hidden.
@@ -1559,14 +1559,15 @@ function IntelligencePage() {
   const comparisonSummary = useMemo(() => buildComparisonMetricSummary(compData?.rows), [compData?.rows]);
 
   return (
-    <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="page-enter skip-intelligence-workspace" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <div className="skip-profile-source-strip" role="region" aria-label="Intelligence data provenance">
         <span className="skip-profile-source-title">DATA PROVENANCE</span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compData ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">{compData ? 'MLB Stats API comparison lookup' : 'MLB Stats API · on demand'}</span></span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compLoading ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">{compLoading ? 'Retrieving selected players' : compData ? `Retrieved ${new Date(compData.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}` : 'Retrieved only when compared'}</span></span>
         <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">Reference snapshots; not live feeds or Team Overview grades</span></span>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <div className="skip-intelligence-primary-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div className="skip-intelligence-primary-column">
 
         {/* Comparison */}
         <Panel title="Player Comparison Engine" accent={C.amber} badge={`${SEASON} Season`}>
@@ -1642,6 +1643,35 @@ function IntelligencePage() {
           )}
         </Panel>
 
+        {/* Hitter projections */}
+        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
+              <thead>
+                <tr style={{ background:C.surface2 }}>
+                  {['Player','Pos','AVG','HR','RBI','OPS','WAR'].map(h=> (
+                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {hitters.map(([n,pos,a,h,r,o,w],i,arr)=> (
+                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
+                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={pos} /></td>
+                    {[a,h,r,o].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
+                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{w}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        </div>
+        <div className="skip-intelligence-primary-column">
+
         {/* Injury risk — FIX: bar transition added, consistent layout */}
         <Panel title="Injury Risk Model" accent={C.rust} badge="Reference snapshot">
           {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
@@ -1659,33 +1689,6 @@ function IntelligencePage() {
               <div style={sans({ fontSize:11, color:C.text2, marginTop:3 })}>{note}</div>
             </div>
           ))}
-        </Panel>
-
-        {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
-              <thead>
-                <tr style={{ background:C.surface2 }}>
-                  {['Player','Pos','AVG','HR','RBI','OPS','WAR'].map(h=>(
-                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {hitters.map(([n,pos,a,h,r,o,w],i,arr)=>(
-                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
-                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={pos} /></td>
-                    {[a,h,r,o].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
-                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{w}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </Panel>
 
         {/* Pitcher projections */}
@@ -1714,6 +1717,7 @@ function IntelligencePage() {
             </table>
           </div>
         </Panel>
+        </div>
       </div>
       <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Reference snapshots preserve original SKIP research examples. They are not automatically refreshed with provider data, do not alter selected-team metrics, and do not feed Front Office grades. Use the comparison engine or player profiles for verified current-season player data.</div>
       {/* ── Trade Value Simulator ── */}
