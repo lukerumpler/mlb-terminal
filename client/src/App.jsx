@@ -260,6 +260,34 @@ export default function App() {
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const retryProvider = useCallback(async (provider) => {
+    const team = TEAMS[defaultTeamKey] || TEAMS.sd;
+    if (provider === 'mlb') {
+      const { getTodaysGames, getStandings } = await import('./api/mlb.js');
+      await Promise.all([getTodaysGames(), getStandings()]);
+      return 'MLB schedule and standings refreshed.';
+    }
+    if (provider === 'fangraphs') {
+      const { getTeamModelSources } = await import('./api/mlb.js');
+      const response = await getTeamModelSources(team?.abbr);
+      if (!response?.found) throw new Error(response?.providerBlocked ? 'FanGraphs is currently blocking the provider request.' : 'FanGraphs did not return verified team model data.');
+      return 'FanGraphs team model refreshed.';
+    }
+    if (provider === 'savant') {
+      const { getSavantData } = await import('./api/mlb.js');
+      const response = await getSavantData();
+      if (!Array.isArray(response) || response.length === 0) throw new Error('Baseball Savant did not return a verified leaderboard response.');
+      return 'Baseball Savant leaderboard refreshed.';
+    }
+    if (provider === 'ncaa') {
+      const { getScoreboard } = await import('./api/ncaa.js');
+      await getScoreboard();
+      return 'NCAA scoreboard refreshed.';
+    }
+    if (provider === 'boxscore') throw new Error('Open a player profile to refresh that player’s completed-game boxscore splits.');
+    if (provider === 'roster-insights') throw new Error('Open a team Roster view to refresh its context-specific roster insights.');
+    throw new Error('This provider does not support an independent refresh.');
+  }, [defaultTeamKey]);
   const refreshCacheHealth = useCallback(async () => {
     setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
     try {
@@ -595,7 +623,7 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} retryProvider={retryProvider} />}
               {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
               </>}
               </Suspense>

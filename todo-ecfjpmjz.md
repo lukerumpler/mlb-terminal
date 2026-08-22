@@ -113,3 +113,8 @@
 - [x] Add condensed comparison cards before the full comparison table on small screens; cards show rank, team, division, selected metric, and W-L record for the top six filtered rows while the full table remains available below.
 - [x] Add touch swipe gestures for moving between workspaces on mobile, with guarded interactive-target detection, a 64px horizontal threshold, vertical-scroll protection, and five-workspace bounds.
 - [x] Add regression coverage, validate desktop/mobile behavior, and publish the mobile workspace release; focused tests passed 8/8, the full suite passed 642/645 with 3 skips on rerun, TypeScript and production build passed, and the browser audit verified mobile cards/navigation/swipe plus desktop hiding.
+
+- [x] Trace why the Data-Source Status Center reports no successful responses for MLB Stats API, boxscore, FanGraphs, NCAA, and roster insights while Baseball Savant remains connected; display keys did not match the canonical freshness ledger, so most providers could never resolve a recorded success.
+- [x] Fix provider connectivity/status synchronization and retry behavior, add regression coverage, validate, and publish the result; provider rows now map canonical freshness keys, verified boxscore/FanGraphs/roster-successes are recorded, Settings retries invoke real MLB/Savant/NCAA probes, and context-required or blocked sources report an honest reason.
+
+- [x] Compare the uploaded hotfix, security, and performance recommendations against the current project and select only compatible, verified improvements for implementation; the provider-status patch was compatible and implemented, the uploaded density selectors were stale against the current overview, and dependency hardening remains a separate release.

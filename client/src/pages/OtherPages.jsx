@@ -1780,7 +1780,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1847,7 +1847,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         </div>
       </Panel>
       {feedFreshnessSettings && <>
-        <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
+        <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} onRetryProvider={retryProvider} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
       <CacheHealthDashboard health={cacheHealth} status={cacheHealthStatus} updatedAt={cacheHealthUpdatedAt} onRefresh={refreshCacheHealth} />

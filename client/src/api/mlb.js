@@ -173,6 +173,7 @@ async function fetchProviderJson(url, {
         );
       }
       const data = await response.json();
+      if (url.startsWith('/api/fangraphs-models') && data?.freshness !== 'stale-cached') recordFeedSuccess('fangraphs');
       providerJsonCache.set(url, { data, expiresAt: Date.now() + ttlMs });
       writePersistentProviderSnapshot(persistentCacheKey, data);
       return data;
@@ -1063,6 +1064,7 @@ async function loadPlayerBoxscoreSplits(playerId, teamId, season, requestOptions
         pitching: finalizeBoxscoreBucket(pitchingBucket, 'pitching'),
       };
     });
+    recordFeedSuccess('boxscore');
     return { status: 'live', source: 'MLB Stats API boxscores', season, retrievedAt: new Date().toISOString(), games: results.length, requestedGames: games.length, windowLabel: `Most recent ${games.length} completed regular-season games`, batting: finalize(batting, 'batting'), pitching: finalize(pitching, 'pitching'), recentGames };
   } catch (error) {
     return unavailable(error?.message?.includes('429') ? 'The MLB boxscore provider is rate-limited; retry shortly.' : 'The official MLB schedule or boxscore feed is unavailable right now.');

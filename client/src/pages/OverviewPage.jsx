@@ -21,6 +21,7 @@ import { DAILY_CACHE_TTL_MS, shouldRefreshDailyCache, readTeamAggregateCache, sa
 import { buildTeamDataQualityPayload, downloadTeamDataQualityExport } from '../lib/dataQuality.js';
 import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.js';
 import { shouldResetRosterInsightsState } from '../lib/rosterInsightsState.js';
+import { recordFeedSuccess } from '../lib/feedFreshness.js';
 import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
 import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
@@ -2023,6 +2024,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       .then(({ ok, payload }) => {
         const data = payload?.[0]?.result?.data?.json;
         if (!ok || !data) throw new Error('AI insights unavailable');
+        recordFeedSuccess('roster-insights');
         if (alive) { setAiInsights(data); setAiInsightsState('ready'); }
       }).catch(error => { if (alive && error?.name !== 'AbortError') setAiInsightsState('error'); });
     return () => { alive = false; controller.abort(); };
