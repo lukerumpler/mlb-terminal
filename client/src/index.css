@@ -382,6 +382,48 @@
 .skip-overview-page .skip-overview-deferred-analysis > .skip-panel { align-self:start !important; height:auto !important; }
 .skip-overview-page .skip-overview-deferred-analysis > .skip-panel > div:last-child { flex:initial !important; }
 .skip-overview-page .skip-overview-deferred-analysis .skip-panel > div:first-child { min-height:0 !important; padding:8px 10px !important; }
+
+/* Overview density hotfix — current markup uses the compact briefing rather
+   than the retired skip-overview-executive-briefing structure. Keep the
+   content-driven briefing and detailed-analysis handoff compact without
+   changing any team data, grading, or source-provenance behavior. */
+.skip-overview-page .skip-compact-executive-briefing {
+  min-height:0;
+  height:auto;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:8px;
+  padding-block:6px;
+}
+.skip-overview-page .skip-compact-executive-signals { align-items:start; }
+.skip-overview-page .skip-compact-executive-signal { min-height:0; align-content:center; padding-block:2px; }
+.skip-overview-page .skip-overview-deferred-analysis-section { margin-top:0; }
+.skip-overview-page .skip-overview-deferred-analysis-intro { margin-top:24px; }
+.skip-overview-page .overview-responsive-grid.overview-decision-row.skip-overview-deferred-analysis {
+  min-height:0 !important;
+  align-items:start !important;
+}
+@media (max-width:720px) {
+  .skip-overview-page .skip-compact-executive-briefing { gap:5px; padding-block:7px; }
+  .skip-overview-page .skip-compact-executive-signal { padding-block:5px; }
+  .skip-overview-page .skip-overview-deferred-analysis-intro { margin-top:24px; }
+}
+
+/* League and Intelligence density audit — keep workspace rhythm aligned with
+   the Overview while allowing unlike panels to keep their natural heights.
+   This avoids empty comparison-panel space without changing tables, models,
+   source states, or user interactions. */
+.skip-league-workspace,
+.skip-intelligence-workspace { gap:10px !important; }
+.skip-league-workspace .skip-balanced-grid,
+.skip-intelligence-primary-grid { align-items:start; gap:10px !important; }
+.skip-league-workspace .skip-balanced-grid > .skip-panel,
+.skip-intelligence-primary-column > .skip-panel { align-self:start; height:auto; }
+.skip-intelligence-primary-column { display:flex; min-width:0; flex-direction:column; gap:10px; }
+.skip-intelligence-primary-column > .skip-panel > div:last-child { flex:initial; }
+@media (max-width:720px) {
+  .skip-intelligence-primary-grid { grid-template-columns:1fr !important; gap:10px !important; }
+}
 .skip-player-page { --profile-ease: cubic-bezier(.23,1,.32,1); gap:10px !important; }
 .skip-player-page .skip-profile-source-strip { margin-top:0; padding:7px 12px; }
 .skip-player-page .skip-profile-tab-rail { margin-top:0; }
@@ -1324,4 +1366,103 @@
   .skip-team-hot-streak-heading { align-items:flex-start; }
   .skip-team-hot-streak-controls { align-items:flex-end; }
   .skip-team-hot-streak-controls > span { max-width:104px; }
+}
+
+/* Mobile condensed comparison cards stay hidden on desktop, where the full
+   sortable table remains the primary comparison surface. */
+.skip-mobile-comparison-cards { display:none; }
+@media (max-width:720px) {
+  .skip-mobile-comparison-cards {
+    display:grid;
+    gap:6px;
+    padding:8px 10px 10px;
+    border-top:1px solid var(--border-light,#e2ddd3);
+    border-bottom:1px solid var(--border-light,#e2ddd3);
+    background:linear-gradient(90deg,color-mix(in srgb,var(--teal-soft,#e7f5f0) 34%,transparent),transparent);
+  }
+  .skip-mobile-comparison-card {
+    display:grid;
+    grid-template-columns:25px minmax(0,1fr) auto 44px;
+    align-items:center;
+    gap:7px;
+    min-width:0;
+    min-height:52px;
+    padding:7px 8px;
+    border:1px solid var(--border-light,#e2ddd3);
+    border-radius:8px;
+    background:var(--surface,#fffdf8);
+  }
+  .skip-mobile-comparison-rank { color:var(--amber-dark,#9b6417); font:800 10px/1 'DM Mono',monospace; }
+  .skip-mobile-comparison-card-main { display:flex; min-width:0; flex-direction:column; gap:3px; }
+  .skip-mobile-comparison-card-main strong { overflow:hidden; color:var(--text,#24211d); font:800 11px/1.15 'Plus Jakarta Sans',sans-serif; text-overflow:ellipsis; white-space:nowrap; }
+  .skip-mobile-comparison-card-main span { overflow:hidden; color:var(--text4,#9c8570); font:700 8px/1 'DM Mono',monospace; text-overflow:ellipsis; white-space:nowrap; }
+  .skip-mobile-comparison-card-stat { display:flex; min-width:42px; flex-direction:column; align-items:flex-end; gap:3px; }
+  .skip-mobile-comparison-card-stat strong { color:var(--teal,#157a6e); font:800 13px/1 'DM Mono',monospace; }
+  .skip-mobile-comparison-card-stat span { color:var(--text4,#9c8570); font:800 7px/1 'DM Mono',monospace; letter-spacing:.04em; text-transform:uppercase; }
+  .skip-mobile-comparison-record { color:var(--text2,#4b443a); font:800 9px/1 'DM Mono',monospace; text-align:right; }
+}
+
+/* Mobile command-center ergonomics: reserve space for the fixed scoreboard, keep
+   primary controls thumb-friendly, and make horizontal navigation intentional. */
+@media (max-width:720px) {
+  .skip-mobile-bottom-nav {
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    position:relative;
+    z-index:55;
+    min-height:54px;
+    padding:5px 8px calc(5px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--border,#d8d2c8);
+    background:color-mix(in srgb,var(--surface,#fffdf8) 96%,transparent);
+    box-shadow:0 -5px 18px rgba(20,31,48,.08);
+  }
+  .skip-mobile-bottom-nav button {
+    display:flex;
+    min-width:0;
+    min-height:44px;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:3px;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    color:var(--text3,#756d62);
+    font:800 8px/1 'DM Mono',monospace;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    touch-action:manipulation;
+  }
+  .skip-mobile-bottom-nav button > span:first-child { font-size:15px; line-height:1; }
+  .skip-mobile-bottom-nav button[aria-current='page'] { background:var(--teal-soft,#e7f5f0); color:var(--teal,#157a6e); }
+  .skip-mobile-bottom-nav button:focus-visible { outline:2px solid var(--amber,#d6922e); outline-offset:-2px; }
+  .skip-content {
+    padding-bottom:calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+  .skip-content[data-swipe-active='true'] { touch-action:pan-y; }
+  .skip-mobile-workspace-switcher {
+    scroll-snap-type:x proximity;
+    overscroll-behavior-x:contain;
+    padding-left:12px;
+    padding-right:24px;
+  }
+  .skip-mobile-workspace-switcher button {
+    min-height:36px;
+    scroll-snap-align:start;
+  }
+  .skip-overview-page select,
+  .skip-overview-page button,
+  .skip-overview-page input {
+    min-height:38px;
+  }
+  .skip-overview-page .skip-overview-view-button {
+    min-height:38px;
+    padding-inline:12px;
+  }
+  .skip-overview-page .overview-team-context {
+    gap:8px !important;
+  }
+  .skip-ticker-shell {
+    min-height:calc(36px + env(safe-area-inset-bottom)) !important;
+  }
 }

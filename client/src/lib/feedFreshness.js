@@ -4,10 +4,13 @@ const SUCCESS_KEY = 'skip-feed-freshness-successes';
 export const FEED_DEFINITIONS = [
   { key:'mlb-scores', label:'MLB live scores', source:'MLB Stats API' },
   { key:'mlb-stats', label:'MLB team and player stats', source:'MLB Stats API' },
+  { key:'boxscore', label:'MLB boxscore feed', source:'MLB Stats API' },
   { key:'savant', label:'Baseball Savant', source:'Baseball Savant' },
+  { key:'fangraphs', label:'FanGraphs', source:'FanGraphs' },
   { key:'spotrac', label:'Payroll and CBT financials', source:'Spotrac' },
   { key:'contracts', label:'Contract and service data', source:'Spotrac / MLB' },
   { key:'ncaa', label:'NCAA baseball', source:'NCAA / Henrygd API' },
+  { key:'roster-insights', label:'Roster insights (AI)', source:'Configured AI provider' },
   { key:'intel-feed', label:'Intel feed', source:'Configured feed proxy' },
 ];
 

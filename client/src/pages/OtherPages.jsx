@@ -57,11 +57,14 @@ export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamS
     const pitching = teamStats.pitching?.[team.id] ?? teamStats.pitching?.[String(team.id)] ?? {};
     const standing = standingsById.get(String(team.id)) || {};
     const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : null;
-    const value = Number(raw);
+    const value = raw == null || raw === '' ? null : Number(raw);
     return { id:team.id, abbr:team.abbr, name:team.name, division:standing.division || 'Division unavailable', value:Number.isFinite(value) ? value : null, wins:standing.wins, losses:standing.losses };
-  }).filter(row => row.value != null);
+  }).filter(row => Number.isFinite(row.value));
   const query = String(search || '').trim().toLowerCase();
-  return rows.filter(row => (!query || `${row.name} ${row.abbr}`.toLowerCase().includes(query)) && (division === 'all' || row.division === division)).sort((a, b) => direction === 'asc' ? a.value - b.value : b.value - a.value);
+  return rows.filter(row => (!query || `${row.name} ${row.abbr}`.toLowerCase().includes(query)) && (division === 'all' || row.division === division)).sort((a, b) => {
+    const valueDelta = direction === 'asc' ? a.value - b.value : b.value - a.value;
+    return valueDelta || a.name.localeCompare(b.name);
+  });
 }
 
 // Module-scope, not defined inside DraftMoversPanel: a component defined
@@ -889,16 +892,16 @@ function LeaguePage() {
 
   const { opsSorted, eraSorted, opsMin, opsMax, eraMin, eraMax } = useMemo(() => {
     const teamBarData = Object.values(TEAMS).map(t => {
-      const hitting = teamStats.hitting[t.id] || {};
-      const pitching = teamStats.pitching[t.id] || {};
+      const hitting = teamStats.hitting?.[t.id] ?? teamStats.hitting?.[String(t.id)] ?? {};
+      const pitching = teamStats.pitching?.[t.id] ?? teamStats.pitching?.[String(t.id)] ?? {};
       return {
         team: t.abbr,
-        ops: hitting.ops != null ? Math.round(Number(hitting.ops) * 1000) : null,
-        era: pitching.era != null ? Number(pitching.era) : null,
+        ops: Number.isFinite(Number(hitting.ops)) ? Math.round(Number(hitting.ops) * 1000) : null,
+        era: Number.isFinite(Number(pitching.era)) ? Number(pitching.era) : null,
       };
-    }).filter(t => t.ops != null || t.era != null);
-    const opsSorted = [...teamBarData].sort((a,b) => b.ops - a.ops).slice(0,6);
-    const eraSorted = [...teamBarData].sort((a,b) => a.era - b.era).slice(0,6);
+    });
+    const opsSorted = teamBarData.filter(row => row.ops != null).sort((a,b) => (b.ops - a.ops) || a.team.localeCompare(b.team)).slice(0,6);
+    const eraSorted = teamBarData.filter(row => row.era != null).sort((a,b) => (a.era - b.era) || a.team.localeCompare(b.team)).slice(0,6);
     return {
       opsSorted, eraSorted,
       opsMin: opsSorted.length ? Math.floor(opsSorted[opsSorted.length-1].ops / 10) * 10 - 10 : 0,
@@ -972,7 +975,7 @@ function LeaguePage() {
   function isLive(g) { return g.inning && g.status !== 'Final' && g.statusCode !== 'F'; }
 
   return (
-    <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="page-enter skip-league-workspace" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <StatStrip items={[
         { val:'30',     lbl:'Teams',          sub:'MLB'         },
         { val:gamesLoading ? '…' : String(liveGames.length), lbl:'Games Today', sub:'Live/Final' },
@@ -1118,7 +1121,28 @@ function LeaguePage() {
           <button type="button" aria-label={`Reverse cross-team comparison sort; currently ${comparisonSortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={()=>setComparisonSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{comparisonSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
           {(comparisonSearch || comparisonDivision !== 'all') && <button type="button" onClick={()=>{setComparisonSearch('');setComparisonDivision('all')}} style={{height:28,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text3,fontSize:9.5,fontWeight:700,cursor:'pointer'}}>Clear filters</button>}
         </div>
-        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
+        {!comparisonLoading && comparisonRows.length > 0 && (
+          <div className="skip-mobile-comparison-cards" aria-label={`Mobile condensed comparison cards sorted by ${comparisonMetricConfig.label}`}>
+            {comparisonRows.slice(0, 6).map((row, index) => {
+              const value = comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString();
+              return (
+                <article key={row.id} className="skip-mobile-comparison-card" data-testid="mobile-comparison-card">
+                  <div className="skip-mobile-comparison-rank">#{index + 1}</div>
+                  <div className="skip-mobile-comparison-card-main">
+                    <strong>{row.name}</strong>
+                    <span>{row.division}</span>
+                  </div>
+                  <div className="skip-mobile-comparison-card-stat">
+                    <strong>{value}</strong>
+                    <span>{comparisonMetricConfig.label}</span>
+                  </div>
+                  <div className="skip-mobile-comparison-record">{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div data-horizontal-scroll style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
       </Panel>
       </div>
 
@@ -1241,7 +1265,7 @@ function LeaguePage() {
       </Panel>
 
       {/* ── Stat leaders + trends + injury + farm ── */}
-      <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+      <div className="skip-balanced-grid skip-league-analysis-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
         <Panel title="League Trends 2026" accent={C.amber} badge="Unavailable">
           <div style={{padding:'28px 14px',textAlign:'center',...sans({fontSize:11,color:C.text3,lineHeight:1.5})}}>
             No verified trend feed is connected. The prior editorial snapshot is hidden.
@@ -1535,14 +1559,15 @@ function IntelligencePage() {
   const comparisonSummary = useMemo(() => buildComparisonMetricSummary(compData?.rows), [compData?.rows]);
 
   return (
-    <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
+    <div className="page-enter skip-intelligence-workspace" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <div className="skip-profile-source-strip" role="region" aria-label="Intelligence data provenance">
         <span className="skip-profile-source-title">DATA PROVENANCE</span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compData ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">{compData ? 'MLB Stats API comparison lookup' : 'MLB Stats API · on demand'}</span></span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compLoading ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">{compLoading ? 'Retrieving selected players' : compData ? `Retrieved ${new Date(compData.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}` : 'Retrieved only when compared'}</span></span>
         <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">Reference snapshots; not live feeds or Team Overview grades</span></span>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <div className="skip-intelligence-primary-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div className="skip-intelligence-primary-column">
 
         {/* Comparison */}
         <Panel title="Player Comparison Engine" accent={C.amber} badge={`${SEASON} Season`}>
@@ -1618,6 +1643,35 @@ function IntelligencePage() {
           )}
         </Panel>
 
+        {/* Hitter projections */}
+        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
+              <thead>
+                <tr style={{ background:C.surface2 }}>
+                  {['Player','Pos','AVG','HR','RBI','OPS','WAR'].map(h=> (
+                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {hitters.map(([n,pos,a,h,r,o,w],i,arr)=> (
+                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
+                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={pos} /></td>
+                    {[a,h,r,o].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
+                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{w}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        </div>
+        <div className="skip-intelligence-primary-column">
+
         {/* Injury risk — FIX: bar transition added, consistent layout */}
         <Panel title="Injury Risk Model" accent={C.rust} badge="Reference snapshot">
           {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
@@ -1635,33 +1689,6 @@ function IntelligencePage() {
               <div style={sans({ fontSize:11, color:C.text2, marginTop:3 })}>{note}</div>
             </div>
           ))}
-        </Panel>
-
-        {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
-              <thead>
-                <tr style={{ background:C.surface2 }}>
-                  {['Player','Pos','AVG','HR','RBI','OPS','WAR'].map(h=>(
-                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {hitters.map(([n,pos,a,h,r,o,w],i,arr)=>(
-                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
-                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={pos} /></td>
-                    {[a,h,r,o].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
-                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{w}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </Panel>
 
         {/* Pitcher projections */}
@@ -1690,6 +1717,7 @@ function IntelligencePage() {
             </table>
           </div>
         </Panel>
+        </div>
       </div>
       <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Reference snapshots preserve original SKIP research examples. They are not automatically refreshed with provider data, do not alter selected-team metrics, and do not feed Front Office grades. Use the comparison engine or player profiles for verified current-season player data.</div>
       {/* ── Trade Value Simulator ── */}
@@ -1756,7 +1784,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth }) {
+function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1823,7 +1851,7 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
         </div>
       </Panel>
       {feedFreshnessSettings && <>
-        <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} />
+        <DataSourceStatusCenter settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} onRetryProvider={retryProvider} />
         <FeedFreshnessPanel settings={feedFreshnessSettings} successes={feedFreshnessSuccesses} updateSettings={updateFeedFreshnessSettings} />
       </>}
       <CacheHealthDashboard health={cacheHealth} status={cacheHealthStatus} updatedAt={cacheHealthUpdatedAt} onRefresh={refreshCacheHealth} />

@@ -144,6 +144,14 @@ const PRIMARY_TABS = [
   { key:'notes', icon:'✎', label:'Scouting Notes', section:'Workflow' },
   WORKSPACE_GROUPS[3],
 ];
+const MOBILE_QUICK_TABS = [
+  { key:'overview', icon:'⊞', label:'Overview' },
+  { key:'players', icon:'↑', label:'Talent' },
+  { key:'league', icon:'◎', label:'League' },
+  { key:'intelligence', icon:'◆', label:'Intel' },
+  { key:'notes', icon:'✎', label:'Notes' },
+];
+const MOBILE_SWIPE_TABS = MOBILE_QUICK_TABS.map(item => item.key);
 
 function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
   return (
@@ -185,6 +193,8 @@ export default function App() {
   const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
+  const mobileSwipeStartRef = useRef(null);
+  const mobileSwipeIgnoreRef = useRef(false);
   const [liveTicker, setLiveTicker] = useState([]);
   // 'loading' | 'live' | 'scheduled' | 'final' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
@@ -250,6 +260,34 @@ export default function App() {
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const retryProvider = useCallback(async (provider) => {
+    const team = TEAMS[defaultTeamKey] || TEAMS.sd;
+    if (provider === 'mlb') {
+      const { getTodaysGames, getStandings } = await import('./api/mlb.js');
+      await Promise.all([getTodaysGames(), getStandings()]);
+      return 'MLB schedule and standings refreshed.';
+    }
+    if (provider === 'fangraphs') {
+      const { getTeamModelSources } = await import('./api/mlb.js');
+      const response = await getTeamModelSources(team?.abbr);
+      if (!response?.found) throw new Error(response?.providerBlocked ? 'FanGraphs is currently blocking the provider request.' : 'FanGraphs did not return verified team model data.');
+      return 'FanGraphs team model refreshed.';
+    }
+    if (provider === 'savant') {
+      const { getSavantData } = await import('./api/mlb.js');
+      const response = await getSavantData();
+      if (!Array.isArray(response) || response.length === 0) throw new Error('Baseball Savant did not return a verified leaderboard response.');
+      return 'Baseball Savant leaderboard refreshed.';
+    }
+    if (provider === 'ncaa') {
+      const { getScoreboard } = await import('./api/ncaa.js');
+      await getScoreboard();
+      return 'NCAA scoreboard refreshed.';
+    }
+    if (provider === 'boxscore') throw new Error('Open a player profile to refresh that player’s completed-game boxscore splits.');
+    if (provider === 'roster-insights') throw new Error('Open a team Roster view to refresh its context-specific roster insights.');
+    throw new Error('This provider does not support an independent refresh.');
+  }, [defaultTeamKey]);
   const refreshCacheHealth = useCallback(async () => {
     setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
     try {
@@ -285,6 +323,32 @@ export default function App() {
   const activeWorkspace = useMemo(() => WORKSPACE_GROUPS.find(workspace => workspace.tabs.some(item => item.key === tab)) || null, [tab]);
   const activePrimaryKey = activeWorkspace?.key || tab;
   const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
+  const navigateMobileWorkspace = useCallback((direction) => {
+    if (!compactMobile || isolatedPreview) return;
+    const currentIndex = MOBILE_SWIPE_TABS.indexOf(tab);
+    if (currentIndex < 0) return;
+    const nextIndex = Math.max(0, Math.min(MOBILE_SWIPE_TABS.length - 1, currentIndex + direction));
+    if (nextIndex !== currentIndex) setTab(MOBILE_SWIPE_TABS[nextIndex]);
+  }, [compactMobile, isolatedPreview, tab]);
+  const handleMobileTouchStart = useCallback((event) => {
+    if (!compactMobile || isolatedPreview || event.touches.length !== 1) return;
+    const target = event.target;
+    const interactive = target?.closest?.('button, a, input, select, textarea, table, [role="button"], [data-no-workspace-swipe]');
+    const horizontalScroller = target?.closest?.('[data-horizontal-scroll]');
+    mobileSwipeIgnoreRef.current = Boolean(interactive || horizontalScroller);
+    mobileSwipeStartRef.current = mobileSwipeIgnoreRef.current ? null : { x:event.touches[0].clientX, y:event.touches[0].clientY };
+  }, [compactMobile, isolatedPreview]);
+  const handleMobileTouchEnd = useCallback((event) => {
+    const start = mobileSwipeStartRef.current;
+    mobileSwipeStartRef.current = null;
+    if (!start || mobileSwipeIgnoreRef.current || event.changedTouches.length !== 1) return;
+    mobileSwipeIgnoreRef.current = false;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    navigateMobileWorkspace(dx < 0 ? 1 : -1);
+  }, [navigateMobileWorkspace]);
 
   const [showPalette, setShowPalette] = useState(false);
   useEffect(() => {
@@ -525,7 +589,7 @@ export default function App() {
         </nav>
 
         {/* Scrollable content */}
-        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
+        <div className="skip-content" onTouchStart={handleMobileTouchStart} onTouchEnd={handleMobileTouchEnd} style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
 
           {!isolatedPreview && activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
@@ -559,15 +623,28 @@ export default function App() {
               {tab === 'notes'        && <ScoutingNotesPage />}
               {tab === 'feed'         && <FeedPage />}
               {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} retryProvider={retryProvider} />}
               {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
               </>}
               </Suspense>
             </PageErrorBoundary>
           </div>
-        </div>
-
+                </div>
+        {!isolatedPreview && compactMobile && (
+          <nav className="skip-mobile-bottom-nav" aria-label="Mobile quick workspace navigation">
+            {MOBILE_QUICK_TABS.map(item => {
+              const selected = tab === item.key || (item.key === 'players' && ['players', 'prospects', 'draft'].includes(tab)) || (item.key === 'intelligence' && ['intelligence', 'amd', 'knowledge'].includes(tab));
+              return (
+                <button key={item.key} type="button" aria-current={selected ? 'page' : undefined} onClick={() => { setTab(item.key); setMobileNavOpen(false); }}>
+                  <span aria-hidden="true">{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
         {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
+
       </div>
 
       <style>{`
