@@ -11,6 +11,11 @@
 - [ ] Apply the additive uptime-monitor production database migration
 - [ ] Create and persist the project-owned daily 09:00 UTC uptime-monitor Heartbeat
 
+## Prospect coverage and discoverability
+- [ ] Verify that each MLB team’s top 30 prospects load and can be found through the application search paths; remediate any data, caching, or UI gaps with regression coverage
+- [x] Validate official MLB API endpoints for exact organization Top-30 membership, ranks, player IDs, and current minor-league status before relying on them for the prospect workspace
+- [x] Implement an official-MLB-API-backed all-team organization player directory with clear non-Top-30 labeling, search coverage, cache/error states, and regression tests
+
 ## Live-score ticker repair
 - [x] Audit the ticker component, live-score request path, polling lifecycle, and CSS animation contract
 - [x] Implement a resilient ticker data, fallback, and scroll-animation repair

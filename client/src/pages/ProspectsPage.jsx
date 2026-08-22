@@ -12,6 +12,7 @@ import ScatterBuilder from '../components/ScatterBuilder.jsx';
 import { useWatchlist } from '../lib/watchlist.js';
 import { compareValues } from '../lib/sorting.js';
 import { buildFarmSystemSummary } from '../lib/farmSystemScore.js';
+import OrganizationRosterDirectory from '../components/OrganizationRosterDirectory.jsx';
 
 /* ── Live MiLB Scoreboard ─────────────────────────────────────── */
 const MILB_LEVEL_COLOR = {
@@ -1215,31 +1216,7 @@ function ProspectsPage() {
       )}
 
       {view === 'byteam' && (
-        <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12 }}>
-          {[
-            ['AL East',   [['BOS','A+ (4)','↑ Franklin Arias OF'],['BAL','A (2)','↑ Nate George SS'],['TOR','A- (2)','↑ Arjun Nimmala SS']]],
-            ['AL Central',[['MIN','A- (3)','↑ Walker Jenkins OF'],['CLE','A (3)','↑ Angel Genao SS'],['KC','B+ (2)','↑ Blake Mitchell C']]],
-            ['AL West',   [['SEA','A+ (5)','↑ Colt Emerson SS'],['TEX','B+ (1)','↑ Caden Scarborough RHP'],['HOU','B (2)','↑ Kevin Alvarez 3B']]],
-            ['NL East',   [['NYM','A- (2)','↑ A.J. Ewing SS'],['WSH','A (3)','↑ Eli Willits SS'],['PHI','B (1)','↑ Gage Wood RHP']]],
-            ['NL Central',[['MIL','A+ (3)','↑ Jesús Made SS'],['STL','A- (2)','↑ Rainiel Rodriguez 2B'],['CHC','B+ (2)','↑ Jefferson Rojas OF']]],
-            ['NL West',   [['LAD','A (5)','↑ Josue De Paula OF'],['SD','B (1)','↑ Ethan Salas C'],['OAK','B+ (2)','↑ Leo De Vries SS']]],
-          ].map(([div,teams])=>(
-            <Panel key={div} title={div} accent={C.amber}>
-              {teams.map(([abbr,grade,top])=>(
-                <div key={abbr}>
-                  <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 14px 3px',borderTop:`0.5px solid ${C.borderLight}` }}>
-                    <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-                      <TeamLogo abbr={abbr} size={18}/>
-                      <span style={sans({ fontSize:12,fontWeight:700,color:C.text })}>{abbr}</span>
-                    </div>
-                    <span style={px({ fontSize:11,fontWeight:700,color:C.teal })}>{grade}</span>
-                  </div>
-                  <div style={{ padding:'2px 14px 9px',...sans({ fontSize:11,fontWeight:600,color:C.amber }) }}>{top}</div>
-                </div>
-              ))}
-            </Panel>
-          ))}
-        </div>
+        <OrganizationRosterDirectory />
       )}
 
       {view === 'breakouts' && (
