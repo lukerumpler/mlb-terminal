@@ -18,3 +18,12 @@
 - [x] Restore Express 5-compatible local fallback routing so the ticker can receive visual browser verification
 - [x] Make the isolated LLM retry fixture independent of injected Forge credentials for clean-suite validation
 - [x] Validate and publish the ticker repair without regressing existing navigation or data contracts
+
+## Master optimization and debugging pass
+- [x] Establish current branch, deployment, test, build, dependency, and performance baselines
+- [x] Audit client render paths, async effects, network/cache behavior, and server error handling for actionable defects
+- [x] Correct the Intel Feed client cache so stale responses remain fallback-only and do not suppress refreshes
+- [x] Pause Intel Feed auto-refresh polling while the document is hidden and resume promptly on return
+- [x] Eliminate in-place roster sorting in Overview’s Savant snapshot selection to preserve state immutability
+- [x] Implement and test only high-confidence reliability or performance improvements
+- [x] Run complete validation, document residual risks, and publish the optimization pass
