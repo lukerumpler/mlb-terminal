@@ -66,3 +66,11 @@
 - [x] Integrate source-backed managed-project improvements and resolve conflicts without deleting GitHub-main behavior
 - [x] Run the complete release gate on the reconciliation branch and open a normal pull request to GitHub main
 - [x] Report the reconciliation pull request and all-branch optimization disposition
+- [x] Inspect main’s current protection rules, Actions workflow requirements, stale Vercel-branch tips, and the uploaded archive contents
+- [x] Add a repository-relative GitHub Actions workflow that runs the verified Padres Operations streak and Petco context regressions
+- [x] Validate the workflow syntax and its targeted test command on a dedicated branch
+- [x] Merge the validated workflow into GitHub main through the protected review path
+- [x] Require the passing GitHub validation and Padres Operations workflow checks before main can merge
+- [x] Delete only the explicitly authorized stale fix/vercel-* remote branches after comparing their history to main; record the diverged-branch exception transparently
+- [ ] Save and report the completed protection, workflow, and cleanup release
+- [x] Record that fix/vercel-api-routing was 2 commits ahead and 206 commits behind main at audit, while the other deleted Vercel branches were strictly behind; deletion followed the user’s explicit authorization and did not merge its stale work
