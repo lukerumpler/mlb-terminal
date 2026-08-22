@@ -16,6 +16,9 @@
 - [x] Validate official MLB API endpoints for exact organization Top-30 membership, ranks, player IDs, and current minor-league status before relying on them for the prospect workspace
 - [x] Implement an official-MLB-API-backed all-team organization player directory with clear non-Top-30 labeling, search coverage, cache/error states, and regression tests
 
+## Regression-gate maintenance
+- [x] Restore the LLM retry test's isolated Forge configuration so the clean suite can validate HTTP 412 no-retry behavior without injected credentials
+
 ## Live-score ticker repair
 - [x] Audit the ticker component, live-score request path, polling lifecycle, and CSS animation contract
 - [x] Implement a resilient ticker data, fallback, and scroll-animation repair

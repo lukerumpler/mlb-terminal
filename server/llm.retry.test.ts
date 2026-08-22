@@ -1,4 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./_core/env", () => ({
+  ENV: {
+    forgeApiUrl: "https://forge.test.invalid",
+    forgeApiKey: "test-forge-key",
+  },
+}));
+
 import { invokeLLM } from "./_core/llm";
 
 describe("LLM retry policy", () => {
