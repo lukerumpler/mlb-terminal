@@ -756,13 +756,43 @@ export async function getLahmanCareerGaps(id, requestOptions = {}) {
 
 // Only append historical rows for seasons wholly absent from the live provider.
 // The live MLB Stats API remains source of truth for every season it returns.
+function canonicalCareerSeason(value) {
+  const season = String(value ?? '').trim();
+  if (!/^\d{4}$/.test(season)) return null;
+  const year = Number(season);
+  return year >= 1871 && year <= 2100 ? season : null;
+}
+
+function isUsableHistoricalCareerRow(row) {
+  return Boolean(
+    row
+    && typeof row === 'object'
+    && canonicalCareerSeason(row.season)
+    && row.stat
+    && typeof row.stat === 'object'
+    && !Array.isArray(row.stat),
+  );
+}
+
 export function mergeLahmanCareerGaps(liveRows, lahmanRows) {
   const live = Array.isArray(liveRows) ? liveRows : [];
   if (!Array.isArray(lahmanRows) || !lahmanRows.length) return live;
-  const liveSeasons = new Set(live.map(row => String(row?.season)));
-  const gapFillers = lahmanRows.filter(row => row?.season != null && !liveSeasons.has(String(row.season)));
+  const liveSeasons = new Set(live.map(row => canonicalCareerSeason(row?.season)).filter(Boolean));
+  const addedSeasons = new Set();
+  const gapFillers = lahmanRows.reduce((rows, row) => {
+    if (!isUsableHistoricalCareerRow(row)) return rows;
+    const season = canonicalCareerSeason(row.season);
+    if (liveSeasons.has(season) || addedSeasons.has(season)) return rows;
+    addedSeasons.add(season);
+    rows.push({ ...row, season, isHistorical: true, source: 'Lahman' });
+    return rows;
+  }, []);
   if (!gapFillers.length) return live;
-  return [...live, ...gapFillers].sort((a, b) => Number(a.season) - Number(b.season));
+  return [...live, ...gapFillers].sort((a, b) => {
+    const left = Number(canonicalCareerSeason(a?.season)) || Number.MAX_SAFE_INTEGER;
+    const right = Number(canonicalCareerSeason(b?.season)) || Number.MAX_SAFE_INTEGER;
+    return left - right;
+  });
 }
 
 // Handedness splits are returned as situational rows by the MLB stats API.
