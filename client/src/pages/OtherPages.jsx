@@ -1783,7 +1783,7 @@ function IntelligencePage() {
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
+function SettingsPage({ theme, toggleTheme, scoutingMode = false, toggleScoutingMode, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1808,20 +1808,37 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <Panel title="Preferences" accent={C.amber}>
-        <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div>
-            <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
-            <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
-              Switch between light and dark theme for the entire terminal.
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom: `0.5px solid ${C.borderLight}` }}>
+            <div>
+              <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
+              <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
+                Switch between light and dark theme for the entire terminal.
+              </div>
             </div>
+            {toggleTheme && (
+              <button onClick={toggleTheme} title="Toggle light / dark theme"
+                style={{ flexShrink:0, padding:'7px 14px', display:'flex', alignItems:'center', gap:8, background:C.surface3, border:`0.5px solid ${C.border}`, borderRadius:7, cursor:'pointer', color:C.text2 }}>
+                <span style={{ fontSize:14 }}>{theme === 'dark' ? '☀' : '☾'}</span>
+                <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+              </button>
+            )}
           </div>
-          {toggleTheme && (
-            <button onClick={toggleTheme} title="Toggle light / dark theme"
-              style={{ flexShrink:0, padding:'7px 14px', display:'flex', alignItems:'center', gap:8, background:C.surface3, border:`0.5px solid ${C.border}`, borderRadius:7, cursor:'pointer', color:C.text2 }}>
-              <span style={{ fontSize:14 }}>{theme === 'dark' ? '☀' : '☾'}</span>
-              <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </button>
-          )}
+          
+          <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Scouting Mode</div>
+              <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>
+                Optimized interface for one-handed use at the ballpark. Simplifies navigation and increases contrast for sunlight.
+              </div>
+            </div>
+            {toggleScoutingMode && (
+              <button type="button" onClick={toggleScoutingMode} role="switch" aria-checked={scoutingMode} aria-label="Toggle Scouting Mode"
+                style={{ flexShrink:0, minWidth:104, padding:'7px 12px', border:`1px solid ${scoutingMode ? C.amberMid : C.border}`, borderRadius:7, background:scoutingMode ? C.amberSoft : C.surface3, color:scoutingMode ? C.amberDark : C.text2, cursor:'pointer', ...px({ fontSize:10, fontWeight:800, letterSpacing:'.05em' }) }}>
+                {scoutingMode ? 'SCOUTING ON' : 'SCOUTING OFF'}
+              </button>
+            )}
+          </div>
         </div>
       </Panel>
       <Panel title="Team Workspace Default" accent={C.teal}>

@@ -29,6 +29,7 @@ import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
 import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
+import BallparkWeatherPanel from '../components/BallparkWeatherPanel.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -2774,6 +2775,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         <div title="Playoff odds are shown only when FanGraphs returns a team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately. WAR proxy is Pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · WAR: proxy · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
       </>}
+      {overviewView === 'operations' && <BallparkWeatherPanel teamKey={selTeam} />}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
         {teamVenueMetadata?.venue ? <>
           <div style={{padding:'10px 14px 8px',display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',alignItems:'baseline'}}>

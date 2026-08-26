@@ -1533,6 +1533,26 @@ body[data-scouting-mode="true"] {
   --text: #000000;
   --text2: #1a1a1a;
   --text3: #444444;
+  --background: #ffffff;
+  --surface: #f8f9fa;
+  --border: #000000;
+}
+
+/* Ballpark Dark Mode: Pure black for OLED power saving and night legibility */
+.dark body[data-scouting-mode="true"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --text: #ffffff;
+  --text2: #e0e0e0;
+  --text3: #bbbbbb;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --border: #333333;
+  --border-light: #222222;
+  --amber: #ffb300;
+  --amber-soft: rgba(255, 179, 0, 0.15);
+  --teal: #00e5ff;
+  --teal-soft: rgba(0, 229, 255, 0.1);
 }
 
 /* Ticker optimization for mobile glanceability */

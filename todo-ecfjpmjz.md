@@ -121,3 +121,10 @@
 - [ ] Implement a quick-action button for voice-to-text scouting notes in Scouting Mode.
 - [ ] Add a pull-to-refresh gesture for live scores and standings in Scouting Mode.
 - [ ] Validate mobile voice and refresh flows, publish the release, and verify lukerumpler.com.
+
+- [x] Implement a quick-action button in Scouting Mode to allow recording voice-to-text scouting notes; added backend transcription/storage routers and a floating mic button.
+- [x] Add a pull-to-refresh gesture to the Scouting Mode so users can easily update live scores; implemented touch handlers and a visual indicator.
+- [x] Validate mobile interactions, publish the release, and verify lukerumpler.com; verified in managed preview, pushed to GitHub PR #27 for production deployment.
+
+- [ ] Implement an offline mode for scouting notes to save locally during poor connectivity.
+- [ ] Add automatic background syncing for offline notes when the connection is restored.

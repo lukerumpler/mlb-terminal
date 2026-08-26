@@ -105,3 +105,30 @@ export const uptimeMonitorSchedules = mysqlTable(
 
 export type UptimeMonitorCheck = typeof uptimeMonitorChecks.$inferSelect;
 export type InsertUptimeMonitorCheck = typeof uptimeMonitorChecks.$inferInsert;
+
+/** Personal scouting notes and structured reports. */
+export const scoutingNotes = mysqlTable("scoutingNotes", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  type: varchar("type", { length: 32 }).notNull(), // 'quick' | 'report'
+  player: varchar("player", { length: 255 }).notNull(),
+  team: varchar("team", { length: 128 }),
+  pos: varchar("pos", { length: 64 }),
+  pinned: boolean("pinned").default(false).notNull(),
+  text: longtext("text"),
+  summary: longtext("summary"),
+  isPitcher: boolean("isPitcher").default(false).notNull(),
+  grades: longtext("grades"), // JSON stringified tool grades
+  fv: varchar("fv", { length: 32 }),
+  risk: varchar("risk", { length: 32 }),
+  eta: varchar("eta", { length: 32 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: timestamp("deletedAt"), // For soft delete sync
+}, (table) => [
+  index("scouting_notes_user_idx").on(table.userId),
+  index("scouting_notes_updated_idx").on(table.updatedAt),
+]);
+
+export type ScoutingNote = typeof scoutingNotes.$inferSelect;
+export type InsertScoutingNote = typeof scoutingNotes.$inferInsert;
