@@ -23,6 +23,7 @@ import { shouldStartRosterInsightsRequest } from '../lib/rosterInsightsRequest.j
 import { shouldResetRosterInsightsState } from '../lib/rosterInsightsState.js';
 import { recordFeedSuccess } from '../lib/feedFreshness.js';
 import { buildRosterSavantKey } from '../lib/rosterSavantKey.js';
+import { selectTopSavantRosterPlayers } from '../lib/rosterSavantSelection.js';
 import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
@@ -1809,12 +1810,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     setTeamPitchArsenalData(null);
     setTeamSavantSource('');
     setTeamSavantState('loading');
-    const hitters = (scopedTeamPlayers.hitting || [])
-      .sort((a, b) => (Number(b?.stat?.plateAppearances || b?.stat?.pa) || 0) - (Number(a?.stat?.plateAppearances || a?.stat?.pa) || 0))
-      .slice(0, 12);
-    const pitchers = (scopedTeamPlayers.pitching || [])
-      .sort((a, b) => (Number(b?.stat?.inningsPitched || b?.stat?.ip) || 0) - (Number(a?.stat?.inningsPitched || a?.stat?.ip) || 0))
-      .slice(0, 12);
+    const { hitters, pitchers } = selectTopSavantRosterPlayers(scopedTeamPlayers);
     resolveTeamSavantSnapshot({
       teamAbbr: teamBase?.abbr,
       season: CURRENT_SEASON,

@@ -268,19 +268,37 @@ export default memo(function FeedPage() {
     setLoading(false);
   }, []);
 
-  // Initial load + auto-refresh. activeHandles is now a stable, memoized
-  // reference that only changes when activeGroups actually changes, so it's
-  // safe to depend on directly instead of JSON.stringify-ing it each render.
+  // Initial load + auto-refresh. The feed is already cached defensively, but
+  // polling while a background tab is hidden still wakes the client and can
+  // create avoidable provider work. Restart promptly when the document returns.
+  // activeHandles is a stable, memoized reference that only changes when
+  // activeGroups changes, so it is safe to depend on directly.
   useEffect(() => {
-    load(activeHandles);
-    const refreshIfVisible = () => {
-      if (document.visibilityState === 'visible') load(activeHandles);
+    const clearRefresh = () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-    timerRef.current = setInterval(refreshIfVisible, REFRESH_MS);
-    document.addEventListener('visibilitychange', refreshIfVisible);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void load(activeHandles);
+    };
+    const startRefresh = () => {
+      clearRefresh();
+      if (document.visibilityState !== 'visible') return;
+      refreshWhenVisible();
+      timerRef.current = setInterval(refreshWhenVisible, REFRESH_MS);
+    };
+    const syncVisibility = () => {
+      if (document.visibilityState === 'visible') startRefresh();
+      else clearRefresh();
+    };
+
+    startRefresh();
+    document.addEventListener('visibilitychange', syncVisibility);
     return () => {
-      clearInterval(timerRef.current);
-      document.removeEventListener('visibilitychange', refreshIfVisible);
+      clearRefresh();
+      document.removeEventListener('visibilitychange', syncVisibility);
     };
   }, [activeHandles, load]);
 
