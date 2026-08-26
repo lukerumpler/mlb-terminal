@@ -114,6 +114,10 @@
 - [x] Implement swipe gestures for workspace navigation on mobile.
 - [x] Diagnose and safely resolve the GitHub/Vercel push blocker; used a Personal Access Token to bypass an invalid connector, consolidated 4 feature branches into `main`, and successfully ran the full validation suite (146 passed test files, TypeScript check, and production build) before pushing to GitHub.
 
-- [ ] Implement a mobile-first "Scouting Mode" with one-handed controls.
-- [ ] Add subtle haptic feedback and smooth transition animations to swipe gestures.
-- [ ] Validate mobile interactions, publish the release, and verify lukerumpler.com.
+- [x] Implement a mobile-first "Scouting Mode" with one-handed controls; added a floating toggle and simplified CSS rules for ballpark use.
+- [x] Add subtle haptic feedback and smooth transition animations to swipe gestures; used `navigator.vibrate` and `framer-motion` for tactile, fluid navigation.
+- [x] Validate mobile interactions, publish the release, and verify lukerumpler.com; verified the floating button and simplified UI on the production domain.
+
+- [ ] Implement a quick-action button for voice-to-text scouting notes in Scouting Mode.
+- [ ] Add a pull-to-refresh gesture for live scores and standings in Scouting Mode.
+- [ ] Validate mobile voice and refresh flows, publish the release, and verify lukerumpler.com.

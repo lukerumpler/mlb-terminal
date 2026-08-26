@@ -42,6 +42,102 @@ function PageLoading() {
   );
 }
 
+function VoiceNoteRecorder({ onTranscribed, onCancel }) {
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribed] = useState(false);
+  const [error, setError] = useState(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const uploadMutation = trpc.storage.upload.useMutation();
+  const transcribeMutation = trpc.voice.transcribe.useMutation();
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        setTranscribed(true);
+        try {
+          // Convert to base64 for tRPC upload
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = async () => {
+            const base64 = reader.result.split(',')[1];
+            const { url } = await uploadMutation.mutateAsync({
+              name: `voice-note-${Date.now()}.webm`,
+              type: 'audio/webm',
+              base64
+            });
+            
+            const result = await transcribeMutation.mutateAsync({ audioUrl: url });
+            onTranscribed(result.text);
+          };
+        } catch (err) {
+          setError('Transcription failed. Please try again.');
+          setTranscribed(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate(20);
+    } catch (err) {
+      setError('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+      setRecording(false);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate(10);
+    }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.65)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:20, backdropFilter:'blur(4px)' }}>
+      <div style={{ width:'100%', maxWidth:320, background:C.surface, border:`1px solid ${C.border}`, borderRadius:16, padding:24, textAlign:'center', boxShadow:'0 20px 50px rgba(0,0,0,0.3)' }}>
+        <div style={sans({ fontSize:14, fontWeight:800, color:C.text, marginBottom:8 })}>Voice Scouting Note</div>
+        <div style={sans({ fontSize:11, color:C.text3, marginBottom:24, lineHeight:1.5 })}>
+          {transcribing ? 'Transcribing your audio...' : recording ? 'Recording... Tap to stop' : 'Tap the mic to start recording your observation.'}
+        </div>
+        
+        <div style={{ display:'flex', justifyContent:'center', marginBottom:24 }}>
+          <button 
+            onClick={recording ? stopRecording : startRecording}
+            disabled={transcribing}
+            style={{ 
+              width: 80, height: 80, borderRadius: '50%', border: 'none', 
+              background: recording ? C.rust : C.teal, color: '#fff', fontSize: 32,
+              cursor: 'pointer', display: 'grid', placeItems: 'center',
+              boxShadow: recording ? `0 0 0 8px ${C.rustSoft}` : '0 8px 20px rgba(0,0,0,0.15)',
+              transition: 'all 0.2s ease',
+              animation: recording ? 'pulse 1.2s ease-in-out infinite' : 'none'
+            }}
+          >
+            {transcribing ? '⏳' : recording ? '⏹' : '🎤'}
+          </button>
+        </div>
+
+        {error && <div style={sans({ fontSize:10, color:C.rust, marginBottom:16, fontWeight:600 })}>{error}</div>}
+
+        <button onClick={onCancel} disabled={transcribing} style={{ background:'none', border:'none', color:C.text3, cursor:'pointer', ...sans({ fontSize:12, fontWeight:700 }) }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Catches failures loading a lazy chunk (e.g. a flaky connection on a code-
 // split tab) so one tab breaking shows a retry message instead of a white-
 // screened app. Resets whenever the active tab changes so navigating away
@@ -194,6 +290,10 @@ export default function App() {
   const [scoutingMode, setScoutingMode] = useState(() => {
     try { return localStorage.getItem('skip-scouting-mode') === 'true'; } catch { return false; }
   });
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [voiceNoteDraft, setVoiceNoteDraft] = useState(null);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [compactMobile, setCompactMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
@@ -333,7 +433,12 @@ export default function App() {
     const currentIndex = MOBILE_SWIPE_TABS.indexOf(tab);
     if (currentIndex < 0) return;
     const nextIndex = Math.max(0, Math.min(MOBILE_SWIPE_TABS.length - 1, currentIndex + direction));
-    if (nextIndex !== currentIndex) setTab(MOBILE_SWIPE_TABS[nextIndex]);
+    if (nextIndex !== currentIndex) {
+      setTab(MOBILE_SWIPE_TABS[nextIndex]);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        window.navigator.vibrate(10);
+      }
+    }
   }, [compactMobile, isolatedPreview, tab]);
   const handleMobileTouchStart = useCallback((event) => {
     if (!compactMobile || isolatedPreview || event.touches.length !== 1) return;
@@ -341,11 +446,40 @@ export default function App() {
     const interactive = target?.closest?.('button, a, input, select, textarea, table, [role="button"], [data-no-workspace-swipe]');
     const horizontalScroller = target?.closest?.('[data-horizontal-scroll]');
     mobileSwipeIgnoreRef.current = Boolean(interactive || horizontalScroller);
-    mobileSwipeStartRef.current = mobileSwipeIgnoreRef.current ? null : { x:event.touches[0].clientX, y:event.touches[0].clientY };
+    mobileSwipeStartRef.current = mobileSwipeIgnoreRef.current ? null : { 
+      x: event.touches[0].clientX, 
+      y: event.touches[0].clientY,
+      scrollTop: event.currentTarget.scrollTop 
+    };
   }, [compactMobile, isolatedPreview]);
-  const handleMobileTouchEnd = useCallback((event) => {
+
+  const handleMobileTouchMove = useCallback((event) => {
+    if (!compactMobile || isolatedPreview || !mobileSwipeStartRef.current || mobileSwipeIgnoreRef.current) return;
+    const deltaX = event.touches[0].clientX - mobileSwipeStartRef.current.x;
+    const deltaY = event.touches[0].clientY - mobileSwipeStartRef.current.y;
+    
+    if (scoutingMode && mobileSwipeStartRef.current.scrollTop <= 0 && deltaY > 0 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      setPullDistance(Math.min(deltaY * 0.4, 80));
+    }
+  }, [compactMobile, isolatedPreview, scoutingMode]);
+
+  const handleMobileTouchEnd = useCallback(async (event) => {
     const start = mobileSwipeStartRef.current;
     mobileSwipeStartRef.current = null;
+    
+    if (pullDistance >= 60 && !isRefreshing) {
+      setIsRefreshing(true);
+      try {
+        await retryProvider('mlb');
+        if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate([10, 30, 10]);
+      } catch (err) {
+        console.error('Refresh failed:', err);
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+    setPullDistance(0);
+
     if (!start || mobileSwipeIgnoreRef.current || event.changedTouches.length !== 1) return;
     mobileSwipeIgnoreRef.current = false;
     const touch = event.changedTouches[0];
@@ -353,7 +487,7 @@ export default function App() {
     const dy = touch.clientY - start.y;
     if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
     navigateMobileWorkspace(dx < 0 ? 1 : -1);
-  }, [navigateMobileWorkspace]);
+  }, [navigateMobileWorkspace, pullDistance, isRefreshing, retryProvider]);
 
   const handleSwipe = useCallback((direction) => {
     const currentIdx = PRIMARY_TABS.findIndex(t => (t.defaultTab || t.key) === tab || t.tabs?.some(st => st.key === tab));
@@ -637,6 +771,9 @@ export default function App() {
               else if (offset.x < -100 || velocity.x < -500) handleSwipe('left');
             }
           }}
+          onTouchStart={handleMobileTouchStart}
+          onTouchMove={handleMobileTouchMove}
+          onTouchEnd={handleMobileTouchEnd}
           style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0, touchAction: compactMobile ? 'pan-y' : 'auto' }}
         >
           {!isolatedPreview && activeWorkspace && (
@@ -675,7 +812,7 @@ export default function App() {
                   {tab === 'intelligence' && <IntelligencePage />}
                   {tab === 'amd'          && <AMDPage />}
                   {tab === 'knowledge'    && <KnowledgePage />}
-                  {tab === 'notes'        && <ScoutingNotesPage />}
+                  {tab === 'notes'        && <ScoutingNotesPage voiceNoteDraft={voiceNoteDraft} onVoiceNoteConsumed={() => setVoiceNoteDraft(null)} />}
                   {tab === 'feed'         && <FeedPage />}
                   {tab === 'follows'      && <FollowListPage />}
                   {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
@@ -728,35 +865,70 @@ export default function App() {
         {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
 
         {compactMobile && !isolatedPreview && (
-          <button 
-            type="button"
-            onClick={() => {
-              setScoutingMode(s => !s);
-              if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate(20);
+          <div style={{ position: 'fixed', bottom: 104, right: 16, display: 'flex', flexDirection: 'column', gap: 12, zIndex: 1000 }}>
+            {scoutingMode && (
+              <button
+                type="button"
+                className="skip-voice-note-trigger"
+                onClick={() => setShowVoiceRecorder(true)}
+                style={{
+                  width: 48, height: 48, borderRadius: '50%', background: C.teal, border: `1px solid ${C.tealMid}`,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'grid', placeItems: 'center', fontSize: 20, cursor: 'pointer', color: '#fff'
+                }}
+                title="Record Voice Note"
+                aria-label="Record Voice Note"
+              >
+                🎤
+              </button>
+            )}
+            <button
+              type="button"
+              className="skip-scouting-mode-toggle"
+              onClick={() => {
+                setScoutingMode(s => !s);
+                if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate(20);
+              }}
+              style={{
+                width: 48, height: 48, borderRadius: '50%', background: scoutingMode ? C.tealSoft : C.surface,
+                border: `1px solid ${scoutingMode ? C.tealMid : C.border}`,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)', display: 'grid', placeItems: 'center', fontSize: 20, cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.23, 1, 0.32, 1)'
+              }}
+              title={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
+              aria-label={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
+            >
+              {scoutingMode ? '🎯' : '🔭'}
+            </button>
+          </div>
+        )}
+
+        {scoutingMode && (
+          <div className="skip-pull-refresh-indicator" style={{ 
+            position: 'absolute', top: 46 + (isRefreshing ? 60 : pullDistance) - 40, left: '50%', transform: 'translateX(-50%)',
+            opacity: isRefreshing ? 1 : pullDistance / 60, zIndex: 10, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '4px 12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', ...sans({ fontSize: 10, fontWeight: 700, color: C.text2 }),
+            transition: isRefreshing ? 'none' : 'top 0.1s ease-out'
+          }}>
+            {isRefreshing ? (
+              <>
+                <div className="skip-refresh-spinner" style={{ width: 10, height: 10, border: `2px solid ${C.teal}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                REFRESHING...
+              </>
+            ) : pullDistance >= 60 ? 'RELEASE TO REFRESH' : 'PULL TO REFRESH'}
+          </div>
+        )}
+
+        {showVoiceRecorder && (
+          <VoiceNoteRecorder 
+            onTranscribed={(text) => {
+              setVoiceNoteDraft(text);
+              setTab('notes');
+              setShowVoiceRecorder(false);
             }}
-            style={{
-              position: 'fixed',
-              right: 16,
-              bottom: 104,
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: scoutingMode ? C.teal : C.surface,
-              color: scoutingMode ? '#fff' : C.text2,
-              border: `1px solid ${scoutingMode ? C.tealMid : C.border}`,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 20,
-              zIndex: 1000,
-              cursor: 'pointer',
-              transition: 'all 0.2s cubic-bezier(0.23, 1, 0.32, 1)'
-            }}
-            title={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
-            aria-label={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
-          >
-            {scoutingMode ? '🎯' : '🔭'}
-          </button>
+            onCancel={() => setShowVoiceRecorder(false)}
+          />
         )}
 
       </div>
