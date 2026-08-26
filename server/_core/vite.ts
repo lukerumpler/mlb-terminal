@@ -21,7 +21,9 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  // A regexp fallback serves both the current Express 4 runtime and Express 5.
+  // Named string wildcards are not accepted by the running Express 4 server.
+  app.use(/.*/, async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
@@ -60,8 +62,8 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // Same compatibility fallback: serve index.html when a static path is absent.
+  app.use(/.*/, (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

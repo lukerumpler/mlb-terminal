@@ -8,9 +8,9 @@ const viteMiddlewareSource = fs.readFileSync(
   "utf8"
 );
 
-describe("Express 5 fallback routing", () => {
-  it("uses named wildcard parameters for development and static SPA fallbacks", () => {
-    expect(viteMiddlewareSource).toContain('app.use("/{*path}"');
-    expect(viteMiddlewareSource).not.toContain('app.use("*"');
+describe("Express SPA fallback routing", () => {
+  it("uses a regular-expression fallback compatible with the running Express 4 server and Express 5", () => {
+    expect(viteMiddlewareSource).toContain("app.use(/.*/");
+    expect(viteMiddlewareSource).not.toContain('app.use("*")');
   });
 });

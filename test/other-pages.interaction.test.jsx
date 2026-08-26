@@ -9,7 +9,12 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../client/src/App.jsx";
-import { buildComparisonMetricSummary, buildCrossTeamComparisonRows } from "../client/src/pages/OtherPages.jsx";
+import {
+  buildComparisonMetricSummary,
+  buildCrossTeamComparisonRows,
+  buildIntelligenceLeaderPanelModel,
+  IntelligenceLiveLeaderPanel,
+} from "../client/src/pages/OtherPages.jsx";
 
 beforeEach(() => {
   cleanup();
@@ -156,15 +161,52 @@ describe("Knowledge page", () => {
 });
 
 describe("Intelligence page", () => {
-  it("exposes source, freshness, and model provenance metadata", async () => {
+  it("exposes source, freshness, and live-leader provenance metadata", async () => {
     const user = userEvent.setup();
     await goToTab(user, "Intelligence", /Player Comparison Engine/i);
     const provenance = screen.getByRole("region", { name: "Intelligence data provenance" });
     expect(provenance).toHaveTextContent(/MLB Stats API.*on demand/i);
     expect(provenance).toHaveTextContent(/Retrieved only when compared/i);
-    expect(provenance).toHaveTextContent(/Reference snapshots; not live feeds or Team Overview grades/i);
-    expect(screen.getAllByText("Reference snapshot").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText(/Reference snapshots preserve original SKIP research examples/i)).toBeInTheDocument();
+    expect(provenance).toHaveTextContent(/League leaders.*MLB Stats API/i);
+    expect(screen.getByText(/Live Hitter Leaders — OPS/i)).toBeInTheDocument();
+    expect(screen.getByText(/Live Pitcher Leaders — ERA/i)).toBeInTheDocument();
+    expect(screen.queryByText("Injury Risk Model")).toBeNull();
+    expect(screen.queryByText("Trade Value Simulator")).toBeNull();
+    expect(screen.getByText(/Live leader rows use current-season MLB Stats API returns/i)).toBeInTheDocument();
+  });
+
+  it("models verified leader rows and explicit unavailable states without a fabricated WAR field", () => {
+    const leaders = {
+      onBasePlusSlugging: [
+        { id: 1, rank: 1, name: "Verified Hitter", team: "SD", value: ".999" },
+        { id: 2, rank: 2, name: "Zero Is Valid", team: "NYM", value: "0" },
+      ],
+    };
+    expect(buildIntelligenceLeaderPanelModel(leaders, "onBasePlusSlugging", "ready")).toEqual({
+      category: "onBasePlusSlugging",
+      state: "ready",
+      rows: leaders.onBasePlusSlugging,
+    });
+    expect(buildIntelligenceLeaderPanelModel(leaders, "earnedRunAverage", "unavailable")).toEqual({
+      category: "earnedRunAverage",
+      state: "unavailable",
+      rows: [],
+    });
+  });
+
+  it("renders an explicit unavailable state when the live leader provider fails", () => {
+    render(
+      <IntelligenceLiveLeaderPanel
+        title="Live Hitter Leaders — OPS"
+        accent="#2A7B6B"
+        model={buildIntelligenceLeaderPanelModel({}, "onBasePlusSlugging", "unavailable")}
+      />
+    );
+    expect(
+      screen.getByText(/Current-season MLB leader data is unavailable right now/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText(/Aaron Judge/i)).toBeNull();
   });
 
   it("rejects comparing a player against themselves", async () => {

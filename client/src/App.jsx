@@ -187,7 +187,10 @@ function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
 }
 
 export default function App() {
-  const [tab, setTab]               = useState('overview');
+  const previewKey = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('preview')
+    : null;
+  const [tab, setTab]               = useState(() => previewKey === 'intelligence' ? 'intelligence' : 'overview');
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
