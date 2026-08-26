@@ -9,7 +9,7 @@ import {
   buildTeamDataQualityPayload,
   buildTeamDataQualityCsv,
 } from "../client/src/lib/dataQuality.js";
-import DataSourceStatusCenter from "../client/src/components/DataSourceStatusCenter.jsx";
+import DataSourceStatusCenter, { resolveProviderRow } from "../client/src/components/DataSourceStatusCenter.jsx";
 import { filterAndSortNcaaGames } from "../client/src/pages/OtherPages.jsx";
 import { filterAndSortBoxscoreGames } from "../client/src/pages/PlayersPage.jsx";
 
@@ -167,6 +167,53 @@ describe("date/team navigation helpers", () => {
 });
 
 describe("data-source status center", () => {
+  it("resolves display providers from their mapped freshness keys", () => {
+    const rows = new Map([
+      ["mlb-scores", { lastSuccess: 1_700_000_000_000 }],
+      ["mlb-stats", { lastSuccess: 1_700_000_100_000 }],
+      ["boxscore", { lastSuccess: 1_700_000_200_000 }],
+      ["fangraphs", { lastSuccess: 1_700_000_300_000 }],
+    ]);
+    expect(resolveProviderRow({ feedKeys: ["mlb-scores", "mlb-stats"] }, rows)).toEqual({ lastSuccess: 1_700_000_100_000 });
+    expect(resolveProviderRow({ feedKeys: ["boxscore"] }, rows)).toEqual({ lastSuccess: 1_700_000_200_000 });
+    expect(resolveProviderRow({ feedKeys: ["roster-insights"] }, rows)).toBeNull();
+  });
+
+  it("shows connected provider state when canonical freshness keys are present", () => {
+    const view = render(
+      <DataSourceStatusCenter
+        settings={{ enabled: true, displayMode: "relative" }}
+        successes={{
+          "mlb-stats": Date.now(),
+          boxscore: Date.now(),
+          fangraphs: Date.now(),
+          savant: Date.now(),
+          ncaa: Date.now(),
+          "roster-insights": Date.now(),
+        }}
+      />
+    );
+    expect(screen.getAllByText(/Last success/)).toHaveLength(6);
+    expect(screen.queryByText("No successful response recorded")).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("uses the independent retry callback when Settings provides one", async () => {
+    const user = userEvent.setup();
+    const retryProvider = vi.fn().mockResolvedValue("MLB schedule and standings refreshed.");
+    const view = render(
+      <DataSourceStatusCenter
+        settings={{ enabled: true, displayMode: "relative" }}
+        successes={{}}
+        onRetryProvider={retryProvider}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Retry MLB Stats API" }));
+    expect(retryProvider).toHaveBeenCalledWith("mlb");
+    expect(await screen.findByText(/MLB schedule and standings refreshed/)).toBeInTheDocument();
+    view.unmount();
+  });
+
   it("shows independent providers and dispatches only the selected retry event", async () => {
     const user = userEvent.setup();
     const retry = vi.fn();

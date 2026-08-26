@@ -4,13 +4,21 @@ import { getFeedFreshnessRows } from '../lib/feedFreshness.js';
 import { Panel } from './atoms.jsx';
 
 const PROVIDERS = [
-  { key: 'mlb', label: 'MLB Stats API', source: 'Official MLB schedule, standings, player, and team feeds' },
-  { key: 'boxscore', label: 'MLB boxscore feed', source: 'Official completed-game boxscores used for player OPS and ERA splits' },
-  { key: 'fangraphs', label: 'FanGraphs', source: 'Team model and projection provider' },
-  { key: 'savant', label: 'Baseball Savant', source: 'Statcast and batted-ball provider' },
-  { key: 'ncaa', label: 'NCAA feed', source: 'College baseball scoreboard and rankings proxy' },
-  { key: 'roster-insights', label: 'Roster insights', source: 'Verified local fallback plus optional AI interpretation' },
+  { key: 'mlb', label: 'MLB Stats API', source: 'Official MLB schedule, standings, player, and team feeds', feedKeys: ['mlb-scores', 'mlb-stats'] },
+  { key: 'boxscore', label: 'MLB boxscore feed', source: 'Official completed-game boxscores used for player OPS and ERA splits', feedKeys: ['boxscore'] },
+  { key: 'fangraphs', label: 'FanGraphs', source: 'Team model and projection provider', feedKeys: ['fangraphs'] },
+  { key: 'savant', label: 'Baseball Savant', source: 'Statcast and batted-ball provider', feedKeys: ['savant'] },
+  { key: 'ncaa', label: 'NCAA feed', source: 'College baseball scoreboard and rankings proxy', feedKeys: ['ncaa'] },
+  { key: 'roster-insights', label: 'Roster insights', source: 'Verified local fallback plus optional AI interpretation', feedKeys: ['roster-insights'] },
 ];
+
+export function resolveProviderRow(provider, freshnessByKey) {
+  const lastSuccess = (provider.feedKeys || []).reduce((latest, feedKey) => {
+    const candidate = freshnessByKey.get(feedKey)?.lastSuccess;
+    return candidate != null && (latest == null || candidate > latest) ? candidate : latest;
+  }, null);
+  return lastSuccess == null ? null : { lastSuccess };
+}
 
 function relativeTime(value) {
   if (!value) return 'No successful update recorded';
@@ -22,7 +30,7 @@ function relativeTime(value) {
   return `${hours} hr ago`;
 }
 
-export default function DataSourceStatusCenter({ successes = {}, settings = { enabled: true, displayMode: 'relative' } }) {
+export default function DataSourceStatusCenter({ successes = {}, settings = { enabled: true, displayMode: 'relative' }, onRetryProvider }) {
   const [now, setNow] = useState(() => Date.now());
   const [retrying, setRetrying] = useState(null);
   const [lastRetry, setLastRetry] = useState({});
@@ -52,7 +60,13 @@ export default function DataSourceStatusCenter({ successes = {}, settings = { en
     setRetrying(provider);
     setRetryState(current => ({ ...current, [provider]: { status: 'loading', message: 'Waiting for provider response…' } }));
     setLastRetry(current => ({ ...current, [provider]: Date.now() }));
-    window.dispatchEvent(new CustomEvent('skip-provider-retry', { detail: { provider } }));
+    if (onRetryProvider) {
+      Promise.resolve(onRetryProvider(provider))
+        .then(message => window.dispatchEvent(new CustomEvent('skip-provider-retry-success', { detail: { provider, message: message || 'Provider refreshed.' } })))
+        .catch(error => window.dispatchEvent(new CustomEvent('skip-provider-retry-error', { detail: { provider, message: error?.message || 'Provider refresh failed.' } })));
+    } else {
+      window.dispatchEvent(new CustomEvent('skip-provider-retry', { detail: { provider } }));
+    }
     window.setTimeout(() => {
       setRetrying(current => current === provider ? null : current);
       setRetryState(current => current[provider]?.status === 'loading' ? { ...current, [provider]: { status: 'error', message: 'No provider response arrived. Retry shortly.' } } : current);
@@ -65,7 +79,7 @@ export default function DataSourceStatusCenter({ successes = {}, settings = { en
       </div>
       <div className="skip-data-list" role="list" aria-label="Data-source providers">
         {PROVIDERS.map((provider, index) => {
-          const row = freshnessByKey.get(provider.key);
+          const row = resolveProviderRow(provider, freshnessByKey);
           const successful = Boolean(row?.lastSuccess);
           const isRetrying = retrying === provider.key;
           const providerRetry = retryState[provider.key];

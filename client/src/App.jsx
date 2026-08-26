@@ -3,7 +3,7 @@ import { C, px, sans } from './constants/colors.js';
 import { TEAMS } from './constants/data.js';
 import { DEFAULT_ROSTER_DEFAULTS, loadRosterDefaults, saveRosterDefaults, sanitizeRosterDefaults } from './constants/rosterFilters.js';
 import { getDailyInsight } from './constants/alerts.js';
-import { getTodaysGames } from './api/mlb.js';
+import { getTodaysGames, getStandings, getSavantData, getTeamModelSources } from './api/mlb.js';
 import { deriveTickerStatus, formatTickerGame, getTickerRefreshDelay } from './lib/ticker.js';
 import { getCacheHealth } from './lib/cacheHealthClient.js';
 import { buildOperationalAlerts, countActionableAlerts } from './lib/operationalAlerts.js';
@@ -145,6 +145,14 @@ const PRIMARY_TABS = [
   { key:'notes', icon:'✎', label:'Scouting Notes', section:'Workflow' },
   WORKSPACE_GROUPS[3],
 ];
+const MOBILE_QUICK_TABS = [
+  { key:'overview', icon:'⊞', label:'Overview' },
+  { key:'players', icon:'↑', label:'Talent' },
+  { key:'league', icon:'◎', label:'League' },
+  { key:'intelligence', icon:'◆', label:'Intel' },
+  { key:'notes', icon:'✎', label:'Notes' },
+];
+const MOBILE_SWIPE_TABS = MOBILE_QUICK_TABS.map(item => item.key);
 
 function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
   return (
@@ -186,6 +194,8 @@ export default function App() {
   const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
+  const mobileSwipeStartRef = useRef(null);
+  const mobileSwipeIgnoreRef = useRef(false);
   const [liveTicker, setLiveTicker] = useState([]);
   // 'loading' | 'live' | 'scheduled' | 'final' | 'empty' | 'error' — the ticker used to seed itself
   // with hardcoded SCORES and silently keep showing them forever if the
@@ -251,6 +261,31 @@ export default function App() {
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
   const dailyInsight = useMemo(() => getDailyInsight(), []);
   const feedFreshnessSummary = useMemo(() => summarizeFeedFreshness(feedFreshnessSuccesses, feedFreshnessSettings), [feedFreshnessSuccesses, feedFreshnessSettings]);
+  const retryProvider = useCallback(async (provider) => {
+    const team = TEAMS[defaultTeamKey] || TEAMS.sd;
+    if (provider === 'mlb') {
+      await Promise.all([getTodaysGames(), getStandings()]);
+      return 'MLB schedule and standings refreshed.';
+    }
+    if (provider === 'fangraphs') {
+      const response = await getTeamModelSources(team?.abbr);
+      if (!response?.found) throw new Error(response?.providerBlocked ? 'FanGraphs is currently blocking the provider request.' : 'FanGraphs did not return verified team model data.');
+      return 'FanGraphs team model refreshed.';
+    }
+    if (provider === 'savant') {
+      const response = await getSavantData();
+      if (!Array.isArray(response) || response.length === 0) throw new Error('Baseball Savant did not return a verified leaderboard response.');
+      return 'Baseball Savant leaderboard refreshed.';
+    }
+    if (provider === 'ncaa') {
+      const { getScoreboard } = await import('./api/ncaa.js');
+      await getScoreboard();
+      return 'NCAA scoreboard refreshed.';
+    }
+    if (provider === 'boxscore') throw new Error('Open a player profile to refresh that player’s completed-game boxscore splits.');
+    if (provider === 'roster-insights') throw new Error('Open a team Roster view to refresh its context-specific roster insights.');
+    throw new Error('This provider does not support an independent refresh.');
+  }, [defaultTeamKey]);
   const refreshCacheHealth = useCallback(async () => {
     setCacheHealthStatus(current => current === 'ready' || current === 'error' ? 'refreshing' : 'loading');
     try {
@@ -286,6 +321,32 @@ export default function App() {
   const activeWorkspace = useMemo(() => WORKSPACE_GROUPS.find(workspace => workspace.tabs.some(item => item.key === tab)) || null, [tab]);
   const activePrimaryKey = activeWorkspace?.key || tab;
   const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
+  const navigateMobileWorkspace = useCallback((direction) => {
+    if (!compactMobile || isolatedPreview) return;
+    const currentIndex = MOBILE_SWIPE_TABS.indexOf(tab);
+    if (currentIndex < 0) return;
+    const nextIndex = Math.max(0, Math.min(MOBILE_SWIPE_TABS.length - 1, currentIndex + direction));
+    if (nextIndex !== currentIndex) setTab(MOBILE_SWIPE_TABS[nextIndex]);
+  }, [compactMobile, isolatedPreview, tab]);
+  const handleMobileTouchStart = useCallback((event) => {
+    if (!compactMobile || isolatedPreview || event.touches.length !== 1) return;
+    const target = event.target;
+    const interactive = target?.closest?.('button, a, input, select, textarea, table, [role="button"], [data-no-workspace-swipe]');
+    const horizontalScroller = target?.closest?.('[data-horizontal-scroll]');
+    mobileSwipeIgnoreRef.current = Boolean(interactive || horizontalScroller);
+    mobileSwipeStartRef.current = mobileSwipeIgnoreRef.current ? null : { x:event.touches[0].clientX, y:event.touches[0].clientY };
+  }, [compactMobile, isolatedPreview]);
+  const handleMobileTouchEnd = useCallback((event) => {
+    const start = mobileSwipeStartRef.current;
+    mobileSwipeStartRef.current = null;
+    if (!start || mobileSwipeIgnoreRef.current || event.changedTouches.length !== 1) return;
+    mobileSwipeIgnoreRef.current = false;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    navigateMobileWorkspace(dx < 0 ? 1 : -1);
+  }, [navigateMobileWorkspace]);
 
   const handleSwipe = useCallback((direction) => {
     const currentIdx = PRIMARY_TABS.findIndex(t => (t.defaultTab || t.key) === tab || t.tabs?.some(st => st.key === tab));
