@@ -333,7 +333,12 @@ export default function App() {
     const currentIndex = MOBILE_SWIPE_TABS.indexOf(tab);
     if (currentIndex < 0) return;
     const nextIndex = Math.max(0, Math.min(MOBILE_SWIPE_TABS.length - 1, currentIndex + direction));
-    if (nextIndex !== currentIndex) setTab(MOBILE_SWIPE_TABS[nextIndex]);
+    if (nextIndex !== currentIndex) {
+      setTab(MOBILE_SWIPE_TABS[nextIndex]);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        window.navigator.vibrate(10);
+      }
+    }
   }, [compactMobile, isolatedPreview, tab]);
   const handleMobileTouchStart = useCallback((event) => {
     if (!compactMobile || isolatedPreview || event.touches.length !== 1) return;
