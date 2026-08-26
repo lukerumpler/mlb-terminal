@@ -191,7 +191,10 @@ export default function App() {
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [compactMobile, setCompactMobile] = useState(() => window.matchMedia?.('(max-width: 720px)').matches || false);
+  const [scoutingMode, setScoutingMode] = useState(() => {
+    try { return localStorage.getItem('skip-scouting-mode') === 'true'; } catch { return false; }
+  });
+  const [compactMobile, setCompactMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches || false);
   const mobileNavToggleRef = useRef(null);
   const mobileNavFirstItemRef = useRef(null);
   const mobileSwipeStartRef = useRef(null);
@@ -250,6 +253,10 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('skip-theme', theme); } catch { /* best effort */ }
   }, [theme]);
+  useEffect(() => {
+    document.body.setAttribute('data-scouting-mode', scoutingMode ? 'true' : 'false');
+    try { localStorage.setItem('skip-scouting-mode', scoutingMode ? 'true' : 'false'); } catch { /* best effort */ }
+  }, [scoutingMode]);
   useEffect(() => {
     const query = window.matchMedia?.('(max-width: 720px)');
     if (!query) return undefined;
@@ -358,7 +365,12 @@ export default function App() {
       nextIdx = Math.max(0, currentIdx - 1);
     }
     const nextTab = PRIMARY_TABS[nextIdx];
-    setTab(nextTab.defaultTab || nextTab.key);
+    if (nextIdx !== currentIdx) {
+      setTab(nextTab.defaultTab || nextTab.key);
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        window.navigator.vibrate(15);
+      }
+    }
   }, [tab]);
 
   const [showPalette, setShowPalette] = useState(false);
@@ -601,23 +613,25 @@ export default function App() {
 
                 {/* Scrollable content */}
         <motion.div 
+          key={tab}
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -10 }}
+          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
           className="skip-content" 
           drag={compactMobile ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.05}
           onDragStart={(e) => {
-            // Prevent swipe if drag starts on an interactive element
             const target = e.target;
             if (target.closest('button, select, input, a, [role="button"], .recharts-surface')) {
               return;
             }
           }}
           onDragEnd={(e, { offset, velocity }) => {
-            // Prevent swipe if drag ended on an interactive element (already handled by dragStart usually)
             const target = e.target;
             if (target.closest('button, select, input, a, [role="button"], .recharts-surface')) return;
 
-            // Only trigger swipe if it's a decisive horizontal movement and not a vertical scroll intent
             if (Math.abs(offset.x) > Math.abs(offset.y) * 2) {
               if (offset.x > 100 || velocity.x > 500) handleSwipe('right');
               else if (offset.x < -100 || velocity.x < -500) handleSwipe('left');
@@ -712,6 +726,38 @@ export default function App() {
         )}
 
         {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
+
+        {compactMobile && !isolatedPreview && (
+          <button 
+            type="button"
+            onClick={() => {
+              setScoutingMode(s => !s);
+              if (typeof window !== 'undefined' && window.navigator?.vibrate) window.navigator.vibrate(20);
+            }}
+            style={{
+              position: 'fixed',
+              right: 16,
+              bottom: 104,
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: scoutingMode ? C.teal : C.surface,
+              color: scoutingMode ? '#fff' : C.text2,
+              border: `1px solid ${scoutingMode ? C.tealMid : C.border}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 20,
+              zIndex: 1000,
+              cursor: 'pointer',
+              transition: 'all 0.2s cubic-bezier(0.23, 1, 0.32, 1)'
+            }}
+            title={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
+            aria-label={scoutingMode ? "Exit Scouting Mode" : "Enter Scouting Mode"}
+          >
+            {scoutingMode ? '🎯' : '🔭'}
+          </button>
+        )}
 
       </div>
 

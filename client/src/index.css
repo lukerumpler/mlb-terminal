@@ -1474,3 +1474,95 @@
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   SCOUTING MODE (Mobile-first, one-handed ballpark use)
+   Simplifies the UI, increases legibility, and optimizes 
+   for thumb-driven interactions.
+   ═══════════════════════════════════════════════════════ */
+body[data-scouting-mode="true"] {
+  --radius: 12px;
+  --surface: #ffffff;
+  --surface2: #f8f7f2;
+}
+
+body[data-scouting-mode="true"] .skip-shell {
+  background: #fdfcf9;
+}
+
+/* Hide non-essential desktop/complex elements in Scouting Mode */
+body[data-scouting-mode="true"] .skip-sidebar-insight,
+body[data-scouting-mode="true"] .skip-nav-shortcut,
+body[data-scouting-mode="true"] .skip-topbar > div:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)) {
+  display: none !important;
+}
+
+/* Maximize content area and increase base sizing */
+body[data-scouting-mode="true"] .skip-content {
+  padding: 16px 14px 120px !important; /* Extra bottom space for one-handed reach */
+}
+
+body[data-scouting-mode="true"] .skip-panel-title {
+  font-size: 14px !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Simplified, larger stat cards */
+body[data-scouting-mode="true"] .skip-stat-strip-item {
+  padding: 12px 10px !important;
+}
+
+body[data-scouting-mode="true"] .skip-stat-strip-val {
+  font-size: 20px !important;
+}
+
+/* One-handed touch targets */
+body[data-scouting-mode="true"] button,
+body[data-scouting-mode="true"] select,
+body[data-scouting-mode="true"] input {
+  min-height: 44px !important; /* iOS/Android standard for touch */
+}
+
+body[data-scouting-mode="true"] .skip-overview-view-button {
+  min-height: 38px !important;
+  font-size: 10px !important;
+  padding: 0 14px !important;
+}
+
+/* Enhanced contrast for sunlight legibility */
+body[data-scouting-mode="true"] {
+  --text: #000000;
+  --text2: #1a1a1a;
+  --text3: #444444;
+}
+
+/* Ticker optimization for mobile glanceability */
+body[data-scouting-mode="true"] .skip-ticker-shell {
+  height: 44px !important;
+  background: #000 !important;
+}
+
+body[data-scouting-mode="true"] .skip-ticker-game {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+/* Transition polish for swipe gestures */
+.skip-content-swipe-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.skip-content-swipe-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.3s, transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.skip-content-swipe-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+.skip-content-swipe-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 0.3s, transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
