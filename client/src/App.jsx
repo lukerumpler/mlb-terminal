@@ -543,11 +543,26 @@ export default function App() {
           className="skip-content" 
           drag={compactMobile ? "x" : false}
           dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={(e, { offset, velocity }) => {
-            if (offset.x > 100 || velocity.x > 500) handleSwipe('right');
-            else if (offset.x < -100 || velocity.x < -500) handleSwipe('left');
+          dragElastic={0.05}
+          onDragStart={(e) => {
+            // Prevent swipe if drag starts on an interactive element
+            const target = e.target;
+            if (target.closest('button, select, input, a, [role="button"], .recharts-surface')) {
+              return;
+            }
           }}
-          style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}
+          onDragEnd={(e, { offset, velocity }) => {
+            // Prevent swipe if drag ended on an interactive element (already handled by dragStart usually)
+            const target = e.target;
+            if (target.closest('button, select, input, a, [role="button"], .recharts-surface')) return;
+
+            // Only trigger swipe if it's a decisive horizontal movement and not a vertical scroll intent
+            if (Math.abs(offset.x) > Math.abs(offset.y) * 2) {
+              if (offset.x > 100 || velocity.x > 500) handleSwipe('right');
+              else if (offset.x < -100 || velocity.x < -500) handleSwipe('left');
+            }
+          }}
+          style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0, touchAction: compactMobile ? 'pan-y' : 'auto' }}
         >
           {!isolatedPreview && activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">

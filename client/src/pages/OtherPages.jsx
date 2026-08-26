@@ -1136,10 +1136,12 @@ function LeaguePage() {
           compactMobile ? (
             <div style={{ display:'flex', flexDirection:'column', gap:8, padding:'8px 14px 14px' }}>
               {comparisonRows.map((row, index) => (
-                <div 
+                <button 
                   key={row.id} 
+                  type="button"
                   onClick={() => openTab('overview', { team:row.abbr })}
                   style={{ 
+                    width:'100%',
                     padding:'12px', 
                     background:C.surface2, 
                     border:`1px solid ${C.borderLight}`, 
@@ -1147,7 +1149,9 @@ function LeaguePage() {
                     display:'flex',
                     alignItems:'center',
                     justifyContent:'space-between',
-                    cursor:'pointer'
+                    cursor:'pointer',
+                    textAlign:'left',
+                    transition:'background-color 0.12s'
                   }}
                 >
                   <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -1171,7 +1175,7 @@ function LeaguePage() {
                     <div style={px({ fontSize:14, fontWeight:800, color:C.teal })}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</div>
                     <div style={sans({ fontSize:8, fontWeight:700, color:C.text4, textTransform:'uppercase', letterSpacing:'.05em' })}>{comparisonMetricConfig.label}</div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
