@@ -1585,3 +1585,54 @@ body[data-scouting-mode="true"] .skip-ticker-game {
   transform: translateX(-20px);
   transition: opacity 0.3s, transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
 }
+
+/* Refined Front Office Evaluation Styles */
+.skip-grade-card-button:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.skip-evaluation-summary-grid {
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .skip-evaluation-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .skip-grade-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)) !important;
+  }
+  
+  .skip-grade-card-button {
+    min-height: 60px !important;
+  }
+  
+  .skip-grade-card-button span:first-child {
+    font-size: 16px !important;
+  }
+  
+  .skip-grade-card-button div:nth-child(2) {
+    font-size: 8px !important;
+  }
+}
+
+/* Radar chart container polish */
+.skip-strength-radar-container {
+  background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
+  border-radius: 12px;
+}
+
+.recharts-polar-grid-concentric-path {
+  stroke-opacity: 0.5;
+}
+
+.recharts-polar-angle-axis-tick-value {
+  transition: fill 0.2s ease;
+}
+
+.recharts-polar-angle-axis-tick:hover .recharts-polar-angle-axis-tick-value {
+  fill: var(--text) !important;
+  font-weight: 800 !important;
+}
