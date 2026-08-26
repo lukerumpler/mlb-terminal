@@ -1476,7 +1476,7 @@ function TradeAnalyticsPanel() {
         </div>
       </Panel>
 
-      <Panel title="Notable Trades — High-End Starting Pitchers" accent={C.purple} badge="netWAR from sending team's POV">
+      <Panel title="Notable Trades — High-End Starting Pitchers" accent={C.purple} badge="fixed historical netWAR">
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
             <thead>
@@ -1486,7 +1486,7 @@ function TradeAnalyticsPanel() {
                 <TradeSortableTh label="To" k="toTeam" align="center" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
                 <th style={{ padding:'6px 8px', fontSize:9.5, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em',
                   color:C.text2, textAlign:'left', borderBottom:`0.5px solid ${C.border}` }}>Trade</th>
-                <TradeSortableTh label="netWAR" k="netWar" align="right" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
+                <TradeSortableTh label="Historical netWAR" k="netWar" align="right" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
               </tr>
             </thead>
             <tbody>

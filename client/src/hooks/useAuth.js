@@ -1,4 +1,4 @@
-import { trpc } from '../lib/trpc.js';
+import { trpc } from '../lib/trpc';
 
 /**
  * Hook to access current authenticated user state.

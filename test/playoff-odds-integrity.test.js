@@ -22,7 +22,7 @@ describe("playoff odds integrity", () => {
     expect(overviewSource).toContain("MLB Stats API");
     expect(overviewSource).toContain("FanGraphs");
     expect(overviewSource).toContain("Provider unavailable");
-    expect(overviewSource).toContain("Playoff odds are shown only when FanGraphs returns a team-specific value");
+    expect(overviewSource).toContain("Playoff odds and Team WAR are shown only when FanGraphs returns a source-backed team-specific value");
     expect(overviewSource).toContain("Current win pace and Pythagorean pace are calculated from verified MLB standings");
     expect(overviewSource).not.toContain("calculated playoff proxy");
     expect(overviewSource).not.toContain("calculatedPlayoffOdds");

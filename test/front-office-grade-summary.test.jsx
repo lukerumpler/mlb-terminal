@@ -39,7 +39,7 @@ describe('Front Office Overall grade', () => {
     render(<FrontOfficeGradeCards grades={grades} overall={buildFrontOfficeGradeSummary(grades)} />);
     expect(screen.getByRole('button', { name: /Overall.*4\.30/i })).toBeInTheDocument();
     expect(screen.getByText('4.30')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Overall.*4\.30/i })).toHaveStyle({ minHeight: '62px' });
+    expect(screen.getByRole('button', { name: /Overall.*4\.30/i })).toHaveStyle({ minHeight: '68px' });
     expect(screen.getByTitle(/Offense 45%, Pitching 40%, Defense 10%, Baserunning 5%/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /overall/i }));
     expect(screen.getByRole('tooltip')).toHaveTextContent(/Weighted current-performance score from defense/i);

@@ -3,6 +3,10 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+vi.mock("../client/src/components/BallparkWeatherPanel.jsx", () => ({
+  default: () => null,
+}));
+
 let feedAttempt = 0;
 let modelAttempt = 0;
 let savantMode = "pending";

@@ -17,6 +17,20 @@ import { useWatchlist } from "../client/src/lib/watchlist.js";
 import ScoutingNotesPage from "../client/src/pages/ScoutingNotesPage.jsx";
 import { PROSPECT_BATTERS } from "../client/src/constants/data.js";
 
+vi.mock("../client/src/hooks/useAuth.js", () => ({
+  useAuth: () => ({ user: null, isLoggedIn: false, isLoading: false }),
+}));
+
+vi.mock("../client/src/lib/trpc", () => ({
+  trpc: {
+    notes: {
+      sync: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
+    },
+  },
+}));
+
 function WatchlistHarness() {
   const player = {
     mlbId: 990001,

@@ -89,7 +89,7 @@ describe('rendered FanGraphs local fallback', () => {
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
   });
 
-  it('fills the briefing headline with a transparent daily MLB WAR proxy when FanGraphs remains deferred', async () => {
+  it('keeps Team WAR explicitly unavailable when FanGraphs remains deferred', async () => {
     vi.stubGlobal('fetch', vi.fn(async url => {
       if (String(url).includes('/api/playoffstatus-odds')) return jsonResponse({ found:true, source:'PlayoffStatus', playoffOddsDisplay:'>99%', freshness:'cached', retrievedAt:'2026-08-21T03:09:43.508Z', lastVerifiedAt:'2026-08-21T03:09:43.508Z' });
       if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
@@ -103,13 +103,14 @@ describe('rendered FanGraphs local fallback', () => {
     render(<OverviewPage />);
 
     expect(await screen.findByText('>99%')).toBeInTheDocument();
-    expect(screen.getByText('51.7')).toBeInTheDocument();
-    expect(screen.getByText('WAR Proxy')).toBeInTheDocument();
-    expect(screen.getByTestId('team-war-proxy-verification')).toHaveTextContent(/MLB verified standings · calculated, not FanGraphs Team WAR/i);
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Team WAR')).toBeInTheDocument();
+    expect(screen.queryByText('51.7')).toBeNull();
+    expect(screen.queryByText('WAR Proxy')).toBeNull();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
   });
 
-it('does not fabricate playoff odds when FanGraphs is unavailable while retaining clearly labeled MLB pace and WAR proxies', async () => {
+  it('does not fabricate playoff odds or Team WAR when FanGraphs is unavailable while retaining calculated pace context', async () => {
     vi.stubGlobal('fetch', vi.fn(async url => {
       if (String(url).includes('/api/fangraphs-models')) return jsonResponse({ found:false, playoffOdds:null, teamWar:null, statuses:{ playoffOdds:'unavailable', teamWar:'unavailable' } });
       if (String(url).includes('/api/intelligence-calculations')) return jsonResponse({
@@ -123,14 +124,15 @@ it('does not fabricate playoff odds when FanGraphs is unavailable while retainin
     fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
     expect((await screen.findAllByText('Unavailable')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('51.2').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('WAR Proxy').length).toBeGreaterThan(0);
+    expect(screen.queryByText('51.2')).toBeNull();
+    expect(screen.getAllByText('Team WAR').length).toBeGreaterThan(0);
+    expect(screen.queryByText('WAR Proxy')).toBeNull();
     expect(screen.getByText('Pythag W')).toBeInTheDocument();
     expect(screen.getByText('Pythag L')).toBeInTheDocument();
     expect(screen.getAllByText('91.2').length).toBeGreaterThan(0);
     expect(screen.getAllByText('70.8').length).toBeGreaterThan(0);
     expect(screen.getByText(/Playoff odds: Provider unavailable/i)).toBeInTheDocument();
-    expect(screen.getByText(/MLB calculated · pace: record · pythag: RS\/RA · WAR: proxy · playoff odds: FanGraphs only/i)).toBeInTheDocument();
+    expect(screen.getByText(/MLB calculated · pace: record · pythag: RS\/RA · Team WAR: FanGraphs only · playoff odds: FanGraphs only/i)).toBeInTheDocument();
   });
 
   it('fills blank headline standings values from the verified backend official-standings response', async () => {

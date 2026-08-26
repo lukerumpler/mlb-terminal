@@ -100,7 +100,10 @@ export function StrengthRadar({ data, accent, showLeagueBenchmark = false }) {
     showLeagueBenchmark
   );
   return (
-    <div className="skip-strength-radar-container" style={{ position: 'relative' }}>
+    <div
+      className="skip-strength-radar-container"
+      style={{ position: "relative" }}
+    >
       <ResponsiveContainer width="100%" height={220}>
         <RadarChart
           data={data}
@@ -138,31 +141,56 @@ export function StrengthRadar({ data, accent, showLeagueBenchmark = false }) {
             fill={accent}
             fillOpacity={0.25}
             strokeWidth={2.5}
-            dot={{ r: 3, fill: accent, strokeWidth: 1.5, stroke: '#fff' }}
+            dot={{ r: 3, fill: accent, strokeWidth: 1.5, stroke: "#fff" }}
             isAnimationActive={false}
           />
           <Tooltip
             {...TT}
-            contentStyle={{ borderRadius: 8, border: `1px solid ${C.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            contentStyle={{
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            }}
             itemStyle={{ fontSize: 11, fontWeight: 700 }}
             formatter={(v, name) => [
-              v == null ? "Unavailable" : `${Number(v).toFixed(0)}th percentile`,
+              v == null
+                ? "Unavailable"
+                : `${Number(v).toFixed(0)}th percentile`,
               name,
             ]}
           />
         </RadarChart>
       </ResponsiveContainer>
-      <div className="skip-radar-legend" style={{ 
-        display: 'flex', justifyContent: 'center', gap: 16, marginTop: -5, paddingBottom: 10,
-        fontFamily: "'DM Mono',monospace", fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: accent }} />
+      <div
+        className="skip-radar-legend"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 16,
+          marginTop: -5,
+          paddingBottom: 10,
+          fontFamily: "'DM Mono',monospace",
+          fontSize: 9,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".05em",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{ width: 8, height: 8, borderRadius: 2, background: accent }}
+          />
           <span style={{ color: C.text2 }}>Team Profile</span>
         </div>
         {shouldRenderLeagueBenchmark && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 12, height: 0, borderTop: `1.5px dashed ${C.text4}` }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                width: 12,
+                height: 0,
+                borderTop: `1.5px dashed ${C.text4}`,
+              }}
+            />
             <span style={{ color: C.text3 }}>MLB Average</span>
           </div>
         )}

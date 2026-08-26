@@ -1,12 +1,10 @@
-import React, { useState, useMemo, useEffect, memo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, DRAFT_CLASS_2026 } from '../constants/data.js';
 import { Panel, Badge, PosBadge, RiskDot, GradeBar, FVBadge } from '../components/atoms.jsx';
 import PitchChartTool from '../components/PitchChartTool.jsx';
-import { trpc } from '../lib/trpc.js';
+import { trpc } from '../lib/trpc';
 import { useAuth } from '../hooks/useAuth.js';
-import { useCallback } from 'react';
-
 /* ── Scouting Notes ───────────────────────────────────────────────────
    Personal scouting notebook: quick freeform notes and structured, full
    scouting reports (20–80 tool grades, FV, risk, ETA) tied to any player.

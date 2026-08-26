@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   render,
   screen,
@@ -15,6 +15,20 @@ import {
   buildIntelligenceLeaderPanelModel,
   IntelligenceLiveLeaderPanel,
 } from "../client/src/pages/OtherPages.jsx";
+
+vi.mock("../client/src/hooks/useAuth.js", () => ({
+  useAuth: () => ({ user: null, isLoggedIn: false, isLoading: false }),
+}));
+
+vi.mock("../client/src/lib/trpc", () => ({
+  trpc: {
+    notes: {
+      sync: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
+    },
+  },
+}));
 
 beforeEach(() => {
   cleanup();
@@ -242,7 +256,7 @@ describe("Intelligence page", () => {
 
     // Sorting by netWAR (including toggling direction on a second click)
     // shouldn't crash the table.
-    const netWarHeader = screen.getByRole("button", { name: /^netWAR/ });
+    const netWarHeader = screen.getByRole("button", { name: /^Historical netWAR/ });
     await user.click(netWarHeader);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     await user.click(netWarHeader);
