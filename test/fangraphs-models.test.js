@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   parseFanGraphsModelHtml,
   parseFanGraphsAggregateWarHtml,
@@ -7,7 +8,7 @@ import {
 } from "../server/api/fangraphs-models.js";
 
 const overviewSource = readFileSync(
-  "/home/ubuntu/skip-baseball/client/src/pages/OverviewPage.jsx",
+  path.resolve(import.meta.dirname, "../client/src/pages/OverviewPage.jsx"),
   "utf8"
 );
 

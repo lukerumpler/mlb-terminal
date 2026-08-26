@@ -18,6 +18,8 @@
     "test:smoke": "vitest run server/vercel-deployment-smoke.test.ts",
     "release:compare": "node scripts/release-shared-comparison.mjs",
     "release:providers": "node scripts/provider-health-smoke.mjs",
+    "audit:prospects": "node scripts/audit-prospect-coverage.mjs",
+    "audit:organization-rosters": "node scripts/audit-organization-rosters.mjs",
     "release:gate": "pnpm release:compare && pnpm release:providers && pnpm check && pnpm lint && pnpm test && pnpm build",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },

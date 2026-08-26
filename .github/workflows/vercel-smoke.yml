@@ -9,25 +9,17 @@ on:
         required: false
         default: "https://mlb-terminal.vercel.app"
         type: string
-  workflow_call:
-    inputs:
-      base_url:
-        description: "Deployed Vercel base URL"
-        required: false
-        default: "https://mlb-terminal.vercel.app"
-        type: string
 
 jobs:
   smoke:
     name: API deployment smoke test
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'workflow_call' ||
       (github.event_name == 'deployment_status' &&
        github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
     env:
-      VERCEL_SMOKE_BASE_URL: ${{ inputs.base_url || vars.VERCEL_SMOKE_BASE_URL || 'https://mlb-terminal.vercel.app' }}
+      VERCEL_SMOKE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || vars.VERCEL_SMOKE_BASE_URL || 'https://mlb-terminal.vercel.app' }}
       VERCEL_SMOKE_TIMEOUT_MS: "15000"
     steps:
       - name: Check out repository

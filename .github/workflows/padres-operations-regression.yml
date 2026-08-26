@@ -1,0 +1,44 @@
+name: Padres Operations regression
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: padres-operations-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  padres-operations:
+    name: Padres Operations regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run verified Padres Operations regressions
+        run: >-
+          pnpm vitest run
+          test/team-schedule-snapshot.test.js
+          test/petco-game-context.test.js
+          test/padres-operations-context.test.jsx
+          --maxWorkers=1
+          --minWorkers=1

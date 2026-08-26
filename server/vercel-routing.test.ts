@@ -1,21 +1,24 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isAnonymousAuthMe } from "../api/trpc/[...path]";
 
 describe("Vercel API routing", () => {
-  it("forwards arbitrary /api/* paths to the shared Express serverless entry", () => {
-    const source = readFileSync(
+  it("bundles the primary and catch-all API entries from explicit shared-handler imports", () => {
+    const catchAllSource = readFileSync(
       resolve(process.cwd(), "api/[...path].ts"),
       "utf8"
     );
-    expect(source).toContain('export { default } from "./index"');
-  });
-
-  it("detects anonymous auth.me requests across Vercel and Express URL shapes", () => {
-    expect(isAnonymousAuthMe({ url:"/auth.me", originalUrl:"/api/trpc/auth.me", headers:{} } as any)).toBe(true);
-    expect(isAnonymousAuthMe({ url:"/api/trpc/auth.me", headers:{ cookie:"session=present" } } as any)).toBe(false);
-    expect(isAnonymousAuthMe({ url:"/api/trpc/other.procedure", headers:{ "x-invoke-path":"/api/trpc/auth.me" } } as any)).toBe(true);
+    const primarySource = readFileSync(
+      resolve(process.cwd(), "api/index.ts"),
+      "utf8"
+    );
+    expect(catchAllSource).toContain('import handler from "../server/vercel-handler";');
+    expect(catchAllSource).toContain("export default handler;");
+    expect(catchAllSource).not.toContain('from "./index"');
+    expect(primarySource).toContain('import handler, {');
+    expect(primarySource).toContain('} from "../server/vercel-handler";');
+    expect(primarySource).toContain("export { normalizeServerlessRequestUrl };");
+    expect(primarySource).toContain("export default handler;");
   });
 
   it("handles anonymous nested tRPC auth requests before dynamic app loading", () => {
@@ -25,5 +28,32 @@ describe("Vercel API routing", () => {
     );
     expect(source).toContain("isAnonymousAuthMe");
     expect(source).toContain("result: { data: { json: null } }");
+  });
+
+  it("gives uptime monitoring dedicated serverless entries outside the heavyweight catch-all", () => {
+    const dashboardSource = readFileSync(
+      resolve(process.cwd(), "api/uptime-monitor.ts"),
+      "utf8"
+    );
+    const scheduledSource = readFileSync(
+      resolve(process.cwd(), "api/scheduled/daily-uptime-monitor.ts"),
+      "utf8"
+    );
+
+    expect(dashboardSource).toContain('from "../server/api/uptime-monitor.js"');
+    expect(dashboardSource).toContain("serveUptimeMonitorDashboard");
+    expect(scheduledSource).toContain('from "../../server/api/uptime-monitor.js"');
+    expect(scheduledSource).toContain("scheduledDailyUptimeMonitor");
+  });
+
+  it("keeps uptime database access handler-bound so initialization errors become controlled responses", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/api/uptime-monitor.ts"), "utf8");
+    const databaseSource = readFileSync(resolve(process.cwd(), "server/db.ts"), "utf8");
+
+    expect(source).not.toContain('from "../db"');
+    expect(source).not.toContain('from "express"');
+    expect(source).toContain('await import("../db.js")');
+    expect(databaseSource).toContain('from "../drizzle/schema.js"');
+    expect(databaseSource).toContain('from "./_core/env.js"');
   });
 });

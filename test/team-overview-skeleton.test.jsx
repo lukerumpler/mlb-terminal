@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { TeamOverviewSkeleton } from '../client/src/components/PageSkeletons.jsx';
 
 describe('Team Overview loading skeleton', () => {
@@ -16,7 +17,7 @@ describe('Team Overview loading skeleton', () => {
   });
 
   it('includes scoped shimmer and reduced-motion safeguards for desktop and mobile layouts', () => {
-    const css = readFileSync('/home/ubuntu/skip-baseball/client/src/index.css', 'utf8');
+    const css = readFileSync(path.resolve(import.meta.dirname, '../client/src/index.css'), 'utf8');
     expect(css).toContain('@keyframes skip-overview-skeleton-shimmer');
     expect(css).toContain('.skip-overview-skeleton-workspace > div { grid-template-columns:repeat(2,minmax(0,1fr)); }');
     expect(css).toContain('.skip-overview-skeleton-loading-mark { animation:none !important; }');

@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 
@@ -27,6 +29,13 @@ async function startTestServer() {
 }
 
 describe("Vercel-compatible API app", () => {
+  it("loads Vite helpers only when frontend serving is explicitly enabled", () => {
+    const source = readFileSync(resolve(process.cwd(), "server/app.ts"), "utf8");
+
+    expect(source).not.toContain('from "./_core/vite"');
+    expect(source).toContain('await import("./_core/vite")');
+  });
+
   it("serves a health response without starting a listener in the module", async () => {
     const baseUrl = await startTestServer();
     const response = await fetch(`${baseUrl}/api/health`);

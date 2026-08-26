@@ -105,4 +105,3 @@ export const uptimeMonitorSchedules = mysqlTable(
 
 export type UptimeMonitorCheck = typeof uptimeMonitorChecks.$inferSelect;
 export type InsertUptimeMonitorCheck = typeof uptimeMonitorChecks.$inferInsert;
-

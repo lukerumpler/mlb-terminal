@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "b6a27be0-adba-4ac3-8221-3153ad29da93",
+  "id": "13f274c3-0783-492f-9f66-53ff850db6f4",
   "prevId": "157695ec-0668-4b91-b38d-3c8dc8551c06",
   "tables": {
     "apiCacheTelemetry": {

@@ -2007,6 +2007,71 @@ export async function getTeamRoster(teamId, season = SEASON, rosterType = 'activ
   }));
 }
 
+export function normalizeOrganizationRosterEntry(entry, organization = {}) {
+  const person = entry?.person || {};
+  const position = entry?.position || person?.primaryPosition || {};
+  const currentTeam = person?.currentTeam || {};
+  const status = entry?.status || {};
+  return {
+    id: person.id ?? null,
+    name: person.fullName || '',
+    position: position.abbreviation || position.code || '—',
+    positionType: position.type || '',
+    jerseyNumber: entry?.jerseyNumber || '',
+    age: Number.isFinite(Number(person.currentAge)) ? Number(person.currentAge) : null,
+    bats: person.batSide?.code || '',
+    throws: person.pitchHand?.code || '',
+    rosterStatus: status.description || status.code || 'Status unavailable',
+    rosterStatusCode: status.code || '',
+    currentTeamName: currentTeam.name || organization.name || '',
+    organizationId: organization.id ?? null,
+    organizationAbbr: organization.abbr || '',
+  };
+}
+
+export async function getOrganizationRoster(organization, season = SEASON) {
+  if (!organization?.id) throw new Error('An MLB organization ID is required to load its official roster.');
+  const data = await mlb(`/teams/${organization.id}/roster`, {
+    rosterType: 'fullRoster',
+    season,
+    hydrate: 'person(currentTeam)',
+  }, {
+    ttl: 5 * 60_000,
+    timeoutMs: 25_000,
+    priority: 'important',
+    stage: 'organization-directory',
+    screen: 'prospects',
+  });
+  const responseMeta = getMlbResponseMeta(data);
+  const players = (data.roster || [])
+    .map(entry => normalizeOrganizationRosterEntry(entry, organization))
+    .filter(player => player.id && player.name)
+    .sort((left, right) => left.name.localeCompare(right.name, 'en', { sensitivity: 'base' }));
+  return {
+    organization,
+    players,
+    freshness: responseMeta?.freshness || 'live',
+    retrievedAt: responseMeta?.retrievedAt || Date.now(),
+    source: 'MLB Stats API · fullRoster',
+  };
+}
+
+export async function getAllOrganizationRosters(organizations, season = SEASON) {
+  const requested = Array.isArray(organizations) ? organizations.filter(team => team?.id) : [];
+  const results = await Promise.allSettled(requested.map(organization => getOrganizationRoster(organization, season)));
+  const byOrganization = {};
+  const failures = [];
+  results.forEach((result, index) => {
+    const organization = requested[index];
+    if (result.status === 'fulfilled') byOrganization[organization.key || organization.abbr || organization.id] = result.value;
+    else failures.push({
+      organization: organization.key || organization.abbr || String(organization.id),
+      message: result.reason?.message || 'Official roster unavailable',
+    });
+  });
+  return { byOrganization, failures, requestedCount: requested.length };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SAVANT
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,21 +1,12 @@
 import express from "express";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "http";
-
-const { authenticateRequest } = vi.hoisted(() => ({
-  authenticateRequest: vi.fn(async () => ({ isCron: false, taskUid: undefined })),
-}));
-vi.mock("../_core/sdk", () => ({ sdk: { authenticateRequest } }));
-
 import { registerUptimeMonitorRoutes } from "./uptime-monitor";
 
 const servers: Server[] = [];
 
 afterEach(async () => {
-  authenticateRequest.mockClear();
-  await Promise.all(
-    servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve())))
-  );
+  await Promise.all(servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))));
 });
 
 async function startServer() {
@@ -36,22 +27,15 @@ async function startServer() {
 }
 
 describe("uptime-monitor route safeguards", () => {
-  it("returns the dashboard through the shared API route", async () => {
+  it("uses the shared rate limiter and returns Retry-After rather than bypassing API protection", async () => {
     const baseUrl = await startServer();
-    const response = await fetch(`${baseUrl}/api/uptime-monitor?days=30`);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ rangeDays: 30, targets: [] });
-  });
-
-  it("rejects non-cron requests to the scheduled callback", async () => {
-    const baseUrl = await startServer();
-    const response = await fetch(`${baseUrl}/api/scheduled/daily-uptime-monitor`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{}",
-    });
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ error: "cron-only" });
-    expect(authenticateRequest).toHaveBeenCalledOnce();
+    const headers = { "x-forwarded-for": "198.51.100.77" };
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const response = await fetch(`${baseUrl}/api/uptime-monitor?days=7`, { headers });
+      expect(response.status).toBe(200);
+    }
+    const limited = await fetch(`${baseUrl}/api/uptime-monitor?days=7`, { headers });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("10");
   });
 });

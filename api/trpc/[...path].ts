@@ -1,11 +1,8 @@
 import type { Request, Response } from "express";
 
-export function isAnonymousAuthMe(req: Request & { originalUrl?: string }) {
-  const rawUrls = [req.url, req.originalUrl, req.headers["x-invoke-path"]].filter(Boolean);
-  const isAuthMe = rawUrls.some(rawUrl => {
-    try { return new URL(rawUrl, "https://vercel.invalid").pathname.endsWith("/auth.me"); } catch { return String(rawUrl).endsWith("/auth.me"); }
-  });
-  return isAuthMe && !req.headers.cookie;
+function isAnonymousAuthMe(req: Request) {
+  const url = new URL(req.url, "https://vercel.invalid");
+  return url.pathname.endsWith("/auth.me") && !req.headers.cookie;
 }
 
 export default async function handler(req: Request, res: Response) {

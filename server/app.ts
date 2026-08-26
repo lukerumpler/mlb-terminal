@@ -6,7 +6,6 @@ import { registerStorageProxy } from "./_core/storageProxy";
 import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerLegacyApiRoutes, legacyApiErrorHandler } from "./api/routes";
-import { serveStatic, setupVite } from "./_core/vite";
 import { scheduledSavantRefresh } from "./api/scheduled-savant-refresh";
 import { scheduledCacheTelemetryCleanup } from "./api/scheduled-cache-telemetry-cleanup";
 import { registerUptimeMonitorRoutes } from "./api/uptime-monitor";
@@ -52,6 +51,7 @@ export async function createApp({
   );
 
   if (serveFrontend) {
+    const { serveStatic, setupVite } = await import("./_core/vite");
     if (!viteServer) {
       throw new Error(
         "A Vite HTTP server is required when serveFrontend is enabled"
