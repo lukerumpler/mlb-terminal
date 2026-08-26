@@ -76,6 +76,10 @@
 - [x] Inspect existing scheduled refresh endpoints, daily provider gates, and durable cache behavior
 - [x] Confirm the preferred morning refresh time and select the safe background refresh approach
 - [x] Retain and regression-test the existing idempotent daily refresh path without bypassing provider request budgets or telemetry
-- [ ] Test and publish the morning refresh, then create and verify its recurring schedule
+- [ ] Verify the retained 09:00 UTC schedule with one successful current-deployment Heartbeat callback, then restore and confirm its daily cadence
 - [ ] Save and report the daily automatic-update setup and its management path
 - [x] Verify the retained 09:00 UTC Savant warm-up is enabled, its deployed callback is protected, and it has a future execution without creating a duplicate job
+- [x] Inventory every active baseball-data provider, its product role, refresh policy, cache behavior, and fallback boundary
+- [x] Separate observed MLB and Baseball Savant upstream limitations from application-side reliability risks using source and runtime evidence
+- [x] Identify realistic supplemental data sources and safe fixes without weakening data provenance or provider request limits
+- [x] Deliver a beginner-friendly data-source reliability rundown and prioritized improvement options
