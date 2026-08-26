@@ -73,3 +73,9 @@
 - [x] Require successful GitHub validation checks before future merges to main
 - [x] Delete only the confirmed stale fix/vercel-* branches after the protected release is merged
 - [x] Save and report the completed repository hardening and optimization release
+- [x] Inspect existing scheduled refresh endpoints, daily provider gates, and durable cache behavior
+- [x] Confirm the preferred morning refresh time and select the safe background refresh approach
+- [x] Retain and regression-test the existing idempotent daily refresh path without bypassing provider request budgets or telemetry
+- [ ] Test and publish the morning refresh, then create and verify its recurring schedule
+- [ ] Save and report the daily automatic-update setup and its management path
+- [x] Verify the retained 09:00 UTC Savant warm-up is enabled, its deployed callback is protected, and it has a future execution without creating a duplicate job

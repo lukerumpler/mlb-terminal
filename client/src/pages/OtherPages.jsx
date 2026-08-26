@@ -1476,7 +1476,7 @@ function TradeAnalyticsPanel() {
         </div>
       </Panel>
 
-      <Panel title="Notable Trades — High-End Starting Pitchers" accent={C.purple} badge="netWAR from sending team's POV">
+      <Panel title="Notable Trades — High-End Starting Pitchers" accent={C.purple} badge="fixed historical netWAR">
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:640 }}>
             <thead>
@@ -1486,7 +1486,7 @@ function TradeAnalyticsPanel() {
                 <TradeSortableTh label="To" k="toTeam" align="center" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
                 <th style={{ padding:'6px 8px', fontSize:9.5, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em',
                   color:C.text2, textAlign:'left', borderBottom:`0.5px solid ${C.border}` }}>Trade</th>
-                <TradeSortableTh label="netWAR" k="netWar" align="right" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
+                <TradeSortableTh label="Historical netWAR" k="netWar" align="right" activeKey={sortKey} ascending={sortAsc} onSort={toggleSort} />
               </tr>
             </thead>
             <tbody>
@@ -1521,12 +1521,84 @@ function TradeAnalyticsPanel() {
   );
 }
 
+export function buildIntelligenceLeaderPanelModel(
+  leaders = {},
+  category,
+  state = "loading"
+) {
+  const rows = Array.isArray(leaders?.[category])
+    ? leaders[category]
+        .filter(
+          row =>
+            row?.id &&
+            row?.name &&
+            row?.value != null &&
+            row.value !== ""
+        )
+        .slice(0, 6)
+    : [];
+  return { category, state, rows };
+}
+
+export function IntelligenceLiveLeaderPanel({ title, accent, model }) {
+  const badge = model.state === "loading"
+    ? "Loading…"
+    : model.state === "ready"
+      ? "MLB Stats API"
+      : "Unavailable";
+  return (
+    <Panel title={title} accent={accent} badge={badge}>
+      {model.state === "loading" && (
+        <div style={{ padding: "10px 14px" }}>
+          <SkeletonRows count={5} height={30} />
+        </div>
+      )}
+      {model.state === "unavailable" && (
+        <div
+          role="status"
+          style={{ padding: "16px 14px", textAlign: "center", ...sans({ fontSize: 11, color: C.text3 }) }}
+        >
+          Current-season MLB leader data is unavailable right now.
+        </div>
+      )}
+      {model.state === "ready" && !model.rows.length && (
+        <div
+          role="status"
+          style={{ padding: "16px 14px", textAlign: "center", ...sans({ fontSize: 11, color: C.text3 }) }}
+        >
+          No qualified current-season leader rows were returned.
+        </div>
+      )}
+      {model.state === "ready" && model.rows.map((row, index) => (
+        <button
+          key={row.id}
+          type="button"
+          onClick={() => openPlayerProfile(row.id, row.name)}
+          aria-label={`Open ${row.name} player profile`}
+          style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "7px 14px", border: 0, borderBottom: index < model.rows.length - 1 ? `0.5px solid ${C.borderLight}` : "none", background: "transparent", color: C.text, cursor: "pointer", textAlign: "left" }}
+        >
+          <span style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+            <span style={{ ...px({ fontSize: 10, color: C.text4 }), minWidth: 14 }}>{row.rank}</span>
+            <span style={{ minWidth: 0 }}>
+              <strong style={sans({ display: "block", fontSize: 11, fontWeight: 700, color: C.text })}>{row.name}</strong>
+              <span style={sans({ display: "block", fontSize: 9.5, color: C.text3 })}>{row.team}</span>
+            </span>
+          </span>
+          <strong style={px({ fontSize: 13, fontWeight: 800, color: accent })}>{row.value}</strong>
+        </button>
+      ))}
+    </Panel>
+  );
+}
+
 function IntelligencePage() {
   const [p1, setP1]             = useState('');
   const [p2, setP2]             = useState('');
   const [compData, setCompData] = useState(null);
   const [compLoading, setLoading] = useState(false);
   const [compError, setError]   = useState(null);
+  const [leaders, setLeaders] = useState({});
+  const [leadersState, setLeadersState] = useState("loading");
   const running                 = useRef(false);
   const mountedRef              = useRef(true);
 
@@ -1537,6 +1609,23 @@ function IntelligencePage() {
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLeadersState("loading");
+    getAllLeaders(SEASON)
+      .then(rows => {
+        if (!active) return;
+        setLeaders(rows || {});
+        setLeadersState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setLeaders({});
+        setLeadersState("unavailable");
+      });
+    return () => { active = false; };
   }, []);
 
   // fmt hoisted to module scope — see top of file
@@ -1593,31 +1682,9 @@ function IntelligencePage() {
     running.current = false;
   };
 
-  const hitters = [
-    ['Aaron Judge','RF','.285',48,115,'1.018',8.4],
-    ['Shohei Ohtani','DH','.292',27,74,'.937',6.4],
-    ['Freddie Freeman','1B','.306',24,96,'.921',6.2],
-    ['Juan Soto','RF','.291',31,98,'.967',7.1],
-    ['Gunnar Henderson','SS','.272',36,98,'.918',6.8],
-    ['Mookie Betts','SS','.296',26,84,'.932',6.4],
-  ];
-  const pitchers = [
-    ['Gerrit Cole','R',2.88,11.2,'1.03',14,6.8],
-    ['Spencer Strider','R',2.76,13.1,'0.99',15,7.2],
-    ['Tarik Skubal','L',2.92,10.8,'1.06',16,6.5],
-    ['Yoshinobu Yamamoto','R',2.98,10.4,'1.07',14,5.6],
-    ['Zack Wheeler','R',3.04,9.8,'1.09',13,5.4],
-    ['Dylan Cease','R',3.22,10.6,'1.18',12,4.8],
-  ];
-  const injuryRisks = [
-    ['Ricky Tiedemann LHP TOR',82,'High','Recurring forearm · Velo monitoring flagged',C.rust],
-    ['Hunter Greene RHP CIN',71,'High','High velo profile correlates with arm fatigue',C.rust],
-    ['Corbin Burnes RHP BAL',48,'Medium','Innings load entering age-31 season',C.amber],
-    ['Julio Rodríguez OF SEA',39,'Medium','Aggressive runner — hamstring history',C.amber],
-    ['Freddie Freeman 1B LAD',12,'Low','Clean history, optimal workload management',C.teal],
-    ['Zack Wheeler RHP PHI',14,'Low','Durable profile, consistent mechanics',C.teal],
-  ];
   const comparisonSummary = useMemo(() => buildComparisonMetricSummary(compData?.rows), [compData?.rows]);
+  const hitterLeaders = buildIntelligenceLeaderPanelModel(leaders, "onBasePlusSlugging", leadersState);
+  const pitcherLeaders = buildIntelligenceLeaderPanelModel(leaders, "earnedRunAverage", leadersState);
 
   return (
     <div className="page-enter skip-intelligence-workspace" style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -1625,7 +1692,7 @@ function IntelligencePage() {
         <span className="skip-profile-source-title">DATA PROVENANCE</span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compData ? 'is-ready' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Source</span><span className="skip-profile-source-provider">{compData ? 'MLB Stats API comparison lookup' : 'MLB Stats API · on demand'}</span></span>
         <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${compLoading ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">Freshness</span><span className="skip-profile-source-provider">{compLoading ? 'Retrieving selected players' : compData ? `Retrieved ${new Date(compData.retrievedAt).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}` : 'Retrieved only when compared'}</span></span>
-        <span className="skip-profile-source-item"><span className="skip-profile-source-dot" aria-hidden="true" /><span className="skip-profile-source-label">Model panels</span><span className="skip-profile-source-provider">Reference snapshots; not live feeds or Team Overview grades</span></span>
+        <span className="skip-profile-source-item"><span className={`skip-profile-source-dot ${leadersState === 'ready' ? 'is-ready' : leadersState === 'loading' ? 'is-loading' : ''}`} aria-hidden="true" /><span className="skip-profile-source-label">League leaders</span><span className="skip-profile-source-provider">{leadersState === 'loading' ? 'MLB Stats API · retrieving current season' : leadersState === 'ready' ? 'MLB Stats API · current season' : 'MLB Stats API · unavailable'}</span></span>
       </div>
       <div className="skip-intelligence-primary-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <div className="skip-intelligence-primary-column">
@@ -1704,148 +1771,19 @@ function IntelligencePage() {
           )}
         </Panel>
 
-        {/* Hitter projections */}
-        <Panel title={`${SEASON} Projections — Hitters`} accent={C.teal} badge="Reference snapshot">
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:380 }}>
-              <thead>
-                <tr style={{ background:C.surface2 }}>
-                  {['Player','Pos','AVG','HR','RBI','OPS','WAR'].map(h=> (
-                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {hitters.map(([n,pos,a,h,r,o,w],i,arr)=> (
-                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.amberSoft}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
-                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={pos} /></td>
-                    {[a,h,r,o].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
-                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{w}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+        <IntelligenceLiveLeaderPanel title="Live Hitter Leaders — OPS" accent={C.teal} model={hitterLeaders} />
         </div>
         <div className="skip-intelligence-primary-column">
-
-        {/* Injury risk — FIX: bar transition added, consistent layout */}
-        <Panel title="Injury Risk Model" accent={C.rust} badge="Reference snapshot">
-          {injuryRisks.map(([n,pct,risk,note,c],i,arr)=>(
-            <div key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none', padding:'7px 14px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={sans({ fontSize:10.5, fontWeight:600, color:C.text })}>{n}</span>
-                <span style={px({ fontSize:11, fontWeight:700, color:c })}>{pct}%</span>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
-                <div style={{ flex:1, height:3, background:C.surface3, borderRadius:2, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${pct}%`, background:c, borderRadius:2, transition:'width 0.7s ease' }} />
-                </div>
-                <span style={sans({ fontSize:11, color:C.text3, minWidth:36 })}>{risk} risk</span>
-              </div>
-              <div style={sans({ fontSize:11, color:C.text2, marginTop:3 })}>{note}</div>
-            </div>
-          ))}
-        </Panel>
-
-        {/* Pitcher projections */}
-        <Panel title={`${SEASON} Projections — Pitchers`} accent={C.rust} badge="Reference snapshot">
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:340 }}>
-              <thead>
-                <tr style={{ background:C.surface2 }}>
-                  {['Player','H','ERA','K/9','WHIP','W','WAR'].map(h=>(
-                    <th key={h} style={{ padding:'5px 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:C.text2, textAlign:h==='Player'?'left':'right', borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pitchers.map(([n,h,e,k,w,wins,war],i,arr)=>(
-                  <tr key={n} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
-                    onMouseEnter={ev=>ev.currentTarget.style.background=C.amberSoft}
-                    onMouseLeave={ev=>ev.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'6px 8px', ...sans({ fontSize:11, fontWeight:700, color:C.text }) }}>{n}</td>
-                    <td style={{ padding:'6px 8px', textAlign:'right' }}><PosBadge pos={h==='L'?'LHP':'RHP'} /></td>
-                    {[e.toFixed(2),k.toFixed(1),w,wins].map((v,j)=><td key={j} style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11 }) }}>{v}</td>)}
-                    <td style={{ padding:'6px 8px', textAlign:'right', ...px({ fontSize:11, fontWeight:700, color:C.teal }) }}>{war}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+        <IntelligenceLiveLeaderPanel title="Live Pitcher Leaders — ERA" accent={C.rust} model={pitcherLeaders} />
         </div>
       </div>
-      <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Reference snapshots preserve original SKIP research examples. They are not automatically refreshed with provider data, do not alter selected-team metrics, and do not feed Front Office grades. Use the comparison engine or player profiles for verified current-season player data.</div>
-      {/* ── Trade Value Simulator ── */}
-      <Panel title="Trade Value Simulator" accent={C.purple} badge="Reference scenario">
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:0 }}>
-          {/* Side A */}
-          <div style={{ padding:'14px', borderRight:`0.5px solid ${C.border}` }}>
-            <div style={sans({ fontSize:10,fontWeight:700,color:C.amber,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10 })}>Team A Offers</div>
-            {[
-              { name:'Jackson Holliday SS', war:14.3, fv:70, tag:'Prospect', color:C.teal },
-              { name:'Pick #8 (2026 Draft)', war:0, fv:60, tag:'Pick', color:C.amber },
-            ].map(p=>(
-              <div key={p.name} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`0.5px solid ${C.borderLight}` }}>
-                <div>
-                  <div style={sans({ fontSize:11,fontWeight:700,color:C.text })}>{p.name}</div>
-                  <div style={{ display:'flex',gap:5,marginTop:2 }}>
-                    <span style={{...px({fontSize:9,fontWeight:700,color:p.color}),background:`color-mix(in srgb, ${p.color} 9%, transparent)`,padding:'1px 5px',borderRadius:3}}>{p.tag}</span>
-                    {p.fv>0&&<span style={{...px({fontSize:9,fontWeight:700,color:C.slate}),background:C.surface3,padding:'1px 5px',borderRadius:3}}>FV {p.fv}</span>}
-                  </div>
-                </div>
-                {p.war>0&&<span style={px({ fontSize:12,fontWeight:800,color:C.teal })}>{p.war} WAR</span>}
-              </div>
-            ))}
-            <div style={{ marginTop:10,padding:'8px 10px',background:C.amberSoft,borderRadius:6,display:'flex',justifyContent:'space-between' }}>
-              <span style={sans({ fontSize:11,fontWeight:700,color:C.amberDark })}>Total Value</span>
-              <span style={px({ fontSize:13,fontWeight:800,color:C.amber })}>~$82M surplus</span>
-            </div>
-          </div>
-          {/* Side B */}
-          <div style={{ padding:'14px' }}>
-            <div style={sans({ fontSize:10,fontWeight:700,color:C.rust,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:10 })}>Team B Offers</div>
-            {[
-              { name:'Gerrit Cole SP', war:6.8, tag:'MLB Veteran', color:C.rust },
-              { name:'Pick #22 (2026 Draft)', war:0, fv:55, tag:'Pick', color:C.amber },
-            ].map(p=>(
-              <div key={p.name} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`0.5px solid ${C.borderLight}` }}>
-                <div>
-                  <div style={sans({ fontSize:11,fontWeight:700,color:C.text })}>{p.name}</div>
-                  <div style={{ display:'flex',gap:5,marginTop:2 }}>
-                    <span style={{...px({fontSize:9,fontWeight:700,color:p.color}),background:`color-mix(in srgb, ${p.color} 9%, transparent)`,padding:'1px 5px',borderRadius:3}}>{p.tag}</span>
-                    {p.fv>0&&<span style={{...px({fontSize:9,fontWeight:700,color:C.slate}),background:C.surface3,padding:'1px 5px',borderRadius:3}}>FV {p.fv}</span>}
-                  </div>
-                </div>
-                {p.war>0&&<span style={px({ fontSize:12,fontWeight:800,color:C.rust })}>{p.war} WAR</span>}
-              </div>
-            ))}
-            <div style={{ marginTop:10,padding:'8px 10px',background:C.rustSoft,borderRadius:6,display:'flex',justifyContent:'space-between' }}>
-              <span style={sans({ fontSize:11,fontWeight:700,color:C.rust })}>Total Value</span>
-              <span style={px({ fontSize:13,fontWeight:800,color:C.rust })}>~$61M surplus</span>
-            </div>
-          </div>
-        </div>
-        {/* Verdict bar */}
-        <div style={{ padding:'10px 14px',borderTop:`0.5px solid ${C.border}`,background:C.tealSoft,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-          <div style={{ display:'flex',gap:10,alignItems:'center' }}>
-            <span style={{ fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:C.teal,background:C.teal+'22',padding:'2px 8px',borderRadius:4 }}>SKIP SAYS</span>
-            <span style={sans({ fontSize:11,color:C.text,fontStyle:'italic' })}>"Team A wins this trade. $21M in surplus value advantage. Holliday's ceiling alone justifies the deal — Cole is a rental."</span>
-          </div>
-          <span style={px({ fontSize:13,fontWeight:800,color:C.teal,whiteSpace:'nowrap',marginLeft:12 })}>Team A +21M</span>
-        </div>
-      </Panel>
+      <div style={sans({ fontSize:10, color:C.text4, lineHeight:1.45, padding:'0 2px' })}>Live leader rows use current-season MLB Stats API returns and do not alter selected-team metrics or Front Office grades. Trade analytics remains a clearly labeled fixed historical compilation.</div>
 
       <TradeAnalyticsPanel />
     </div>
   );
 }
-function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
+function SettingsPage({ theme, toggleTheme, scoutingMode = false, toggleScoutingMode, lowDataMode = false, toggleLowDataMode, defaultTeamKey = 'sd', updateDefaultTeamKey, rosterDefaults = DEFAULT_ROSTER_DEFAULTS, updateRosterDefaults, feedFreshnessSettings, feedFreshnessSuccesses, updateFeedFreshnessSettings, cacheHealth, cacheHealthStatus, cacheHealthUpdatedAt, refreshCacheHealth, retryProvider }) {
   const infoRows = [
     ['Version','SKIP MARK5'],
     ['Season',String(SEASON)],
@@ -1870,20 +1808,37 @@ function SettingsPage({ theme, toggleTheme, lowDataMode = false, toggleLowDataMo
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <Panel title="Preferences" accent={C.amber}>
-        <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div>
-            <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
-            <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
-              Switch between light and dark theme for the entire terminal.
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom: `0.5px solid ${C.borderLight}` }}>
+            <div>
+              <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Appearance</div>
+              <div style={sans({ fontSize:11, color:C.text3, marginTop:2 })}>
+                Switch between light and dark theme for the entire terminal.
+              </div>
             </div>
+            {toggleTheme && (
+              <button onClick={toggleTheme} title="Toggle light / dark theme"
+                style={{ flexShrink:0, padding:'7px 14px', display:'flex', alignItems:'center', gap:8, background:C.surface3, border:`0.5px solid ${C.border}`, borderRadius:7, cursor:'pointer', color:C.text2 }}>
+                <span style={{ fontSize:14 }}>{theme === 'dark' ? '☀' : '☾'}</span>
+                <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+              </button>
+            )}
           </div>
-          {toggleTheme && (
-            <button onClick={toggleTheme} title="Toggle light / dark theme"
-              style={{ flexShrink:0, padding:'7px 14px', display:'flex', alignItems:'center', gap:8, background:C.surface3, border:`0.5px solid ${C.border}`, borderRadius:7, cursor:'pointer', color:C.text2 }}>
-              <span style={{ fontSize:14 }}>{theme === 'dark' ? '☀' : '☾'}</span>
-              <span style={sans({ fontSize:12, fontWeight:600 })}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </button>
-          )}
+          
+          <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Scouting Mode</div>
+              <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>
+                Optimized interface for one-handed use at the ballpark. Simplifies navigation and increases contrast for sunlight.
+              </div>
+            </div>
+            {toggleScoutingMode && (
+              <button type="button" onClick={toggleScoutingMode} role="switch" aria-checked={scoutingMode} aria-label="Toggle Scouting Mode"
+                style={{ flexShrink:0, minWidth:104, padding:'7px 12px', border:`1px solid ${scoutingMode ? C.amberMid : C.border}`, borderRadius:7, background:scoutingMode ? C.amberSoft : C.surface3, color:scoutingMode ? C.amberDark : C.text2, cursor:'pointer', ...px({ fontSize:10, fontWeight:800, letterSpacing:'.05em' }) }}>
+                {scoutingMode ? 'SCOUTING ON' : 'SCOUTING OFF'}
+              </button>
+            )}
+          </div>
         </div>
       </Panel>
       <Panel title="Team Workspace Default" accent={C.teal}>

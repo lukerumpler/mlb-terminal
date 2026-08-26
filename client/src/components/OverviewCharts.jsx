@@ -100,54 +100,102 @@ export function StrengthRadar({ data, accent, showLeagueBenchmark = false }) {
     showLeagueBenchmark
   );
   return (
-    <ResponsiveContainer width="100%" height={196}>
-      <RadarChart
-        data={data}
-        margin={{ top: 12, right: 22, bottom: 12, left: 22 }}
-      >
-        <PolarGrid stroke={C.border} />
-        <PolarAngleAxis
-          dataKey="axis"
-          tick={{
-            fontSize: 9.5,
-            fill: C.text2,
-            fontFamily: "'DM Mono',monospace",
-          }}
-          tickLine={false}
-        />
-        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-        {shouldRenderLeagueBenchmark && (
+    <div
+      className="skip-strength-radar-container"
+      style={{ position: "relative" }}
+    >
+      <ResponsiveContainer width="100%" height={220}>
+        <RadarChart
+          data={data}
+          margin={{ top: 10, right: 30, bottom: 10, left: 30 }}
+        >
+          <PolarGrid stroke={C.borderLight} />
+          <PolarAngleAxis
+            dataKey="axis"
+            tick={{
+              fontSize: 10,
+              fontWeight: 700,
+              fill: C.text2,
+              fontFamily: "'Plus Jakarta Sans',sans-serif",
+            }}
+            tickLine={false}
+          />
+          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+          {shouldRenderLeagueBenchmark && (
+            <Radar
+              dataKey="leagueAverage"
+              name="MLB Average"
+              stroke={C.text4}
+              fill="transparent"
+              fillOpacity={0}
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+            />
+          )}
           <Radar
-            dataKey="leagueAverage"
-            name="MLB average benchmark"
-            stroke={C.text3}
-            fill="transparent"
-            fillOpacity={0}
-            strokeDasharray="4 3"
-            strokeWidth={1.5}
-            dot={false}
+            dataKey="val"
+            name="Selected Team"
+            stroke={accent}
+            fill={accent}
+            fillOpacity={0.25}
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: accent, strokeWidth: 1.5, stroke: "#fff" }}
             isAnimationActive={false}
           />
+          <Tooltip
+            {...TT}
+            contentStyle={{
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            }}
+            itemStyle={{ fontSize: 11, fontWeight: 700 }}
+            formatter={(v, name) => [
+              v == null
+                ? "Unavailable"
+                : `${Number(v).toFixed(0)}th percentile`,
+              name,
+            ]}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+      <div
+        className="skip-radar-legend"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 16,
+          marginTop: -5,
+          paddingBottom: 10,
+          fontFamily: "'DM Mono',monospace",
+          fontSize: 9,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: ".05em",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{ width: 8, height: 8, borderRadius: 2, background: accent }}
+          />
+          <span style={{ color: C.text2 }}>Team Profile</span>
+        </div>
+        {shouldRenderLeagueBenchmark && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                width: 12,
+                height: 0,
+                borderTop: `1.5px dashed ${C.text4}`,
+              }}
+            />
+            <span style={{ color: C.text3 }}>MLB Average</span>
+          </div>
         )}
-        <Radar
-          dataKey="val"
-          name="Selected team percentile"
-          stroke={accent}
-          fill={accent}
-          fillOpacity={0.15}
-          strokeWidth={2}
-          dot={{ r: 2.5, fill: accent }}
-          isAnimationActive={false}
-        />
-        <Tooltip
-          {...TT}
-          formatter={(v, name) => [
-            v == null ? "Unavailable" : `${Number(v).toFixed(0)}th percentile`,
-            name,
-          ]}
-        />
-      </RadarChart>
-    </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 

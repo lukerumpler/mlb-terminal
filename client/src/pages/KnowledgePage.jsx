@@ -94,7 +94,7 @@ function GradeTable() {
 
 function FVWarTable() {
   return (
-    <Panel title="eFV → Projected WAR Anchors" accent={C.teal} badge="5-yr Projection">
+    <Panel title="eFV → Five-Year WAR Estimate Anchors" accent={C.teal} badge="SKIP methodology">
       <div style={{ overflowX:'auto' }}>
         <table style={{ width:'100%', borderCollapse:'collapse', minWidth:420 }}>
           <thead>
@@ -109,7 +109,7 @@ function FVWarTable() {
           </thead>
           <tbody>
             <tr>
-              <td style={{ padding:'7px 10px', ...sans({ fontSize:10, fontWeight:700, color:C.text2 }) }}>Proj. WAR</td>
+              <td style={{ padding:'7px 10px', ...sans({ fontSize:10, fontWeight:700, color:C.text2 }) }}>5-yr WAR est.</td>
               {FV_METHODOLOGY.warAnchors.map(([fv, war]) => (
                 <td key={fv} style={{ padding:'7px 10px', textAlign:'center', ...px({ fontSize:12, fontWeight:800, color:C.teal }) }}>{war}</td>
               ))}
@@ -118,7 +118,7 @@ function FVWarTable() {
         </table>
       </div>
       <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.borderLight}` }}>
-        <span style={sans({ fontSize:9.5, color:C.text3, lineHeight:1.5 })}>Intermediate eFV values are linearly interpolated between these anchors — see src/engine/skip.js.</span>
+        <span style={sans({ fontSize:9.5, color:C.text3, lineHeight:1.5 })}>Intermediate eFV values are linearly interpolated between these SKIP anchors — see src/engine/skip.js. These are internal five-year scouting estimates, not live player WAR values.</span>
       </div>
     </Panel>
   );

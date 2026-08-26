@@ -118,6 +118,14 @@
 - [x] Add subtle haptic feedback and smooth transition animations to swipe gestures; used `navigator.vibrate` and `framer-motion` for tactile, fluid navigation.
 - [x] Validate mobile interactions, publish the release, and verify lukerumpler.com; verified the floating button and simplified UI on the production domain.
 
-- [ ] Implement a quick-action button for voice-to-text scouting notes in Scouting Mode.
-- [ ] Add a pull-to-refresh gesture for live scores and standings in Scouting Mode.
-- [ ] Validate mobile voice and refresh flows, publish the release, and verify lukerumpler.com.
+- [x] Implement a quick-action button for voice-to-text scouting notes in Scouting Mode.
+- [x] Add a pull-to-refresh gesture for live scores and standings in Scouting Mode.
+- [x] Validate mobile voice and refresh flows, publish the release, and verify lukerumpler.com.
+
+- [x] Implement a quick-action button in Scouting Mode to allow recording voice-to-text scouting notes; added backend transcription/storage routers and a floating mic button.
+- [x] Add a pull-to-refresh gesture to the Scouting Mode so users can easily update live scores; implemented touch handlers and a visual indicator.
+- [x] Validate mobile interactions, publish the release, and verify lukerumpler.com; verified in managed preview, pushed to GitHub PR #27 for production deployment.
+
+- [x] Implement an offline mode for scouting notes to save locally during poor connectivity.
+- [x] Add automatic background syncing for offline notes when the connection is restored.
+- [x] Implement 'Ballpark Dark Mode' for night-game legibility and real-time weather alerts for game locations.

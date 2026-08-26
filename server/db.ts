@@ -1,8 +1,11 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { desc, eq, gte, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
+  InsertScoutingNote,
   InsertUptimeMonitorCheck,
   InsertUser,
+  ScoutingNote,
+  scoutingNotes,
   UptimeMonitorCheck,
   uptimeMonitorChecks,
   uptimeMonitorSchedules,
@@ -136,4 +139,56 @@ export async function getUptimeMonitorScheduleByTaskUid(taskUid: string) {
     .where(eq(uptimeMonitorSchedules.scheduleCronTaskUid, taskUid))
     .limit(1);
   return rows[0];
+}
+
+export async function getUserNotes(userId: number): Promise<ScoutingNote[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable for scouting notes");
+  return db
+    .select()
+    .from(scoutingNotes)
+    .where(eq(scoutingNotes.userId, userId))
+    .orderBy(desc(scoutingNotes.updatedAt));
+}
+
+export async function syncUserNotes(
+  userId: number,
+  localNotes: Omit<InsertScoutingNote, "userId">[]
+): Promise<ScoutingNote[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable for scouting notes sync");
+
+  if (localNotes.length > 0) {
+    for (const note of localNotes) {
+      // Ensure userId matches
+      const noteToUpsert = { ...note, userId };
+      
+      await db.insert(scoutingNotes)
+        .values(noteToUpsert)
+        .onDuplicateKeyUpdate({
+          set: {
+            type: note.type,
+            player: note.player,
+            team: note.team,
+            pos: note.pos,
+            pinned: note.pinned,
+            text: note.text,
+            summary: note.summary,
+            isPitcher: note.isPitcher,
+            grades: note.grades,
+            fv: note.fv,
+            risk: note.risk,
+            eta: note.eta,
+            updatedAt: note.updatedAt || new Date(),
+            deletedAt: note.deletedAt,
+          }
+        });
+    }
+  }
+
+  return db
+    .select()
+    .from(scoutingNotes)
+    .where(eq(scoutingNotes.userId, userId))
+    .orderBy(desc(scoutingNotes.updatedAt));
 }

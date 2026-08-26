@@ -1,8 +1,22 @@
 import React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../client/src/App.jsx";
+
+vi.mock("../client/src/hooks/useAuth.js", () => ({
+  useAuth: () => ({ user: null, isLoggedIn: false, isLoading: false }),
+}));
+
+vi.mock("../client/src/lib/trpc", () => ({
+  trpc: {
+    notes: {
+      sync: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
+    },
+  },
+}));
 
 const TABS = [
   "Overview",

@@ -6,6 +6,10 @@ import { __resetFanGraphsLocalSnapshotForTests, __resetMlbClientStateForTests, _
 import { __resetFeedClientStateForTests } from '../client/src/api/feed.js';
 import { saveTeamAggregateCache, saveTeamPlayersCache, saveTeamSavantSummaryCache } from '../client/src/lib/teamDataCache.js';
 
+vi.mock('../client/src/components/BallparkWeatherPanel.jsx', () => ({
+  default: () => null,
+}));
+
 describe('Team Overview compact navigation', () => {
   beforeEach(() => {
     cleanup();

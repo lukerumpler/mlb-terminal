@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, memo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, DRAFT_CLASS_2026 } from '../constants/data.js';
 import { Panel, Badge, PosBadge, RiskDot, GradeBar, FVBadge } from '../components/atoms.jsx';
 import PitchChartTool from '../components/PitchChartTool.jsx';
-
+import { trpc } from '../lib/trpc';
+import { useAuth } from '../hooks/useAuth.js';
 /* ── Scouting Notes ───────────────────────────────────────────────────
    Personal scouting notebook: quick freeform notes and structured, full
    scouting reports (20–80 tool grades, FV, risk, ETA) tied to any player.
@@ -218,7 +219,10 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, confirmingDelete, onCon
         {isReport && note.eta && <span style={sans({ fontSize:10, color:C.text3 })}>· ETA {note.eta}</span>}
         <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
           {isReport && note.fv && <FVBadge fv={+note.fv} />}
-          <span style={px({ fontSize:10, color:C.text4 })}>{timeAgo(note.updatedAt)}</span>
+          <span style={px({ fontSize:10, color:C.text4 })}>
+            {note.isDirty && <span style={{ color: C.amber, marginRight: 4 }} title="Pending sync">●</span>}
+            {timeAgo(note.updatedAt)}
+          </span>
         </span>
       </div>
 
@@ -254,10 +258,62 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, confirmingDelete, onCon
 }
 
 function ScoutingNotesPage({ voiceNoteDraft, onVoiceNoteConsumed }) {
+  const { user } = useAuth();
   const [notes, setNotes] = useState(() => loadNotes());
   const [query, setQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all | quick | report
   const [draft, setDraft] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(window.navigator.onLine);
+
+  const syncMutation = trpc.notes.sync.useMutation();
+
+  // Network status listener
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const performSync = useCallback(async (currentNotes = notes) => {
+    if (!user || !isOnline || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const payload = currentNotes.map(n => ({
+        ...n,
+        grades: JSON.stringify(n.grades),
+        updatedAt: n.updatedAt,
+        deletedAt: n.deletedAt || null,
+      }));
+      const serverNotes = await syncMutation.mutateAsync(payload);
+      
+      const merged = serverNotes.map(n => ({
+        ...n,
+        grades: typeof n.grades === 'string' ? JSON.parse(n.grades) : (n.grades || {}),
+        updatedAt: new Date(n.updatedAt).getTime(),
+        deletedAt: n.deletedAt ? new Date(n.deletedAt).getTime() : null,
+        isDirty: false,
+      })).filter(n => !n.deletedAt);
+
+      setNotes(merged);
+    } catch (err) {
+      console.error('Sync failed:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user, isOnline, isSyncing, notes, syncMutation]);
+
+  // Auto-sync when coming online or logging in
+  useEffect(() => {
+    if (isOnline && user && notes.some(n => n.isDirty)) {
+      performSync();
+    }
+  }, [isOnline, user]);
 
   useEffect(() => {
     if (voiceNoteDraft) {
@@ -297,14 +353,37 @@ function ScoutingNotesPage({ voiceNoteDraft, onVoiceNoteConsumed }) {
   const saveDraft = () => {
     if (!draft.player.trim()) return;
     const now = Date.now();
-    setNotes(prev => draft.id
-      ? prev.map(n => n.id === draft.id ? { ...draft, player: draft.player.trim(), updatedAt: now } : n)
-      : [...prev, { ...draft, id: uid(), player: draft.player.trim(), createdAt: now, updatedAt: now }]);
+    const newNote = draft.id
+      ? { ...draft, player: draft.player.trim(), updatedAt: now, isDirty: true }
+      : { ...draft, id: uid(), player: draft.player.trim(), createdAt: now, updatedAt: now, isDirty: true };
+    
+    setNotes(prev => {
+      const next = draft.id
+        ? prev.map(n => n.id === draft.id ? newNote : n)
+        : [newNote, ...prev];
+      if (isOnline && user) performSync(next);
+      return next;
+    });
     setDraft(null);
   };
 
-  const deleteNote  = (id) => { setNotes(prev => prev.filter(n => n.id !== id)); setConfirmDeleteId(null); };
-  const togglePin   = (id) => setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+  const deleteNote = (id) => {
+    const now = Date.now();
+    setNotes(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, deletedAt: now, isDirty: true } : n);
+      if (isOnline && user) performSync(next);
+      return next;
+    });
+    setConfirmDeleteId(null);
+  };
+  const togglePin = (id) => {
+    const now = Date.now();
+    setNotes(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: now, isDirty: true } : n);
+      if (isOnline && user) performSync(next);
+      return next;
+    });
+  };
 
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -330,6 +409,23 @@ function ScoutingNotesPage({ voiceNoteDraft, onVoiceNoteConsumed }) {
       {subTab === 'notes' && (<>
       <Panel title="Scouting Notes" accent={C.amber} badge={`${notes.length} saved`}>
         <div style={{ padding:'12px 14px', display:'flex', flexWrap:'wrap', gap:10, alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={sans({ fontSize: 11, color: C.text3, maxWidth: 480, lineHeight: 1.5 })}>
+              Quick notes and full scouting reports on any player — saved on this device.
+            </div>
+            {user && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 6, background: C.surface2, border: `1px solid ${C.border}` }}>
+                <div style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: !isOnline ? C.rust : (isSyncing ? C.amber : C.teal),
+                  boxShadow: isSyncing ? `0 0 6px ${C.amber}` : 'none'
+                }} />
+                <span style={sans({ fontSize: 9, color: C.text3, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.02em' })}>
+                  {!isOnline ? 'Offline' : (isSyncing ? 'Syncing' : 'Cloud Sync')}
+                </span>
+              </div>
+            )}
+          </div>
           <div style={sans({ fontSize:11, color:C.text3, maxWidth:480, lineHeight:1.5 })}>
             Quick notes and full scouting reports on any player — saved on this device.
           </div>

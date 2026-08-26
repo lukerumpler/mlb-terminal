@@ -312,13 +312,13 @@ export default function ProspectCard({ prospect, isPitcher, pool, onClose }) {
         <div style={{ margin: '20px 32px 0', background: CARD.ink, borderRadius: 3, padding: '16px 20px' }}>
           <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase',
             color: CARD.goldOnInk, marginBottom: 6 }}>
-            Projection
+            SKIP Five-Year Estimate
           </div>
           <div style={{ fontSize: 13, lineHeight: 1.6, color: CARD.onInk }}>
             <span style={{ fontFamily: "'Lora', Georgia, serif", fontWeight: 700 }}>
               {p.risk ?? '—'}-risk, FV {p.fv ?? '—'}
             </span>
-            {' — '}Projects to roughly {projWarStr} WAR over the first five MLB seasons, with an estimated debut by {p.eta ?? '—'}.
+            {' — '}SKIP estimates roughly {projWarStr} WAR over the first five MLB seasons, with an estimated debut by {p.eta ?? '—'}.
           </div>
         </div>
 
@@ -328,7 +328,7 @@ export default function ProspectCard({ prospect, isPitcher, pool, onClose }) {
           pool using traditional MiLB stat lines. Advanced Statcast tracking isn&rsquo;t available for most MiLB
           games and is intentionally omitted rather than estimated. FV is a continuous grade recomputed live from
           board position, level-relative performance, and age-for-level — see Knowledge → Future Value for the
-          full methodology.
+          full methodology. The five-year WAR figure is a SKIP eFV anchor estimate, not a live player WAR value.
         </div>
 
         {/* ── Footer ── */}

@@ -778,7 +778,7 @@ function ProspectsPage() {
                 <option value="fv">Sort: eFV</option>
                 <option value="ops">Sort: OPS</option>
                 <option value="era">Sort: ERA</option>
-                <option value="projWar">Sort: Proj. WAR</option>
+                <option value="projWar">Sort: 5-yr WAR estimate</option>
               </select>
 
               <button onClick={() => setWatchOnly(w => !w)} style={{
@@ -1093,7 +1093,7 @@ function ProspectsPage() {
                         </div>
                       </div>
                       <div style={{ textAlign:'right' }}>
-                        <div style={sans({ fontSize:10,color:C.text3,marginBottom:2 })}>Proj. WAR · ETA</div>
+                        <div style={sans({ fontSize:10,color:C.text3,marginBottom:2 })}>5-yr WAR est. · ETA</div>
                         <div style={px({ fontSize:12,fontWeight:700,color:C.teal })}>{selBatter.projWar} · {selBatter.eta}</div>
                       </div>
                     </div>
@@ -1123,7 +1123,7 @@ function ProspectsPage() {
                           </div>
                         </div>
                         <div style={{ textAlign:'right' }}>
-                          <div style={sans({ fontSize:10,color:C.text3,marginBottom:2 })}>Proj. WAR · ETA</div>
+                          <div style={sans({ fontSize:10,color:C.text3,marginBottom:2 })}>5-yr WAR est. · ETA</div>
                           <div style={px({ fontSize:12,fontWeight:700,color:C.teal })}>{selPitcher.projWar} · {selPitcher.eta}</div>
                         </div>
                       </div>

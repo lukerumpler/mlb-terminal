@@ -6,6 +6,8 @@ import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { storagePut } from "./storage";
 import { z } from "zod";
+import { getUserNotes, syncUserNotes } from "./db";
+import { protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 
 let aiFallbackUntil = 0;
@@ -122,6 +124,26 @@ function buildRosterInsightsFallback(input: {
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  weather: router({
+    getBallparkWeather: publicProcedure
+      .input(z.object({
+        lat: z.number(),
+        lon: z.number()
+      }))
+      .query(async ({ input }) => {
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${input.lat}&longitude=${input.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m&timezone=auto`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Weather service unavailable");
+          return await res.json();
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to fetch ballpark weather"
+          });
+        }
+      })
+  }),
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -358,6 +380,33 @@ export const appRouter = router({
             message: error instanceof Error ? error.message : 'Upload failed',
           });
         }
+      }),
+  }),
+
+  notes: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getUserNotes(ctx.user.id);
+    }),
+    sync: protectedProcedure
+      .input(z.array(z.object({
+        id: z.string(),
+        type: z.string(),
+        player: z.string(),
+        team: z.string().nullable(),
+        pos: z.string().nullable(),
+        pinned: z.boolean(),
+        text: z.string().nullable(),
+        summary: z.string().nullable(),
+        isPitcher: z.boolean(),
+        grades: z.string().nullable(),
+        fv: z.string().nullable(),
+        risk: z.string().nullable(),
+        eta: z.string().nullable(),
+        updatedAt: z.union([z.date(), z.number()]).transform(v => new Date(v)),
+        deletedAt: z.union([z.date(), z.number(), z.null()]).transform(v => v ? new Date(v) : null).optional(),
+      })))
+      .mutation(async ({ ctx, input }) => {
+        return syncUserNotes(ctx.user.id, input);
       }),
   }),
 

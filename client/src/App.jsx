@@ -283,7 +283,10 @@ function AlertsWorkspacePanel({ alerts, cacheHealth, cacheHealthStatus }) {
 }
 
 export default function App() {
-  const [tab, setTab]               = useState('overview');
+  const previewKey = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('preview')
+    : null;
+  const [tab, setTab]               = useState(() => previewKey === 'intelligence' ? 'intelligence' : 'overview');
   const [pendingPlayerProfile, setPendingPlayerProfile] = useState(null);
   const consumePendingPlayerProfile = useCallback(() => setPendingPlayerProfile(null), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -815,7 +818,7 @@ export default function App() {
                   {tab === 'notes'        && <ScoutingNotesPage voiceNoteDraft={voiceNoteDraft} onVoiceNoteConsumed={() => setVoiceNoteDraft(null)} />}
                   {tab === 'feed'         && <FeedPage />}
                   {tab === 'follows'      && <FollowListPage />}
-                  {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+                  {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} scoutingMode={scoutingMode} toggleScoutingMode={() => setScoutingMode(s => !s)} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
                   {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
                   </>}
                 </motion.div>
