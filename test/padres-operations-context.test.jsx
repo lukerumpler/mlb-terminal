@@ -4,6 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetMlbClientStateForTests, __resetTeamScheduleSnapshotCacheForTests } from '../client/src/api/mlb.js';
 
+vi.mock('../client/src/components/BallparkWeatherPanel.jsx', () => ({
+  default: () => null,
+}));
+
 const response = json => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => json, text: async () => JSON.stringify(json) });
 
 describe('Padres Operations context', () => {

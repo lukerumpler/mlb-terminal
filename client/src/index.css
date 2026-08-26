@@ -659,7 +659,7 @@
 .skip-performance-summary-card-label { color:var(--text3, #777); font:800 8px/1 'DM Mono', monospace; letter-spacing:.08em; text-transform:uppercase; }
 .skip-performance-summary-card-value { margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:800 22px/1 'DM Mono', monospace; } .skip-performance-summary-card-value.is-unavailable { font-size:14px; letter-spacing:.01em; }
 .skip-performance-summary-card-detail { margin-top:5px; color:var(--text2, #555); font:9px/1.15 'Plus Jakarta Sans', sans-serif; }
-.skip-performance-summary-card-source { display:flex; align-items:center; gap:5px; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--status-verified, #168c7a); font:8px/1 'DM Mono', monospace; } .skip-performance-summary-card-status { flex-shrink:0; padding:2px 4px; border:1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius:3px; font-size:7px; letter-spacing:.04em; text-transform:uppercase; }
+.skip-performance-summary-card-source { display:flex; align-items:center; gap:5px; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--status-verified, #168c7a); font:8px/1 'DM Mono', monospace; } .skip-performance-summary-card-status { flex-shrink:0; padding:2px 4px; border:1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius:3px; font-size:8.5px; letter-spacing:.04em; text-transform:uppercase; }
 .skip-performance-summary-card-source.is-unavailable { color:var(--status-unavailable, #777); }
 .skip-performance-summary-card-button { display:flex; width:100%; min-height:112px; flex-direction:column; align-items:flex-start; border:0; background:transparent; color:inherit; padding:10px 12px 9px; text-align:left; cursor:pointer; }
 .skip-performance-summary-card-button:focus-visible { outline:2px solid var(--teal, #168c7a); outline-offset:-2px; }
@@ -1242,7 +1242,6 @@
 @media (max-width:720px){
   .skip-overview-page .overview-team-metrics{display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;width:100% !important;gap:8px 4px !important;overflow:visible !important;padding:2px 0 !important;}
   .skip-overview-page .overview-team-metrics > div{min-width:0 !important;width:auto !important;flex:none !important;}
-  .skip-overview-page .overview-team-metrics > div:nth-child(n+6){display:none;}
 }
 
 /* Players Favorites: browser-local quick access, responsive by design. */
@@ -1534,6 +1533,26 @@ body[data-scouting-mode="true"] {
   --text: #000000;
   --text2: #1a1a1a;
   --text3: #444444;
+  --background: #ffffff;
+  --surface: #f8f9fa;
+  --border: #000000;
+}
+
+/* Ballpark Dark Mode: Pure black for OLED power saving and night legibility */
+.dark body[data-scouting-mode="true"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --text: #ffffff;
+  --text2: #e0e0e0;
+  --text3: #bbbbbb;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --border: #333333;
+  --border-light: #222222;
+  --amber: #ffb300;
+  --amber-soft: rgba(255, 179, 0, 0.15);
+  --teal: #00e5ff;
+  --teal-soft: rgba(0, 229, 255, 0.1);
 }
 
 /* Ticker optimization for mobile glanceability */
@@ -1565,4 +1584,55 @@ body[data-scouting-mode="true"] .skip-ticker-game {
   opacity: 0;
   transform: translateX(-20px);
   transition: opacity 0.3s, transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Refined Front Office Evaluation Styles */
+.skip-grade-card-button:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.skip-evaluation-summary-grid {
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .skip-evaluation-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .skip-grade-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)) !important;
+  }
+  
+  .skip-grade-card-button {
+    min-height: 60px !important;
+  }
+  
+  .skip-grade-card-button span:first-child {
+    font-size: 16px !important;
+  }
+  
+  .skip-grade-card-button div:nth-child(2) {
+    font-size: 8px !important;
+  }
+}
+
+/* Radar chart container polish */
+.skip-strength-radar-container {
+  background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
+  border-radius: 12px;
+}
+
+.recharts-polar-grid-concentric-path {
+  stroke-opacity: 0.5;
+}
+
+.recharts-polar-angle-axis-tick-value {
+  transition: fill 0.2s ease;
+}
+
+.recharts-polar-angle-axis-tick:hover .recharts-polar-angle-axis-tick-value {
+  fill: var(--text) !important;
+  font-weight: 800 !important;
 }

@@ -29,6 +29,7 @@ import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
 import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
+import BallparkWeatherPanel from '../components/BallparkWeatherPanel.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -310,7 +311,7 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
       closeActiveCard();
     }
   }}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(64px,1fr))',gap:4}}>
+    <div className="skip-grade-cards-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(72px,1fr))',gap:6}}>
       {cards.map(card => {
         const isActive = activeLabel === card.label;
         const id = `front-office-grade-${card.label.replace(/\s+/g, '-').toLowerCase()}`;
@@ -318,16 +319,26 @@ export function FrontOfficeGradeCards({ grades = [], overall = buildFrontOfficeG
         const trendLabel = card.label === 'Overall' && overallDelta != null ? ` Overall score ${overallDelta > 0 ? 'increased' : 'decreased'} by ${Math.abs(overallDelta).toFixed(2)} from the prior comparable score.` : '';
         const isOverall = card.label === 'Overall';
         return <button key={card.label} ref={node => { if (node) buttonRefs.current.set(card.label, node); else buttonRefs.current.delete(card.label); }} type="button" aria-expanded={isActive} aria-controls={id} aria-label={numericScore ? `Show ${card.label} calculation details: ${card.grade}, ${numericScore} out of 4.30.${trendLabel}` : `Show ${card.label} calculation details`} onClick={() => setActiveLabel(activeLabel === card.label ? null : card.label)} title={`Show ${card.label} calculation details`}
-          style={{minHeight:isOverall ? 62 : 46,textAlign:'center',background:isOverall ? C.surface3 : C.surface2,border:`1px solid ${isActive ? card.color : isOverall ? C.navy : C.borderLight}`,borderRadius:6,padding:isOverall ? '6px 3px 5px' : '5px 3px',cursor:'pointer',color:C.text,boxShadow:isOverall ? `inset 0 2px 0 ${C.navy}` : 'none'}}>
-          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:isOverall ? 5 : 4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:isOverall ? 29 : 17,fontWeight:800,color:card.color,lineHeight:isOverall ? .88 : 1,letterSpacing:isOverall ? '-.06em' : 0})}>{card.grade}</span>{numericScore && <span title={OVERALL_SCORE_TOOLTIP} aria-label={`Weighted Overall score ${numericScore} out of 4.30. ${OVERALL_SCORE_TOOLTIP}`} style={{...px({fontSize:isOverall ? 8 : 8.5,fontWeight:700,color:C.text3,lineHeight:1}),cursor:'help',textDecoration:'underline dotted',textUnderlineOffset:2}}>{numericScore}<span style={{color:C.text4}}>/4.30</span></span>}{isOverall && overallDelta != null && <span aria-hidden="true" title={`Prior comparable score: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)}`} style={px({fontSize:10,fontWeight:800,color:overallDelta > 0 ? C.teal : C.rust,lineHeight:1})}>{overallDelta > 0 ? '↑' : '↓'}</span>}</div>
-          <div style={sans({fontSize:8.5,color:C.text3,marginTop:2,lineHeight:1.15})}>{card.label}</div>
-          <span aria-hidden="true" style={sans({display:'block',fontSize:8,color:card.color,marginTop:1})}>details</span>
+          className="skip-grade-card-button"
+          style={{
+            minHeight:isOverall ? 68 : 52,textAlign:'center',background:isOverall ? C.surface3 : C.surface2,
+            border:`1.5px solid ${isActive ? card.color : isOverall ? C.navy : C.borderLight}`,
+            borderRadius:8,padding:isOverall ? '8px 4px 6px' : '6px 4px',cursor:'pointer',color:C.text,
+            boxShadow:isOverall ? `0 2px 4px rgba(0,0,0,0.05), inset 0 2.5px 0 ${C.navy}` : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.2s cubic-bezier(0.23, 1, 0.32, 1)'
+          }}>
+          <div style={{display:'flex',justifyContent:'center',alignItems:'baseline',gap:isOverall ? 5 : 4}} aria-label={numericScore ? `${card.label} grade ${card.grade}, weighted score ${numericScore} out of 4.30` : `${card.label} grade ${card.grade}`}><span style={px({fontSize:isOverall ? 32 : 18,fontWeight:900,color:card.color,lineHeight:isOverall ? .85 : 1,letterSpacing:isOverall ? '-.06em' : 0})}>{card.grade}</span>{numericScore && <span title={OVERALL_SCORE_TOOLTIP} aria-label={`Weighted Overall score ${numericScore} out of 4.30. ${OVERALL_SCORE_TOOLTIP}`} style={{...px({fontSize:isOverall ? 9 : 9,fontWeight:800,color:C.text3,lineHeight:1}),cursor:'help',textDecoration:'underline dotted',textUnderlineOffset:2}}>{numericScore}<span style={{color:C.text4, fontWeight:400}}>/4.30</span></span>}{isOverall && overallDelta != null && <span aria-hidden="true" title={`Prior comparable score: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)}`} style={px({fontSize:11,fontWeight:900,color:overallDelta > 0 ? C.teal : C.rust,lineHeight:1})}>{overallDelta > 0 ? '↑' : '↓'}</span>}</div>
+          <div style={sans({fontSize:9,fontWeight:700,color:C.text2,marginTop:3,lineHeight:1.1,textTransform:'uppercase',letterSpacing:'.02em'})}>{card.label}</div>
+          <span aria-hidden="true" style={sans({display:'block',fontSize:8,fontWeight:800,color:card.color,marginTop:2,opacity:isActive?1:0.6})}>{isActive?'ACTIVE':'DETAILS'}</span>
         </button>;
       })}
     </div>
     {activeCard
-      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:8.5,color:C.text3,lineHeight:1.35,marginTop:6,padding:'5px 7px',background:C.surface3,borderRadius:5})}>{activeCard.detail}</div>
-      : <div style={sans({fontSize:8.5,color:C.text4,lineHeight:1.3,marginTop:6})}>Select a grade for its calculation, data source, and limitations.</div>}
+      ? <div id={`front-office-grade-${activeCard.label.replace(/\s+/g, '-').toLowerCase()}`} role="tooltip" style={sans({fontSize:10,color:C.text2,lineHeight:1.4,marginTop:10,padding:'10px 12px',background:C.surface3,borderRadius:8,border:`1px solid ${activeCard.color}33`,boxShadow:'0 2px 8px rgba(0,0,0,0.04)'})}>
+          <strong style={{color:activeCard.color,display:'block',marginBottom:4,fontSize:9,textTransform:'uppercase',letterSpacing:'.05em'}}>{activeCard.label} Logic</strong>
+          {activeCard.detail}
+        </div>
+      : <div style={sans({fontSize:9,color:C.text4,lineHeight:1.3,marginTop:10,textAlign:'center',fontStyle:'italic'})}>Select a grade category to view calculation methodology and source data coverage.</div>}
   </div>;
 }
 
@@ -2044,15 +2055,12 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       ? `PlayoffStatus secondary odds · last verified ${formatVerifiedTimestamp(playoffOddsVerifiedAt)}`
       : secondaryPlayoffOddsState === 'loading' ? 'Checking secondary postseason probability source…' : 'No verified postseason probability source is currently available.';
   const providerTeamWar = finiteMetric(teamModelData?.teamWar);
-  const calculatedWarProxy = finiteMetric(calculatedMetrics.calculatedWarProxy);
   const hasProviderTeamWar = providerTeamWar != null;
-  const hasCalculatedWarProxy = calculatedWarProxy != null;
-  const teamWarIsCalculated = !hasProviderTeamWar && hasCalculatedWarProxy;
-  const teamWarValue = hasProviderTeamWar ? providerTeamWar.toFixed(1) : hasCalculatedWarProxy ? calculatedWarProxy.toFixed(1) : 'Unavailable';
-  const teamWarHeadlineLabel = teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR';
-  const teamWarHeadlineTitle = teamWarIsCalculated
-    ? 'Calculated from verified MLB standings: Pythagorean expected 162-game wins minus a fixed 48-win replacement baseline. This is not FanGraphs Team WAR.'
-    : teamWarValue === 'Unavailable' ? 'No verified provider response or safe calculated proxy is currently available.' : undefined;
+  const teamWarValue = hasProviderTeamWar ? providerTeamWar.toFixed(1) : 'Unavailable';
+  const teamWarHeadlineLabel = 'Team WAR';
+  const teamWarHeadlineTitle = teamWarValue === 'Unavailable'
+    ? 'No verified Team WAR provider response is currently available.'
+    : undefined;
   const divisionWarData = useMemo(() => (Array.isArray(teamModelData?.divisionTeams) ? teamModelData.divisionTeams : [])
     .filter(row => row?.team && row?.totalWAR != null)
     .map(row => ({
@@ -2642,14 +2650,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         {overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
           {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',fmtWinPct(team.pct)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue], [teamWarHeadlineLabel,teamWarValue,teamWarHeadlineTitle]].map(([l,v,title],i)=>(
-            <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response or safe derived rollup` : undefined)} style={{textAlign:'center',minWidth:0}}>
+            <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response is currently available` : undefined)} style={{textAlign:'center',minWidth:0}}>
               <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
         </div>
         <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
-        {teamWarIsCalculated && <div role="status" data-testid="team-war-proxy-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>WAR proxy · MLB verified standings · calculated, not FanGraphs Team WAR</div>}
         {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
@@ -2711,14 +2718,14 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         {val:<MetricValue value={fmtScorebookRate(team.avg)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
-        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:teamWarIsCalculated ? 'WAR Proxy' : 'Team WAR',   sub:<div>{teamWarIsCalculated ? <span style={sans({fontSize:8,color:C.teal})}>MLB Stats API · calculated</span> : <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />}{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple},
+        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR', sub:<div><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple},
       ]}/>}
 
       {overviewView === 'performance' && <>
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
-        <span>Model source: <strong style={{color:C.text2}}>{teamWarIsCalculated ? 'FanGraphs when available · MLB fallback' : 'FanGraphs'}</strong> · {modelFreshness}</span>
-        <span>Playoff odds: {playoffOddsSource} · {teamWarIsCalculated ? 'WAR: MLB Stats API · calculated proxy' : `Team WAR: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`}</span>
+        <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
+        <span>Playoff odds: {playoffOddsSource} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
       </div>
       <Panel title="Postseason Standing Context" accent={C.teal} badge="MLB Stats API">
         {standingsContext ? <>
@@ -2771,9 +2778,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
             return <div key={label} title={metricTitle} style={{padding:'8px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2}}><div style={px({fontSize:14,fontWeight:800,color:value==null?C.text3:C.text})}>{value==null?'—':Number(value).toFixed(digits)}</div><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:4}}><span style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.05em'})}>{label}</span>{value == null && <span style={px({fontSize:8,color:C.text4,letterSpacing:'.04em'})}>—</span>}</div></div>;
           })}
         </div>
-        <div title="Playoff odds are shown only when FanGraphs returns a team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately. WAR proxy is Pythagorean expected wins above a 48-win replacement baseline, not FanGraphs WAR." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null || teamWarIsCalculated) ? 'MLB calculated · pace: record · pythag: RS/RA · WAR: proxy · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
+        <div title="Playoff odds and Team WAR are shown only when FanGraphs returns a source-backed team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null) ? 'MLB calculated · pace: record · pythag: RS/RA · Team WAR: FanGraphs only · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
       </>}
+      {overviewView === 'operations' && <BallparkWeatherPanel teamKey={selTeam} />}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>
         {teamVenueMetadata?.venue ? <>
           <div style={{padding:'10px 14px 8px',display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',alignItems:'baseline'}}>
@@ -2888,35 +2896,53 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
 
         <div id="team-overview-front-office-evaluation">
         <Panel title="Front Office Evaluation" accent={OVERVIEW_ACCENTS.context} badge="Decision Lens">
-          <div style={{padding:'8px 10px 0'}}>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <div>
-                <div style={sans({fontSize:9.5,fontWeight:700,color:C.teal,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Strengths</div>
+          <div className="skip-evaluation-content" style={{padding:'10px 12px 0'}}>
+            <div className="skip-evaluation-summary-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))',gap:14,marginBottom:12}}>
+              <div style={{padding:'10px',background:C.tealSoft,borderRadius:8,border:`1px solid ${C.teal}22`}}>
+                <div style={sans({fontSize:10,fontWeight:800,color:C.teal,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6})}>
+                  <span style={{fontSize:12}}>✓</span> Core Strengths
+                </div>
                 {fo.strengths.map(s=>(
-                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:5}}>
-                    <span style={{color:C.teal,fontSize:11,flexShrink:0,marginTop:1}}>✓</span>
-                    <span style={sans({fontSize:10.5,color:C.text2,lineHeight:1.4})}>{s}</span>
+                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:6,marginBottom:6}}>
+                    <span style={{color:C.teal,fontSize:10,flexShrink:0,marginTop:2}}>●</span>
+                    <span style={sans({fontSize:11,fontWeight:600,color:C.text,lineHeight:1.3})}>{s}</span>
                   </div>
                 ))}
               </div>
-              <div>
-                <div style={sans({fontSize:9.5,fontWeight:700,color:C.rust,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6})}>Weaknesses</div>
+              <div style={{padding:'10px',background:fo.weaknesses.length?C.rustSoft:C.surface2,borderRadius:8,border:`1px solid ${fo.weaknesses.length?C.rust:C.border}22`}}>
+                <div style={sans({fontSize:10,fontWeight:800,color:fo.weaknesses.length?C.rust:C.text3,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8,display:'flex',alignItems:'center',gap:6})}>
+                  <span style={{fontSize:12}}>{fo.weaknesses.length?'✕':'○'}</span> Identified Risks
+                </div>
                 {fo.weaknesses.length ? fo.weaknesses.map(s=>(
-                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:5,marginBottom:5}}>
-                    <span style={{color:C.rust,fontSize:11,flexShrink:0,marginTop:1}}>✕</span>
-                    <span style={sans({fontSize:10.5,color:C.text2,lineHeight:1.4})}>{s}</span>
+                  <div key={s} style={{display:'flex',alignItems:'flex-start',gap:6,marginBottom:6}}>
+                    <span style={{color:C.rust,fontSize:10,flexShrink:0,marginTop:2}}>●</span>
+                    <span style={sans({fontSize:11,fontWeight:600,color:C.text,lineHeight:1.3})}>{s}</span>
                   </div>
-                )) : <div style={sans({fontSize:10,color:C.text4,lineHeight:1.4})}>No material weaknesses surfaced at current thresholds.</div>}
+                )) : <div style={sans({fontSize:10.5,color:C.text3,lineHeight:1.4,fontStyle:'italic'})}>No material weaknesses surfaced at current thresholds.</div>}
               </div>
             </div>
-            <div style={{marginTop:6,paddingTop:10,borderTop:`0.5px solid ${C.borderLight}`}} data-evaluation-presentation={evaluationPresentation}>
-              <div style={sans({fontSize:9.5,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3,marginBottom:8})}>Overall Team Rating</div>
+            <div style={{paddingTop:12,borderTop:`1px solid ${C.borderLight}`}} data-evaluation-presentation={evaluationPresentation}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:10}}>
+                <div style={sans({fontSize:10,fontWeight:800,letterSpacing:'.07em',textTransform:'uppercase',color:C.text3})}>Internal Grade Matrix</div>
+                <div style={sans({fontSize:9,color:C.text4})}>Weighted against 4.30 scale</div>
+              </div>
               {evaluationPresentation === 'score-ring'
                 ? <FrontOfficeScoreRingPreview teamName={team.name} grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />
                 : <FrontOfficeGradeCards grades={D.frontOfficeGradeRows} overall={D.frontOfficeOverall} teamKey={team.abbr} activeLabel={evaluationActiveLabel} onActiveLabelChange={setEvaluationActiveLabel} />}
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',marginTop:7}}>
-                <div data-selected-grade={selectedEvaluationGrade.label} style={sans({fontSize:8.5,color:C.text4,lineHeight:1.35})}><strong style={{color:C.text3}}>{selectedEvaluationGrade.label} methodology. </strong>{selectedEvaluationGrade.detail}</div>
-                <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" style={{border:`1px solid ${C.purple}`,borderRadius:5,background:C.surface,color:C.purple,padding:'4px 7px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:8.5,fontWeight:700})}}>INSPECT PROSPECT DEPTH</button>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginTop:12,padding:'8px 0',borderTop:`0.5px dashed ${C.borderLight}`}}>
+                <div data-selected-grade={selectedEvaluationGrade.label} style={{...sans({fontSize:9,color:C.text3,lineHeight:1.4}),flex:'1',minWidth:200}}>
+                  <strong style={{color:C.text2,textTransform:'uppercase',fontSize:8,letterSpacing:'.04em'}}>{selectedEvaluationGrade.label} Context: </strong>
+                  {selectedEvaluationGrade.detail}
+                </div>
+                <button type="button" onClick={() => setFutureValueModalOpen(true)} aria-haspopup="dialog" aria-label="Open organization prospect depth chart" 
+                  style={{
+                    border:`1.5px solid ${C.purple}`,borderRadius:6,background:C.surface,color:C.purple,
+                    padding:'6px 10px',cursor:'pointer',whiteSpace:'nowrap',...sans({fontSize:9,fontWeight:800,letterSpacing:'.04em'}),
+                    transition:'all 0.2s ease'
+                  }}
+                  onMouseOver={e=>e.currentTarget.style.background=C.purpleSoft}
+                  onMouseOut={e=>e.currentTarget.style.background=C.surface}
+                >INSPECT PROSPECT DEPTH</button>
               </div>
             </div>
           </div>
