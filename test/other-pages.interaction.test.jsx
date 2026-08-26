@@ -340,7 +340,9 @@ describe("Settings roster defaults", () => {
 
     const overviewButton = screen.getByTitle("Overview");
     await user.click(overviewButton);
-    await user.click(screen.getByRole("button", { name: "Roster" }));
+    // Target the subtab button inside the overview page
+    const rosterTab = await screen.findByRole("button", { name: /^Roster$/i });
+    await user.click(rosterTab);
     await screen.findByText("AI Scout Insights");
     expect(
       screen.getByRole("combobox", { name: "Minimum plate appearances" })
