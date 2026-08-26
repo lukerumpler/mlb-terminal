@@ -1,0 +1,43 @@
+name: Cache health regression
+
+on:
+  schedule:
+    # Daily UTC verification. The suite uses controlled test state and never calls providers.
+    - cron: "17 05 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cache-health-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cache-health:
+    name: Cache health regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out main revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run cache-health regressions
+        run: >-
+          pnpm vitest run
+          server/cache-health.test.ts
+          test/cache-health-client.test.js
+          test/cache-health-dashboard.test.jsx
+          --maxWorkers=1
+          --minWorkers=1

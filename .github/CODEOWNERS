@@ -1,0 +1,12 @@
+# Provider-cache controls require review by the repository owner.
+/client/src/api/mlb.js @lukerumpler
+/client/src/api/feed.js @lukerumpler
+/client/src/lib/cacheHealthClient.js @lukerumpler
+/client/src/lib/teamDataCache.js @lukerumpler
+/client/src/components/CacheHealthDashboard.jsx @lukerumpler
+/server/cache-health.ts @lukerumpler
+/server/durable-cache.ts @lukerumpler
+/server/api/cache-health.js @lukerumpler
+/server/api/fangraphs-models.js @lukerumpler
+/server/api/savant.js @lukerumpler
+/server/api/scheduled-savant-refresh.ts @lukerumpler

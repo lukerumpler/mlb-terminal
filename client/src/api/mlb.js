@@ -735,6 +735,36 @@ export async function getCareerSplits(id, group, requestOptions = {}) {
   } catch { return []; }
 }
 
+// Lahman database gap-fill — a season this player's own live yearByYear
+// splits do not return, backed by the checked-in historical dataset. This is
+// a best-effort supplement for an already identified player; it never replaces
+// live MLB data, never changes search eligibility, and never throws.
+const LAHMAN_TTL_MS = 24 * 60 * 60_000;
+export async function getLahmanCareerGaps(id, requestOptions = {}) {
+  const empty = { batting: [], pitching: [] };
+  try {
+    const url = `/api/lahman?mlbam=${encodeURIComponent(id)}`;
+    const data = await fetchProviderJson(url, { timeoutMs: 8_000, ttlMs: LAHMAN_TTL_MS, persistentCacheKey: `lahman:${id}`, ...requestOptions });
+    if (!data?.found) return empty;
+    recordFeedSuccess('lahman');
+    return {
+      batting: Array.isArray(data.batting) ? data.batting : [],
+      pitching: Array.isArray(data.pitching) ? data.pitching : [],
+    };
+  } catch { return empty; }
+}
+
+// Only append historical rows for seasons wholly absent from the live provider.
+// The live MLB Stats API remains source of truth for every season it returns.
+export function mergeLahmanCareerGaps(liveRows, lahmanRows) {
+  const live = Array.isArray(liveRows) ? liveRows : [];
+  if (!Array.isArray(lahmanRows) || !lahmanRows.length) return live;
+  const liveSeasons = new Set(live.map(row => String(row?.season)));
+  const gapFillers = lahmanRows.filter(row => row?.season != null && !liveSeasons.has(String(row.season)));
+  if (!gapFillers.length) return live;
+  return [...live, ...gapFillers].sort((a, b) => Number(a.season) - Number(b.season));
+}
+
 // Handedness splits are returned as situational rows by the MLB stats API.
 // Keep this normalization deliberately narrow: only explicit vl/vr (or
 // clearly named left/right descriptions) become LHP/RHP rows; unknown rows are
@@ -1168,6 +1198,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const careerPitchingPromise = isPitcher
     ? getCareerSplits(id, 'pitching', importantRequest)
     : Promise.resolve([]);
+  const lahmanGapsPromise = getLahmanCareerGaps(id, importantRequest);
   const careerAdvancedPromise = getCareerAdvancedStatsSafe(id, isPitcher ? 'pitching' : 'hitting', importantRequest);
   const contractPromise = fetchContractData(id, person.fullName, importantRequest);
   const handednessPromise = isPitcher
@@ -1177,9 +1208,10 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
   const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season, { mlbId: id });
 
-  const [careerHitting, careerPitching, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
+  const [careerHittingLive, careerPitchingLive, lahmanGaps, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
     careerPitchingPromise,
+    lahmanGapsPromise,
     careerAdvancedPromise,
     contractPromise,
     handednessPromise,
@@ -1187,6 +1219,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     advancedMetricsPromise,
     fallbackAdvancedMetricsPromise,
   ]);
+  // Preserve the intended hitter/pitcher request boundary, and only fill a
+  // missing season on the player’s actual side of play.
+  const careerHitting = isPitcher
+    ? careerHittingLive
+    : mergeLahmanCareerGaps(careerHittingLive, lahmanGaps.batting);
+  const careerPitching = isPitcher
+    ? mergeLahmanCareerGaps(careerPitchingLive, lahmanGaps.pitching)
+    : careerPitchingLive;
 
   // Important enrichment has settled. Publish it before beginning the slower
   // optional Savant leaderboards and boxscore aggregation, so verified
@@ -2005,6 +2045,71 @@ export async function getTeamRoster(teamId, season = SEASON, rosterType = 'activ
   return (data.roster || []).map(r => ({
     id: r.person?.id, name: r.person?.fullName, pos: r.position?.abbreviation, num: r.jerseyNumber,
   }));
+}
+
+export function normalizeOrganizationRosterEntry(entry, organization = {}) {
+  const person = entry?.person || {};
+  const position = entry?.position || person?.primaryPosition || {};
+  const currentTeam = person?.currentTeam || {};
+  const status = entry?.status || {};
+  return {
+    id: person.id ?? null,
+    name: person.fullName || '',
+    position: position.abbreviation || position.code || '—',
+    positionType: position.type || '',
+    jerseyNumber: entry?.jerseyNumber || '',
+    age: Number.isFinite(Number(person.currentAge)) ? Number(person.currentAge) : null,
+    bats: person.batSide?.code || '',
+    throws: person.pitchHand?.code || '',
+    rosterStatus: status.description || status.code || 'Status unavailable',
+    rosterStatusCode: status.code || '',
+    currentTeamName: currentTeam.name || organization.name || '',
+    organizationId: organization.id ?? null,
+    organizationAbbr: organization.abbr || '',
+  };
+}
+
+export async function getOrganizationRoster(organization, season = SEASON) {
+  if (!organization?.id) throw new Error('An MLB organization ID is required to load its official roster.');
+  const data = await mlb(`/teams/${organization.id}/roster`, {
+    rosterType: 'fullRoster',
+    season,
+    hydrate: 'person(currentTeam)',
+  }, {
+    ttl: 5 * 60_000,
+    timeoutMs: 25_000,
+    priority: 'important',
+    stage: 'organization-directory',
+    screen: 'prospects',
+  });
+  const responseMeta = getMlbResponseMeta(data);
+  const players = (data.roster || [])
+    .map(entry => normalizeOrganizationRosterEntry(entry, organization))
+    .filter(player => player.id && player.name)
+    .sort((left, right) => left.name.localeCompare(right.name, 'en', { sensitivity: 'base' }));
+  return {
+    organization,
+    players,
+    freshness: responseMeta?.freshness || 'live',
+    retrievedAt: responseMeta?.retrievedAt || Date.now(),
+    source: 'MLB Stats API · fullRoster',
+  };
+}
+
+export async function getAllOrganizationRosters(organizations, season = SEASON) {
+  const requested = Array.isArray(organizations) ? organizations.filter(team => team?.id) : [];
+  const results = await Promise.allSettled(requested.map(organization => getOrganizationRoster(organization, season)));
+  const byOrganization = {};
+  const failures = [];
+  results.forEach((result, index) => {
+    const organization = requested[index];
+    if (result.status === 'fulfilled') byOrganization[organization.key || organization.abbr || organization.id] = result.value;
+    else failures.push({
+      organization: organization.key || organization.abbr || String(organization.id),
+      message: result.reason?.message || 'Official roster unavailable',
+    });
+  });
+  return { byOrganization, failures, requestedCount: requested.length };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

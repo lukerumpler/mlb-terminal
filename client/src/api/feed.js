@@ -15,11 +15,13 @@ const STALE_TTL_MS = 30 * 60 * 1_000;
 const _cache = new Map();
 const _inFlight = new Map();
 
-function cacheGet(key) {
+function cacheGet(key, { allowStale = false } = {}) {
   const hit = _cache.get(key);
   if (!hit) return null;
   const now = Date.now();
-  if (hit.staleUntil > now) return hit;
+  if (hit.expiresAt > now) return hit;
+  if (allowStale && hit.staleUntil > now) return hit;
+  if (hit.staleUntil > now) return null;
   _cache.delete(key);
   return null;
 }
@@ -48,7 +50,10 @@ function requestedKinds(handles = []) {
 async function fetchNews(kind, n, handle = null, team = null) {
   const normalizedTeam = team ? String(team).trim().toUpperCase() : null;
   const key = `${handle ? `handle:${handle}` : normalizedTeam ? `team:${normalizedTeam}` : kind}:${n}`;
-  const cached = cacheGet(key);
+  // Capture a bounded stale entry for a single revalidation attempt. Fresh
+  // entries still return immediately below; stale entries are used only if
+  // the refresh fails, never presented as a fresh response.
+  const cached = cacheGet(key, { allowStale: true });
   const now = Date.now();
   if (cached?.expiresAt > now) {
     return { ...cached.data, status: 'cached', ageSeconds: Math.round((now - cached.retrievedAt) / 1000) };
