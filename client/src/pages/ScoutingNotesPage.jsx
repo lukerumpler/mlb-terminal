@@ -253,11 +253,18 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, confirmingDelete, onCon
   );
 }
 
-function ScoutingNotesPage() {
+function ScoutingNotesPage({ voiceNoteDraft, onVoiceNoteConsumed }) {
   const [notes, setNotes] = useState(() => loadNotes());
   const [query, setQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // all | quick | report
   const [draft, setDraft] = useState(null);
+
+  useEffect(() => {
+    if (voiceNoteDraft) {
+      setDraft({ ...emptyDraft('quick'), text: voiceNoteDraft });
+      onVoiceNoteConsumed();
+    }
+  }, [voiceNoteDraft, onVoiceNoteConsumed]);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   // Roadmap #8 (live pitch-charting tool) lives as a sub-tab of this page
   // rather than a new top-level nav item, per that item's own "what to

@@ -3,7 +3,10 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
+import { transcribeAudio } from "./_core/voiceTranscription";
+import { storagePut } from "./storage";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 let aiFallbackUntil = 0;
 const AI_ROSTER_INSIGHTS_CACHE_TTL_MS = 30_000;
@@ -313,6 +316,47 @@ export const appRouter = router({
           return result;
         } finally {
           if (aiQueryInFlight.get(key) === request) aiQueryInFlight.delete(key);
+        }
+      }),
+  }),
+
+  voice: router({
+    transcribe: publicProcedure
+      .input(z.object({
+        audioUrl: z.string(),
+        language: z.string().optional(),
+        prompt: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await transcribeAudio(input);
+        if ('error' in result) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: result.error,
+            cause: result,
+          });
+        }
+        return result;
+      }),
+  }),
+
+  storage: router({
+    upload: publicProcedure
+      .input(z.object({
+        name: z.string(),
+        type: z.string(),
+        base64: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const buffer = Buffer.from(input.base64, 'base64');
+          const result = await storagePut(input.name, buffer, input.type);
+          return result;
+        } catch (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Upload failed',
+          });
         }
       }),
   }),
