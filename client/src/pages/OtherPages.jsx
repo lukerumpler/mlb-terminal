@@ -793,7 +793,6 @@ function LeaguePage() {
   const [gamesLoading,setGamesLoading]= useState(true);
   const [stdLoading,  setStdLoading]  = useState(true);
   const [standingsRetrievedAt, setStandingsRetrievedAt] = useState(null);
-
   // Static leaderboard state (Statcast-enriched data)
   const [lbTab,    setLbTab]    = useState('hitting');
   const [lbSort,   setLbSort]   = useState('ops');
@@ -802,6 +801,16 @@ function LeaguePage() {
   const [comparisonSearch, setComparisonSearch] = useState('');
   const [comparisonDivision, setComparisonDivision] = useState('all');
   const [comparisonSortDirection, setComparisonSortDirection] = useState('desc');
+  const [compactMobile, setCompactMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches || false);
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 720px)');
+    if (!query) return undefined;
+    const sync = () => setCompactMobile(query.matches);
+    query.addEventListener?.('change', sync);
+    return () => query.removeEventListener?.('change', sync);
+  }, []);
+
 
   const liveHitterRows = useMemo(() => {
     const byId = new Map();
@@ -1121,7 +1130,76 @@ function LeaguePage() {
           <button type="button" aria-label={`Reverse cross-team comparison sort; currently ${comparisonSortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={()=>setComparisonSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{comparisonSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
           {(comparisonSearch || comparisonDivision !== 'all') && <button type="button" onClick={()=>{setComparisonSearch('');setComparisonDivision('all')}} style={{height:28,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text3,fontSize:9.5,fontWeight:700,cursor:'pointer'}}>Clear filters</button>}
         </div>
-        {comparisonLoading ? <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div> : comparisonRows.length ? <div style={{overflowX:'auto'}}><table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}><thead><tr style={{background:C.surface2}}>{['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=><th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>)}</tr></thead><tbody>{comparisonRows.map((row,index)=><tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}><th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th><td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td><td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td></tr>)}</tbody></table></div> : <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>}
+        {comparisonLoading ? (
+          <div role="status" aria-live="polite" style={{padding:'14px'}}><SkeletonRows count={5} height={30} /></div>
+        ) : comparisonRows.length ? (
+          compactMobile ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:8, padding:'8px 14px 14px' }}>
+              {comparisonRows.map((row, index) => (
+                <div 
+                  key={row.id} 
+                  onClick={() => openTab('overview', { team:row.abbr })}
+                  style={{ 
+                    padding:'12px', 
+                    background:C.surface2, 
+                    border:`1px solid ${C.borderLight}`, 
+                    borderRadius:8,
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'space-between',
+                    cursor:'pointer'
+                  }}
+                >
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ 
+                      width:28, 
+                      height:28, 
+                      borderRadius:6, 
+                      background:C.surface3, 
+                      display:'grid', 
+                      placeItems:'center',
+                      ...px({ fontSize:10, fontWeight:800, color:C.text3 })
+                    }}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div style={sans({ fontSize:13, fontWeight:700, color:C.text })}>{row.name}</div>
+                      <div style={sans({ fontSize:10, color:C.text3 })}>{row.division} · {row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={px({ fontSize:14, fontWeight:800, color:C.teal })}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</div>
+                    <div style={sans({ fontSize:8, fontWeight:700, color:C.text4, textTransform:'uppercase', letterSpacing:'.05em' })}>{comparisonMetricConfig.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table aria-label={`Cross-team comparison sorted by ${comparisonMetricConfig.label}`} style={{width:'100%',borderCollapse:'collapse',minWidth:540}}>
+                <thead>
+                  <tr style={{background:C.surface2}}>
+                    {['Team','Division',comparisonMetricConfig.label,'W-L'].map((heading,index)=>(
+                      <th key={heading} scope="col" style={{padding:'6px 10px',textAlign:index < 2 ? 'left' : 'right',borderBottom:`0.5px solid ${C.border}`,...sans({fontSize:9.5,fontWeight:800,color:C.text2,textTransform:'uppercase',letterSpacing:'.05em'})}}>{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row,index)=>(
+                    <tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}>
+                      <th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th>
+                      <td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{comparisonMetric === 'ops' ? fmtScorebookRate(row.value) : comparisonMetric === 'era' ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <div role="status" style={sans({padding:'20px 14px',textAlign:'center',fontSize:10,color:C.text3})}>No verified team rows match the selected comparison filters.</div>
+        )}
       </Panel>
       </div>
 

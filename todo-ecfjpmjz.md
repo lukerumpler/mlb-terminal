@@ -108,3 +108,8 @@
 - [x] Exercise the real League comparison workspace, mobile navigation drawer, and fixed ticker at 375px after the new CSS changes; desktop and mobile browser audits both passed with no horizontal overflow, the drawer opened, the League table rendered, and the ticker stayed within the viewport.
 - [x] Add and run focused regression coverage for the mobile-specific layout contract; `test/mobile-layout.test.js` passed all 3 assertions for safe-area clearance, touch targets, and scroll navigation.
 - [x] Save and publish a mobile optimization checkpoint and record its version ID.
+
+- [ ] Implement a compact mobile bottom navigation bar for quick access to the most-used workspaces.
+- [ ] Create mobile-specific condensed comparison cards for smaller screens.
+- [ ] Implement swipe gestures for workspace navigation on mobile.
+- [ ] Diagnose and safely resolve the GitHub/Vercel push blocker without removing production safety checks.

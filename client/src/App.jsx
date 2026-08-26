@@ -15,6 +15,7 @@ import { readDefaultTeamPreference, saveDefaultTeamPreference } from './lib/defa
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
 // pages) ships as its own chunk and loads on demand instead of bloating the
@@ -286,6 +287,19 @@ export default function App() {
   const activePrimaryKey = activeWorkspace?.key || tab;
   const activeTitle = activeWorkspace?.label || TABS.find(item => item.key === tab)?.label || 'SKIP';
 
+  const handleSwipe = useCallback((direction) => {
+    const currentIdx = PRIMARY_TABS.findIndex(t => (t.defaultTab || t.key) === tab || t.tabs?.some(st => st.key === tab));
+    if (currentIdx === -1) return;
+    let nextIdx;
+    if (direction === 'left') {
+      nextIdx = Math.min(PRIMARY_TABS.length - 1, currentIdx + 1);
+    } else {
+      nextIdx = Math.max(0, currentIdx - 1);
+    }
+    const nextTab = PRIMARY_TABS[nextIdx];
+    setTab(nextTab.defaultTab || nextTab.key);
+  }, [tab]);
+
   const [showPalette, setShowPalette] = useState(false);
   useEffect(() => {
     if (!mobileNavOpen) return undefined;
@@ -524,9 +538,17 @@ export default function App() {
           })}
         </nav>
 
-        {/* Scrollable content */}
-        <div className="skip-content" style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}>
-
+                {/* Scrollable content */}
+        <motion.div 
+          className="skip-content" 
+          drag={compactMobile ? "x" : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          onDragEnd={(e, { offset, velocity }) => {
+            if (offset.x > 100 || velocity.x > 500) handleSwipe('right');
+            else if (offset.x < -100 || velocity.x < -500) handleSwipe('left');
+          }}
+          style={{ flex:1, overflowY:'auto', padding:'16px 18px 24px', display:'flex', flexDirection:'column', gap:0, minHeight:0 }}
+        >
           {!isolatedPreview && activeWorkspace && (
             <nav className="skip-workspace-subtabs" aria-label={`${activeWorkspace.label} workspace sections`} role="tablist">
               <div className="skip-workspace-subtabs-copy">
@@ -542,32 +564,79 @@ export default function App() {
               </div>
             </nav>
           )}
-
           <div id={`skip-workspace-panel-${tab}`} role={!isolatedPreview && activeWorkspace ? 'tabpanel' : undefined} aria-label={!isolatedPreview && activeWorkspace ? `${activeWorkspace.label}: ${activeWorkspace.tabs.find(item => item.key === tab)?.label}` : undefined}>
             <PageErrorBoundary resetKey={isolatedPreview ? 'player-profile-preview' : tab}>
               <Suspense fallback={<PageLoading />}>
-              {isolatedPreview && <PlayerProfilePreviewsPage />}
-              {!isolatedPreview && <>
-              {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} defaultTeamKey={defaultTeamKey} />}
-              {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
-              {tab === 'prospects'    && <ProspectsPage />}
-              {tab === 'draft'        && <DraftPage />}
-              {tab === 'league'       && <LeaguePage />}
-              {tab === 'intelligence' && <IntelligencePage />}
-              {tab === 'amd'          && <AMDPage />}
-              {tab === 'knowledge'    && <KnowledgePage />}
-              {tab === 'notes'        && <ScoutingNotesPage />}
-              {tab === 'feed'         && <FeedPage />}
-              {tab === 'follows'      && <FollowListPage />}
-              {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
-              {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
-              </>}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {isolatedPreview && <PlayerProfilePreviewsPage />}
+                  {!isolatedPreview && <>
+                  {tab === 'overview'     && <OverviewPage rosterDefaults={rosterDefaults} defaultTeamKey={defaultTeamKey} />}
+                  {tab === 'players'      && <PlayersPage initialPlayer={pendingPlayerProfile} onInitialPlayerConsumed={consumePendingPlayerProfile} />}
+                  {tab === 'prospects'    && <ProspectsPage />}
+                  {tab === 'draft'        && <DraftPage />}
+                  {tab === 'league'       && <LeaguePage />}
+                  {tab === 'intelligence' && <IntelligencePage />}
+                  {tab === 'amd'          && <AMDPage />}
+                  {tab === 'knowledge'    && <KnowledgePage />}
+                  {tab === 'notes'        && <ScoutingNotesPage />}
+                  {tab === 'feed'         && <FeedPage />}
+                  {tab === 'follows'      && <FollowListPage />}
+                  {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
+                  {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
+                  </>}
+                </motion.div>
+              </AnimatePresence>
               </Suspense>
             </PageErrorBoundary>
           </div>
-        </div>
+        </motion.div>
+        
+        {compactMobile && !isolatedPreview && (
+          <nav className="skip-mobile-bottom-nav" style={{ 
+            height: 'calc(56px + env(safe-area-inset-bottom))', 
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            background: C.surface, 
+            borderTop: `1px solid ${C.border}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            zIndex: 100,
+            flexShrink: 0
+          }}>
+            {PRIMARY_TABS.filter(t => ['overview', 'talent', 'league', 'intelligence-workspace', 'feed-workspace'].includes(t.key)).map(t => (
+              <button 
+                key={t.key}
+                onClick={() => setTab(t.defaultTab || t.key)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                  background: 'none',
+                  border: 'none',
+                  color: activePrimaryKey === t.key ? C.amber : C.text3,
+                  padding: '8px 0',
+                  width: '20%',
+                  cursor: 'pointer',
+                  transition: 'color 0.12s'
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{t.icon}</span>
+                <span style={sans({ fontSize: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em' })}>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
 
         {!isolatedPreview && <LiveScoreTicker status={tickerStatus} ticks={liveTicker} source="MLB Stats API" updatedAt={tickerUpdatedAt} onRetry={refreshTicker} />}
+
       </div>
 
       <style>{`

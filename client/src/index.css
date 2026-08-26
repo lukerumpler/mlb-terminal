@@ -1356,5 +1356,13 @@
   }
   .skip-ticker-shell {
     min-height:calc(36px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .skip-mobile-bottom-nav {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   }
 }
