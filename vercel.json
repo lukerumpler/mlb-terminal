@@ -25,7 +25,8 @@
       "maxDuration": 60
     },
     "api/[...path].ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "server/data/lahman/**"
     },
     "api/news.js": {
       "maxDuration": 15
