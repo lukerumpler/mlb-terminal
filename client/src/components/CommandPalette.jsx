@@ -19,6 +19,7 @@ const TAB_ENTRIES = [
   { type:'tab', key:'feed',         label:'Intel Feed' },
   { type:'tab', key:'follows',      label:'Follow List' },
   { type:'tab', key:'settings',     label:'Settings' },
+  { type:'tab', key:'about',        label:'About Me' },
 ];
 
 const PROSPECT_ENTRIES = [
