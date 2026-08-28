@@ -15,6 +15,7 @@ A Bloomberg-terminal-inspired baseball intelligence platform for scouting, prosp
 - **Data Source Status Center** — transparency panel showing the live/cached/stale state of every upstream provider
 - **Command palette & recent history** — fast keyboard-driven navigation across the whole terminal
 - **Ballpark weather, defensive OAA field maps, pitch shape/contact heatmaps** — supplementary scouting visualizations
+- **About the builder** — a profile/bio page on the live deployment (`/about`); not currently part of this repo's tracked source — see [Deployment Model](#deployment-model)
 
 ## Tech Stack
 
@@ -23,7 +24,7 @@ A Bloomberg-terminal-inspired baseball intelligence platform for scouting, prosp
 | Client | React 19, Vite 7, Tailwind CSS 4, Radix UI / shadcn, Recharts, Framer Motion, wouter |
 | Server | Express 4, tRPC 11, Zod, Drizzle ORM |
 | Testing | Vitest, Testing Library, Playwright (E2E) |
-| Deployment | Vercel (serverless functions under `api/`) — see [`docs/deployment.md`](docs/deployment.md) |
+| Deployment | Manus-managed release (canonical/live) + Vercel via this repo (mirror) — see [Deployment Model](#deployment-model) |
 
 ## Project Structure
 
@@ -101,6 +102,16 @@ SKIP never fabricates missing data — every metric carries a source-health badg
 | Spotrac | Payroll, luxury tax (CBT), contract projections |
 
 Full provenance rules, TTLs, and fallback behavior are documented in [`docs/data-sources.md`](docs/data-sources.md).
+
+## Deployment Model
+
+This project runs on two tracks that are **not** a simple mirror of each other:
+
+- **Manus-managed project (canonical/live)** — published through Manus's own release process to `skipbasebal-mm6hz9ps.manus.space`. This is the source of truth for what's actually live, and it can move ahead of GitHub (e.g. the `/about` builder-profile page currently only exists here).
+- **This GitHub repo** — a deliberately reconciled reference/mirror, not a push target for the managed deployment. Merges between the two are done by comparing file-by-file rather than overwriting either side, since the histories have diverged at times. See [`GITHUB_SYNC_AUDIT.md`](GITHUB_SYNC_AUDIT.md) and [`docs/BRANCH_INTEGRATION_AUDIT_2026-08-21.md`](docs/BRANCH_INTEGRATION_AUDIT_2026-08-21.md) for past reconciliation reviews. Vercel deployment config (`vercel.json`) exists for building from this repo directly, but it is a secondary path, not the canonical release.
+- Automated tools without managed-project access will not have push credentials to this repo's `main` by design — see [`docs/RELEASE_WORKFLOW.md`](docs/RELEASE_WORKFLOW.md) for the intended release-gate → managed-checkpoint flow.
+
+If you're reconciling the two, treat the managed project as canonical and compare before merging — don't force-push or bulk-overwrite either side.
 
 ## Documentation
 
