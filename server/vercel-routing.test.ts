@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Vercel API routing", () => {
-  it("bundles the primary and catch-all API entries from explicit shared-handler imports", () => {
+  it("keeps the catch-all entry lightweight while preserving explicit primary-handler routing", () => {
     const catchAllSource = readFileSync(
       resolve(process.cwd(), "api/[...path].ts"),
       "utf8"
@@ -12,8 +12,10 @@ describe("Vercel API routing", () => {
       resolve(process.cwd(), "api/index.ts"),
       "utf8"
     );
-    expect(catchAllSource).toContain('import handler from "../server/vercel-handler";');
-    expect(catchAllSource).toContain("export default handler;");
+    expect(catchAllSource).toContain("legacyHandlerLoaders");
+    expect(catchAllSource).toContain('import("../server/api/cache-health.js")');
+    expect(catchAllSource).not.toContain("../server/vercel-handler");
+    expect(catchAllSource).toContain("export default async function handler");
     expect(catchAllSource).not.toContain('from "./index"');
     expect(primarySource).toContain('import handler, {');
     expect(primarySource).toContain('} from "../server/vercel-handler";');

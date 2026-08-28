@@ -736,6 +736,66 @@ export async function getCareerSplits(id, group, requestOptions = {}) {
   } catch { return []; }
 }
 
+// Lahman database gap-fill — a season this player's own live yearByYear
+// splits do not return, backed by the checked-in historical dataset. This is
+// a best-effort supplement for an already identified player; it never replaces
+// live MLB data, never changes search eligibility, and never throws.
+const LAHMAN_TTL_MS = 24 * 60 * 60_000;
+export async function getLahmanCareerGaps(id, requestOptions = {}) {
+  const empty = { batting: [], pitching: [] };
+  try {
+    const url = `/api/lahman?mlbam=${encodeURIComponent(id)}`;
+    const data = await fetchProviderJson(url, { timeoutMs: 8_000, ttlMs: LAHMAN_TTL_MS, persistentCacheKey: `lahman:${id}`, ...requestOptions });
+    if (!data?.found) return empty;
+    recordFeedSuccess('lahman');
+    return {
+      batting: Array.isArray(data.batting) ? data.batting : [],
+      pitching: Array.isArray(data.pitching) ? data.pitching : [],
+    };
+  } catch { return empty; }
+}
+
+// Only append historical rows for seasons wholly absent from the live provider.
+// The live MLB Stats API remains source of truth for every season it returns.
+function canonicalCareerSeason(value) {
+  const season = String(value ?? '').trim();
+  if (!/^\d{4}$/.test(season)) return null;
+  const year = Number(season);
+  return year >= 1871 && year <= 2100 ? season : null;
+}
+
+function isUsableHistoricalCareerRow(row) {
+  return Boolean(
+    row
+    && typeof row === 'object'
+    && canonicalCareerSeason(row.season)
+    && row.stat
+    && typeof row.stat === 'object'
+    && !Array.isArray(row.stat),
+  );
+}
+
+export function mergeLahmanCareerGaps(liveRows, lahmanRows) {
+  const live = Array.isArray(liveRows) ? liveRows : [];
+  if (!Array.isArray(lahmanRows) || !lahmanRows.length) return live;
+  const liveSeasons = new Set(live.map(row => canonicalCareerSeason(row?.season)).filter(Boolean));
+  const addedSeasons = new Set();
+  const gapFillers = lahmanRows.reduce((rows, row) => {
+    if (!isUsableHistoricalCareerRow(row)) return rows;
+    const season = canonicalCareerSeason(row.season);
+    if (liveSeasons.has(season) || addedSeasons.has(season)) return rows;
+    addedSeasons.add(season);
+    rows.push({ ...row, season, isHistorical: true, source: 'Lahman' });
+    return rows;
+  }, []);
+  if (!gapFillers.length) return live;
+  return [...live, ...gapFillers].sort((a, b) => {
+    const left = Number(canonicalCareerSeason(a?.season)) || Number.MAX_SAFE_INTEGER;
+    const right = Number(canonicalCareerSeason(b?.season)) || Number.MAX_SAFE_INTEGER;
+    return left - right;
+  });
+}
+
 // Handedness splits are returned as situational rows by the MLB stats API.
 // Keep this normalization deliberately narrow: only explicit vl/vr (or
 // clearly named left/right descriptions) become LHP/RHP rows; unknown rows are
@@ -1170,6 +1230,7 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const careerPitchingPromise = isPitcher
     ? getCareerSplits(id, 'pitching', importantRequest)
     : Promise.resolve([]);
+  const lahmanGapsPromise = getLahmanCareerGaps(id, importantRequest);
   const careerAdvancedPromise = getCareerAdvancedStatsSafe(id, isPitcher ? 'pitching' : 'hitting', importantRequest);
   const contractPromise = fetchContractData(id, person.fullName, importantRequest);
   const handednessPromise = isPitcher
@@ -1179,9 +1240,10 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
   const advancedMetricsPromise = getSeasonAdvancedStatsSafe(id, season, profileSportId, importantRequest);
   const fallbackAdvancedMetricsPromise = getBaseballReferenceAdvancedSafe(person.fullName || profile?.fullName, season, { mlbId: id });
 
-  const [careerHitting, careerPitching, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
+  const [careerHittingLive, careerPitchingLive, lahmanGaps, careerAdvanced, contractRaw, handednessResult, teamFinancials, advancedMetricsPrimary, fallbackAdvancedMetrics] = await Promise.all([
     careerHittingPromise,
     careerPitchingPromise,
+    lahmanGapsPromise,
     careerAdvancedPromise,
     contractPromise,
     handednessPromise,
@@ -1189,6 +1251,14 @@ export async function loadFullPlayer(person, season = SEASON, { onCoreReady, onI
     advancedMetricsPromise,
     fallbackAdvancedMetricsPromise,
   ]);
+  // Preserve the intended hitter/pitcher request boundary, and only fill a
+  // missing season on the player’s actual side of play.
+  const careerHitting = isPitcher
+    ? careerHittingLive
+    : mergeLahmanCareerGaps(careerHittingLive, lahmanGaps.batting);
+  const careerPitching = isPitcher
+    ? mergeLahmanCareerGaps(careerPitchingLive, lahmanGaps.pitching)
+    : careerPitchingLive;
 
   // Important enrichment has settled. Publish it before beginning the slower
   // optional Savant leaderboards and boxscore aggregation, so verified

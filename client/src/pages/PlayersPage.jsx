@@ -2402,7 +2402,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
               <NaturalLanguageMlbQuery accent={teamAccent} context={{ view:'player profile', player:p?.fullName || 'Selected player', team:p?.currentTeam?.name || 'Free Agent', position:p?.primaryPosition?.abbreviation || 'Unavailable', stats:{ ops:s?.ops ?? null, avg:s?.avg ?? null, homeRuns:s?.homeRuns ?? null, era:s?.era ?? null, strikeouts:s?.strikeouts ?? null }, recentTrend:recentPerformanceSummary?.label || 'Unavailable' }} />
               <HandednessSplitComparison splits={player.handednessSplits} />
               <Panel title={player.isPitcher ? 'Career Pitching Splits' : 'Career Batting Splits'} accent={teamAccent} badge={`${careerRows.length} seasons`}>
-              <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td>{r.season}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
+              <div className="skip-long-table"><table className="skip-profile-splits-table"><thead><tr className="skip-table-group-row"><th colSpan={1}>Identity</th><th colSpan={5}>Volume</th><th colSpan={4}>Rate &amp; value</th></tr><tr>{careerHeaders.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{careerRows.map((r, i) => { const st = r.stat || {}; const cells = player.isPitcher ? [st.gamesPlayed,st.gamesStarted,fmtIP(st.inningsPitched),st.wins,st.losses,st.era?(+st.era).toFixed(2):'—',st.strikeOuts,st.baseOnBalls,st.whip?(+st.whip).toFixed(3):'—'] : [st.gamesPlayed,st.atBats,st.hits,st.homeRuns,st.rbi,fmt(st.avg),fmt(st.obp),fmt(st.slg),fmt(st.ops)]; return <tr key={i}><td title={r.isHistorical ? 'Filled from the Lahman historical database' : undefined}>{r.season}{r.isHistorical ? '†' : ''}</td>{cells.map((v,j) => <td key={j}>{v ?? '—'}</td>)}</tr>; })}</tbody></table></div>
               </Panel>
             </div>
           )}
@@ -2784,7 +2784,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
                       <tr key={i} style={{ borderBottom:i<arr.length-1?`0.5px solid ${C.borderLight}`:'none' }}
                         onMouseEnter={e => e.currentTarget.style.background = C.amberSoft}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding:'6px 8px', fontFamily:"'DM Mono',monospace", fontWeight:700, color:C.amber, fontSize:11, whiteSpace:'nowrap' }}>{r.season}</td>
+                        <td style={{ padding:'6px 8px', fontFamily:"'DM Mono',monospace", fontWeight:700, color:r.isHistorical?C.text3:C.amber, fontSize:11, whiteSpace:'nowrap' }} title={r.isHistorical ? 'Filled from the Lahman historical database — not in the live MLB Stats API feed for this player' : undefined}>{r.season}{r.isHistorical && <span style={{ marginLeft:4, fontSize:8.5, color:C.text4 }}>†</span>}</td>
                         {cells.map((v,j) => <td key={j} style={{ padding:'6px 8px', textAlign:'right', fontFamily:"'DM Mono',monospace", fontSize:11, color:C.text }}>{v??'—'}</td>)}
                       </tr>
                     );
@@ -2792,6 +2792,9 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
                 </tbody>
               </table>
             </div>
+            {careerRows.some(r => r.isHistorical) && (
+              <div style={sans({ padding:'4px 8px 0', fontSize:8.5, color:C.text4, lineHeight:1.35 })}>† Season filled from the Lahman historical database — not returned by the live MLB Stats API for this player.</div>
+            )}
           </Panel>
         </div>
 
