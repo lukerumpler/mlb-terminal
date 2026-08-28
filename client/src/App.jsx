@@ -33,6 +33,7 @@ const ScoutingNotesPage = lazy(() => import('./pages/ScoutingNotesPage.jsx'));
 const FollowListPage = lazy(() => import('./pages/FollowListPage.jsx'));
 const FeedPage          = lazy(() => import('./pages/FeedPage.jsx'));
 const PlayerProfilePreviewsPage = lazy(() => import('./pages/PlayerProfilePreviewsPage.jsx'));
+const AboutPage = lazy(() => import('./pages/AboutPage.jsx'));
 
 function PageLoading() {
   return (
@@ -181,6 +182,7 @@ const TABS = [
   { key:'knowledge',    icon:'◉', label:'Knowledge',      section:'Knowledge' },
   { key:'settings',     icon:'⚙', label:'Settings',       section:'System' },
   { key:'alerts',       icon:'🔔', label:'Alerts',         section:'System' },
+  { key:'about',        icon:'👤', label:'About Me',       section:'System' },
 ];
 
 const WORKSPACE_GROUPS = [
@@ -697,6 +699,13 @@ export default function App() {
 
         </nav>
 
+        <button type="button" onClick={() => { setTab('about'); setMobileNavOpen(false); }} aria-current={tab === 'about' ? 'page' : undefined}
+          style={{ display:'flex', alignItems:'center', gap:7, margin:'0 6px', padding:'7px 8px', background:tab === 'about' ? C.amberSoft : 'transparent', border:'none', borderTop:`1px solid ${C.border}`, borderRadius:0, cursor:'pointer', color:tab === 'about' ? C.amberDark : C.text3, textAlign:'left' }}>
+          <span aria-hidden="true" style={{ fontSize:13, flexShrink:0, width:20, textAlign:'center' }}>👤</span>
+          <span style={sans({ fontSize:11, fontWeight:600 })}>About Me</span>
+          <span aria-hidden="true" style={{ marginLeft:'auto', fontSize:11, color:C.text4 }}>↗</span>
+        </button>
+
         <div className="skip-sidebar-insight" style={{ padding:'8px 10px', borderTop:`1px solid ${C.border}` }}>
           <div style={{ marginBottom:5, fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700, color:C.amber, letterSpacing:'.08em' }}>SKIP INSIGHT</div>
           <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:10, color:C.text2, lineHeight:1.5, fontStyle:'italic' }}>
@@ -820,6 +829,7 @@ export default function App() {
                   {tab === 'follows'      && <FollowListPage />}
                   {tab === 'settings'     && <SettingsPage theme={theme} toggleTheme={toggleTheme} scoutingMode={scoutingMode} toggleScoutingMode={() => setScoutingMode(s => !s)} lowDataMode={lowDataMode} toggleLowDataMode={toggleLowDataMode} defaultTeamKey={defaultTeamKey} updateDefaultTeamKey={updateDefaultTeamKey} rosterDefaults={rosterDefaults} updateRosterDefaults={updateRosterDefaults} feedFreshnessSettings={feedFreshnessSettings} feedFreshnessSuccesses={feedFreshnessSuccesses} updateFeedFreshnessSettings={updateFeedFreshnessSettings} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} cacheHealthUpdatedAt={cacheHealthUpdatedAt} refreshCacheHealth={refreshCacheHealth} />}
                   {tab === 'alerts'       && <AlertsWorkspacePanel alerts={liveAlerts} cacheHealth={cacheHealth} cacheHealthStatus={cacheHealthStatus} />}
+                  {tab === 'about'        && <AboutPage onNavigate={setTab} />}
                   </>}
                 </motion.div>
               </AnimatePresence>
