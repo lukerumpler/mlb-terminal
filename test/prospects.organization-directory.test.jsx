@@ -14,7 +14,7 @@ describe('Organization player directory', () => {
   it('replaces the static by-team grid with a clearly labeled official roster directory', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByTitle('Talent'));
+    await user.click(await screen.findByTitle('Players'));
     await user.click(await screen.findByRole('tab', { name: 'Prospects' }));
     await screen.findByText(/Top Prospect Batters/, {}, { timeout: 8000 });
     await user.click(await screen.findByRole('button', { name: 'By Team' }));

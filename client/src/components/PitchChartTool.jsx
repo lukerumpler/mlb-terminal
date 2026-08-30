@@ -15,41 +15,57 @@ const sideToggle = (active) => ({
 });
 
 // 9-zone core (standard scouting numbering, 1–9 top-left to bottom-right)
-// plus 4 outer "expanded zone" strips (High/Low/In/Out) for well-outside
-// pitches — a simplified stand-in for the reference UI's full 17-zone grid
-// (9 core + 8 individually-numbered outer cells). Labeled by absolute
-// direction (High/Low/In/Out), not arm-side/glove-side, so this doesn't
-// need to know or assume pitcher handedness to be correct.
+// plus the full 17-zone outer ring (v2 scope from the roadmap's "what to
+// build" note — this was the deferred piece; v1 shipped with 4 broad
+// High/Low/In/Out strips instead): 4 corners + 4 edge-middles, individually
+// numbered 10–17. Like the 13-zone v1 grid, this is SKIP's own extended
+// scouting convention, not a Statcast field (see the zone-numbering note in
+// PlayersPage.jsx a few files away, which documents that distinction for
+// the *other* zone system this app uses).
 const CORE_ZONES = Array.from({ length: 9 }, (_, i) => ({
   zone: i + 1, x: 50 + (i % 3) * (100 / 3), y: 50 + Math.floor(i / 3) * (100 / 3), w: 100 / 3, h: 100 / 3,
 }));
 const OUTER_ZONES = [
-  { zone:10, label:'High', x:50,  y:5,   w:100, h:45 },
-  { zone:11, label:'Low',  x:50,  y:150, w:100, h:45 },
-  { zone:12, label:'In',   x:5,   y:50,  w:45,  h:100 },
-  { zone:13, label:'Out',  x:150, y:50,  w:45,  h:100 },
+  { zone:10, label:'⌜',  x:0,   y:0,   w:50,  h:50  }, // up-and-in corner (as drawn; see mirroring note below)
+  { zone:11, label:'▲',  x:50,  y:0,   w:100, h:50  }, // high, over the plate
+  { zone:12, label:'⌝',  x:150, y:0,   w:50,  h:50  }, // up-and-away corner
+  { zone:13, label:'▶',  x:150, y:50,  w:50,  h:100 }, // away, middle height
+  { zone:14, label:'⌟',  x:150, y:150, w:50,  h:50  }, // down-and-away corner
+  { zone:15, label:'▼',  x:50,  y:150, w:100, h:50  }, // low, over the plate
+  { zone:16, label:'⌞',  x:0,   y:150, w:50,  h:50  }, // down-and-in corner
+  { zone:17, label:'◀',  x:0,   y:50,  w:50,  h:100 }, // in, middle height
 ];
 
-function ZoneGrid({ selected, onTap }) {
+// Zone *numbers* are a fixed, canonical map of real strike-zone quadrants —
+// they never change based on which way you're looking at the plate. Only
+// the on-screen x-position mirrors for the pitcher/catcher view toggle, so
+// tapping the same real-world location logs the same zone number from
+// either view (a pitcher's glove-side and a catcher's glove-side are
+// screen-mirrored but describe the same physical spot).
+function displayX(x, w, mirror) {
+  return mirror ? 200 - x - w : x;
+}
+
+function ZoneGrid({ selected, onTap, mirror = false }) {
   return (
     <svg viewBox="0 0 200 200" width="100%" height={220} style={{ display:'block', maxWidth:220, margin:'0 auto' }}>
       {OUTER_ZONES.map(z => (
-        <g key={z.zone} role="button" tabIndex={0} aria-label={`Zone ${z.zone} (${z.label})`}
+        <g key={z.zone} role="button" tabIndex={0} aria-label={`Zone ${z.zone}`}
           aria-pressed={selected === z.zone} style={{ cursor:'pointer' }}
           onClick={() => onTap(z.zone)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onTap(z.zone); }}>
-          <rect x={z.x} y={z.y} width={z.w} height={z.h}
+          <rect x={displayX(z.x, z.w, mirror)} y={z.y} width={z.w} height={z.h}
             fill={selected === z.zone ? C.amberSoft : C.surface2} stroke={C.borderLight} strokeWidth="1" />
-          <text x={z.x + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
-            fontSize="7.5" fill={C.text4} fontFamily="'Plus Jakarta Sans',sans-serif">{z.label}</text>
+          <text x={displayX(z.x, z.w, mirror) + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
+            fontSize="9" fill={C.text4} fontFamily="'Plus Jakarta Sans',sans-serif">{z.zone}</text>
         </g>
       ))}
       {CORE_ZONES.map(z => (
         <g key={z.zone} role="button" tabIndex={0} aria-label={`Zone ${z.zone}`}
           aria-pressed={selected === z.zone} style={{ cursor:'pointer' }}
           onClick={() => onTap(z.zone)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onTap(z.zone); }}>
-          <rect x={z.x} y={z.y} width={z.w} height={z.h}
+          <rect x={displayX(z.x, z.w, mirror)} y={z.y} width={z.w} height={z.h}
             fill={selected === z.zone ? C.amber : C.surface} stroke={C.border} strokeWidth="1" />
-          <text x={z.x + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
+          <text x={displayX(z.x, z.w, mirror) + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
             fontSize="12" fontWeight="700" fill={selected === z.zone ? '#fff' : C.text2}
             fontFamily="'DM Mono',monospace">{z.zone}</text>
         </g>
@@ -130,6 +146,7 @@ export default function PitchChartTool() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [confirmingNewSession, setConfirmingNewSession] = useState(false);
+  const [viewMode, setViewMode] = useState('catcher'); // 'catcher' | 'pitcher' — v2 scope, see ZoneGrid
 
   const handleLog = (resultKey) => {
     if (selectedZone == null) return;
@@ -202,8 +219,12 @@ export default function PitchChartTool() {
           {/* Zone grid + pitch type + result */}
           <div style={{ display:'flex', gap:18, flexWrap:'wrap' }}>
             <div style={{ flex:'0 0 220px' }}>
+              <div style={{ display:'flex', justifyContent:'center', gap:4, marginBottom:6 }}>
+                <button style={sideToggle(viewMode === 'catcher')} onClick={() => setViewMode('catcher')} title="View from behind the plate">Catcher View</button>
+                <button style={sideToggle(viewMode === 'pitcher')} onClick={() => setViewMode('pitcher')} title="View from the mound">Pitcher View</button>
+              </div>
               <div style={{ ...fieldLabel, textAlign:'center' }}>Strike Zone — tap to select</div>
-              <ZoneGrid selected={selectedZone} onTap={z => setSelectedZone(z === selectedZone ? null : z)} />
+              <ZoneGrid selected={selectedZone} onTap={z => setSelectedZone(z === selectedZone ? null : z)} mirror={viewMode === 'pitcher'} />
             </div>
             <div style={{ flex:'1 1 240px', minWidth:220, display:'flex', flexDirection:'column', gap:10 }}>
               <div>

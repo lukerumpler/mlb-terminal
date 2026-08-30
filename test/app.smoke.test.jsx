@@ -19,8 +19,8 @@ vi.mock("../client/src/lib/trpc", () => ({
 }));
 
 const TABS = [
-  "Overview",
-  "Talent",
+  "Team Overview",
+  "Players",
   "League",
   "Intelligence",
   "Scouting Notes",
@@ -51,7 +51,7 @@ describe("SKIP app — mobile navigation", () => {
       document.querySelector(".skip-sidebar.skip-mobile-nav-open")
     ).toBeTruthy();
     const talentButton = document.querySelector(
-      '.skip-sidebar button[title="Talent"]'
+      '.skip-sidebar button[title="Players"]'
     );
     expect(talentButton).toBeTruthy();
     await user.click(talentButton);
@@ -61,7 +61,7 @@ describe("SKIP app — mobile navigation", () => {
       ).toBeNull()
     );
     expect(document.querySelector(".skip-topbar")?.textContent).toContain(
-      "Talent"
+      "Players"
     );
     expect(screen.getByRole("tab", { name: "Players" })).toHaveAttribute(
       "aria-selected",
@@ -78,7 +78,7 @@ describe("SKIP app — mobile navigation", () => {
     render(<App />);
     const openButton = document.querySelector(".skip-mobile-nav-toggle");
     const firstNavItem = document.querySelector(
-      '.skip-sidebar button[title="Overview"]'
+      '.skip-sidebar button[title="Team Overview"]'
     );
     expect(openButton).toBeTruthy();
     expect(firstNavItem).toBeTruthy();
