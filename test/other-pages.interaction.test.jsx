@@ -38,7 +38,7 @@ beforeEach(() => {
 async function goToTab(user, label, waitForText) {
   render(<App />);
   const groupedTabs = {
-    Draft: { workspace: "Players", tab: "Draft Board" },
+    Draft: { workspace: "Player", tab: "Draft Board" },
     AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
   };
   const grouped = groupedTabs[label];

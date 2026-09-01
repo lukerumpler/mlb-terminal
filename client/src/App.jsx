@@ -189,7 +189,7 @@ const WORKSPACE_GROUPS = [
   {
     key:'talent',
     icon:'↑',
-    label:'Players',
+    label:'Player',
     section:'Evaluation',
     defaultTab:'players',
     tabs:[
@@ -554,7 +554,7 @@ export default function App() {
       const detail = e.detail || {};
       if (detail.id) {
         recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
-        // The Players workspace is lazy-loaded. Persist the requested player
+        // The Player workspace is lazy-loaded. Persist the requested player
         // in App state so a name clicked from another workspace still opens
         // the profile after the Players page has mounted.
         setPendingPlayerProfile(detail);

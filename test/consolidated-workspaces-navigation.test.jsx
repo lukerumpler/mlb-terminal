@@ -10,14 +10,14 @@ describe('consolidated workspace navigation', () => {
     localStorage.clear();
   });
 
-  it('replaces separate sidebar entries with Players, Intelligence, Intel Feed, and Settings workspace controls', async () => {
+  it('replaces separate sidebar entries with Player, Intelligence, Intel Feed, and Settings workspace controls', async () => {
     render(<App />);
 
-    expect(await screen.findByTitle('Players')).toBeInTheDocument();
+    expect(await screen.findByTitle('Player')).toBeInTheDocument();
     expect(screen.getByTitle('Intelligence')).toBeInTheDocument();
     expect(screen.getByTitle('Intel Feed')).toBeInTheDocument();
     expect(document.querySelector('.skip-sidebar button[title="Prospects"]')).toBeNull();
-    expect(document.querySelectorAll('.skip-sidebar button[title="Players"]')).toHaveLength(1);
+    expect(document.querySelectorAll('.skip-sidebar button[title="Player"]')).toHaveLength(1);
     expect(document.querySelector('.skip-sidebar button[title="Draft"]')).toBeNull();
     expect(document.querySelector('.skip-sidebar button[title="AMD / IMD"]')).toBeNull();
     expect(document.querySelector('.skip-sidebar button[title="Knowledge"]')).toBeNull();
@@ -26,12 +26,12 @@ describe('consolidated workspace navigation', () => {
     expect(screen.getByRole('img', { name: /active alerts/i })).toBeInTheDocument();
   });
 
-  it('uses horizontal Players-workspace sub-tabs to switch between Players, Prospects, and Draft Board', async () => {
+  it('uses horizontal Player-workspace sub-tabs to switch between Players, Prospects, and Draft Board', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByTitle('Players'));
-    const workspaceTabs = await screen.findByRole('tablist', { name: 'Players workspace sections' });
+    await user.click(await screen.findByTitle('Player'));
+    const workspaceTabs = await screen.findByRole('tablist', { name: 'Player workspace sections' });
     expect(screen.getByRole('tab', { name: 'Players' })).toHaveAttribute('aria-selected', 'true');
     expect(workspaceTabs).toHaveTextContent('Prospects');
     expect(workspaceTabs).toHaveTextContent('Draft Board');
@@ -98,8 +98,8 @@ describe('consolidated workspace navigation', () => {
 
     const switcher = document.querySelector('.skip-mobile-workspace-switcher');
     expect(switcher).toHaveAttribute('aria-label', 'Quick workspace switcher');
-    const talentButton = within(switcher).getByRole('button', { name: /Players/i, hidden:true });
+    const talentButton = within(switcher).getByRole('button', { name: /Player/i, hidden:true });
     await user.click(talentButton);
-    expect(await screen.findByRole('tablist', { name: 'Players workspace sections' })).toBeInTheDocument();
+    expect(await screen.findByRole('tablist', { name: 'Player workspace sections' })).toBeInTheDocument();
   });
 });
