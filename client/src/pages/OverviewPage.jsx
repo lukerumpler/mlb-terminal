@@ -28,6 +28,8 @@ import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
+import WorkshopViewControl from '../components/WorkshopViewControl.jsx';
+import { useWorkshopPreferences } from '../lib/workshopPreferences.js';
 import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
 import BallparkWeatherPanel from '../components/BallparkWeatherPanel.jsx';
 
@@ -1290,6 +1292,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const initialTeamKey = TEAMS[defaultTeamKey] ? defaultTeamKey : DEFAULT_OVERVIEW_TEAM_KEY;
   const [selTeam,setSelTeam]=useState(initialTeamKey);
   const [overviewView, setOverviewView] = useState(() => getInitialOverviewView());
+  const workshopPrefs = useWorkshopPreferences();
   const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
@@ -2625,6 +2628,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           <div style={sans({fontSize:11,color:C.text3,marginTop:6})}><span>Season overview</span><span aria-hidden="true"> · </span>a live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <WorkshopViewControl />
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('csv')} aria-label="Download current team data as CSV"
             style={{height:30,padding:'0 9px',border:`1px solid ${C.tealMid}`,borderRadius:7,background:C.tealSoft,color:C.teal,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>CSV</button>
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('json')} aria-label="Download current team data as JSON"
@@ -2649,30 +2653,38 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
             {sortTeamsByLeagueDivisionName().map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
           </select>
-          <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateLevelFilter('all'); setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateLevelFilter('all'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
-            style={{height:34,padding:'0 12px',border:`1px solid ${affiliateControlsOpen?C.tealMid:C.border}`,borderRadius:7,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:'.04em',background:affiliateControlsOpen?C.tealSoft:C.surface,color:affiliateControlsOpen?C.teal:C.text2,cursor:mlbParentReadyForAffiliate?'pointer':'wait',opacity:mlbParentReadyForAffiliate?1:.65}}>MINOR LEAGUE{affiliateControlsOpen?' · CLOSE':''}</button>
-          {affiliateControlsOpen && <select aria-label="Filter minor league affiliates by level" value={affiliateLevelFilter} onChange={e=>{ const nextFilter=e.target.value; setAffiliateLevelFilter(nextFilter); const selected=affiliates.find(row=>String(row.id)===String(affiliateId)); if (selected && nextFilter !== 'all' && String(selected.levelId) !== nextFilter) { setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); } }} disabled={!affiliateLevelOptions.length || affiliatesState==='loading'}
+          {workshopPrefs.showMinorLeagueControls && <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateLevelFilter('all'); setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateLevelFilter('all'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
+            style={{height:34,padding:'0 12px',border:`1px solid ${affiliateControlsOpen?C.tealMid:C.border}`,borderRadius:7,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:'.04em',background:affiliateControlsOpen?C.tealSoft:C.surface,color:affiliateControlsOpen?C.teal:C.text2,cursor:mlbParentReadyForAffiliate?'pointer':'wait',opacity:mlbParentReadyForAffiliate?1:.65}}>MINOR LEAGUE{affiliateControlsOpen?' · CLOSE':''}</button>}
+          {workshopPrefs.showMinorLeagueControls && affiliateControlsOpen && <select aria-label="Filter minor league affiliates by level" value={affiliateLevelFilter} onChange={e=>{ const nextFilter=e.target.value; setAffiliateLevelFilter(nextFilter); const selected=affiliates.find(row=>String(row.id)===String(affiliateId)); if (selected && nextFilter !== 'all' && String(selected.levelId) !== nextFilter) { setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); } }} disabled={!affiliateLevelOptions.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 10px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliateLevelOptions.length?'pointer':'not-allowed',opacity:affiliateLevelOptions.length?1:.65}}>
              <option value="all">All levels</option>
              {affiliateLevelOptions.map(level=><option key={level.id} value={level.id}>{level.label}</option>)}
            </select>}
-          {affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=visibleAffiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!visibleAffiliates.length || affiliatesState==='loading'}
+          {workshopPrefs.showMinorLeagueControls && affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=visibleAffiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!visibleAffiliates.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliates.length?'pointer':'not-allowed',opacity:affiliates.length?1:.65}}>
              <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':visibleAffiliates.length?'Select MiLB affiliate':'No affiliates at this level'}</option>
              {visibleAffiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>}
         </label>
-        {overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
-        {overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
+        {workshopPrefs.showCacheDiagnostics && overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
+        {workshopPrefs.showCacheDiagnostics && overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
-          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',fmtWinPct(team.pct)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue], [teamWarHeadlineLabel,teamWarValue,teamWarHeadlineTitle]].map(([l,v,title],i)=>(
+          {[
+            ['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`, undefined, null],
+            ['Win%',fmtWinPct(team.pct), undefined, null],
+            ['RS',formatTeamMetric(team.rs), undefined, null],
+            ['RA',formatTeamMetric(team.ra), undefined, null],
+            ['Run Diff', rd == null ? '—' : `${rd>0?'+':''}${rd}`, undefined, rd==null?C.text3:rd>0?C.teal:C.rust],
+            ...(workshopPrefs.showPlayoffOdds ? [['Playoff Odds', playoffOddsValue, undefined, playoffOddsValue === 'Unavailable' ? C.text4 : C.teal]] : []),
+            [teamWarHeadlineLabel, teamWarValue, teamWarHeadlineTitle, teamWarValue === 'Unavailable' ? C.text4 : C.teal],
+          ].map(([l,v,title,color],i)=>(
             <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response is currently available` : undefined)} style={{textAlign:'center',minWidth:0}}>
-              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
+              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:color ?? C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
         </div>
-        <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
+        {workshopPrefs.showPlayoffOdds && <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>}
         {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
@@ -3006,7 +3018,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         </div>
       </section>}
 
-      {overviewView === 'operations' && <Panel id="team-overview-operations" role="tabpanel" title="Franchise CBT Trend" accent={teamAccent} badge={`${taxHistorySeasons[0]}–${taxHistorySeasons.at(-1)}`}>
+      {workshopPrefs.showContractData && overviewView === 'operations' && <Panel id="team-overview-operations" role="tabpanel" title="Franchise CBT Trend" accent={teamAccent} badge={`${taxHistorySeasons[0]}–${taxHistorySeasons.at(-1)}`}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px 4px',flexWrap:'wrap'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />

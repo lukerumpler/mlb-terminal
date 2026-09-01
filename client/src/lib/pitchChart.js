@@ -76,6 +76,61 @@ export const RESULTS = [
   { key:'hbp',        lbl:'Hit By Pitch' },
 ];
 
+// A "swing" for whiff-rate purposes — anything the batter offered at.
+// 'ball', 'called', and 'hbp' are explicitly not swings.
+const SWING_RESULTS = new Set(['swinging', 'foul', 'inplay_out', 'inplay_hit']);
+
+// Every pitch thrown this session, oldest first: closed at-bats (already
+// newest-first, so reversed) followed by whatever's still in progress. Pulled
+// out as its own helper because both summarizePitches() and any future
+// per-session aggregate (e.g. a post-game report) need the same flattened,
+// chronological view rather than each re-deriving it from session.atBats /
+// session.currentPitches separately.
+export function allSessionPitches(session) {
+  const closed = [...session.atBats].reverse().flatMap(ab => ab.pitches);
+  return [...closed, ...session.currentPitches];
+}
+
+// Pure aggregation for the Pitch Summary panel (Roadmap #8 v2): groups every
+// pitch thrown this session by type and returns usage/velocity/whiff-rate
+// per type, sorted by most-thrown first. Deliberately only surfaces a stat
+// when the underlying field actually supports it — velocity is an optional
+// per-pitch entry (a charter may not have a radar/scoreboard reading handy),
+// so avgVelocity/veloRange stay null for a type until at least one recorded
+// pitch of that type has one, rather than defaulting to 0 and implying a
+// real (if slow) fastball. Same reasoning for whiffRate: null, not 0%, when
+// that type was never actually swung at.
+export function summarizePitches(pitchesOrSession) {
+  const pitches = Array.isArray(pitchesOrSession) ? pitchesOrSession : allSessionPitches(pitchesOrSession);
+  const total = pitches.length;
+  if (total === 0) return [];
+
+  const byType = new Map();
+  for (const p of pitches) {
+    const key = p.type || 'UNK';
+    if (!byType.has(key)) byType.set(key, { type: key, count: 0, velocities: [], swings: 0, whiffs: 0 });
+    const row = byType.get(key);
+    row.count += 1;
+    if (Number.isFinite(p.velocity)) row.velocities.push(p.velocity);
+    if (SWING_RESULTS.has(p.result)) {
+      row.swings += 1;
+      if (p.result === 'swinging') row.whiffs += 1;
+    }
+  }
+
+  return [...byType.values()]
+    .map(row => ({
+      type: row.type,
+      count: row.count,
+      usagePct: total > 0 ? (row.count / total) * 100 : null,
+      avgVelocity: row.velocities.length ? row.velocities.reduce((a, b) => a + b, 0) / row.velocities.length : null,
+      minVelocity: row.velocities.length ? Math.min(...row.velocities) : null,
+      maxVelocity: row.velocities.length ? Math.max(...row.velocities) : null,
+      whiffRate: row.swings > 0 ? (row.whiffs / row.swings) * 100 : null,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
 // Pure function: given the count *before* a pitch and its result, returns
 // the count *after* it plus whether the at-bat is over. Exported and
 // unit-tested on its own (test/pitch-chart.test.jsx), independent of the
@@ -130,12 +185,22 @@ export function usePitchChart() {
   // The one entry point that actually logs a pitch. zone/type may be null
   // (a charter can log a result without having picked a zone or type yet —
   // better an incomplete-but-real row than blocking entry entirely), but
-  // resultKey is required; logPitch no-ops without one.
-  const logPitch = useCallback((zone, type, resultKey) => {
+  // resultKey is required; logPitch no-ops without one. velocity and
+  // targetZone (the catcher's pre-pitch target, vs. `zone` which is where it
+  // actually crossed — a command signal, not a duplicate of `zone`) are both
+  // optional extras layered on the same v1 entry point rather than a second
+  // one, so a charter who skips them still gets the fast, one-tap-per-field
+  // flow the tool was built for.
+  const logPitch = useCallback((zone, type, resultKey, extras = {}) => {
     if (!resultKey) return;
+    const { velocity = null, targetZone = null } = extras;
     const cur = load();
     const { balls, strikes, endsAtBat, outcome } = applyResult(cur.balls, cur.strikes, resultKey);
-    const pitch = { id:uid(), zone, type, result:resultKey, countBefore:`${cur.balls}-${cur.strikes}`, ts:Date.now() };
+    const pitch = {
+      id:uid(), zone, targetZone, type,
+      velocity: Number.isFinite(velocity) ? velocity : null,
+      result:resultKey, countBefore:`${cur.balls}-${cur.strikes}`, ts:Date.now(),
+    };
     const pitches = [...cur.currentPitches, pitch];
 
     if (!endsAtBat) {
@@ -147,6 +212,22 @@ export function usePitchChart() {
       pitches, outcome, closedAt:Date.now(),
     };
     commit({ ...cur, balls:0, strikes:0, currentPitches:[], atBats:[closedAtBat, ...cur.atBats] });
+  }, [commit]);
+
+  // Corrects a mis-tap: drops the most recently logged pitch from the
+  // in-progress at-bat and restores the count to what it was immediately
+  // before that pitch (stored on the pitch itself as `countBefore`, so this
+  // needs no replay of the whole at-bat). Deliberately scoped to the
+  // current, still-open at-bat only — reopening an already-closed at-bat
+  // (e.g. to fix the pitch that ended it) is a materially different,
+  // riskier operation (recomputing outs/inning state too) and out of scope
+  // for a same-at-bat correction tool. No-ops with nothing to undo.
+  const undoLastPitch = useCallback(() => {
+    const cur = load();
+    if (cur.currentPitches.length === 0) return;
+    const last = cur.currentPitches[cur.currentPitches.length - 1];
+    const [balls, strikes] = (last.countBefore || '0-0').split('-').map(Number);
+    commit({ ...cur, balls: balls || 0, strikes: strikes || 0, currentPitches: cur.currentPitches.slice(0, -1) });
   }, [commit]);
 
   // Manually closes the current at-bat even if the count didn't force it
@@ -181,5 +262,5 @@ export function usePitchChart() {
     commit(emptySession());
   }, [commit]);
 
-  return { session, setField, logPitch, newAtBat, recordOut, advanceInning, resetCount, newSession };
+  return { session, setField, logPitch, undoLastPitch, newAtBat, recordOut, advanceInning, resetCount, newSession };
 }

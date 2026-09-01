@@ -3,6 +3,8 @@ import {
   applyResult,
   emptySession,
   closeCurrentAtBat,
+  allSessionPitches,
+  summarizePitches,
 } from "../client/src/lib/pitchChart.js";
 
 beforeEach(() => {
@@ -190,5 +192,84 @@ describe("closeCurrentAtBat (inning-rollover archiving)", () => {
     expect(next.atBats).toHaveLength(2);
     expect(next.atBats[0].outcome).toBe("Inning ended"); // newest first
     expect(next.atBats[1]).toBe(prior);
+  });
+});
+
+describe("allSessionPitches (v2: chronological view across closed + in-progress at-bats)", () => {
+  it("returns closed at-bats oldest-first followed by the in-progress at-bat", () => {
+    const older = { id: "ab1", batterName: "A", pitcherName: "P", outcome: "Walk", closedAt: 1, pitches: [{ id: "p1", zone: 1, type: "FF", result: "ball", countBefore: "0-0", ts: 1 }] };
+    const newer = { id: "ab2", batterName: "A", pitcherName: "P", outcome: "Strikeout", closedAt: 2, pitches: [{ id: "p2", zone: 5, type: "SL", result: "called", countBefore: "0-0", ts: 2 }] };
+    const current = [{ id: "p3", zone: 3, type: "FF", result: "foul", countBefore: "0-0", ts: 3 }];
+    // atBats is stored newest-first, same convention as everywhere else in this module.
+    const session = { ...emptySession(), atBats: [newer, older], currentPitches: current };
+    expect(allSessionPitches(session).map(p => p.id)).toEqual(["p1", "p2", "p3"]);
+  });
+
+  it("returns an empty array for a fresh session", () => {
+    expect(allSessionPitches(emptySession())).toEqual([]);
+  });
+});
+
+describe("summarizePitches (v2 Pitch Summary panel)", () => {
+  it("returns an empty array when nothing has been thrown", () => {
+    expect(summarizePitches(emptySession())).toEqual([]);
+  });
+
+  it("groups by type, sorted most-thrown first, with usage percentages that sum to 100", () => {
+    const pitches = [
+      { id: "1", type: "FF", result: "ball" },
+      { id: "2", type: "FF", result: "called" },
+      { id: "3", type: "FF", result: "foul" },
+      { id: "4", type: "SL", result: "swinging" },
+    ];
+    const rows = summarizePitches(pitches);
+    expect(rows.map(r => r.type)).toEqual(["FF", "SL"]);
+    expect(rows[0].count).toBe(3);
+    expect(rows[1].count).toBe(1);
+    expect(rows[0].usagePct).toBeCloseTo(75);
+    expect(rows[1].usagePct).toBeCloseTo(25);
+  });
+
+  it("only reports avg/min/max velocity for a type once at least one of its pitches has one, and never fabricates a value for a type with none", () => {
+    const pitches = [
+      { id: "1", type: "FF", result: "ball", velocity: 95 },
+      { id: "2", type: "FF", result: "called", velocity: 97 },
+      { id: "3", type: "CH", result: "foul" }, // no velocity entered for this pitch
+    ];
+    const rows = summarizePitches(pitches);
+    const ff = rows.find(r => r.type === "FF");
+    const ch = rows.find(r => r.type === "CH");
+    expect(ff.avgVelocity).toBeCloseTo(96);
+    expect(ff.minVelocity).toBe(95);
+    expect(ff.maxVelocity).toBe(97);
+    expect(ch.avgVelocity).toBeNull();
+    expect(ch.minVelocity).toBeNull();
+    expect(ch.maxVelocity).toBeNull();
+  });
+
+  it("computes whiff rate as swinging strikes over swings only, excluding balls/called strikes/HBP from the denominator", () => {
+    const pitches = [
+      { id: "1", type: "SL", result: "ball" },      // not a swing
+      { id: "2", type: "SL", result: "called" },     // not a swing
+      { id: "3", type: "SL", result: "swinging" },   // swing + whiff
+      { id: "4", type: "SL", result: "foul" },       // swing, not a whiff
+    ];
+    const [row] = summarizePitches(pitches);
+    // 2 swings (swinging + foul), 1 whiff -> 50%
+    expect(row.whiffRate).toBeCloseTo(50);
+  });
+
+  it("leaves whiffRate null for a type that was never swung at, rather than reporting 0%", () => {
+    const pitches = [{ id: "1", type: "CU", result: "ball" }, { id: "2", type: "CU", result: "called" }];
+    const [row] = summarizePitches(pitches);
+    expect(row.whiffRate).toBeNull();
+  });
+
+  it("groups pitches with no type under a distinct UNK bucket rather than dropping them", () => {
+    const pitches = [{ id: "1", type: null, result: "ball" }, { id: "2", type: null, result: "called" }];
+    const rows = summarizePitches(pitches);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe("UNK");
+    expect(rows[0].count).toBe(2);
   });
 });
