@@ -2645,6 +2645,53 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           </div>
           </div>
         </div>
+
+      {/* Team WAR hero (HANDOFF S9-10): its own dedicated block between team
+          identity and the flat performance strip below, not one more entry
+          in that strip. Division-average comparison is shown as real context
+          in place of a league-wide rank/percentile — SKIP doesn't fetch a
+          full 30-team WAR set for this page, so a "#2 MLB" style rank isn't
+          backed by real data yet; per HANDOFF's own instruction ("do not
+          create a fake evaluation... never imply confidence the data
+          doesn't support"), that line is left off rather than invented. */}
+      <div className="skip-team-war-hero" role="group" aria-label="Team WAR"
+        style={{display:'flex',alignItems:'center',gap:18,flexWrap:'wrap',padding:'14px 18px',border:`1px solid ${teamWarValue === 'Unavailable' ? C.border : C.tealMid}`,borderRadius:10,background:teamWarValue === 'Unavailable' ? C.surface2 : `color-mix(in srgb, ${C.teal} 7%, ${C.surface})`}}>
+        <div style={{minWidth:0}}>
+          <div style={px({fontSize:10,fontWeight:800,color:C.text3,letterSpacing:'.12em',textTransform:'uppercase'})}>{teamWarHeadlineLabel}</div>
+          <div className="skip-team-war-hero-value" style={px({fontSize:44,fontWeight:900,lineHeight:1,color:teamWarValue === 'Unavailable' ? C.text4 : C.teal,marginTop:4})}>
+            {liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings ? (
+              <SkeletonBlock width={70} height={18} radius={4} style={{margin:'0 auto'}} />
+            ) : teamWarValue === 'Unavailable' ? (
+              // HANDOFF's own mockup shows the unavailable state as a literal
+              // em dash for the headline value, with "Unavailable" as smaller
+              // supporting text below (see the block just under this one) —
+              // deliberately not reusing MetricValue's generic behavior here,
+              // which renders the word "Unavailable" as the value itself and
+              // would duplicate that status word twice in the same block.
+              '—'
+            ) : teamWarValue}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
+          {teamWarValue === 'Unavailable' ? (
+            <>
+              <span style={sans({fontSize:11.5,fontWeight:700,color:C.text3})}>Unavailable</span>
+              <span style={sans({fontSize:9.5,color:C.text4})}>Source data unavailable</span>
+            </>
+          ) : (
+            <>
+              <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={teamWarHeadlineTitle} />
+              {teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && (
+                <span style={sans({fontSize:10.5,color:C.text2})}>
+                  {Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR) >= 0 ? '+' : ''}
+                  {(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} vs {team.div || 'division'} avg
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="overview-team-context" style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
@@ -2676,7 +2723,6 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
             ['RA',formatTeamMetric(team.ra), undefined, null],
             ['Run Diff', rd == null ? '—' : `${rd>0?'+':''}${rd}`, undefined, rd==null?C.text3:rd>0?C.teal:C.rust],
             ...(workshopPrefs.showPlayoffOdds ? [['Playoff Odds', playoffOddsValue, undefined, playoffOddsValue === 'Unavailable' ? C.text4 : C.teal]] : []),
-            [teamWarHeadlineLabel, teamWarValue, teamWarHeadlineTitle, teamWarValue === 'Unavailable' ? C.text4 : C.teal],
           ].map(([l,v,title,color],i)=>(
             <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response is currently available` : undefined)} style={{textAlign:'center',minWidth:0}}>
               <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:color ?? C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
