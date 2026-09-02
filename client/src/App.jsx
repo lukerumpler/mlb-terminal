@@ -15,6 +15,7 @@ import { readDefaultTeamPreference, saveDefaultTeamPreference } from './lib/defa
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
+import { trpc } from './lib/trpc';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
@@ -43,7 +44,7 @@ function PageLoading() {
   );
 }
 
-function VoiceNoteRecorder({ onTranscribed, onCancel }) {
+export function VoiceNoteRecorder({ onTranscribed, onCancel }) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribed] = useState(false);
   const [error, setError] = useState(null);
