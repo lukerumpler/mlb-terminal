@@ -12,7 +12,7 @@ import {
   Badge, PosBadge, FVBadge,
   Panel, StatStrip, KVRow, SkeletonRows,
 } from '../components/atoms.jsx';
-import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits } from '../api/mlb.js';
+import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits, getLeagueTeamsWar, normalizeFanGraphsTeamName } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt, fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
 import { downloadMlbStandingsCsv } from '../lib/csvExports.js';
@@ -49,14 +49,19 @@ export function buildComparisonMetricSummary(rows = []) {
   return summary;
 }
 
-export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamStats = { hitting:{}, pitching:{} }, metric = 'ops', search = '', division = 'all', direction = 'desc' } = {}) {
+export function buildCrossTeamComparisonRows({ teams = {}, standings = {}, teamStats = { hitting:{}, pitching:{} }, warByTeam = null, metric = 'ops', search = '', division = 'all', direction = 'desc' } = {}) {
   const standingsRows = Object.entries(standings || {}).flatMap(([divisionName, rows]) => (rows || []).map(team => ({ ...team, division:divisionName })));
   const standingsById = new Map(standingsRows.map(team => [String(team.id), team]));
   const rows = Object.values(teams || {}).map(team => {
     const hitting = teamStats.hitting?.[team.id] ?? teamStats.hitting?.[String(team.id)] ?? {};
     const pitching = teamStats.pitching?.[team.id] ?? teamStats.pitching?.[String(team.id)] ?? {};
     const standing = standingsById.get(String(team.id)) || {};
-    const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : metric === 'whip' ? pitching.whip : metric === 'avg' ? hitting.avg : metric === 'sb' ? hitting.stolenBases : metric === 'k' ? (pitching.strikeOuts ?? pitching.strikeouts) : null;
+    // warByTeam is keyed by the exact team.name string (already normalized
+    // by the caller to match, since FanGraphs' own team-name spelling can
+    // differ from TEAMS' — see getLeagueTeamsWar/normalizeFanGraphsTeamName
+    // in api/mlb.js). Kept as a plain lookup here so this stays a pure,
+    // provider-agnostic function that's easy to test with fake team names.
+    const raw = metric === 'ops' ? hitting.ops : metric === 'era' ? pitching.era : metric === 'hr' ? hitting.homeRuns : metric === 'runs' ? (hitting.runs ?? standing.runsScored) : metric === 'runsAllowed' ? (pitching.runs ?? standing.runsAllowed) : metric === 'winPct' ? (standing.winningPercentage ?? standing.winningPct) : metric === 'whip' ? pitching.whip : metric === 'avg' ? hitting.avg : metric === 'sb' ? hitting.stolenBases : metric === 'k' ? (pitching.strikeOuts ?? pitching.strikeouts) : metric === 'war' ? warByTeam?.get?.(team.name) ?? warByTeam?.[team.name] : null;
     const value = raw == null || raw === '' ? null : Number(raw);
     return { id:team.id, abbr:team.abbr, name:team.name, division:standing.division || 'Division unavailable', value:Number.isFinite(value) ? value : null, wins:standing.wins, losses:standing.losses };
   }).filter(row => Number.isFinite(row.value));
@@ -801,6 +806,7 @@ function LeaguePage() {
   const [comparisonSearch, setComparisonSearch] = useState('');
   const [comparisonDivision, setComparisonDivision] = useState('all');
   const [comparisonSortDirection, setComparisonSortDirection] = useState('desc');
+  const [leagueWarRows, setLeagueWarRows] = useState([]);
   const [compactMobile, setCompactMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches || false);
 
   useEffect(() => {
@@ -871,10 +877,36 @@ function LeaguePage() {
 
   const lbTeams = ['all', ...new Set(liveHitterRows.map(r => r.team).filter(Boolean))].sort();
 
-  const comparisonRows = useMemo(() => buildCrossTeamComparisonRows({ teams:TEAMS, standings, teamStats, metric:comparisonMetric, search:comparisonSearch, division:comparisonDivision, direction:comparisonSortDirection }), [comparisonDivision, comparisonMetric, comparisonSearch, comparisonSortDirection, standings, teamStats]);
+  // Team WAR for the cross-team comparison table below. getLeagueTeamsWar()
+  // never throws (it resolves to [] on any provider failure), so there's no
+  // error state to track here — teams simply have no 'war' comparison value
+  // until this resolves, same as any other metric with missing data.
+  useEffect(() => {
+    let alive = true;
+    getLeagueTeamsWar().then(rows => { if (alive) setLeagueWarRows(rows); });
+    return () => { alive = false; };
+  }, []);
+
+  // getLeagueTeamsWar() keys by FanGraphs' own team-name spelling (run
+  // through canonicalTeamName), which doesn't always match TEAMS' spelling
+  // exactly. Re-key here to TEAMS' own team.name strings so the plain
+  // lookup inside buildCrossTeamComparisonRows (team.name -> WAR) just works.
+  const leagueWarByTeamName = useMemo(() => {
+    if (!leagueWarRows.length) return new Map();
+    const canonicalToDisplayName = new Map(Object.values(TEAMS).map(t => [normalizeFanGraphsTeamName(t.name), t.name]));
+    const map = new Map();
+    leagueWarRows.forEach(row => {
+      const displayName = canonicalToDisplayName.get(row.team);
+      if (displayName) map.set(displayName, row.totalWAR);
+    });
+    return map;
+  }, [leagueWarRows]);
+
+  const comparisonRows = useMemo(() => buildCrossTeamComparisonRows({ teams:TEAMS, standings, teamStats, warByTeam:leagueWarByTeamName, metric:comparisonMetric, search:comparisonSearch, division:comparisonDivision, direction:comparisonSortDirection }), [comparisonDivision, comparisonMetric, comparisonSearch, comparisonSortDirection, standings, teamStats, leagueWarByTeamName]);
   const comparisonLoading = stdLoading && !Object.keys(teamStats.hitting || {}).length && !Object.keys(teamStats.pitching || {}).length;
   const comparisonDivisions = ['all', ...new Set(Object.keys(standings || {}))];
   const comparisonMetricConfig = {
+    war:{ label:'Team WAR', digits:1, suffix:'', group:'standings' },
     ops:{ label:'Team OPS', digits:3, suffix:'', group:'hitting' },
     era:{ label:'Team ERA', digits:2, suffix:'', group:'pitching' },
     hr:{ label:'Home Runs', digits:0, suffix:'', group:'hitting' },
@@ -886,6 +918,9 @@ function LeaguePage() {
     sb:{ label:'Stolen Bases', digits:0, suffix:'', group:'hitting' },
     k:{ label:'Strikeouts (Pitching)', digits:0, suffix:'', group:'pitching' },
   }[comparisonMetric];
+  // Shared by both comparison-value render spots below so the two never
+  // drift out of sync (they used to be the exact ternary copy-pasted twice).
+  const formatComparisonValue = value => (comparisonMetric === 'ops' || comparisonMetric === 'avg') ? fmtScorebookRate(value) : (comparisonMetric === 'era' || comparisonMetric === 'whip') ? value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(value) : comparisonMetric === 'war' ? value.toFixed(1) : Math.round(value).toLocaleString();
 
   const HIT_COLS = [
     { key:'avg',  label:'AVG', fmt:fmtScorebookRate },
@@ -1128,7 +1163,7 @@ function LeaguePage() {
       <Panel title="Cross-Team Comparison" accent={C.teal} badge={comparisonRows.length ? `${comparisonRows.length} verified teams` : 'Unavailable'}>
         <div style={{padding:'8px 14px 4px',...sans({fontSize:10,color:C.text3,lineHeight:1.4})}}>Compare current-season team performance side-by-side using the same metric, division, and search filters. Missing provider values remain excluded.</div>
         <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',padding:'8px 14px'}}>
-          <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Metric</span><select aria-label="Cross-team comparison metric" value={comparisonMetric} onChange={event=>{setComparisonMetric(event.target.value);setComparisonSortDirection(event.target.value === 'era' ? 'asc' : 'desc')}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}}>{Object.entries({ops:'Team OPS',era:'Team ERA',hr:'Home Runs',runs:'Runs Scored',runsAllowed:'Runs Allowed',winPct:'Win %',whip:'Team WHIP',avg:'Team AVG',sb:'Stolen Bases',k:'Strikeouts (Pitching)'}).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+          <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Metric</span><select aria-label="Cross-team comparison metric" value={comparisonMetric} onChange={event=>{setComparisonMetric(event.target.value);setComparisonSortDirection(event.target.value === 'era' ? 'asc' : 'desc')}} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}}>{Object.entries({war:'Team WAR',ops:'Team OPS',era:'Team ERA',hr:'Home Runs',runs:'Runs Scored',runsAllowed:'Runs Allowed',winPct:'Win %',whip:'Team WHIP',avg:'Team AVG',sb:'Stolen Bases',k:'Strikeouts (Pitching)'}).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
           <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Division</span><select aria-label="Cross-team comparison division" value={comparisonDivision} onChange={event=>setComparisonDivision(event.target.value)} style={{height:30,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}}>{comparisonDivisions.map(value=><option key={value} value={value}>{value === 'all' ? 'All divisions' : value}</option>)}</select></label>
           <label style={{display:'flex',alignItems:'center',gap:5,...sans({fontSize:10,color:C.text2,fontWeight:700})}}><span>Team</span><input aria-label="Filter cross-team comparison by team" value={comparisonSearch} onChange={event=>setComparisonSearch(event.target.value)} placeholder="Search team" style={{height:30,width:140,padding:'0 8px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text,fontSize:10}} /></label>
           <button type="button" aria-label={`Reverse cross-team comparison sort; currently ${comparisonSortDirection === 'asc' ? 'ascending' : 'descending'}`} onClick={()=>setComparisonSortDirection(direction=>direction === 'asc' ? 'desc' : 'asc')} style={{height:30,padding:'0 9px',border:`1px solid ${C.border}`,borderRadius:6,background:C.surface,color:C.text2,fontSize:10,fontWeight:800,cursor:'pointer'}}>{comparisonSortDirection === 'asc' ? 'ASC ↑' : 'DESC ↓'}</button>
@@ -1176,7 +1211,7 @@ function LeaguePage() {
                     </div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={px({ fontSize:14, fontWeight:800, color:C.teal })}>{(comparisonMetric === 'ops' || comparisonMetric === 'avg') ? fmtScorebookRate(row.value) : (comparisonMetric === 'era' || comparisonMetric === 'whip') ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</div>
+                    <div style={px({ fontSize:14, fontWeight:800, color:C.teal })}>{formatComparisonValue(row.value)}</div>
                     <div style={sans({ fontSize:8, fontWeight:700, color:C.text4, textTransform:'uppercase', letterSpacing:'.05em' })}>{comparisonMetricConfig.label}</div>
                   </div>
                 </button>
@@ -1197,7 +1232,7 @@ function LeaguePage() {
                     <tr key={row.id} style={{borderBottom:index < comparisonRows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none'}}>
                       <th scope="row" style={{padding:'7px 10px',textAlign:'left',...sans({fontSize:11,fontWeight:800,color:C.text})}}>{row.name}</th>
                       <td style={{padding:'7px 10px',...sans({fontSize:10,color:C.text3})}}>{row.division}</td>
-                      <td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{(comparisonMetric === 'ops' || comparisonMetric === 'avg') ? fmtScorebookRate(row.value) : (comparisonMetric === 'era' || comparisonMetric === 'whip') ? row.value.toFixed(2) : comparisonMetric === 'winPct' ? fmtWinPct(row.value) : Math.round(row.value).toLocaleString()}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:11,fontWeight:800,color:C.teal})}}>{formatComparisonValue(row.value)}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',...px({fontSize:10,color:C.text2})}}>{row.wins != null && row.losses != null ? `${row.wins}-${row.losses}` : '—'}</td>
                     </tr>
                   ))}

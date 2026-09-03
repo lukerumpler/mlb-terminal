@@ -164,7 +164,19 @@ async function fetchProviderJson(url, {
   const persistent = readPersistentProviderSnapshot(persistentCacheKey, now);
   const request = (async () => {
     try {
-      const response = await fetch(apiUrl(url), { signal: AbortSignal.timeout(timeoutMs) });
+      let response;
+      try {
+        response = await fetch(apiUrl(url), { signal: AbortSignal.timeout(timeoutMs) });
+      } catch (transportError) {
+        // A raw fetch() failure (offline, DNS, CORS) has a browser-authored
+        // .message like "Failed to fetch", and staleReason below (plus any
+        // caller without its own stale fallback) surfaces error.message to
+        // the user verbatim. This function has no externally-passed signal,
+        // so unlike mlb() below there's no cancellation semantics to
+        // preserve — every failure here, timeout included, should fall
+        // through to the stale-data check below exactly as it already does.
+        throw new Error(`Provider request failed — could not reach ${url}`, { cause: transportError });
+      }
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw Object.assign(
@@ -172,7 +184,15 @@ async function fetchProviderJson(url, {
           { status: response.status, providerBlocked: Boolean(payload?.providerBlocked), payload }
         );
       }
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // Same reasoning as the !response.ok case just above: a 200 with a
+        // non-JSON body used to throw a raw SyntaxError straight out of
+        // response.json().
+        throw new Error(`Provider returned an unreadable response — ${url}`, { cause: parseError });
+      }
       if (url.startsWith('/api/fangraphs-models') && data?.freshness !== 'stale-cached') recordFeedSuccess('fangraphs');
       providerJsonCache.set(url, { data, expiresAt: Date.now() + ttlMs });
       writePersistentProviderSnapshot(persistentCacheKey, data);
@@ -469,7 +489,15 @@ export async function mlb(path, params = {}, {
         recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'stale-hit', reason: 'transport-error' });
         return stale;
       }
-      throw error;
+      recordRequestTrace({ key: url, priority, stage, screen, resource: 'mlb-proxy', event: 'transport-error' });
+      // A raw fetch() failure here — offline, DNS, CORS — has a
+      // browser/engine-authored .message ("Failed to fetch", "Load failed",
+      // "NetworkError when attempting to fetch resource.") that several
+      // callers surface to the user verbatim (e.g. DataSourceStatusCenter's
+      // retry banner via retryProvider() -> getTodaysGames() -> here, with
+      // no catch of its own in between). AbortError is excluded above and
+      // still rethrown as-is.
+      throw new Error(`MLB API request failed — ${path}`, { cause: error });
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -2411,6 +2439,28 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
     return null;
   }
 }
+
+// League-wide Team WAR for the League page's cross-team comparison table.
+// Deliberately hits the exact same `/api/fangraphs-models?mode=aggregate`
+// URL as getTeamAggregateWar() above (same params, same persistentCacheKey
+// prefix) so fetchProviderJson()'s in-flight/short-TTL cache dedupes the two
+// callers instead of doubling the request — whichever one runs first serves
+// both. getTeamAggregateWar() only keeps the selected team + its division;
+// this keeps all 30 (whatever FanGraphs returns), for a full-league table.
+export async function getLeagueTeamsWar(season = SEASON) {
+  const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
+  try {
+    const url = `/api/fangraphs-models?${params.toString()}`;
+    const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
+    const teams = Array.isArray(data?.teams) ? data.teams : [];
+    return teams
+      .filter(row => row?.team && row.totalWAR != null && Number.isFinite(Number(row.totalWAR)))
+      .map(row => ({ team: canonicalTeamName(row.team), totalWAR: Number(row.totalWAR) }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getTeamCalculatedIntelligence(teamId, season = SEASON) {
   if (!teamId) return null;
   const params = new URLSearchParams({ teamId: String(teamId), season: String(season) });

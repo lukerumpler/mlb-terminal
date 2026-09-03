@@ -565,4 +565,32 @@ describe("MLB request cache optimization", () => {
     const res = await mlb("/test/fast", {}, { ttl: 60_000 });
     expect(res).toBeDefined();
   });
+
+  it("still serves stale cached data on a transport failure instead of throwing", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ teams: [{ id: 9001 }] }),
+      text: async () => "",
+    });
+    const first = await mlb("/teams/9001", {}, { ttl: 1 });
+    expect(first).toEqual({ teams: [{ id: 9001 }] });
+    await vi.advanceTimersByTimeAsync(2);
+
+    fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await expect(mlb("/teams/9001", {}, { ttl: 1 })).resolves.toEqual({ teams: [{ id: 9001 }] });
+  });
+
+  it("still rethrows AbortError as-is, not wrapped", async () => {
+    const controller = new AbortController();
+    fetch.mockImplementation(() => new Promise((_, reject) => {
+      controller.signal.addEventListener("abort", () => {
+        const abortError = new Error("The operation was aborted");
+        abortError.name = "AbortError";
+        reject(abortError);
+      });
+    }));
+    const pending = mlb("/teams/abort-me", {}, { signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
 });
