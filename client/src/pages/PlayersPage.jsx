@@ -591,6 +591,17 @@ export function aggregateZoneWhiffs(contactPoints) {
   return out;
 }
 
+// Single source of truth for "does this player actually have zone-plottable
+// Savant data" — used both for the Plate Discipline panel's badge (data
+// provenance sweep) and its body content, so they can't drift apart. A
+// non-empty contactPoints array with every row missing usable zone data
+// would pass a naive `.length` check but still render nothing below —
+// that mismatch is exactly what this shares instead of duplicates.
+export function hasZoneWhiffData(contactPoints) {
+  const byZone = aggregateZoneWhiffs(contactPoints);
+  return Object.values(byZone).reduce((sum, b) => sum + b.swings, 0) > 0;
+}
+
 function ZoneWhiffGrid({ contactPoints }) {
   const byZone = useMemo(() => aggregateZoneWhiffs(contactPoints), [contactPoints]);
   const totalSwings = Object.values(byZone).reduce((sum, b) => sum + b.swings, 0);
@@ -2585,7 +2596,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
               <PlateDisciplineZone s={s} isPitcher={player.isPitcher} />
             </Panel>
           ) : (
-            <Panel title="Plate Discipline" accent={C.slate} badge="Live Savant">
+            <Panel title="Plate Discipline" accent={C.slate} badge={hasZoneWhiffData(player.contactPoints) ? 'Live Savant' : 'Unavailable'}>
               <ZoneWhiffGrid contactPoints={player.contactPoints} />
             </Panel>
           )}
