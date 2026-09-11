@@ -152,3 +152,90 @@ describe("SKIP app — full tab cycle", () => {
     });
   }
 });
+
+// The sidebar only exposes each workspace's *default* tab (title={t.label}
+// on WORKSPACE_GROUPS, clicking always sets tab to t.defaultTab) — the tab
+// cycle above, driven by that same sidebar, can never actually reach a
+// workspace's other sub-tabs. Those are a second click away, inside the
+// role="tablist" sub-nav that only renders once you're already on that
+// workspace. Six real pages were getting zero automated coverage as a
+// result: Prospects, Draft Board, AMD / IMD, Knowledge, Follow List, and
+// Alerts. (This is also exactly how a stale/wrong workspace sub-tab
+// description — Follow List's used to say "Tracked players and follow-up
+// activity", which isn't what that page does — went unnoticed: nothing
+// ever rendered it in a test.)
+const WORKSPACE_SUBTABS = [
+  { workspaceLabel: "Player", subTabLabels: ["Prospects", "Draft Board"] },
+  { workspaceLabel: "Intelligence", subTabLabels: ["AMD / IMD", "Knowledge"] },
+  { workspaceLabel: "Intel Feed", subTabLabels: ["Follow List"] },
+  { workspaceLabel: "Settings", subTabLabels: ["Alerts"] },
+];
+
+describe("SKIP app — workspace sub-tabs (a second click past the sidebar)", () => {
+  for (const { workspaceLabel, subTabLabels } of WORKSPACE_SUBTABS) {
+    for (const subTabLabel of subTabLabels) {
+      it(`renders the "${subTabLabel}" sub-tab (under the ${workspaceLabel} workspace) without an error-boundary fallback`, async () => {
+        const user = userEvent.setup();
+        render(<App />);
+
+        const navButton = await waitFor(() => {
+          const button = document.querySelector(
+            `.skip-sidebar button[title="${workspaceLabel.replace(/"/g, '\\"')}"]`
+          );
+          if (!button)
+            throw new Error(`Workspace navigation button not found: ${workspaceLabel}`);
+          return button;
+        });
+        await user.click(navButton);
+
+        const subTabButton = await waitFor(() =>
+          screen.getByRole("tab", { name: subTabLabel })
+        );
+        await user.click(subTabButton);
+
+        await waitFor(
+          () => {
+            expect(document.body.textContent).not.toMatch(
+              /This tab failed to load/
+            );
+          },
+          { timeout: 10000 }
+        );
+
+        await new Promise(r => setTimeout(r, 300));
+
+        expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+        expect(
+          screen.getByRole("tab", { name: subTabLabel })
+        ).toHaveAttribute("aria-selected", "true");
+      });
+    }
+  }
+
+  it('renders "About Me" without an error-boundary fallback', async () => {
+    // Not part of TABS/WORKSPACE_GROUPS at all — its own always-visible,
+    // bottom-pinned sidebar button.
+    const user = userEvent.setup();
+    render(<App />);
+
+    const aboutButton = await waitFor(() => {
+      const button = screen.getByText("About Me").closest("button");
+      if (!button) throw new Error("About Me button not found");
+      return button;
+    });
+    await user.click(aboutButton);
+
+    await waitFor(
+      () => {
+        expect(document.body.textContent).not.toMatch(
+          /This tab failed to load/
+        );
+      },
+      { timeout: 10000 }
+    );
+
+    await new Promise(r => setTimeout(r, 300));
+
+    expect(document.body.textContent).not.toMatch(/This tab failed to load/);
+  });
+});

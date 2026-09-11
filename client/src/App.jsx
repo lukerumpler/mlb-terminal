@@ -219,7 +219,7 @@ const WORKSPACE_GROUPS = [
     defaultTab:'feed',
     tabs:[
       { key:'feed', label:'Intel Feed', description:'Source-aware league and team intelligence' },
-      { key:'follows', label:'Follow List', description:'Tracked players and follow-up activity' },
+      { key:'follows', label:'Follow List', description:'Curated X accounts — scouts, analysts, and front offices' },
     ],
   },
   {

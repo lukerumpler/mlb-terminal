@@ -37,7 +37,7 @@ import { BoxscoreSplitPanel, ReconciliationPanel } from '../features/player-prof
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation, getSurchargeBand } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
-import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
+import { PLAYER_NOTE_CATEGORIES, readPlayerNotes, writePlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 import { buildHandednessComparison } from '../features/player-profile/handedness.js';
 import { buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance } from '../features/player-profile/boxscore.js';
 
@@ -2034,7 +2034,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
   const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
   useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); setNoteSearch(''); setBulkTag(''); setBulkTagReplacement(''); }, [player.id]);
-  useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
+  useEffect(() => { writePlayerNotes(player.id, observations); }, [player.id, observations]);
   const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
   const availableNoteTags = useMemo(() => [...new Set(observations.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b)), [observations]);
   const visibleObservations = useMemo(() => {
