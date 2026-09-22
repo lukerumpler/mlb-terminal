@@ -27,19 +27,39 @@ feeds (higher frequency, biomechanics, bullpen/cage sessions, whatever a
 club's internal systems expose) that aren't public at all. Don't conflate
 the two — they're separate features with separate data sources.
 
-## 0. Baseline — what's built now (don't rebuild these)
+## 0. Baseline — NOT BUILT IN THIS REPO (verify before trusting)
 
-- [x] `shared/trackingProviders.js` — registry of the 5 provider definitions
+> **Correction (2026-09-16).** Every item in this section was previously
+> marked `[x]` done. **None of these files exist** — not on this branch, not
+> on `main`, not anywhere in this repository's reachable history. Verified
+> with:
+>
+> ```bash
+> git ls-tree -r HEAD --name-only | grep -iE "trackingProviders|_providers|tracking-providers"
+> git log --all --oneline -- "*trackingProviders*" "*AdvancedTrackingPanel*" "*tracking-providers*"
+> ```
+>
+> Both return empty. The progress-log entry below describes building this
+> against a `combine-branches` checkout, which also does not exist on this
+> remote. Wherever that work went, it did not arrive here.
+>
+> Items are therefore re-marked `[ ]`. **Do not treat this section as
+> "already done, don't rebuild."** Either locate the original work and merge
+> it, or build it fresh. The descriptions are retained because they are a
+> reasonable design spec — but they describe an intention, not a fact.
+
+
+- [ ] `shared/trackingProviders.js` — registry of the 5 provider definitions
       (label, category, honest public description, what connecting it
       unlocks, required env vars) + canonical `PitchTrackingEvent` /
       `SwingTrackingEvent` JSDoc shapes every adapter normalizes into.
-- [x] `server/api/_providers/{shared,trackman,rapsodo,hawkeye,bats,teamInternalFeed}.js`
+- [ ] `server/api/_providers/{shared,trackman,rapsodo,hawkeye,bats,teamInternalFeed}.js`
       — one adapter stub per provider. Each checks env vars via
       `getEnvStatus()` and throws `ProviderNotConnectedError` until
       configured; `fetchRaw()` bodies are placeholders that throw a clear
       "implement me" error even once env vars exist, since no real request
       logic has been written against real docs yet.
-- [x] `server/api/tracking-providers.js` — status endpoint. Returns
+- [ ] `server/api/tracking-providers.js` — status endpoint. Returns
       `{ providers: [...], generatedAt }` where each provider reports
       `connected` (env vars present, nothing more) and `missingEnvVars`.
       Never fetches real data, never echoes credential values. Registered in
@@ -47,21 +67,21 @@ the two — they're separate features with separate data sources.
       `api/[...path].ts` (production Vercel catch-all) — both had to be
       updated; missing the second one means it 404s in production while
       working fine locally.
-- [x] `client/src/lib/trackingProvidersClient.js` — TTL-cached fetch wrapper
+- [ ] `client/src/lib/trackingProvidersClient.js` — TTL-cached fetch wrapper
       for the status endpoint, same pattern as `cacheHealthClient.js`.
-- [x] `client/src/components/TrackingDataSourcesPanel.jsx` — Settings page
+- [ ] `client/src/components/TrackingDataSourcesPanel.jsx` — Settings page
       panel (below the existing `DataSourceStatusCenter`) listing all 5
       providers with category, description, what they unlock, and a
       Connected/Not-connected pill. Not connected is styled neutrally, not
       as an error/warning — it's the expected default state.
-- [x] `client/src/features/player-profile/AdvancedTrackingPanel.jsx` +
+- [ ] `client/src/features/player-profile/AdvancedTrackingPanel.jsx` +
       `advancedTrackingSampleData.js` — a panel on the player profile page
       (pitchers get a pitch-events table, hitters get a swing-events table),
       with a "Preview with sample data" toggle that renders clearly-labeled
       synthetic rows through the exact same table component real data will
       use later. The sample banner is persistent and unmissable while
       active; sample state is React-local, never persisted.
-- [x] `server/api/tracking-providers.test.ts` — covers all-disconnected,
+- [ ] `server/api/tracking-providers.test.ts` — covers all-disconnected,
       one-provider-connected, method rejection, and CORS preflight. Full
       suite (`npx vitest run`) passes at 153 files / 687 tests / 4 skipped
       with these changes in; `tsc --noEmit` and `vite build` both clean.
@@ -144,7 +164,9 @@ the two — they're separate features with separate data sources.
 
 _Add one line per work session, newest at top._
 
-2026-08-28 — Claude (chat) — Built the full baseline (section 0): shared
+2026-08-28 — Claude (chat) — **[UNVERIFIABLE — see the correction in
+section 0; none of the files below are present in this repo]** Reported
+building the full baseline (section 0): shared
 canonical schema/registry, 5 adapter stubs (TrackMan/Rapsodo with hedged
 placeholder field-mappings from public docs, Hawkeye/BATS/team-internal
 deliberately left unmapped), status endpoint registered in both the
@@ -161,3 +183,10 @@ clean (3021 modules). No existing files' behavior changed — every edit to
 a pre-existing file (`routes.ts`, `api/[...path].ts`, `OtherPages.jsx`,
 `PlayersPage.jsx`) is a pure addition. Next: nothing further until real
 provider access exists — see section 6 for what that unlocks.
+
+2026-09-16 — Verification pass — Searched the full tree and every reachable
+ref for the seven artifacts section 0 marked done. Found none. Re-marked
+section 0 as not-started and annotated the 2026-08-28 entry rather than
+deleting it, so the discrepancy stays visible instead of being quietly
+erased. No code changed. Next step for whoever owns this: find the
+`combine-branches` work or rebuild section 0 from scratch.

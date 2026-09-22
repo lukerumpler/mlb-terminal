@@ -15,7 +15,7 @@ A Bloomberg-terminal-inspired baseball intelligence platform for scouting, prosp
 - **Data Source Status Center** — transparency panel showing the live/cached/stale state of every upstream provider
 - **Command palette & recent history** — fast keyboard-driven navigation across the whole terminal
 - **Ballpark weather, defensive OAA field maps, pitch shape/contact heatmaps** — supplementary scouting visualizations
-- **About the builder** — a profile/bio page on the live deployment (`/about`); not currently part of this repo's tracked source — see [Deployment Model](#deployment-model)
+- **About the builder** — a profile/bio page (`/about`) with background, evaluation principles, and experience; tracked in this repo at `client/src/pages/AboutPage.jsx`
 
 ## Tech Stack
 
@@ -107,7 +107,7 @@ Full provenance rules, TTLs, and fallback behavior are documented in [`docs/data
 
 This project runs on two tracks that are **not** a simple mirror of each other:
 
-- **Manus-managed project (canonical/live)** — published through Manus's own release process to `skipbasebal-mm6hz9ps.manus.space`. This is the source of truth for what's actually live, and it can move ahead of GitHub (e.g. the `/about` builder-profile page currently only exists here).
+- **Manus-managed project (canonical/live)** — published through Manus's own release process to `skipbasebal-mm6hz9ps.manus.space`. This is the source of truth for what's actually live, and it can move ahead of GitHub.
 - **This GitHub repo** — a deliberately reconciled reference/mirror, not a push target for the managed deployment. Merges between the two are done by comparing file-by-file rather than overwriting either side, since the histories have diverged at times. See [`GITHUB_SYNC_AUDIT.md`](GITHUB_SYNC_AUDIT.md) and [`docs/BRANCH_INTEGRATION_AUDIT_2026-08-21.md`](docs/BRANCH_INTEGRATION_AUDIT_2026-08-21.md) for past reconciliation reviews. Vercel deployment config (`vercel.json`) exists for building from this repo directly, but it is a secondary path, not the canonical release.
 - Automated tools without managed-project access will not have push credentials to this repo's `main` by design — see [`docs/RELEASE_WORKFLOW.md`](docs/RELEASE_WORKFLOW.md) for the intended release-gate → managed-checkpoint flow.
 
