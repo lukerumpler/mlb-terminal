@@ -28,6 +28,8 @@ import { apiUrl } from '../lib/apiOrigin.js';
 import { getCacheHealth } from '../lib/cacheHealthClient.js';
 import RequestDiagnosticsPanel from '../components/RequestDiagnosticsPanel.jsx';
 import TeamNewsPanel from '../components/TeamNewsPanel.jsx';
+import WorkshopViewControl from '../components/WorkshopViewControl.jsx';
+import { useWorkshopPreferences } from '../lib/workshopPreferences.js';
 import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
 import BallparkWeatherPanel from '../components/BallparkWeatherPanel.jsx';
 
@@ -61,8 +63,7 @@ export const OVERVIEW_ACCENTS = Object.freeze({
 export const DEFAULT_OVERVIEW_TEAM_KEY = 'sd';
 
 const OVERVIEW_VIEW_OPTIONS = [
-  { id: 'briefing', label: 'Briefing', detail: 'Core signals' },
-  { id: 'performance', label: 'Performance', detail: 'Models & field play' },
+  { id: 'briefing', label: 'Briefing', detail: 'Core signals, models & field play' },
   { id: 'roster', label: 'Roster', detail: 'Players & affiliates' },
   { id: 'news', label: 'Team News', detail: 'Club headlines' },
   { id: 'operations', label: 'Operations', detail: 'Context & schedule' },
@@ -1291,6 +1292,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const initialTeamKey = TEAMS[defaultTeamKey] ? defaultTeamKey : DEFAULT_OVERVIEW_TEAM_KEY;
   const [selTeam,setSelTeam]=useState(initialTeamKey);
   const [overviewView, setOverviewView] = useState(() => getInitialOverviewView());
+  const workshopPrefs = useWorkshopPreferences();
   const [evaluationActiveLabel, setEvaluationActiveLabel] = useState('Overall');
   const evaluationPresentation = useMemo(() => getEvaluationPresentation(), []);
   const [affiliateLevel, setAffiliateLevel] = useState('11');
@@ -1450,6 +1452,23 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     };
   }, []);
   const teamBase=TEAMS[selTeam];
+  // The Performance tab's data was previously fetched only when a user
+  // explicitly clicked over to it. Now that it's merged into the default
+  // Briefing view, firing all of it immediately on mount adds a real burst
+  // of requests that can crowd out whatever the user just navigated to
+  // (e.g. clicking Operations right after landing) against the client's
+  // shared per-window request budget (see the queue comment in api/mlb.js —
+  // deliberately kept below the server's real limit). A short, imperceptible
+  // stagger gives navigation-triggered requests room to enqueue first;
+  // total request volume is unchanged, only the timing of this specific
+  // batch. Briefing's own original data is untouched by this and still
+  // fetches immediately.
+  const [mergedPerformanceDataReady, setMergedPerformanceDataReady] = useState(false);
+  useEffect(() => {
+    if (overviewView !== 'briefing') { setMergedPerformanceDataReady(false); return undefined; }
+    const timer = setTimeout(() => setMergedPerformanceDataReady(true), 200);
+    return () => clearTimeout(timer);
+  }, [overviewView, teamBase?.id]);
   useEffect(() => {
     let alive = true;
     if (!affiliateControlsOpen) {
@@ -1792,7 +1811,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   }, [overviewView, teamBase?.id, mlbRetryToken]);
   const rosterSavantKey = useMemo(() => buildRosterSavantKey(scopedTeamPlayers), [scopedTeamPlayers]);
   useEffect(() => {
-    if (overviewView !== 'performance') return undefined;
+    if (overviewView !== 'briefing' || !mergedPerformanceDataReady) return undefined;
     let alive = true;
     const cached = readTeamSavantCache(teamBase?.abbr, CURRENT_SEASON);
     const applySnapshot = (snapshot, source) => {
@@ -1838,9 +1857,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       applySnapshot({ exitVelocityRows: [], battedBallRows: [], pitchRows: [] }, '');
     });
     return () => { alive = false; };
-  }, [overviewView, teamBase?.abbr, savantRetryToken, rosterSavantKey]);
+  }, [overviewView, mergedPerformanceDataReady, teamBase?.abbr, savantRetryToken, rosterSavantKey]);
   useEffect(() => {
-    if (overviewView !== 'performance') return undefined;
+    if (overviewView !== 'briefing' || !mergedPerformanceDataReady) return undefined;
     let alive = true;
     const cached = readTeamSavantAgainstCache(teamBase?.abbr, CURRENT_SEASON);
     const cachedRows = Array.isArray(cached?.data) ? cached.data : [];
@@ -1854,9 +1873,9 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       if (alive) setTeamBattedBallAgainstRows(normalized);
     }).catch(() => { if (alive && !cached) setTeamBattedBallAgainstRows([]); });
     return () => { alive = false; };
-  }, [overviewView, teamBase?.abbr, savantRetryToken]);
+  }, [overviewView, mergedPerformanceDataReady, teamBase?.abbr, savantRetryToken]);
   useEffect(() => {
-    if (overviewView !== 'performance') return undefined;
+    if (overviewView !== 'briefing' || !mergedPerformanceDataReady) return undefined;
     let alive = true;
     setTeamModelState('loading');
     const divisionTeamNames = Object.values(TEAMS).filter(t => t.div === teamBase?.div).map(t => t.name);
@@ -1885,7 +1904,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       setTeamModelState(data?.found ? 'ready' : 'source-gap');
     }).catch(() => { if (alive) setTeamModelState('error'); });
     return () => { alive = false; };
-  }, [overviewView, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
+  }, [overviewView, mergedPerformanceDataReady, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
   useEffect(() => {
     let alive = true;
     setCalculatedIntelligence(null);
@@ -1916,7 +1935,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   }, [teamBase?.abbr]);
 
   useEffect(() => {
-    if (overviewView !== 'performance') return undefined;
+    if (overviewView !== 'briefing' || !mergedPerformanceDataReady) return undefined;
     let alive = true;
     const cached = readTeamSavantSummaryCache(teamBase?.abbr, CURRENT_SEASON);
     setTeamSavantData(cached?.data || null);
@@ -1930,10 +1949,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       if (alive && !cached?.data) setTeamSavantData({ status:'upstream-unavailable', source:'Baseball Savant', retrievedAt:new Date().toISOString() });
     });
     return () => { alive = false; };
-  }, [overviewView, teamBase?.abbr]);
+  }, [overviewView, mergedPerformanceDataReady, teamBase?.abbr]);
 
   useEffect(() => {
-    if (overviewView !== 'performance' && evaluationActiveLabel !== 'Defense') return undefined;
+    if ((overviewView !== 'briefing' || !mergedPerformanceDataReady) && evaluationActiveLabel !== 'Defense') return undefined;
     let alive = true;
     setTeamOaaData(null);
     getTeamSavantOaa(teamBase?.abbr, teamBase?.name, CURRENT_SEASON).then(data => {
@@ -1942,7 +1961,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
       if (alive) setTeamOaaData({ status:'upstream-unavailable', source:'Baseball Savant Statcast OAA leaderboard', retrievedAt:new Date().toISOString(), oaa:null, playerCount:0, playerRows:[], teamAbbr:teamBase?.abbr || '' });
     });
     return () => { alive = false; };
-  }, [overviewView, evaluationActiveLabel, teamBase?.abbr, teamBase?.name, savantRetryToken]);
+  }, [overviewView, mergedPerformanceDataReady, evaluationActiveLabel, teamBase?.abbr, teamBase?.name, savantRetryToken]);
 
   useEffect(() => {
     if (evaluationActiveLabel !== 'Baserunning') return undefined;
@@ -2594,13 +2613,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     <div ref={overviewRef} className="page-enter skip-overview-page" style={{display:'flex',flexDirection:'column',gap:14,borderTop:`3px solid ${teamAccent}`,paddingTop:9}}>
 
       {showInitialSkeleton && <TeamOverviewSkeleton />}
-      <Breadcrumbs items={[{ label:'Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
+      <Breadcrumbs items={[{ label:'Team Overview', onClick:() => openTab('overview') }, { label:team.name || 'Team overview' }]} accent={teamAccent} />
 
       {/* ── Selector + headline ── */}
       <div className="overview-command-header" style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',gap:20,flexWrap:'wrap',paddingBottom:2}}>
           <div>
           <div className="skip-overview-team-brand" style={{'--team-accent':teamAccent}}>
-            <span className="skip-overview-team-logo-mark"><TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={38} /></span>
+            <span className="skip-overview-team-logo-mark"><TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={52} /></span>
             <div>
               <div style={px({fontSize:10,fontWeight:800,color:teamAccent,letterSpacing:'.14em',textTransform:'uppercase'})}>TEAM COMMAND CENTER</div>
               <h1 style={{ ...sans({fontSize:24,fontWeight:800,color:C.text,letterSpacing:'-.04em',lineHeight:1.1}), marginTop:3 }}>{team.name || 'Season overview'}</h1>
@@ -2609,6 +2628,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           <div style={sans({fontSize:11,color:C.text3,marginTop:6})}><span>Season overview</span><span aria-hidden="true"> · </span>a live snapshot of performance, leverage, and roster context.</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <WorkshopViewControl />
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('csv')} aria-label="Download current team data as CSV"
             style={{height:30,padding:'0 9px',border:`1px solid ${C.tealMid}`,borderRadius:7,background:C.tealSoft,color:C.teal,...px({fontSize:9.5,fontWeight:800,letterSpacing:'.05em'})}}>CSV</button>
           <button type="button" data-export-ignore onClick={() => exportTeamDataQuality('json')} aria-label="Download current team data as JSON"
@@ -2625,6 +2645,53 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           </div>
           </div>
         </div>
+
+      {/* Team WAR hero (HANDOFF S9-10): its own dedicated block between team
+          identity and the flat performance strip below, not one more entry
+          in that strip. Division-average comparison is shown as real context
+          in place of a league-wide rank/percentile — SKIP doesn't fetch a
+          full 30-team WAR set for this page, so a "#2 MLB" style rank isn't
+          backed by real data yet; per HANDOFF's own instruction ("do not
+          create a fake evaluation... never imply confidence the data
+          doesn't support"), that line is left off rather than invented. */}
+      <div className="skip-team-war-hero" role="group" aria-label="Team WAR"
+        style={{display:'flex',alignItems:'center',gap:18,flexWrap:'wrap',padding:'14px 18px',border:`1px solid ${teamWarValue === 'Unavailable' ? C.border : C.tealMid}`,borderRadius:10,background:teamWarValue === 'Unavailable' ? C.surface2 : `color-mix(in srgb, ${C.teal} 7%, ${C.surface})`}}>
+        <div style={{minWidth:0}}>
+          <div style={px({fontSize:10,fontWeight:800,color:C.text3,letterSpacing:'.12em',textTransform:'uppercase'})}>{teamWarHeadlineLabel}</div>
+          <div className="skip-team-war-hero-value" style={px({fontSize:44,fontWeight:900,lineHeight:1,color:teamWarValue === 'Unavailable' ? C.text4 : C.teal,marginTop:4})}>
+            {liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings ? (
+              <SkeletonBlock width={70} height={18} radius={4} style={{margin:'0 auto'}} />
+            ) : teamWarValue === 'Unavailable' ? (
+              // HANDOFF's own mockup shows the unavailable state as a literal
+              // em dash for the headline value, with "Unavailable" as smaller
+              // supporting text below (see the block just under this one) —
+              // deliberately not reusing MetricValue's generic behavior here,
+              // which renders the word "Unavailable" as the value itself and
+              // would duplicate that status word twice in the same block.
+              '—'
+            ) : teamWarValue}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
+          {teamWarValue === 'Unavailable' ? (
+            <>
+              <span style={sans({fontSize:11.5,fontWeight:700,color:C.text3})}>Unavailable</span>
+              <span style={sans({fontSize:9.5,color:C.text4})}>Source data unavailable</span>
+            </>
+          ) : (
+            <>
+              <OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={teamWarHeadlineTitle} />
+              {teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && (
+                <span style={sans({fontSize:10.5,color:C.text2})}>
+                  {Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR) >= 0 ? '+' : ''}
+                  {(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} vs {team.div || 'division'} avg
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
       <div className="overview-team-context" style={{display:'flex',alignItems:'center',gap:20,flexWrap:'wrap'}}>
         <label style={{display:'flex',alignItems:'center',gap:8}}>
           <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
@@ -2633,30 +2700,37 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:'pointer'}}>
             {sortTeamsByLeagueDivisionName().map(([k,v])=><option key={k} value={k}>{v.name}</option>)}
           </select>
-          <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateLevelFilter('all'); setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateLevelFilter('all'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
-            style={{height:34,padding:'0 12px',border:`1px solid ${affiliateControlsOpen?C.tealMid:C.border}`,borderRadius:7,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:'.04em',background:affiliateControlsOpen?C.tealSoft:C.surface,color:affiliateControlsOpen?C.teal:C.text2,cursor:mlbParentReadyForAffiliate?'pointer':'wait',opacity:mlbParentReadyForAffiliate?1:.65}}>MINOR LEAGUE{affiliateControlsOpen?' · CLOSE':''}</button>
-          {affiliateControlsOpen && <select aria-label="Filter minor league affiliates by level" value={affiliateLevelFilter} onChange={e=>{ const nextFilter=e.target.value; setAffiliateLevelFilter(nextFilter); const selected=affiliates.find(row=>String(row.id)===String(affiliateId)); if (selected && nextFilter !== 'all' && String(selected.levelId) !== nextFilter) { setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); } }} disabled={!affiliateLevelOptions.length || affiliatesState==='loading'}
+          {workshopPrefs.showMinorLeagueControls && <button type="button" aria-expanded={affiliateControlsOpen} aria-controls="minor-league-affiliate-selector" onClick={()=>{ if (!affiliateControlsOpen) { setAffiliateLevelFilter('all'); setAffiliateControlsOpen(true); } else { setPendingAffiliate(null); setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); setAffiliateLevelFilter('all'); setAffiliateControlsOpen(false); } }} disabled={!mlbParentReadyForAffiliate}
+            style={{height:34,padding:'0 12px',border:`1px solid ${affiliateControlsOpen?C.tealMid:C.border}`,borderRadius:7,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:'.04em',background:affiliateControlsOpen?C.tealSoft:C.surface,color:affiliateControlsOpen?C.teal:C.text2,cursor:mlbParentReadyForAffiliate?'pointer':'wait',opacity:mlbParentReadyForAffiliate?1:.65}}>MINOR LEAGUE{affiliateControlsOpen?' · CLOSE':''}</button>}
+          {workshopPrefs.showMinorLeagueControls && affiliateControlsOpen && <select aria-label="Filter minor league affiliates by level" value={affiliateLevelFilter} onChange={e=>{ const nextFilter=e.target.value; setAffiliateLevelFilter(nextFilter); const selected=affiliates.find(row=>String(row.id)===String(affiliateId)); if (selected && nextFilter !== 'all' && String(selected.levelId) !== nextFilter) { setAffiliateId(''); setAffiliateLevel('11'); setAffiliateTab('overview'); } }} disabled={!affiliateLevelOptions.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 10px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:11,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliateLevelOptions.length?'pointer':'not-allowed',opacity:affiliateLevelOptions.length?1:.65}}>
              <option value="all">All levels</option>
              {affiliateLevelOptions.map(level=><option key={level.id} value={level.id}>{level.label}</option>)}
            </select>}
-          {affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=visibleAffiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!visibleAffiliates.length || affiliatesState==='loading'}
+          {workshopPrefs.showMinorLeagueControls && affiliateControlsOpen && <select id="minor-league-affiliate-selector" aria-label="Select minor league affiliate" value={affiliateId} onChange={e=>{const next=visibleAffiliates.find(row=>String(row.id)===e.target.value); setAffiliateId(e.target.value); if(next) { setAffiliateLevel(String(next.levelId)); setOverviewView('roster'); recordRecentView({ type:'affiliate', affiliateId:next.id, parentAbbr:team.abbr, levelId:next.levelId, label:next.name, secondary:`${next.level} · ${team.name}` }); }}} disabled={!visibleAffiliates.length || affiliatesState==='loading'}
            style={{height:34,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:7,fontSize:12,fontFamily:"'Plus Jakarta Sans',sans-serif",background:C.surface,color:C.text,cursor:affiliates.length?'pointer':'not-allowed',opacity:affiliates.length?1:.65}}>
              <option value="">{affiliatesState==='loading'?'Loading affiliates…':affiliatesState==='error'?'Affiliates unavailable':visibleAffiliates.length?'Select MiLB affiliate':'No affiliates at this level'}</option>
              {visibleAffiliates.map(row=><option key={row.id} value={row.id}>{row.level} · {row.name}</option>)}
            </select>}
         </label>
-        {overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
-        {overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
+        {workshopPrefs.showCacheDiagnostics && overviewView === 'operations' && cacheHealth?.providers && <div role="status" aria-label="Provider cache health" style={{width:'100%',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginTop:4,padding:'6px 9px',border:`1px solid ${C.borderLight}`,borderRadius:6,background:C.surface2,...sans({fontSize:9,color:C.text3})}}><strong style={px({fontSize:9,color:C.text2,letterSpacing:'.06em',textTransform:'uppercase'})}>Cache health · {cacheHealth.day}</strong>{Object.entries(cacheHealth.providers).filter(([,counts]) => counts && (counts['durable-hit'] || counts['stale-hit'] || counts['upstream-miss'])).map(([provider,counts]) => <span key={provider} style={{display:'inline-flex',gap:5,alignItems:'center'}}><span style={{color:C.text2}}>{provider}</span><span style={{color:C.teal}}>D {counts['durable-hit'] || 0}</span><span style={{color:C.amber}}>S {counts['stale-hit'] || 0}</span><span style={{color:C.text3}}>M {counts['upstream-miss'] || 0}</span></span>)}</div>}
+        {workshopPrefs.showCacheDiagnostics && overviewView === 'operations' && import.meta.env.DEV && <RequestDiagnosticsPanel />}
         <div className="overview-team-metrics" aria-label="Season team metrics" style={{display:'flex',gap:22,flexWrap:'wrap'}}>
-          {[['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`],['Win%',fmtWinPct(team.pct)],['RS',formatTeamMetric(team.rs)],['RA',formatTeamMetric(team.ra)],['Run Diff',rd == null ? '—' : `${rd>0?'+':''}${rd}`],['Playoff Odds',playoffOddsValue], [teamWarHeadlineLabel,teamWarValue,teamWarHeadlineTitle]].map(([l,v,title],i)=>(
+          {[
+            ['W–L',team.w == null || team.l == null ? '—' : `${team.w}–${team.l}`, undefined, null],
+            ['Win%',fmtWinPct(team.pct), undefined, null],
+            ['RS',formatTeamMetric(team.rs), undefined, null],
+            ['RA',formatTeamMetric(team.ra), undefined, null],
+            ['Run Diff', rd == null ? '—' : `${rd>0?'+':''}${rd}`, undefined, rd==null?C.text3:rd>0?C.teal:C.rust],
+            ...(workshopPrefs.showPlayoffOdds ? [['Playoff Odds', playoffOddsValue, undefined, playoffOddsValue === 'Unavailable' ? C.text4 : C.teal]] : []),
+          ].map(([l,v,title,color],i)=>(
             <div key={i} title={title || (v === 'Unavailable' ? `${l} unavailable: no verified provider response is currently available` : undefined)} style={{textAlign:'center',minWidth:0}}>
-              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:i===4?(rd==null?C.text3:rd>0?C.teal:C.rust):(i===5||i===6)?(v === 'Unavailable' ? C.text4 : C.teal):C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
+              <div className="overview-team-metric-value" style={px({fontSize:20,fontWeight:800,lineHeight:1,color:color ?? C.text})}><MetricValue value={v} loading={liveTeamDataMode === 'loading' && !headlineUsesCalculatedStandings} width={i === 0 ? 54 : 38} /></div>
               <div style={sans({fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3})}>{l}</div>
             </div>
           ))}
         </div>
-        <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>
+        {workshopPrefs.showPlayoffOdds && <div role="status" data-testid="playoff-odds-verification" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:hasProviderPlayoffOdds?C.teal:hasSecondaryPlayoffOdds?C.purple:C.text3,lineHeight:1.4})}}>{playoffOddsVerificationLabel}</div>}
         {headlineUsesCalculatedStandings && <div role="status" data-testid="calculated-standings-headline-note" style={{width:'100%',marginTop:-8,...sans({fontSize:9,color:C.teal,lineHeight:1.4})}}>MLB standings fallback · verified, not projected</div>}
       </div>
 
@@ -2686,7 +2760,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         era={team.era}
         executivePercentiles={executivePercentiles}
         activeView={overviewView}
-        onOpenPerformance={() => openExecutiveDestination('performance', 'team-overview-performance')}
+        onOpenPerformance={() => openExecutiveDestination('briefing', 'team-overview-performance')}
         onOpenProspects={() => window.dispatchEvent(new CustomEvent('skip-navigate', { detail:{ tab:'prospects' } }))}
       />
       {overviewView === 'news' && <TeamNewsPanel team={team} accent={teamAccent} />}
@@ -2710,7 +2784,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         {affiliateTab==='schedule' && <div style={{padding:'10px 14px'}}><div style={sans({fontSize:9,color:C.text3,marginBottom:8})}>Next 14 days · {affiliateSchedule?.freshness === 'stale-cached' ? 'verified cached schedule · provider temporarily unavailable' : affiliateSchedule?.retrievedAt ? `retrieved ${new Date(affiliateSchedule.retrievedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}` : humanizeFeedStatus(affiliateSchedule?.status, 'Loading')}</div>{affiliateSchedule?.games?.length ? affiliateSchedule.games.map(game=><div key={game.gamePk} style={{display:'grid',gridTemplateColumns:'76px minmax(0,1fr) 74px',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,...sans({fontSize:10,color:C.text})}}><span>{game.time ? new Date(game.time).toLocaleDateString([], {month:'short',day:'numeric'}) : 'TBD'}</span><span>{game.away.name} @ {game.home.name}</span><span style={{color:C.text3}}>{game.status || 'Scheduled'}</span></div>) : <div style={sans({padding:'14px 0',fontSize:10,color:C.text3})}>The affiliate schedule is unavailable or has no games in the next 14 days.</div>}</div>}
       </Panel>}
 
-      {overviewView === 'performance' && <StatStrip items={[
+      {overviewView === 'briefing' && <StatStrip items={[
         {val:<MetricValue value={fmtScorebookRate(team.ops)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team OPS',   sub:'Offense', trend:verifiedTrends.ops},
         {val:<MetricValue value={formatTeamMetric(team.hr)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Home Runs',  sub:'Power'},
         {val:<MetricValue value={formatTeamMetric(team.era,2)} loading={liveTeamDataMode === 'loading'} />,lbl:'Team ERA',   sub:'Pitching', trend:verifiedTrends.era},
@@ -2718,10 +2792,10 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         {val:<MetricValue value={fmtScorebookRate(team.avg)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
-        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR', sub:<div><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple},
+        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR', sub:<div><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple, emphasis:teamWarValue !== 'Unavailable'},
       ]}/>}
 
-      {overviewView === 'performance' && <>
+      {overviewView === 'briefing' && <>
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
         <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
@@ -2990,7 +3064,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         </div>
       </section>}
 
-      {overviewView === 'operations' && <Panel id="team-overview-operations" role="tabpanel" title="Franchise CBT Trend" accent={teamAccent} badge={`${taxHistorySeasons[0]}–${taxHistorySeasons.at(-1)}`}>
+      {workshopPrefs.showContractData && overviewView === 'operations' && <Panel id="team-overview-operations" role="tabpanel" title="Franchise CBT Trend" accent={teamAccent} badge={`${taxHistorySeasons[0]}–${taxHistorySeasons.at(-1)}`}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'10px 14px 4px',flexWrap:'wrap'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <TeamLogo abbr={team.abbr || selTeam.toUpperCase()} size={24} />
@@ -3102,7 +3176,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         </div>
       </Panel>}
 
-      {overviewView === 'performance' && <div id="team-overview-performance" role="tabpanel">
+      {overviewView === 'briefing' && <div id="team-overview-performance" role="tabpanel">
       {/* ── ROW 1: Tables | Radars + Run Diff | Standings + Grade ── */}
       <div className="overview-responsive-grid" style={{display:'grid',gridTemplateColumns:'minmax(160px,190px) 1fr minmax(168px,210px)',gap:14,alignItems:'start'}}>
 

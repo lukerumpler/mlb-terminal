@@ -15,6 +15,7 @@ import { readDefaultTeamPreference, saveDefaultTeamPreference } from './lib/defa
 import RecentHistoryDropdown from './components/RecentHistoryDropdown.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { readRecentHistory, recordRecentView } from './lib/recentHistory.js';
+import { trpc } from './lib/trpc';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Lazy-loaded so each tab (and heavy deps like recharts, only used by a few
@@ -43,7 +44,7 @@ function PageLoading() {
   );
 }
 
-function VoiceNoteRecorder({ onTranscribed, onCancel }) {
+export function VoiceNoteRecorder({ onTranscribed, onCancel }) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribed] = useState(false);
   const [error, setError] = useState(null);
@@ -169,7 +170,7 @@ class PageErrorBoundary extends React.Component {
 }
 
 const TABS = [
-  { key:'overview',     icon:'⊞', label:'Overview',       section:'Overview' },
+  { key:'overview',     icon:'⊞', label:'Team Overview',  section:'Overview' },
   { key:'players',      icon:'◷', label:'Players',        section:'Evaluation' },
   { key:'prospects',    icon:'↑', label:'Prospects',      section:'Evaluation' },
   { key:'draft',        icon:'◈', label:'Draft',          section:'Evaluation' },
@@ -189,7 +190,7 @@ const WORKSPACE_GROUPS = [
   {
     key:'talent',
     icon:'↑',
-    label:'Talent',
+    label:'Player',
     section:'Evaluation',
     defaultTab:'players',
     tabs:[
@@ -218,7 +219,7 @@ const WORKSPACE_GROUPS = [
     defaultTab:'feed',
     tabs:[
       { key:'feed', label:'Intel Feed', description:'Source-aware league and team intelligence' },
-      { key:'follows', label:'Follow List', description:'Tracked players and follow-up activity' },
+      { key:'follows', label:'Follow List', description:'Curated X accounts — scouts, analysts, and front offices' },
     ],
   },
   {
@@ -235,7 +236,7 @@ const WORKSPACE_GROUPS = [
 ];
 
 const PRIMARY_TABS = [
-  { key:'overview', icon:'⊞', label:'Overview', section:'Overview' },
+  { key:'overview', icon:'⊞', label:'Team Overview', section:'Overview' },
   WORKSPACE_GROUPS[0],
   { key:'league', icon:'◎', label:'League', section:'Monitor' },
   WORKSPACE_GROUPS[1],
@@ -244,8 +245,8 @@ const PRIMARY_TABS = [
   WORKSPACE_GROUPS[3],
 ];
 const MOBILE_QUICK_TABS = [
-  { key:'overview', icon:'⊞', label:'Overview' },
-  { key:'players', icon:'↑', label:'Talent' },
+  { key:'overview', icon:'⊞', label:'Team Overview' },
+  { key:'players', icon:'↑', label:'Players' },
   { key:'league', icon:'◎', label:'League' },
   { key:'intelligence', icon:'◆', label:'Intel' },
   { key:'notes', icon:'✎', label:'Notes' },
@@ -554,7 +555,7 @@ export default function App() {
       const detail = e.detail || {};
       if (detail.id) {
         recordRecentView({ type:'player', id:detail.id, label:detail.fullName || detail.name || 'Player', secondary:detail.secondary || 'Player profile' });
-        // The Players workspace is lazy-loaded. Persist the requested player
+        // The Player workspace is lazy-loaded. Persist the requested player
         // in App state so a name clicked from another workspace still opens
         // the profile after the Players page has mounted.
         setPendingPlayerProfile(detail);
@@ -648,22 +649,25 @@ export default function App() {
 
       {/* ── SIDEBAR ── */}
       {mobileNavOpen && <button type="button" className="skip-mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
-      <div id="skip-mobile-nav" className={`skip-sidebar${mobileNavOpen ? ' skip-mobile-nav-open' : ''}`} data-mobile-open={mobileNavOpen ? 'true' : 'false'} style={{ width:196, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
+      <div id="skip-mobile-nav" className={`skip-sidebar${mobileNavOpen ? ' skip-mobile-nav-open' : ''}`} data-mobile-open={mobileNavOpen ? 'true' : 'false'} style={{ width:172, flexShrink:0, background:C.surface, borderRight:`1px solid ${C.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:`4px 0 18px color-mix(in srgb, ${C.navy} 4%, transparent)` }}>
 
         {/* Logo */}
         <div style={{ padding:'12px 12px 10px', borderBottom:`1px solid ${C.border}`, background:`linear-gradient(180deg, ${C.surface}, ${C.surface2})` }}>
-          <svg className="skip-sidebar-logo" viewBox="0 0 200 78" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', maxWidth:148, height:'auto', display:'block', marginBottom:7 }}>
-            <path d="M 18 28 Q 95 -8 168 18" stroke={C.text4} strokeWidth="2" fill="none" strokeLinecap="round"/>
-            <circle cx="168" cy="18" r="9" fill="none" stroke={C.text3} strokeWidth="1.5"/>
-            <path d="M 162 14 Q 168 18 162 22" stroke="#CC2222" strokeWidth="1" fill="none"/>
-            <path d="M 174 14 Q 168 18 174 22" stroke="#CC2222" strokeWidth="1" fill="none"/>
-            <text x="4" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">S</text>
-            <text x="53" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">K</text>
-            <polygon points="72,26 82,26 96,62 86,62" fill="#CC2222"/>
-            <text x="102" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">I</text>
-            <text x="122" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">P</text>
-            <line x1="4" y1="67" x2="178" y2="67" stroke="#CC2222" strokeWidth="2.5" strokeLinecap="round"/>
-          </svg>
+          <button type="button" onClick={() => { setTab('overview'); setMobileNavOpen(false); }} aria-label="SKIP — go to Team Overview" title="Go to Team Overview"
+            style={{ display:'block', width:'100%', padding:0, border:'none', background:'transparent', cursor:'pointer' }}>
+            <svg className="skip-sidebar-logo" viewBox="0 0 200 78" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', maxWidth:148, height:'auto', display:'block', marginBottom:7 }}>
+              <path d="M 18 28 Q 95 -8 168 18" stroke={C.text4} strokeWidth="2" fill="none" strokeLinecap="round"/>
+              <circle cx="168" cy="18" r="9" fill="none" stroke={C.text3} strokeWidth="1.5"/>
+              <path d="M 162 14 Q 168 18 162 22" stroke="#CC2222" strokeWidth="1" fill="none"/>
+              <path d="M 174 14 Q 168 18 174 22" stroke="#CC2222" strokeWidth="1" fill="none"/>
+              <text x="4" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">S</text>
+              <text x="53" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">K</text>
+              <polygon points="72,26 82,26 96,62 86,62" fill="#CC2222"/>
+              <text x="102" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">I</text>
+              <text x="122" y="62" fontFamily="'Plus Jakarta Sans', Arial Black, sans-serif" fontWeight="900" fontSize="48" fill={C.text} letterSpacing="-1">P</text>
+              <line x1="4" y1="67" x2="178" y2="67" stroke="#CC2222" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </button>
           <button type="button" onClick={() => setShowPalette(true)} title="Search everything" aria-label="Search everything"
             style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, cursor:'pointer', width:'100%', textAlign:'left' }}>
             <span aria-hidden="true" style={{ fontSize:14, lineHeight:1 }}>⌕</span>
@@ -673,7 +677,7 @@ export default function App() {
         </div>
 
         {/* Nav */}
-        <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
+        <nav className="skip-mobile-nav-scroll" aria-label="SKIP workspace navigation" style={{ flex:1, minHeight:0, padding:'6px 6px', display:'flex', flexDirection:'column', gap:1, overflowY:'auto' }}>
           {PRIMARY_TABS.map((t, i) => {
             const workspaceAlertCount = t.key === 'settings-workspace' ? alertCount : t.alertCount;
             return (
@@ -685,10 +689,10 @@ export default function App() {
               style={{ width:'100%', padding:'7px 8px', display:'flex', alignItems:'center', gap:7, background:activePrimaryKey===t.key?C.amberSoft:'transparent', border:'none', borderRadius:7, cursor:'pointer', color:activePrimaryKey===t.key?C.amberDark:C.text2, transition:'all .12s', textAlign:'left' }}>
               <span style={{ fontSize:14, flexShrink:0, width:20, textAlign:'center' }}>{t.icon}</span>
               <span className="skip-nav-label" style={sans({ fontSize:11.5, fontWeight:600, letterSpacing:'.01em' })}>{t.label}</span>
-              {t.key === 'settings-workspace' && (
+              {t.key === 'settings-workspace' && workspaceAlertCount > 0 && (
                 <span className="skip-settings-alert-indicator" style={{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:3, minHeight:19, padding:'1px 5px', borderRadius:999, background:C.rustSoft, color:C.rust, border:`1px solid ${C.rustMid}`, ...px({ fontSize:9, fontWeight:800 }) }}>
                   <span role="img" aria-label={`${workspaceAlertCount} active alerts`} style={{ fontSize:10, lineHeight:1 }}>🔔</span>
-                  {workspaceAlertCount > 0 && <span aria-hidden="true">{workspaceAlertCount}</span>}
+                  <span aria-hidden="true">{workspaceAlertCount}</span>
                 </span>
               )}
               {activePrimaryKey === t.key && <div style={{ marginLeft:t.key === 'settings-workspace' ? 4 : 'auto', width:3, height:14, borderRadius:1.5, background:C.amber }} />}

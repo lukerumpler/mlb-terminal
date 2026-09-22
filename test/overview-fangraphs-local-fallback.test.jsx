@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import OverviewPage from '../client/src/pages/OverviewPage.jsx';
 import { __resetProviderJsonCacheForTests } from '../client/src/api/mlb.js';
 
@@ -58,7 +58,6 @@ describe('rendered FanGraphs local fallback', () => {
     }));
 
     render(<OverviewPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
     expect((await screen.findAllByText('42.4')).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
@@ -103,8 +102,11 @@ describe('rendered FanGraphs local fallback', () => {
     render(<OverviewPage />);
 
     expect(await screen.findByText('>99%')).toBeInTheDocument();
-    expect(screen.getByText('Unavailable')).toBeInTheDocument();
-    expect(screen.getByText('Team WAR')).toBeInTheDocument();
+    const teamWarCell = screen.getAllByText('Team WAR')
+      .map(el => el.closest('.skip-stat-strip-item'))
+      .find(Boolean);
+    expect(teamWarCell).toBeInTheDocument();
+    expect(within(teamWarCell).getAllByText('Unavailable').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('51.7')).toBeNull();
     expect(screen.queryByText('WAR Proxy')).toBeNull();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
@@ -121,7 +123,6 @@ describe('rendered FanGraphs local fallback', () => {
     }));
 
     render(<OverviewPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
 
     expect((await screen.findAllByText('Unavailable')).length).toBeGreaterThan(0);
     expect(screen.queryByText('51.2')).toBeNull();

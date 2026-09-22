@@ -82,6 +82,32 @@ describe("feed freshness persistence", () => {
   });
 });
 
+describe("feed freshness persistence — storage-access failures don't crash the app", () => {
+  // canUseStorage() only confirms window.localStorage *exists* as a
+  // property — actually calling .getItem() can still throw (Safari private
+  // browsing, storage-blocking policies) even when it does. These two
+  // readers are invoked as useState lazy initializers at the very top of
+  // App.jsx, so an uncaught throw here would crash the entire app on mount
+  // for anyone in one of those environments.
+  it("readFeedFreshnessSettings falls back to defaults instead of throwing when getItem throws", () => {
+    const spy = vi.spyOn(window.localStorage.__proto__, "getItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+    expect(() => readFeedFreshnessSettings()).not.toThrow();
+    expect(readFeedFreshnessSettings()).toEqual({ enabled: true, displayMode: "relative" });
+    spy.mockRestore();
+  });
+
+  it("readFeedSuccesses falls back to an empty object instead of throwing when getItem throws", () => {
+    const spy = vi.spyOn(window.localStorage.__proto__, "getItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+    expect(() => readFeedSuccesses()).not.toThrow();
+    expect(readFeedSuccesses()).toEqual({});
+    spy.mockRestore();
+  });
+});
+
 describe("selectable CBT history range", () => {
   it("accepts only 5, 10, and 15 seasons and persists the normalized value", () => {
     expect(CBT_HISTORY_OPTIONS).toEqual([5, 10, 15]);

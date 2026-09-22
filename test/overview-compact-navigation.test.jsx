@@ -37,19 +37,15 @@ describe('Team Overview compact navigation', () => {
     __resetTeamScheduleSnapshotCacheForTests();
   });
 
-  it('opens on a concise briefing and exposes dense sections through compact view controls', async () => {
+  it('opens on a combined briefing that includes performance sections through compact view controls', async () => {
     render(<OverviewPage />);
 
     const briefing = await screen.findByRole('button', { name: 'Briefing' });
     expect(briefing).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Front Office Read')).toBeInTheDocument();
-    expect(screen.queryByText('Divisional WAR Comparison')).not.toBeInTheDocument();
-    expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
-    expect(screen.getByText('Divisional WAR Comparison')).toBeInTheDocument();
+    expect(await screen.findByText('Divisional WAR Comparison')).toBeInTheDocument();
     expect(screen.getByText('Batted Ball Profile')).toBeInTheDocument();
-    expect(screen.getByText('Front Office Read')).toBeInTheDocument();
+    expect(screen.queryByText('AI Scout Insights')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Roster' }));
     expect(screen.getByText('AI Scout Insights')).toBeInTheDocument();
@@ -145,13 +141,10 @@ describe('Team Overview compact navigation', () => {
     window.removeEventListener('skip-navigate', onNavigate);
   });
 
-  it('defers FanGraphs model requests until Performance is explicitly opened', async () => {
+  it('loads FanGraphs model requests immediately now that Performance is part of the combined Briefing view', async () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     await waitFor(() => {
       expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
     });
@@ -169,7 +162,7 @@ describe('Team Overview compact navigation', () => {
     expect(screen.getByRole('tabpanel', { name: 'San Diego Padres headlines' })).toBeInTheDocument();
   });
 
-  it('loads one cached/coalesced calculated-intelligence result for the briefing WAR proxy without requesting FanGraphs', async () => {
+  it('loads one cached/coalesced calculated-intelligence result for the briefing WAR proxy alongside FanGraphs data', async () => {
     window.localStorage.clear();
     const teamSnapshot = {
       standings: { w: 75, l: 51, pct: 0.595, rs: 627, ra: 485, diff: 142 },
@@ -182,12 +175,6 @@ describe('Team Overview compact navigation', () => {
     await screen.findByRole('button', { name: 'Briefing' });
     await waitFor(() => {
       expect(fetch.mock.calls.filter(([url]) => String(url).includes('/api/intelligence-calculations'))).toHaveLength(1);
-    });
-    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(false);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
-    await waitFor(() => {
-      expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/intelligence-calculations'))).toBe(true);
       expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/fangraphs-models'))).toBe(true);
     });
     expect(fetch.mock.calls.filter(([url]) => String(url).includes('/api/intelligence-calculations'))).toHaveLength(1);
@@ -226,7 +213,7 @@ describe('Team Overview compact navigation', () => {
     });
   });
 
-  it('defers heavyweight team Statcast rollups until Performance is explicitly opened', async () => {
+  it('loads heavyweight team Statcast rollups immediately now that Performance is part of the combined Briefing view', async () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
@@ -234,9 +221,6 @@ describe('Team Overview compact navigation', () => {
       const value = String(url);
       return value.includes('endpoint=team_exit_velocity') || value.includes('endpoint=team_batted_balls');
     });
-    expect(teamStatcastCalls()).toHaveLength(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     await waitFor(() => {
       expect(teamStatcastCalls().length).toBeGreaterThan(0);
     });
@@ -272,7 +256,6 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     expect(screen.queryByText('Overall Team Rating')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open canonical Front Office Evaluation' }));
 
@@ -292,7 +275,6 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
     await screen.findByText('0.456');
 
     window.dispatchEvent(new CustomEvent('skip-select-team', { detail: { abbr: 'SF' } }));

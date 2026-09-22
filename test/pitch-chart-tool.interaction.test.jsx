@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PitchChartTool, {
   atBatsUnchanged,
@@ -192,6 +192,104 @@ describe("PitchChartTool (Roadmap #8)", () => {
     expect(screen.getByDisplayValue("Kyle Bradish")).toBeInTheDocument();
     expect(screen.getByText("Walk")).toBeInTheDocument();
     expect(screen.getByText("4 pitches")).toBeInTheDocument();
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("logs an optional velocity with the pitch and shows it on the badge", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    await user.click(screen.getByRole("button", { name: "Zone 5" }));
+    await user.type(screen.getByLabelText(/Velocity/), "95.4");
+    await user.click(screen.getByRole("button", { name: "Called Strike" }));
+
+    expect(screen.getByText("95.4mph")).toBeInTheDocument();
+    // Velocity input clears after logging, same as zone/type.
+    expect(screen.getByLabelText(/Velocity/)).toHaveValue(null);
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("rejects an unrealistic velocity and keeps Result buttons disabled until it is fixed", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    await user.click(screen.getByRole("button", { name: "Zone 5" }));
+    await user.type(screen.getByLabelText(/Velocity/), "500");
+
+    expect(screen.getByRole("button", { name: "Ball" })).toBeDisabled();
+    expect(
+      screen.getByText(/Enter a realistic mph value/)
+    ).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/Velocity/));
+    expect(screen.getByRole("button", { name: "Ball" })).not.toBeDisabled();
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("logging a pitch without ever touching velocity leaves it out of the pitch entirely (no fabricated 0)", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    await user.click(screen.getByRole("button", { name: "Zone 5" }));
+    await user.click(screen.getByRole("button", { name: "Ball" }));
+
+    // Distinct from the "Velocity, mph (optional)" field label — this checks
+    // specifically for a rendered velocity badge on the logged pitch.
+    expect(screen.queryByText(/^\d+(\.\d+)?mph$/)).not.toBeInTheDocument();
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("an optional catcher target zone shows on the badge only when it differs from the actual zone", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    await user.click(
+      screen.getByRole("button", { name: "+ Add catcher target (optional)" })
+    );
+    await user.click(screen.getByRole("button", { name: "Target Zone 3" }));
+    await user.click(screen.getByRole("button", { name: "Zone 5" }));
+    await user.click(screen.getByRole("button", { name: "Ball" }));
+
+    expect(screen.getByText("Z5")).toBeInTheDocument();
+    expect(screen.getByText("←T3")).toBeInTheDocument();
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("Undo Last Pitch is disabled with nothing logged, then removes the last pitch and restores the count before it", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    const undoBtn = screen.getByRole("button", { name: "Undo Last Pitch" });
+    expect(undoBtn).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Zone 1" }));
+    await user.click(screen.getByRole("button", { name: "Ball" })); // 1-0
+    await user.click(screen.getByRole("button", { name: "Zone 1" }));
+    await user.click(screen.getByRole("button", { name: "Called Strike" })); // 1-1
+    expect(screen.getByText("1-1")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Undo Last Pitch" }));
+    // Back to the count before the called strike, and only the ball remains logged.
+    expect(screen.getByText("1-0")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Z1/)).toHaveLength(1);
+    expect(global.__consoleErrors.length).toBe(0);
+  });
+
+  it("Pitch Summary reflects logged pitches grouped by type as they're thrown", async () => {
+    const user = userEvent.setup();
+    render(<PitchChartTool />);
+
+    expect(
+      screen.getByText(/Log a pitch to see usage/)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Zone 5" }));
+    await user.click(screen.getByRole("button", { name: "4-Seam" }));
+    await user.click(screen.getByRole("button", { name: "Called Strike" }));
+
+    const summaryPanel = screen.getByRole("region", { name: "Pitch Summary" });
+    expect(within(summaryPanel).getByText("4-Seam")).toBeInTheDocument();
+    expect(within(summaryPanel).getByText("100%")).toBeInTheDocument(); // 1 of 1 pitches so far is a 4-Seam
     expect(global.__consoleErrors.length).toBe(0);
   });
 });

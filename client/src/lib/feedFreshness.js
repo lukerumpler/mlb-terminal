@@ -34,7 +34,16 @@ function safeParse(raw, fallback) {
 
 export function readFeedFreshnessSettings() {
   if (!canUseStorage()) return { ...DEFAULT_FEED_FRESHNESS_SETTINGS };
-  const parsed = safeParse(window.localStorage.getItem(SETTINGS_KEY) || '', {});
+  // canUseStorage() only confirms window.localStorage *exists* as a property;
+  // actually calling .getItem() can still throw (Safari private browsing,
+  // storage-blocking policies) even when it does. This is invoked as a
+  // useState lazy initializer at the very top of App.jsx, so an uncaught
+  // throw here crashes the entire app on mount for anyone in one of those
+  // environments — hence the try/catch here rather than trusting the
+  // existence check alone.
+  let raw = '';
+  try { raw = window.localStorage.getItem(SETTINGS_KEY) || ''; } catch { return { ...DEFAULT_FEED_FRESHNESS_SETTINGS }; }
+  const parsed = safeParse(raw, {});
   return {
     enabled: parsed.enabled !== false,
     displayMode: parsed.displayMode === 'exact' ? 'exact' : 'relative',
@@ -55,7 +64,9 @@ export function saveFeedFreshnessSettings(next) {
 
 export function readFeedSuccesses() {
   if (!canUseStorage()) return {};
-  const parsed = safeParse(window.localStorage.getItem(SUCCESS_KEY) || '', {});
+  let raw = '';
+  try { raw = window.localStorage.getItem(SUCCESS_KEY) || ''; } catch { return {}; }
+  const parsed = safeParse(raw, {});
   return Object.fromEntries(Object.entries(parsed).filter(([key, value]) => (
     FEED_DEFINITIONS.some(feed => feed.key === key) && Number.isFinite(Number(value))
   )).map(([key, value]) => [key, Number(value)]));

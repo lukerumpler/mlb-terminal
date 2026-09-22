@@ -86,7 +86,7 @@ describe("SKIP preserved interactions and persistence", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByTitle("Overview")).toBeInTheDocument();
+      expect(screen.getByTitle("Team Overview")).toBeInTheDocument();
       expect(document.documentElement.dataset.theme).toBe("light");
     });
     fireEvent.click(screen.getByTitle("Search everything"));

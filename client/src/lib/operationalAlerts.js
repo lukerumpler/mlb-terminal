@@ -75,7 +75,7 @@ export function buildOperationalAlerts({ cacheHealth, cacheHealthStatus, feedFre
     if (summary.totals.staleHits > 0) {
       alerts.push({
         id: 'stale-cache-served',
-        type: 'warn',
+        type: 'info',
         title: 'Stale cache fallback served',
         body: `${summary.totals.staleHits} request${summary.totals.staleHits === 1 ? '' : 's'} used a clearly labeled stale snapshot rather than issuing an unbounded provider retry.`,
         source: 'SKIP cache telemetry',
@@ -110,7 +110,7 @@ export function buildOperationalAlerts({ cacheHealth, cacheHealthStatus, feedFre
     if (total > 0 && successful < total) {
       alerts.push({
         id: 'feed-freshness-pending',
-        type: 'warn',
+        type: 'info',
         title: 'Some feed sources are pending',
         body: `${successful} of ${total} configured feed sources have recorded a recent successful update.`,
         source: 'Feed freshness settings',

@@ -19,7 +19,7 @@ import TeamLogo from '../components/TeamLogo.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 import { openTab, openTeamOverview } from '../lib/navigation.js';
 import { getTeamAccent } from '../lib/teamVisuals.js';
-import { recordRecentView } from '../lib/recentHistory.js';
+import { recordRecentView, readRecentHistory } from '../lib/recentHistory.js';
 import { getPlayerDataConfidence } from '../lib/playerDataConfidence.js';
 import PitchShapePanel from '../components/PitchShapePanel.jsx';
 import MetricInfo from '../components/MetricInfo.jsx';
@@ -37,7 +37,7 @@ import { BoxscoreSplitPanel, ReconciliationPanel } from '../features/player-prof
 import { buildMultiYearTaxProjection, getRepeaterTierExplanation, getSurchargeBand } from '../../../shared/luxuryTax.js';
 import { buildPlayerValuationCardModel, buildExecutiveScoutingSummaryModel, downloadPlayerValuationCardPdf, downloadExecutiveScoutingSummaryPdf } from '../lib/pdfExports.js';
 import { downloadTeamFinancialCsv } from '../lib/csvExports.js';
-import { PLAYER_NOTE_CATEGORIES, playerNotesStorageKey, readPlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
+import { PLAYER_NOTE_CATEGORIES, readPlayerNotes, writePlayerNotes, sortPlayerNotes, normalizeImportedNotes, renameNoteTag, removeNoteTag, buildNotesExportPayload, applyImportedNotes } from './playerNotes.js';
 import { buildHandednessComparison } from '../features/player-profile/handedness.js';
 import { buildRecentGameSeries, buildRecentPerformanceSeries, summarizeRecentPerformance } from '../features/player-profile/boxscore.js';
 
@@ -131,7 +131,22 @@ function favoritePlayerRecord(person) {
   };
 }
 
-function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
+// Recent player searches first (most recent first, deduped by id), then
+// popular players fill whatever's left up to QUICK_ACCESS_COUNT total — a
+// mix of "what you were just looking at" and "who most people look at",
+// rather than only ever showing the same fixed six names.
+const QUICK_ACCESS_COUNT = 6;
+function buildQuickAccessList(recentPlayerViews) {
+  const recent = (recentPlayerViews || []).map(entry => ({
+    id: entry.id, fullName: entry.label, team: entry.secondary || '—', pos: '—', isRecent: true,
+  }));
+  const seen = new Set(recent.map(p => p.id));
+  const popularFill = QUICK_PLAYERS.filter(p => !seen.has(p.id));
+  return [...recent, ...popularFill].slice(0, QUICK_ACCESS_COUNT);
+}
+
+function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite, recentPlayerViews = [] }) {
+  const quickAccessList = useMemo(() => buildQuickAccessList(recentPlayerViews), [recentPlayerViews]);
   return (
     <div style={{ padding:'8px 2px 0' }}>
       <div className="skip-player-favorites" role="region" aria-label="Favorite players">
@@ -160,7 +175,7 @@ function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
       </div>
       <div style={{ marginBottom:18 }}>
         <div style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.08em', color:C.text3, textTransform:'uppercase', marginBottom:8 })}>
-          Quick access
+          Quick access <span style={{ textTransform:'none', fontWeight:400, color:C.text4 }}>— recent searches and popular players</span>
         </div>
         {/* auto-fill/minmax instead of a fixed repeat(6,1fr): six equal
             columns with no floor squishes each card's photo+name+badge into
@@ -168,18 +183,21 @@ function PlayersEmptyState({ onPick, favorites = [], onRemoveFavorite }) {
             window — this reflows to fewer columns instead, same pattern
             LeaguePage already uses for its standings grid. */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:10 }}>
-          {QUICK_PLAYERS.map(p => (
+          {quickAccessList.map(p => (
             <button key={p.id} onClick={() => onPick(p)}
               style={{
                 display:'flex', flexDirection:'column', alignItems:'center', gap:8,
                 padding:'12px 8px', background:C.surface, border:`0.5px solid ${C.border}`,
-                borderRadius:10, cursor:'pointer', textAlign:'center',
+                borderRadius:10, cursor:'pointer', textAlign:'center', position:'relative',
                 boxShadow:'0 1px 4px rgba(0,0,0,.05)', transition:'all .12s',
               }}>
+              {p.isRecent && (
+                <span style={{ position:'absolute', top:6, right:6, ...px({ fontSize:7.5, fontWeight:800, letterSpacing:'.05em', color:C.teal, background:C.tealSoft, border:`0.5px solid ${C.tealMid}`, borderRadius:4, padding:'1px 4px' }) }}>RECENT</span>
+              )}
               <PlayerPhoto id={p.id} name={p.fullName} size={56} />
               <div style={sans({ fontSize:11.5, fontWeight:700, color:C.text, lineHeight:1.25 })}>{p.fullName}</div>
               <div style={{ display:'flex', gap:5, alignItems:'center' }}>
-                <PosBadge pos={p.pos} />
+                {p.pos && p.pos !== '—' && <PosBadge pos={p.pos} />}
                 <span style={px({ fontSize:10, color:C.text3 })}>{p.team}</span>
               </div>
             </button>
@@ -571,6 +589,17 @@ export function aggregateZoneWhiffs(contactPoints) {
     if (WHIFF_DESCRIPTIONS.has(row.description)) out[zone].whiffs += 1;
   }
   return out;
+}
+
+// Single source of truth for "does this player actually have zone-plottable
+// Savant data" — used both for the Plate Discipline panel's badge (data
+// provenance sweep) and its body content, so they can't drift apart. A
+// non-empty contactPoints array with every row missing usable zone data
+// would pass a naive `.length` check but still render nothing below —
+// that mismatch is exactly what this shares instead of duplicates.
+export function hasZoneWhiffData(contactPoints) {
+  const byZone = aggregateZoneWhiffs(contactPoints);
+  return Object.values(byZone).reduce((sum, b) => sum + b.swings, 0) > 0;
 }
 
 function ZoneWhiffGrid({ contactPoints }) {
@@ -1468,6 +1497,12 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
   const [searchStatus, setSearchStatus] = useState('idle');
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
   const [favorites, setFavorites] = useState(() => readPlayerFavorites());
+  const [recentPlayerViews, setRecentPlayerViews] = useState(() => readRecentHistory().filter(item => item.type === 'player'));
+  useEffect(() => {
+    const sync = () => setRecentPlayerViews(readRecentHistory().filter(item => item.type === 'player'));
+    window.addEventListener('skip-recent-history-updated', sync);
+    return () => window.removeEventListener('skip-recent-history-updated', sync);
+  }, []);
 
   const [boxscoreRetryToken, setBoxscoreRetryToken] = useState(0);
   const [boxscoreStatus, setBoxscoreStatus] = useState('idle');
@@ -1835,7 +1870,7 @@ function PlayersPage({ initialPlayer = null, onInitialPlayerConsumed }) {
           fontFamily:"'DM Mono',monospace" }}>{error}</div>
       )}
       {!loading && !player && !error && results.length === 0 && (
-        <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} />
+        <PlayersEmptyState onPick={pickPlayer} favorites={favorites} onRemoveFavorite={removeFavorite} recentPlayerViews={recentPlayerViews} />
       )}
 
       {player && derived && !loading && (
@@ -1999,7 +2034,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
   const [deleteNoteId, setDeleteNoteId] = useState(null);
   const [observations, setObservations] = useState(() => readPlayerNotes(player.id));
   useEffect(() => { setObservations(readPlayerNotes(player.id)); setNoteText(''); setNoteTags(''); setEditingNoteId(null); setDeleteNoteId(null); setNoteFilterTag(''); setNoteSearch(''); setBulkTag(''); setBulkTagReplacement(''); }, [player.id]);
-  useEffect(() => { if (player.id && typeof localStorage !== 'undefined') localStorage.setItem(playerNotesStorageKey(player.id), JSON.stringify(observations)); }, [player.id, observations]);
+  useEffect(() => { writePlayerNotes(player.id, observations); }, [player.id, observations]);
   const sortedObservations = useMemo(() => sortPlayerNotes(observations, noteSort), [observations, noteSort]);
   const availableNoteTags = useMemo(() => [...new Set(observations.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b)), [observations]);
   const visibleObservations = useMemo(() => {
@@ -2561,7 +2596,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
               <PlateDisciplineZone s={s} isPitcher={player.isPitcher} />
             </Panel>
           ) : (
-            <Panel title="Plate Discipline" accent={C.slate} badge="Live Savant">
+            <Panel title="Plate Discipline" accent={C.slate} badge={hasZoneWhiffData(player.contactPoints) ? 'Live Savant' : 'Unavailable'}>
               <ZoneWhiffGrid contactPoints={player.contactPoints} />
             </Panel>
           )}

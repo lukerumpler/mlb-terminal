@@ -34,4 +34,22 @@ describe('all-team comparison data', () => {
     });
     expect(rows.map(row => row.name)).toEqual(['Alpha Club', 'Bravo Club']);
   });
+
+  it('looks up Team WAR by team.name and excludes teams missing from the map', () => {
+    const warByTeam = new Map([
+      ['Alpha Club', 38.4],
+      ['Bravo Club', 42.1],
+      // Charlie Club deliberately absent, e.g. not yet returned by the
+      // provider — must be excluded, not shown as 0 or NaN.
+    ]);
+    const rows = buildCrossTeamComparisonRows({ teams, warByTeam, metric: 'war' });
+    expect(rows.map(row => row.abbr)).toEqual(['BRV', 'ALP']);
+    expect(rows.map(row => row.value)).toEqual([42.1, 38.4]);
+    expect(rows.every(row => Number.isFinite(row.value))).toBe(true);
+  });
+
+  it('excludes every team from the Team WAR column when no WAR data has loaded yet', () => {
+    const rows = buildCrossTeamComparisonRows({ teams, metric: 'war' });
+    expect(rows).toHaveLength(0);
+  });
 });

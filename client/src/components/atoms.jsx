@@ -145,12 +145,18 @@ export function StatStrip({ items, label = 'Key metrics' }) {
       overflow:'hidden', boxShadow:`0 8px 24px color-mix(in srgb, ${C.navy} 7%, transparent)`,
     }}>
       {items.map((it, i) => (
-        <div className="skip-stat-strip-item" key={i} aria-label={`${it.lbl}: ${typeof it.val === 'string' || typeof it.val === 'number' ? it.val : 'available'}`} style={{
+        <div className="skip-stat-strip-item" key={i} aria-label={`${it.lbl}: ${typeof it.val === 'string' || typeof it.val === 'number' ? it.val : 'available'}${it.emphasis ? ' (featured metric)' : ''}`} style={{
           padding:'13px 10px', textAlign:'center', minWidth:0,
           borderRight: i < items.length - 1 ? `0.5px solid ${C.borderLight}` : 'none',
           display:'flex', flexDirection:'column', gap:3,
+          ...(it.emphasis ? {
+            background:`color-mix(in srgb, ${it.color || C.purple} 9%, transparent)`,
+            boxShadow:`inset 0 2px 0 ${it.color || C.purple}`,
+          } : null),
         }}>
-          <div className="skip-stat-strip-value" style={px({ fontSize:19, fontWeight:800, color:C.text, lineHeight:1, letterSpacing:'-.02em', overflowWrap:'anywhere' })}>
+          <div className="skip-stat-strip-value" style={px(it.emphasis
+            ? { fontSize:25, fontWeight:800, color:it.color || C.text, lineHeight:1, letterSpacing:'-.02em', overflowWrap:'anywhere' }
+            : { fontSize:19, fontWeight:800, color:C.text, lineHeight:1, letterSpacing:'-.02em', overflowWrap:'anywhere' })}>
             {it.val}
           </div>
           <div className="skip-stat-strip-label" style={sans({ fontSize:10, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color:it.color || C.text2, overflowWrap:'anywhere' })}>

@@ -48,7 +48,17 @@ async function ncaa(path, params = {}, { cache: useCache = true, ttl = CACHE_TTL
   }
 
   const request = (async () => {
-    const res = await fetch(url);
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (transportError) {
+      // Same defensive fix as the JSON-parse case below, extended to cover
+      // the request itself: a raw fetch() failure (offline, DNS, CORS) has
+      // a browser-authored .message like "Failed to fetch", and that .message
+      // is what reaches the user (OtherPages.jsx: `setError(err.message ||
+      // '...')`, and retryProvider('ncaa') via DataSourceStatusCenter).
+      throw new Error(`NCAA API request failed — ${path}`, { cause: transportError });
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `NCAA API ${res.status} for ${path}`);

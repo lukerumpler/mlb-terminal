@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateZoneWhiffs } from "../client/src/pages/PlayersPage.jsx";
+import { aggregateZoneWhiffs, hasZoneWhiffData } from "../client/src/pages/PlayersPage.jsx";
 
 // Real Statcast Search fields (baseballsavant.mlb.com/csv-docs): `zone`
 // (1-9 in-zone, 11-14 the four outside corners) and `description` (e.g.
@@ -58,5 +58,31 @@ describe("aggregateZoneWhiffs (Roadmap #3 upgrade — real zone-level Whiff%)", 
     expect(result[1]).toEqual({ swings: 3, whiffs: 1 });
     expect(result[11]).toEqual({ swings: 2, whiffs: 2 });
     expect(result[14]).toEqual({ swings: 1, whiffs: 0 });
+  });
+});
+
+// §29 data-provenance sweep: the "Plate Discipline" panel's badge used to
+// hardcode "Live Savant" regardless of whether contactPoints actually had
+// any plottable data — including on a Savant fetch failure, where the
+// panel body was already honestly showing "No per-zone Statcast swing data
+// available for this player yet." hasZoneWhiffData() is the single check
+// both the badge and ZoneWhiffGrid's body now share, so they can't
+// disagree about whether there's real data to show.
+describe("hasZoneWhiffData (backs the Plate Discipline panel's provenance badge)", () => {
+  it("is true when there's at least one usable zone-level swing", () => {
+    expect(hasZoneWhiffData([swing(5, "foul")])).toBe(true);
+  });
+
+  it("is false for null, undefined, or an empty array", () => {
+    expect(hasZoneWhiffData(null)).toBe(false);
+    expect(hasZoneWhiffData(undefined)).toBe(false);
+    expect(hasZoneWhiffData([])).toBe(false);
+  });
+
+  it("is false when every row is missing zone data, even though the array itself is non-empty", () => {
+    // The exact edge case a naive `contactPoints.length > 0` check would
+    // get wrong: rows are present, but none of them carry usable zone
+    // data, so ZoneWhiffGrid renders its empty state regardless.
+    expect(hasZoneWhiffData([{ description: "foul" }, { zone: null, description: "swinging_strike" }])).toBe(false);
   });
 });

@@ -38,7 +38,7 @@ beforeEach(() => {
 async function goToTab(user, label, waitForText) {
   render(<App />);
   const groupedTabs = {
-    Draft: { workspace: "Talent", tab: "Draft Board" },
+    Draft: { workspace: "Player", tab: "Draft Board" },
     AMD: { workspace: "Intelligence", tab: "AMD / IMD" },
   };
   const grouped = groupedTabs[label];
@@ -394,7 +394,7 @@ describe("Settings roster defaults", () => {
     expect(battingDefault).toHaveValue("150");
     expect(pitchingDefault).toHaveValue("30");
 
-    const overviewButton = screen.getByTitle("Overview");
+    const overviewButton = screen.getByTitle("Team Overview");
     await user.click(overviewButton);
     // Target the subtab button inside the overview page
     const rosterTab = await screen.findByRole("button", { name: /^Roster$/i });

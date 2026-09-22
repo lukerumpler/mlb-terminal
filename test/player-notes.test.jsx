@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import {
   applyImportedNotes,
   buildNotesExportPayload,
   normalizeImportedNotes,
+  playerNotesStorageKey,
+  readPlayerNotes,
   removeNoteTag,
   renameNoteTag,
   sortPlayerNotes,
+  writePlayerNotes,
 } from "../client/src/pages/playerNotes.js";
 
 describe("player note sorting and management", () => {
@@ -121,5 +124,42 @@ describe("player note sorting and management", () => {
       tags: [],
     });
     expect(normalizeImportedNotes({ bad: true })).toEqual([]);
+  });
+});
+
+// §29 audit: writePlayerNotes() replaces what used to be an unguarded
+// localStorage.setItem() call inline in PlayersPage.jsx's useEffect — it
+// re-ran on every keystroke while editing a scouting note, so an unguarded
+// throw there (private browsing, quota exceeded) would have crashed the
+// whole Player Profile tab's render repeatedly, not just once.
+describe("writePlayerNotes (persists scouting notes, must never throw)", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("round-trips through readPlayerNotes via real localStorage", () => {
+    const observations = [
+      { id: "a", text: "Good bat speed", category: "Scouting", tags: ["power"], createdAt: 1 },
+    ];
+    writePlayerNotes("660271", observations);
+    expect(JSON.parse(localStorage.getItem(playerNotesStorageKey("660271")))).toEqual(observations);
+    expect(readPlayerNotes("660271")).toMatchObject([{ id: "a", text: "Good bat speed" }]);
+  });
+
+  it("does nothing (and does not throw) without a playerId", () => {
+    expect(() => writePlayerNotes(null, [{ id: "a", text: "x", category: "Scouting", tags: [], createdAt: 1 }])).not.toThrow();
+    expect(() => writePlayerNotes(undefined, [])).not.toThrow();
+  });
+
+  it("swallows a storage failure instead of throwing (private browsing / quota exceeded)", () => {
+    const realSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new DOMException("QuotaExceededError");
+    };
+    try {
+      expect(() => writePlayerNotes("660271", [{ id: "a", text: "x", category: "Scouting", tags: [], createdAt: 1 }])).not.toThrow();
+    } finally {
+      Storage.prototype.setItem = realSetItem;
+    }
   });
 });

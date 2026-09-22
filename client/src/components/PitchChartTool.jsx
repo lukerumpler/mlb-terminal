@@ -1,7 +1,7 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { PITCH_TYPES, pitchColor } from '../constants/pitchTypes.js';
-import { usePitchChart, RESULTS } from '../lib/pitchChart.js';
+import { usePitchChart, RESULTS, summarizePitches } from '../lib/pitchChart.js';
 import { Panel, Badge } from './atoms.jsx';
 
 const fieldLabel = { display:'block', ...sans({ fontSize:9.5, fontWeight:700, color:C.text3, textTransform:'uppercase', letterSpacing:'.04em', marginBottom:3 }) };
@@ -15,41 +15,62 @@ const sideToggle = (active) => ({
 });
 
 // 9-zone core (standard scouting numbering, 1–9 top-left to bottom-right)
-// plus 4 outer "expanded zone" strips (High/Low/In/Out) for well-outside
-// pitches — a simplified stand-in for the reference UI's full 17-zone grid
-// (9 core + 8 individually-numbered outer cells). Labeled by absolute
-// direction (High/Low/In/Out), not arm-side/glove-side, so this doesn't
-// need to know or assume pitcher handedness to be correct.
+// plus the full 17-zone outer ring (v2 scope from the roadmap's "what to
+// build" note — this was the deferred piece; v1 shipped with 4 broad
+// High/Low/In/Out strips instead): 4 corners + 4 edge-middles, individually
+// numbered 10–17. Like the 13-zone v1 grid, this is SKIP's own extended
+// scouting convention, not a Statcast field (see the zone-numbering note in
+// PlayersPage.jsx a few files away, which documents that distinction for
+// the *other* zone system this app uses).
 const CORE_ZONES = Array.from({ length: 9 }, (_, i) => ({
   zone: i + 1, x: 50 + (i % 3) * (100 / 3), y: 50 + Math.floor(i / 3) * (100 / 3), w: 100 / 3, h: 100 / 3,
 }));
 const OUTER_ZONES = [
-  { zone:10, label:'High', x:50,  y:5,   w:100, h:45 },
-  { zone:11, label:'Low',  x:50,  y:150, w:100, h:45 },
-  { zone:12, label:'In',   x:5,   y:50,  w:45,  h:100 },
-  { zone:13, label:'Out',  x:150, y:50,  w:45,  h:100 },
+  { zone:10, label:'⌜',  x:0,   y:0,   w:50,  h:50  }, // up-and-in corner (as drawn; see mirroring note below)
+  { zone:11, label:'▲',  x:50,  y:0,   w:100, h:50  }, // high, over the plate
+  { zone:12, label:'⌝',  x:150, y:0,   w:50,  h:50  }, // up-and-away corner
+  { zone:13, label:'▶',  x:150, y:50,  w:50,  h:100 }, // away, middle height
+  { zone:14, label:'⌟',  x:150, y:150, w:50,  h:50  }, // down-and-away corner
+  { zone:15, label:'▼',  x:50,  y:150, w:100, h:50  }, // low, over the plate
+  { zone:16, label:'⌞',  x:0,   y:150, w:50,  h:50  }, // down-and-in corner
+  { zone:17, label:'◀',  x:0,   y:50,  w:50,  h:100 }, // in, middle height
 ];
 
-function ZoneGrid({ selected, onTap }) {
+// Zone *numbers* are a fixed, canonical map of real strike-zone quadrants —
+// they never change based on which way you're looking at the plate. Only
+// the on-screen x-position mirrors for the pitcher/catcher view toggle, so
+// tapping the same real-world location logs the same zone number from
+// either view (a pitcher's glove-side and a catcher's glove-side are
+// screen-mirrored but describe the same physical spot).
+function displayX(x, w, mirror) {
+  return mirror ? 200 - x - w : x;
+}
+
+// ariaPrefix distinguishes the main (actual-zone) grid from the optional
+// catcher-target grid, which renders a second, simultaneous instance of
+// this same component — without distinct accessible names, "Zone 5" would
+// be ambiguous (two same-named controls on screen at once) for both
+// assistive tech and tests.
+function ZoneGrid({ selected, onTap, mirror = false, ariaPrefix = 'Zone' }) {
   return (
     <svg viewBox="0 0 200 200" width="100%" height={220} style={{ display:'block', maxWidth:220, margin:'0 auto' }}>
       {OUTER_ZONES.map(z => (
-        <g key={z.zone} role="button" tabIndex={0} aria-label={`Zone ${z.zone} (${z.label})`}
+        <g key={z.zone} role="button" tabIndex={0} aria-label={`${ariaPrefix} ${z.zone}`}
           aria-pressed={selected === z.zone} style={{ cursor:'pointer' }}
           onClick={() => onTap(z.zone)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onTap(z.zone); }}>
-          <rect x={z.x} y={z.y} width={z.w} height={z.h}
+          <rect x={displayX(z.x, z.w, mirror)} y={z.y} width={z.w} height={z.h}
             fill={selected === z.zone ? C.amberSoft : C.surface2} stroke={C.borderLight} strokeWidth="1" />
-          <text x={z.x + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
-            fontSize="7.5" fill={C.text4} fontFamily="'Plus Jakarta Sans',sans-serif">{z.label}</text>
+          <text x={displayX(z.x, z.w, mirror) + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
+            fontSize="9" fill={C.text4} fontFamily="'Plus Jakarta Sans',sans-serif">{z.zone}</text>
         </g>
       ))}
       {CORE_ZONES.map(z => (
-        <g key={z.zone} role="button" tabIndex={0} aria-label={`Zone ${z.zone}`}
+        <g key={z.zone} role="button" tabIndex={0} aria-label={`${ariaPrefix} ${z.zone}`}
           aria-pressed={selected === z.zone} style={{ cursor:'pointer' }}
           onClick={() => onTap(z.zone)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onTap(z.zone); }}>
-          <rect x={z.x} y={z.y} width={z.w} height={z.h}
+          <rect x={displayX(z.x, z.w, mirror)} y={z.y} width={z.w} height={z.h}
             fill={selected === z.zone ? C.amber : C.surface} stroke={C.border} strokeWidth="1" />
-          <text x={z.x + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
+          <text x={displayX(z.x, z.w, mirror) + z.w / 2} y={z.y + z.h / 2} textAnchor="middle" dominantBaseline="central"
             fontSize="12" fontWeight="700" fill={selected === z.zone ? '#fff' : C.text2}
             fontFamily="'DM Mono',monospace">{z.zone}</text>
         </g>
@@ -102,12 +123,57 @@ const PitchLog = memo(function PitchLog({ atBats }) {
   );
 }, atBatsUnchanged);
 
+// Pitch Summary (Roadmap #8 v2's other new piece): auto-derived from every
+// pitch thrown this session via summarizePitches() in lib/pitchChart.js —
+// nothing here is computed independently, so this can never drift from the
+// pitch log itself. usageRate always renders (it's just count/total, always
+// knowable); avg velo and whiff% render per-row only when that type actually
+// has the underlying data, rather than a misleading 0.
+const PitchSummaryTable = memo(function PitchSummaryTable({ rows }) {
+  if (rows.length === 0) {
+    return <div style={sans({ fontSize:10.5, color:C.text4 })}>Log a pitch to see usage, velocity, and whiff-rate by type.</div>;
+  }
+  return (
+    <div style={{ overflowX:'auto' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', minWidth:360 }}>
+        <thead>
+          <tr style={{ background:C.surface2 }}>
+            {['Type', 'Thrown', 'Usage', 'Avg Velo', 'Whiff%'].map((h, i) => (
+              <th key={h} style={{ padding:'6px 9px', textAlign:i === 0 ? 'left' : 'right', borderBottom:`0.5px solid ${C.border}`, ...sans({ fontSize:9.5, fontWeight:800, color:C.text3, textTransform:'uppercase', letterSpacing:'.04em' }) }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const label = PITCH_TYPES.find(pt => pt.code === row.type)?.name || (row.type === 'UNK' ? 'Type not set' : row.type);
+            return (
+              <tr key={row.type} style={{ borderBottom: i < rows.length - 1 ? `0.5px solid ${C.borderLight}` : 'none' }}>
+                <td style={{ padding:'6px 9px', display:'flex', alignItems:'center', gap:6, ...sans({ fontSize:11.5, color:C.text }) }}>
+                  <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, background: row.type === 'UNK' ? C.text4 : pitchColor(row.type) }} />
+                  {label}
+                </td>
+                <td style={{ padding:'6px 9px', textAlign:'right', ...px({ fontSize:11.5, fontWeight:700, color:C.text }) }}>{row.count}</td>
+                <td style={{ padding:'6px 9px', textAlign:'right', ...px({ fontSize:11, color:C.text2 }) }}>{row.usagePct.toFixed(0)}%</td>
+                <td style={{ padding:'6px 9px', textAlign:'right', ...px({ fontSize:11, color:C.text2 }) }}>{row.avgVelocity != null ? `${row.avgVelocity.toFixed(1)}` : '—'}</td>
+                <td style={{ padding:'6px 9px', textAlign:'right', ...px({ fontSize:11, color:C.text2 }) }}>{row.whiffRate != null ? `${row.whiffRate.toFixed(0)}%` : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+});
+
 function PitchBadge({ pitch }) {
   const resultDef = RESULTS.find(r => r.key === pitch.result);
   return (
     <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 7px', borderRadius:5, background:C.surface3, border:`0.5px solid ${C.border}` }}>
       <span style={{ width:6, height:6, borderRadius:2, flexShrink:0, background: pitch.type ? pitchColor(pitch.type) : C.text4 }} />
-      <span style={px({ fontSize:9.5, color:C.text2 })}>Z{pitch.zone ?? '—'}</span>
+      <span style={px({ fontSize:9.5, color:C.text2 })}>
+        Z{pitch.zone ?? '—'}{pitch.targetZone != null && pitch.targetZone !== pitch.zone && <span style={{ color:C.teal }}>←T{pitch.targetZone}</span>}
+      </span>
+      {Number.isFinite(pitch.velocity) && <span style={px({ fontSize:9.5, color:C.text3 })}>{pitch.velocity}mph</span>}
       <span style={sans({ fontSize:9.5, color:C.text3 })}>{resultDef?.lbl || pitch.result}</span>
     </span>
   );
@@ -126,16 +192,36 @@ function PitchBadge({ pitch }) {
    anyone's tracked as a gap the way #1/#3's deferred pieces are.
 ------------------------------------------------------------------------ */
 export default function PitchChartTool() {
-  const { session, setField, logPitch, newAtBat, recordOut, advanceInning, resetCount, newSession } = usePitchChart();
+  const { session, setField, logPitch, undoLastPitch, newAtBat, recordOut, advanceInning, resetCount, newSession } = usePitchChart();
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [confirmingNewSession, setConfirmingNewSession] = useState(false);
+  const [viewMode, setViewMode] = useState('catcher'); // 'catcher' | 'pitcher' — v2 scope, see ZoneGrid
+  // Both v2 additions, alongside the pitcher/catcher toggle above: velocity
+  // is a plain optional number (no radar/Statcast feed backs this tool, so
+  // it's exactly as trustworthy as whatever the charter typed in — same
+  // status as pitch type). targetZone reuses the same ZoneGrid the actual
+  // zone uses, kept as a separate collapsed control rather than always-on
+  // so a charter who doesn't want to track command isn't forced to make two
+  // taps per pitch instead of one.
+  const [velocityInput, setVelocityInput] = useState('');
+  const [showTarget, setShowTarget] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState(null);
+
+  const parsedVelocity = velocityInput.trim() === '' ? null : Number(velocityInput);
+  const velocityValid = velocityInput.trim() === '' || (Number.isFinite(parsedVelocity) && parsedVelocity > 0 && parsedVelocity < 130);
+  const pitchSummaryRows = useMemo(() => summarizePitches(session), [session]);
 
   const handleLog = (resultKey) => {
     if (selectedZone == null) return;
-    logPitch(selectedZone, selectedType, resultKey);
+    logPitch(selectedZone, selectedType, resultKey, {
+      velocity: velocityValid ? parsedVelocity : null,
+      targetZone: selectedTarget,
+    });
     setSelectedZone(null);
     setSelectedType(null);
+    setVelocityInput('');
+    setSelectedTarget(null);
   };
 
   return (
@@ -183,6 +269,11 @@ export default function PitchChartTool() {
               Inning {session.inning} · {session.outs} out{session.outs === 1 ? '' : 's'}
             </div>
             <div style={{ display:'flex', gap:6, marginLeft:'auto', flexWrap:'wrap' }}>
+              <button onClick={undoLastPitch} disabled={session.currentPitches.length === 0}
+                style={{ ...btnGhost, opacity: session.currentPitches.length === 0 ? 0.5 : 1, cursor: session.currentPitches.length === 0 ? 'not-allowed' : 'pointer' }}
+                title="Remove the last logged pitch and restore the count before it">
+                Undo Last Pitch
+              </button>
               <button onClick={recordOut} style={btnGhost}>Record Out</button>
               <button onClick={advanceInning} style={btnGhost}>Advance Inning</button>
               <button onClick={resetCount} style={btnGhost}>Reset Count</button>
@@ -202,8 +293,36 @@ export default function PitchChartTool() {
           {/* Zone grid + pitch type + result */}
           <div style={{ display:'flex', gap:18, flexWrap:'wrap' }}>
             <div style={{ flex:'0 0 220px' }}>
-              <div style={{ ...fieldLabel, textAlign:'center' }}>Strike Zone — tap to select</div>
-              <ZoneGrid selected={selectedZone} onTap={z => setSelectedZone(z === selectedZone ? null : z)} />
+              <div style={{ display:'flex', justifyContent:'center', gap:4, marginBottom:6 }}>
+                <button style={sideToggle(viewMode === 'catcher')} onClick={() => setViewMode('catcher')} title="View from behind the plate">Catcher View</button>
+                <button style={sideToggle(viewMode === 'pitcher')} onClick={() => setViewMode('pitcher')} title="View from the mound">Pitcher View</button>
+              </div>
+              <div style={{ ...fieldLabel, textAlign:'center' }}>Strike Zone — where it crossed</div>
+              <ZoneGrid selected={selectedZone} onTap={z => setSelectedZone(z === selectedZone ? null : z)} mirror={viewMode === 'pitcher'} />
+
+              {/* Catcher target zone — v2's other deferred piece (see the
+                  module comment above). Kept collapsed by default: this is
+                  a second tap on top of the required actual-zone tap, so it
+                  should be an opt-in add for a charter who specifically
+                  wants command data, not a default tax on every pitch. */}
+              {showTarget ? (
+                <div style={{ marginTop:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:2 }}>
+                    <div style={{ ...fieldLabel, textAlign:'center', color:C.teal, marginBottom:0 }}>Catcher's target</div>
+                    <button type="button" onClick={() => { setShowTarget(false); setSelectedTarget(null); }}
+                      style={{ background:'none', border:'none', color:C.text4, cursor:'pointer', fontSize:13, lineHeight:1, padding:'0 2px' }}
+                      aria-label="Remove catcher target zone">×</button>
+                  </div>
+                  <div style={{ opacity:0.85 }}>
+                    <ZoneGrid selected={selectedTarget} onTap={z => setSelectedTarget(z === selectedTarget ? null : z)} mirror={viewMode === 'pitcher'} ariaPrefix="Target Zone" />
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowTarget(true)}
+                  style={{ display:'block', margin:'8px auto 0', background:'none', border:'none', color:C.teal, cursor:'pointer', ...sans({ fontSize:10.5, fontWeight:700 }) }}>
+                  + Add catcher target (optional)
+                </button>
+              )}
             </div>
             <div style={{ flex:'1 1 240px', minWidth:220, display:'flex', flexDirection:'column', gap:10 }}>
               <div>
@@ -224,22 +343,34 @@ export default function PitchChartTool() {
                   ))}
                 </div>
               </div>
+              <div style={{ maxWidth:140 }}>
+                <label style={fieldLabel} htmlFor="skip-pitch-velocity">Velocity, mph (optional)</label>
+                <input id="skip-pitch-velocity" type="number" inputMode="decimal" min="0" max="129" step="0.1"
+                  value={velocityInput} onChange={e => setVelocityInput(e.target.value)} placeholder="e.g. 95.4"
+                  style={{ ...fieldInput, borderColor: velocityValid ? C.border : C.rust }} />
+                {!velocityValid && (
+                  <div style={{ marginTop:3, ...sans({ fontSize:9.5, color:C.rust }) }}>Enter a realistic mph value, or leave blank.</div>
+                )}
+              </div>
               <div>
                 <div style={fieldLabel}>Result {selectedZone == null && <span style={{ fontWeight:400, textTransform:'none' }}>— pick a zone first</span>}</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                  {RESULTS.map(r => (
-                    <button key={r.key} disabled={selectedZone == null} onClick={() => handleLog(r.key)}
+                  {RESULTS.map(r => {
+                    const blocked = selectedZone == null || !velocityValid;
+                    return (
+                    <button key={r.key} disabled={blocked} onClick={() => handleLog(r.key)}
                       style={{
                         padding:'7px 11px', borderRadius:6, border:`1px solid ${C.border}`,
-                        background: selectedZone == null ? C.surface2 : C.surface,
-                        color: selectedZone == null ? C.text4 : C.text,
-                        cursor: selectedZone == null ? 'not-allowed' : 'pointer',
-                        opacity: selectedZone == null ? 0.55 : 1,
+                        background: blocked ? C.surface2 : C.surface,
+                        color: blocked ? C.text4 : C.text,
+                        cursor: blocked ? 'not-allowed' : 'pointer',
+                        opacity: blocked ? 0.55 : 1,
                         ...sans({ fontSize:11, fontWeight:700 }),
                       }}>
                       {r.lbl}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -262,6 +393,12 @@ export default function PitchChartTool() {
             <div style={fieldLabel}>Pitch Log</div>
             <PitchLog atBats={session.atBats} />
           </div>
+        </div>
+      </Panel>
+
+      <Panel title="Pitch Summary" accent={C.teal} badge={`${pitchSummaryRows.reduce((n, r) => n + r.count, 0)} pitch${pitchSummaryRows.reduce((n, r) => n + r.count, 0) === 1 ? '' : 'es'} this session`}>
+        <div style={{ padding:'12px 14px' }}>
+          <PitchSummaryTable rows={pitchSummaryRows} />
         </div>
       </Panel>
     </div>

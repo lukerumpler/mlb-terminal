@@ -309,7 +309,6 @@ describe("Team Overview model source and retry interaction", () => {
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -322,7 +321,6 @@ describe("Team Overview model source and retry interaction", () => {
     savantMode = "ready";
     const user = userEvent.setup();
     render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByRole("img", {
         name: "Verified Baseball Savant batted-ball spray coordinates",
@@ -338,7 +336,6 @@ describe("Team Overview model source and retry interaction", () => {
     savantMode = "empty";
     const user = userEvent.setup();
     render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -351,7 +348,6 @@ describe("Team Overview model source and retry interaction", () => {
     modelMode = "502";
     const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
@@ -387,7 +383,6 @@ describe("Team Overview model source and retry interaction", () => {
     });
     const user = userEvent.setup();
     render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText(/div avg/)).toBeInTheDocument();
   });
 
@@ -414,7 +409,6 @@ describe("Team Overview model source and retry interaction", () => {
     const user = userEvent.setup();
     render(<OverviewPage />);
 
-    await user.click(screen.getByRole("button", { name: "Performance" }));
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
     expect(screen.getByText(/SD highlighted/i)).toBeInTheDocument();
     const exactValuesTable = screen.getByRole("table", { name: "Exact divisional WAR values" });
@@ -426,20 +420,21 @@ describe("Team Overview model source and retry interaction", () => {
   it("shows explicit unavailable model states, exposes retry, and recovers MLB data without refreshing FanGraphs", async () => {
     const user = userEvent.setup();
     const { container } = render(<OverviewPage />);
-    await user.click(screen.getByRole("button", { name: "Performance" }));
 
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
-    expect(document.body.textContent).toMatch(
-      /Playoff odds:\s*Provider unavailable/
-    );
-    expect(document.body.textContent).toMatch(/Playoff Odds/);
-    expect(document.body.textContent).toMatch(/Team WAR/);
-    expect(document.body.textContent).toContain("Unavailable");
-    expect(document.body.textContent).toMatch(
-      /Team WAR:\s*Provider unavailable/
-    );
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(
+        /Playoff odds:\s*Provider unavailable/
+      );
+      expect(document.body.textContent).toMatch(/Playoff Odds/);
+      expect(document.body.textContent).toMatch(/Team WAR/);
+      expect(document.body.textContent).toContain("Unavailable");
+      expect(document.body.textContent).toMatch(
+        /Team WAR:\s*Provider unavailable/
+      );
+    });
     expect(document.body.textContent).toMatch(
       /Model source:\s*FanGraphs\s*·\s*retrieved\s+\d{1,2}:\d{2}/
     );

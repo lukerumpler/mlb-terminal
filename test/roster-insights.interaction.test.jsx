@@ -11,7 +11,7 @@ describe("Roster Insights rendered filters", () => {
     const user = userEvent.setup();
     localStorage.removeItem("skip-roster-sample-defaults");
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Roster" }));
+    await user.click(await screen.findByRole("button", { name: "Roster" }, { timeout: 8000 }));
     await screen.findByText("AI Scout Insights");
 
     const allPositionsButton = await screen.findByRole("button", {

@@ -36,7 +36,10 @@ describe('operational alert sources', () => {
     ]));
     expect(alerts.every(alert => alert.source)).toBe(true);
     expect(alerts.some(alert => /Ricky Tiedemann|Jordan Walker|Gerrit Cole|Roman Anthony|Ethan Holliday/i.test(`${alert.title} ${alert.body}`))).toBe(false);
-    expect(countActionableAlerts(alerts)).toBe(2);
+    // stale-cache-served and feed-freshness-pending both describe normal,
+    // working-as-designed resilience behavior, not real problems — neither
+    // should count toward the sidebar's actionable-alert badge.
+    expect(countActionableAlerts(alerts)).toBe(0);
   });
 
   it('keeps a cache-health read failure clearly distinct from provider freshness', () => {

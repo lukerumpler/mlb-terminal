@@ -29,9 +29,7 @@ describe('Overview page section reordering for unavailable data', () => {
     render(<OverviewPage />);
     
     const seasonOverviewHeading = await screen.findByText(/Season overview/i);
-    expect(screen.queryByText(/Advanced Models & Savant/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Performance' }));
-    const advancedModelsPanel = screen.getByText(/Advanced Models & Savant/i);
+    const advancedModelsPanel = await screen.findByText(/Advanced Models & Savant/i);
     const divisionalWarPanel = screen.getByText(/Divisional WAR Comparison/i);
 
     expect(seasonOverviewHeading).toBeInTheDocument();

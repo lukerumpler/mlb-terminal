@@ -30,6 +30,23 @@ export function readPlayerNotes(playerId) {
   }
 }
 
+// §29 audit: this used to be an unguarded localStorage.setItem() call
+// inline in PlayersPage.jsx's useEffect. Every other localStorage write in
+// the app goes through a try/catch (private browsing, quota-exceeded), but
+// this one didn't — and since it re-runs on every observations change while
+// scouting notes are being edited, a throw here would crash the whole
+// Player Profile tab's render on every keystroke, not just once.
+export function writePlayerNotes(playerId, observations) {
+  if (!playerId || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(playerNotesStorageKey(playerId), JSON.stringify(observations));
+  } catch {
+    // Storage can be unavailable (private browsing, quota exceeded). Notes
+    // still work for the rest of the session via React state; they just
+    // won't persist across a reload.
+  }
+}
+
 export function sortPlayerNotes(notes, mode = 'date-desc') {
   return [...(Array.isArray(notes) ? notes : [])].sort((a, b) => {
     if (mode === 'category') return String(a.category || '').localeCompare(String(b.category || '')) || Number(b.createdAt || 0) - Number(a.createdAt || 0);

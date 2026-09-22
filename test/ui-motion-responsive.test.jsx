@@ -42,7 +42,7 @@ describe("SKIP motion and responsive UI hooks", () => {
     expect(appSource).toContain('className="skip-nav-section"');
     expect(appSource).toContain("section:'Evaluation'");
     expect(appSource).toContain("title={t.label}");
-    expect(appSource).toContain("width:196");
+    expect(appSource).toContain("width:172");
     expect(appSource).toContain("height:46");
     expect(appSource).toContain("padding:'16px 18px 24px'");
     expect(appSource).toContain('className="skip-low-data-indicator"');
