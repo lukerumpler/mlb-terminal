@@ -8,6 +8,7 @@ vi.mock('../durable-cache', () => ({ readDurableCache, writeDurableCache }));
 
 import fangraphsHandler, {
   __resetFanGraphsProviderStateForTests,
+  parseBaseballReferenceTeamWarHtml,
 } from "./fangraphs-models.js";
 import savantHandler, { __resetSavantStateForTests } from "./savant.js";
 import ncaaHandler from "./ncaa.js";
@@ -70,6 +71,33 @@ afterEach(() => {
 });
 
 describe("FanGraphs provider cache", () => {
+  it("parses Baseball-Reference team WAR totals", () => {
+    const body = `<table><tr><th>Rk</th><th>Total</th><th>All P</th></tr><tr><td>1</td><td><a href="/teams/SDP/2026.shtml">San Diego Padres</a></td><td>12.4</td><td>7.1</td></tr></table>`;
+    expect(parseBaseballReferenceTeamWarHtml(body, 2026)).toEqual({
+      season: 2026,
+      teams: [{ team: "San Diego Padres", battingWAR: null, pitchingWAR: null, totalWAR: 12.4 }],
+    });
+  });
+
+  it("falls back to Baseball-Reference totals when FanGraphs aggregate pages fail", async () => {
+    const baseballReference = `<table><tr><th>Rk</th><th>Total</th><th>All P</th></tr><tr><td>1</td><td><a href="/teams/SDP/2099.shtml">San Diego Padres</a></td><td>12.4</td><td>7.1</td></tr></table>`;
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error("FanGraphs blocked"), { status: 403 }))
+      .mockRejectedValueOnce(Object.assign(new Error("FanGraphs blocked"), { status: 403 }))
+      .mockResolvedValueOnce(new Response(baseballReference, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = response();
+    await fangraphsHandler(req("/api/fangraphs-models?mode=aggregate&season=2099"), result);
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({
+      found: true,
+      source: "Baseball-Reference",
+      teams: [{ team: "San Diego Padres", totalWAR: 12.4 }],
+      statuses: { total: "live" },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("coalesces identical model loads and serves the second read from cache", async () => {
     const fetchMock = vi.fn(
       async (url: string) =>

@@ -2430,10 +2430,10 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
       defensiveWAR: selected?.defenseWAR ?? selected?.defensiveWAR ?? null,
       divisionAverageWAR,
       divisionTeams,
-      source: 'FanGraphs aggregate Team WAR',
+      source: data.source || 'FanGraphs aggregate Team WAR',
       freshness: data.freshness || 'live',
       retrievedAt: data.retrievedAt || data.servedAt,
-      status: data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial',
+      status: data.statuses?.total === 'live' || (data.statuses?.batting === 'live' && data.statuses?.pitching === 'live') ? 'live' : 'partial',
     };
   } catch {
     return null;
