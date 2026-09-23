@@ -8,6 +8,8 @@ const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
 const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
+const BASEBALL_REFERENCE_WAR_URL = season =>
+  `https://www.baseball-reference.com/leagues/team_compare.cgi?year=${season}&lg=MLB&stat=WAR`;
 const AGGREGATE_WAR_URL = (season, stats) =>
   `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
 const UA = "Mozilla/5.0 (compatible; SKIPBaseball/1.0)";
@@ -272,6 +274,27 @@ export function parseFanGraphsAggregateWarHtml(
   };
 }
 
+export function parseBaseballReferenceTeamWarHtml(html, season = DEFAULT_SEASON) {
+  const teams = [];
+  for (const match of String(html || "").matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const row = match[1];
+    const teamLink = row.match(
+      new RegExp(
+        `<a[^>]+href=["']/teams/[^"'/]+/${season}\\.shtml["'][^>]*>([\\s\\S]*?)<\\/a>`,
+        "i"
+      )
+    );
+    if (!teamLink) continue;
+    const team = stripTags(teamLink[1]);
+    const cells = cellsFromRow(row);
+    const teamIndex = cells.findIndex(cell => cell === team);
+    const totalWAR = teamIndex >= 0 ? numeric(cells[teamIndex + 1]) : null;
+    if (team && totalWAR != null)
+      teams.push({ team, battingWAR: null, pitchingWAR: null, totalWAR });
+  }
+  return { season, teams };
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -295,6 +318,40 @@ async function fetchHtml(url) {
     );
   }
   return response.text();
+}
+
+async function fetchBaseballReferenceHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html,application/xhtml+xml,*/*",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok)
+    throw Object.assign(
+      new Error(`Baseball-Reference returned HTTP ${response.status}`),
+      { status: response.status }
+    );
+  return response.text();
+}
+
+async function loadBaseballReferenceAggregateWar(season) {
+  const html = await fetchBaseballReferenceHtml(BASEBALL_REFERENCE_WAR_URL(season));
+  const parsed = parseBaseballReferenceTeamWarHtml(html, season);
+  if (!parsed.teams.length)
+    throw new Error("Baseball-Reference Team WAR table was empty");
+  return {
+    found: true,
+    ...parsed,
+    source: "Baseball-Reference",
+    sourceUrls: { teamWar: BASEBALL_REFERENCE_WAR_URL(season) },
+    retrievedAt: new Date().toISOString(),
+    freshness: "live",
+    statuses: { batting: "unavailable", pitching: "unavailable", total: "live" },
+  };
 }
 
 async function loadAggregateWar(season) {
@@ -357,7 +414,7 @@ async function loadAggregateWar(season) {
             )
           )
       );
-    const parsed = parseFanGraphsAggregateWarHtml(
+    let parsed = parseFanGraphsAggregateWarHtml(
       {
         battingHtml:
           battingResult.status === "fulfilled" ? battingResult.value : "",
@@ -366,7 +423,15 @@ async function loadAggregateWar(season) {
       },
       season
     );
-    const hasRows = parsed.teams.some(team => team.totalWAR != null);
+    let hasRows = parsed.teams.some(team => team.totalWAR != null);
+    if (!hasRows) {
+      try {
+        parsed = await loadBaseballReferenceAggregateWar(season);
+        hasRows = true;
+      } catch {
+        // Keep the original FanGraphs failure semantics when both providers fail.
+      }
+    }
     if (
       !hasRows &&
       battingResult.status === "rejected" &&
@@ -392,6 +457,7 @@ async function loadAggregateWar(season) {
         );
       throw error;
     }
+    if (parsed.source === "Baseball-Reference") return parsed;
     return {
       found: hasRows,
       ...parsed,
