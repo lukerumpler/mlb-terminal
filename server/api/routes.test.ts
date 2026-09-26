@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { legacyApiPaths } from "./routes";
 
 describe("legacy API route registration", () => {
-  it("keeps every original SKIP proxy path", () => {
+  it("keeps every original SKIP proxy path and registers efficiency services", () => {
     expect(legacyApiPaths).toEqual([
       "/api/mlb",
       "/api/ncaa",
@@ -12,6 +12,8 @@ describe("legacy API route registration", () => {
       "/api/contract",
       "/api/comparison-summary",
       "/api/natural-search",
+      "/api/team-financials",
+      "/api/team-efficiency",
       "/api/playoffstatus-odds",
       "/api/player-advanced",
       "/api/player-identity",

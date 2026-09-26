@@ -44,6 +44,8 @@ export async function registerLegacyApiRoutes(app: Express) {
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./team-financials.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./team-efficiency.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./fangraphs-models.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./intelligence-calculations.js"),
@@ -69,6 +71,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/comparison-summary",
     "/api/natural-search",
     "/api/team-financials",
+    "/api/team-efficiency",
     "/api/fangraphs-models",
     "/api/intelligence-calculations",
     "/api/playoffstatus-odds",
@@ -108,6 +111,8 @@ export const legacyApiPaths = [
   "/api/contract",
   "/api/comparison-summary",
   "/api/natural-search",
+  "/api/team-financials",
+  "/api/team-efficiency",
   "/api/playoffstatus-odds",
   "/api/player-advanced",
   "/api/player-identity",

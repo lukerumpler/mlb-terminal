@@ -24,10 +24,19 @@ const FRESH_TTL_MS = 30 * 60_000;
 const STALE_TTL_MS = 6 * 60 * 60_000;
 const financialCache = new Map();
 const financialInFlight = new Map();
+const spotracPageCache = new Map();
+const spotracPageInFlight = new Map();
 
 export function __resetTeamFinancialsStateForTests() {
   financialCache.clear();
   financialInFlight.clear();
+  spotracPageCache.clear();
+  spotracPageInFlight.clear();
+}
+
+export function shouldRateLimitFinancialRefresh(team, season = DEFAULT_SEASON) {
+  const cached = financialCache.get(financialCacheKey(team, season));
+  return !(cached?.freshUntil > Date.now()) && !financialInFlight.has(financialCacheKey(team, season));
 }
 
 function financialCacheKey(team, season) {
@@ -244,34 +253,25 @@ async function fetchHtml(url, timeoutMs = 12_000) {
   return response.text();
 }
 
-export default async function handler(req, res) {
-  applyCors(req, res);
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "GET")
-    return res.status(405).json({ error: "Method not allowed" });
-  const url = new URL(req.url, "https://placeholder.invalid");
-  const team = String(url.searchParams.get("team") || "")
-    .trim()
-    .toUpperCase();
-  const parsedSeason = Number(url.searchParams.get("season") || DEFAULT_SEASON);
-  const season =
-    Number.isInteger(parsedSeason) &&
-    parsedSeason >= 2024 &&
-    parsedSeason <= 2030
-      ? parsedSeason
-      : DEFAULT_SEASON;
-  if (!TEAM_CODE.test(team))
-    return res
-      .status(400)
-      .json({ error: "Missing or invalid team abbreviation" });
+async function fetchSpotracPage(url) {
+  const cached = spotracPageCache.get(url);
+  if (cached?.expiresAt > Date.now()) return cached.html;
+  const existing = spotracPageInFlight.get(url);
+  if (existing) return existing;
+  const request = fetchHtml(url).then(html => {
+    spotracPageCache.set(url, { html, expiresAt: Date.now() + FRESH_TTL_MS });
+    return html;
+  });
+  spotracPageInFlight.set(url, request);
+  request.finally(() => spotracPageInFlight.delete(url)).catch(() => {});
+  return request;
+}
 
+export async function getTeamFinancialSnapshot(team, season = DEFAULT_SEASON) {
   const key = financialCacheKey(team, season);
   const now = Date.now();
   let cached = financialCache.get(key);
-  if (cached?.freshUntil > now) {
-    setFinancialHeaders(res, cached.freshness);
-    return res.status(200).json(cached.payload);
-  }
+  if (cached?.freshUntil > now) return cached.payload;
 
   if (!process.env.VITEST && process.env.DATABASE_URL) {
     const durable = await readDurableCache(durableFinancialCacheKey(team, season));
@@ -285,29 +285,20 @@ export default async function handler(req, res) {
       financialCache.set(key, cached);
       if (cached.freshUntil > now) {
         recordCacheOutcome("team-financials", "durable-hit");
-        res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=3600");
-        res.setHeader("X-Provider-Cache", "DURABLE-HIT");
-        res.setHeader("X-Provider-Freshness", "cached");
-        return res.status(200).json(cached.payload);
+        return { ...cached.payload, freshness: "cached" };
       }
     }
   }
 
   const existing = financialInFlight.get(key);
-  if (existing) {
-    const payload = await existing;
-    setFinancialHeaders(res, payload.freshness || "live");
-    return res.status(200).json(payload);
-  }
-
-  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+  if (existing) return existing;
 
   const request = (async () => {
     const [payrollResult, taxResult] = await Promise.allSettled([
-      fetchHtml(SPOTRAC_PAYROLL_URL(season)).then(html =>
+      fetchSpotracPage(SPOTRAC_PAYROLL_URL(season)).then(html =>
         parseTeamPayrollHtml(html, team, season)
       ),
-      fetchHtml(SPOTRAC_TAX_URL(season)).then(html =>
+      fetchSpotracPage(SPOTRAC_TAX_URL(season)).then(html =>
         parseTeamTaxHtml(html, team, season)
       ),
     ]);
@@ -360,7 +351,31 @@ export default async function handler(req, res) {
   })();
   financialInFlight.set(key, request);
   request.finally(() => financialInFlight.delete(key)).catch(() => {});
-  const payload = await request;
+  return request;
+}
+
+export default async function handler(req, res) {
+  applyCors(req, res);
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+  const url = new URL(req.url, "https://placeholder.invalid");
+  const team = String(url.searchParams.get("team") || "")
+    .trim()
+    .toUpperCase();
+  const parsedSeason = Number(url.searchParams.get("season") || DEFAULT_SEASON);
+  const season =
+    Number.isInteger(parsedSeason) &&
+    parsedSeason >= 2024 &&
+    parsedSeason <= 2030
+      ? parsedSeason
+      : DEFAULT_SEASON;
+  if (!TEAM_CODE.test(team))
+    return res
+      .status(400)
+      .json({ error: "Missing or invalid team abbreviation" });
+  if (shouldRateLimitFinancialRefresh(team, season) && isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+  const payload = await getTeamFinancialSnapshot(team, season);
   setFinancialHeaders(res, payload.freshness || "live");
   return res.status(200).json(payload);
 }

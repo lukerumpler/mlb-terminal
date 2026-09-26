@@ -10,6 +10,8 @@ const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
 const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
 const AGGREGATE_WAR_URL = (season, stats) =>
   `https://www.fangraphs.com/leaders-legacy.aspx?pos=all&stats=${stats}&lg=all&qual=y&type=8&season=${season}&season1=${season}&month=0&ind=0&team=0%2Cts&rost=0&age=0%2C100&filter=&players=&page=1_50`;
+const BASEBALL_REFERENCE_TEAM_WAR_URL = season =>
+  `https://www.baseball-reference.com/leagues/team_compare.cgi?year=${season}&lg=MLB&stat=WAR`;
 const UA = "Mozilla/5.0 (compatible; SKIPBaseball/1.0)";
 const CACHE_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
@@ -272,6 +274,73 @@ export function parseFanGraphsAggregateWarHtml(
   };
 }
 
+export function parseBaseballReferenceTeamWarHtml(html, season = DEFAULT_SEASON) {
+  const teams = [];
+  const strip = value => String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+  const number = value => {
+    const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : null;
+  };
+  const tables = [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)].map(match => match[1]);
+  for (const tableHtml of tables) {
+    const rows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+    const header = rows.find(row => /<th/i.test(row[1]));
+    const headers = header
+      ? [...header[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match => strip(match[1]).toLowerCase())
+      : [];
+    for (const rowMatch of rows) {
+      const rowHtml = rowMatch[1];
+      const teamLink = rowHtml.match(new RegExp(`<a[^>]+href=["']/teams/[^/]+/${season}\\.shtml[^"']*["'][^>]*>([\\s\\S]*?)<\\/a>`, "i"));
+      if (!teamLink) continue;
+      const team = strip(teamLink[1]);
+      const cells = [...rowHtml.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match => strip(match[1]));
+      const teamIndex = cells.findIndex(cell => cell === team);
+      const totalWar = teamIndex >= 0 ? number(cells[teamIndex + 1]) : null;
+      const defensiveIndex = headers.findIndex(header => /def|fld|field|dwar/.test(header) && !/off/.test(header));
+      const defensiveWAR = defensiveIndex >= 0 ? number(cells[defensiveIndex]) : null;
+      if (team && totalWar != null) {
+        teams.push({
+          team,
+          battingWAR: null,
+          pitchingWAR: null,
+          totalWAR: totalWar,
+          ...(defensiveWAR != null ? { defensiveWAR } : {}),
+          season,
+        });
+      }
+    }
+  }
+  return teams;
+}
+
+async function loadBaseballReferenceAggregateWar(season) {
+  const sourceUrl = BASEBALL_REFERENCE_TEAM_WAR_URL(season);
+  const html = await fetchHtml(sourceUrl);
+  const teams = parseBaseballReferenceTeamWarHtml(html, season);
+  if (!teams.length) {
+    const error = new Error("Baseball-Reference aggregate Team WAR unavailable");
+    error.status = 502;
+    throw error;
+  }
+  return {
+    found: true,
+    season,
+    teams,
+    source: "Baseball-Reference",
+    sourceUrls: { aggregate: sourceUrl },
+    retrievedAt: new Date().toISOString(),
+    freshness: "live",
+    fallback: true,
+    statuses: { batting: "not-provided", pitching: "not-provided", teamWar: "fallback-live" },
+  };
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -297,13 +366,13 @@ async function fetchHtml(url) {
   return response.text();
 }
 
-async function loadAggregateWar(season) {
+export async function loadAggregateWar(season) {
   const key = String(season);
   let cached = aggregateWarCache.get(key);
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
   if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
-    const durable = await readDurableCache(durableFanGraphsKey(`aggregate:${season}`));
+    const durable = await readDurableCache(durableFanGraphsKey(`aggregate-blended-v2:${season}`));
     if (durable) {
       cached = {
         data: durable.data,
@@ -367,11 +436,20 @@ async function loadAggregateWar(season) {
       season
     );
     const hasRows = parsed.teams.some(team => team.totalWAR != null);
-    if (
-      !hasRows &&
-      battingResult.status === "rejected" &&
-      pitchingResult.status === "rejected"
-    ) {
+    if (!hasRows) {
+      try {
+        const baseballReference = await loadBaseballReferenceAggregateWar(season);
+        return {
+          ...baseballReference,
+          providerSnapshots: {
+            fanGraphs: null,
+            baseballReference,
+          },
+        };
+      } catch (fallbackError) {
+        // Preserve the FanGraphs error contract when both providers fail.
+        // The caller will serve an already-cached aggregate snapshot if one exists.
+      }
       const providerBlocked = [battingResult, pitchingResult].some(
         result => result.status === "rejected" && result.reason?.providerBlocked
       );
@@ -392,9 +470,16 @@ async function loadAggregateWar(season) {
         );
       throw error;
     }
-    return {
+    const baseballReferenceResult = await Promise.allSettled([
+      loadBaseballReferenceAggregateWar(season),
+    ]);
+    const baseballReference = baseballReferenceResult[0].status === "fulfilled"
+      ? baseballReferenceResult[0].value
+      : null;
+    const fanGraphs = {
       found: hasRows,
-      ...parsed,
+      season,
+      teams: parsed.teams,
       source: "FanGraphs",
       sourceUrls: {
         batting: AGGREGATE_WAR_URL(season, "bat"),
@@ -402,6 +487,10 @@ async function loadAggregateWar(season) {
       },
       retrievedAt: new Date().toISOString(),
       freshness: "live",
+    };
+    return {
+      ...fanGraphs,
+      providerSnapshots: { fanGraphs, baseballReference },
       statuses: {
         batting:
           battingResult.status === "fulfilled" && battingResult.value
@@ -411,6 +500,7 @@ async function loadAggregateWar(season) {
           pitchingResult.status === "fulfilled" && pitchingResult.value
             ? "live"
             : "upstream-unavailable",
+        baseballReference: baseballReference ? "live" : "upstream-unavailable",
       },
     };
   })();
@@ -425,8 +515,8 @@ async function loadAggregateWar(season) {
         staleExpiresAt,
       });
       void writeDurableCache({
-        cacheKey: durableFanGraphsKey(`aggregate:${season}`),
-        source: 'FanGraphs',
+        cacheKey: durableFanGraphsKey(`aggregate-blended-v2:${season}`),
+        source: data.source || 'FanGraphs',
         data,
         freshUntil: new Date(expiresAt),
         staleUntil: new Date(staleExpiresAt),

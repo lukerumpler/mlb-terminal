@@ -31,8 +31,8 @@ describe('getLeagueTeamsWar (League page Team WAR column)', () => {
       });
     }));
     const rows = await getLeagueTeamsWar(2026);
-    expect(rows).toContainEqual({ team: 'san diego padres', totalWAR: 38.4 });
-    expect(rows).toContainEqual({ team: 'los angeles dodgers', totalWAR: 42.4 });
+    expect(rows).toContainEqual({ team: 'san diego padres', totalWAR: 38.4, fWAR: 38.4, bWAR: null, methodology: 'fWAR' });
+    expect(rows).toContainEqual({ team: 'los angeles dodgers', totalWAR: 42.4, fWAR: 42.4, bWAR: null, methodology: 'fWAR' });
   });
 
   it('excludes rows with no verified total WAR instead of coercing to 0', async () => {
@@ -44,7 +44,7 @@ describe('getLeagueTeamsWar (League page Team WAR column)', () => {
     })));
     const rows = await getLeagueTeamsWar(2026);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual({ team: 'boston red sox', totalWAR: 30.0 });
+    expect(rows[0]).toEqual({ team: 'boston red sox', totalWAR: 30.0, fWAR: 30.0, bWAR: null, methodology: 'fWAR' });
   });
 
   it('resolves to an empty array rather than throwing when the provider is unreachable', async () => {

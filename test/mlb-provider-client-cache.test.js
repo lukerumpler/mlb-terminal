@@ -118,4 +118,24 @@ describe("browser provider request cache", () => {
       expect.objectContaining({ teamWar: 42.4, divisionAverageWAR: 42.4 }),
     ]);
   });
+
+  // Regression test: a genuine transport-level failure (fetch() itself
+  // rejecting - offline, DNS, timeout) previously collapsed to a bare
+  // `null` here, discarding status/source/reason detail every other
+  // return path from this function provides. It also referenced `url`
+  // from inside the try block's scope as a fallback, the same
+  // out-of-scope bug fixed upstream in the fallback-only implementation -
+  // any failure lacking a structured error payload would have thrown
+  // "ReferenceError: url is not defined" instead of returning gracefully.
+  it("reports team WAR as an unavailable object (not null, not a thrown error) when the network request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+
+    const result = await getTeamAggregateWar("Los Angeles Dodgers", ["Los Angeles Dodgers"], 2026);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: "unavailable",
+      teamWar: null,
+      sourceUrl: "/api/fangraphs-models?mode=aggregate&season=2026",
+    }));
+  });
 });
