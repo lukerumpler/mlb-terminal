@@ -13,7 +13,8 @@
  * Requires DATABASE_URL and the 0005_mlb_warehouse migration (pnpm db:push).
  */
 import { getDb } from "../server/db.js";
-import { runIngestion } from "../server/mlb-warehouse/ingest.js";
+import { checkArgs } from "../server/mlb-warehouse/cliArgs.js";
+import { isValidSeason, runIngestion } from "../server/mlb-warehouse/ingest.js";
 import { createDrizzleWarehouseStore } from "../server/mlb-warehouse/store.js";
 
 function arg(name: string): string | undefined {
@@ -34,7 +35,24 @@ const numArg = (name: string): number | undefined => {
 
 /** Runs the requested action and returns the process exit code. */
 async function main(): Promise<number> {
+  const argError = checkArgs(
+    process.argv.slice(2),
+    ["season", "limit", "max-attempts", "concurrency", "refresh-days"],
+    ["status", "requeue-failed", "skip-discovery"]
+  );
+  if (argError) {
+    console.error(
+      `${argError}. See the usage at the top of scripts/mlb-ingest.ts.`
+    );
+    return 2;
+  }
   const season = numArg("season") ?? new Date().getUTCFullYear();
+  if (!isValidSeason(season)) {
+    console.error(
+      `--season must be a year from 1876 to next year, got ${season}`
+    );
+    return 2;
+  }
   const db = await getDb();
   if (!db) {
     console.error("DATABASE_URL is not set or the database is unreachable.");
