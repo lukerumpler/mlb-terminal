@@ -62,7 +62,7 @@ pnpm dev
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Postgres connection string (Drizzle) |
+| `DATABASE_URL` | MySQL connection string (Drizzle, `mysql2`); also required by the MLB warehouse (`pnpm ingest:mlb`) |
 | `JWT_SECRET` | Session/auth token signing |
 | `OAUTH_SERVER_URL` / `OWNER_OPEN_ID` | Auth provider configuration |
 | `ALLOWED_ORIGIN` | CORS allow-list |
