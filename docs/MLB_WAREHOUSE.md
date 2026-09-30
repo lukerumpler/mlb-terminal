@@ -49,6 +49,12 @@ its pitches inside one transaction (no duplicates, no stale rows after a correct
   use up one of a game's `--max-attempts`. 4xx other than 429 are not retried.
 - **One bad schedule month** is recorded in `discoveryErrors` and skipped; the other months and
   the existing queue are still processed, and the missing month is rediscovered next run.
+- **Game claims are atomic.** `markProcessing` is a single conditional `UPDATE` that returns
+  whether *this* worker won the game (pending, failed under `--max-attempts`, or `processing` but
+  older than 30 minutes). Workers that lose the race skip the game entirely: no fetch, no write, no
+  failure recorded. The run report counts them in `skipped`, separately from `attempted`/`failed`.
+- **Read API:** `server/mlb-warehouse/queries.ts` (`createMlbWarehouseQueries(db)`) holds the bounded,
+  paginated game/pitch/player/team/ingestion-status queries for API routes and the dashboard.
 - **Concurrent writers** lock `mlb_players` rows in ascending id order and retry a transaction
   that InnoDB rolls back as a deadlock or lock-wait timeout (`withLockRetry`). Without the
   ordering, parallel games sharing players deadlock under `--concurrency` > 1.
