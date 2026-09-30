@@ -33,12 +33,41 @@ pnpm ingest:mlb --season 2026                  # discover + ingest up to 200 gam
 pnpm ingest:mlb --season 2026 --limit 1000     # bigger batch
 pnpm ingest:mlb --season 2026 --refresh-days 3 # also re-ingest last 3 days (MLB corrections)
 pnpm ingest:mlb --season 2026 --skip-discovery # only work the existing queue
+pnpm ingest:mlb --season 2026 --requeue-failed # give games that exhausted --max-attempts a fresh budget
 ```
 
-Exit code is `1` if any game failed, `2` on config/DB errors. Re-running is always safe:
+Exit code is `1` if any game failed **or any schedule window could not be read** (see
+`discoveryErrors` in the report), `2` on config/DB errors. Re-running is always safe:
 completed games are skipped, failed games retry up to `--max-attempts` (default 5), games
 stuck in `processing` for 30+ minutes are recovered, and re-ingesting a game *replaces*
 its pitches inside one transaction (no duplicates, no stale rows after a correction).
+
+## Failure handling
+
+- **Transient MLB API errors** (network errors, timeouts, 429, 5xx, truncated bodies) are
+  retried inside the fetcher with jittered backoff and `Retry-After` support, so a blip does not
+  use up one of a game's `--max-attempts`. 4xx other than 429 are not retried.
+- **One bad schedule month** is recorded in `discoveryErrors` and skipped; the other months and
+  the existing queue are still processed, and the missing month is rediscovered next run.
+- **Concurrent writers** lock `mlb_players` rows in ascending id order and retry a transaction
+  that InnoDB rolls back as a deadlock or lock-wait timeout (`withLockRetry`). Without the
+  ordering, parallel games sharing players deadlock under `--concurrency` > 1.
+- **Retry budget** (`attempt_count`) means attempts since the last success; it resets on
+  success and on requeue, so frequently refreshed games never run out of retries.
+
+## Testing
+
+```bash
+pnpm test server/mlb-warehouse   # unit tests; in-memory store, recorded GUMBO fixture
+```
+
+`store.integration.test.ts` runs the real Drizzle store against a real MySQL/MariaDB server
+(upserts, transactions, concurrent writes). It is skipped unless `MLB_TEST_DATABASE_URL` is set,
+and it **truncates the `mlb_*` tables**, so use a scratch database with migration 0005 applied:
+
+```bash
+MLB_TEST_DATABASE_URL=mysql://user:pass@127.0.0.1:3306/scratch pnpm test server/mlb-warehouse/store.integration
+```
 
 ## Validation
 
