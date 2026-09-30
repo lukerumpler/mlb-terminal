@@ -21,7 +21,8 @@
     "audit:prospects": "node scripts/audit-prospect-coverage.mjs",
     "audit:organization-rosters": "node scripts/audit-organization-rosters.mjs",
     "release:gate": "pnpm release:compare && pnpm release:providers && pnpm check && pnpm lint && pnpm test && pnpm build",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "ingest:mlb": "tsx scripts/mlb-ingest.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
