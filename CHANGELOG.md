@@ -2,6 +2,30 @@
 
 All notable changes to **MLB Terminal** are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **MLB warehouse**: resumable game and pitch ingestion from the MLB Stats API into MySQL (`pnpm ingest:mlb`), with migration `0005_mlb_warehouse`, atomic game claims, deadlock-safe writes and a bounded read layer. See `docs/MLB_WAREHOUSE.md`.
+- **`GET /api/mlb-warehouse`**: read-only views (`status`, `arsenal`, `pitches`, `game`, `team-games`). Returns a clean 503 `{ available: false }` when the database is not configured or not migrated. No UI calls it yet.
+- **Team salary-to-WAR efficiency** panels (Overview and League) backed by `/api/team-efficiency`, a Baseball-Reference fallback for Team WAR, and a Statcast Snapshot panel on Overview.
+
+### Fixed
+
+- Team and division WAR tables no longer come back empty when the aggregate response omits `source`; division rows keep their defensive WAR; a network failure no longer throws `url is not defined`.
+- `/api/team-efficiency` is now served on Vercel (it was missing from the catch-all), and a test derives the Vercel route list from `server/api/routes.ts` so the next missed route fails CI.
+- README no longer describes `DATABASE_URL` as Postgres; SKIP uses MySQL.
+
+### Security
+
+- `axios` 1.20, `mysql2` 3.23.1, and `dompurify` / `qs` overrides; `pnpm audit --prod` reports no known vulnerabilities (was 17).
+
+### Known gaps
+
+- Blended defensive WAR is `null` when FanGraphs is the only provider.
+- The warehouse horizontal break (`breakHorizontal`) differs in sign and magnitude from Savant `pfx_x`; do not plot them together.
+- Live provider responses and the production database engine have not been verified.
+
 ## [v2026.08.19] — 2026-08-19
 
 This release consolidates the validated SKIP platform update, the canonical synchronization release, and the durable uptime-monitor integration on `main`.
