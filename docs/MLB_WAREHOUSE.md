@@ -82,6 +82,33 @@ and it **truncates the `mlb_*` tables**, so use a scratch database with migratio
 MLB_TEST_DATABASE_URL=mysql://user:pass@127.0.0.1:3306/scratch pnpm test server/mlb-warehouse/store.integration
 ```
 
+`server/api/mlb-warehouse.integration.test.ts` exercises the HTTP handler against the real
+database (handler -> `getDb` -> queries -> SQL). It does not truncate, but the other
+integration files do, so run DB-gated suites with `--no-file-parallelism`.
+
+## Read API: `GET /api/mlb-warehouse`
+
+Read-only, rate-limited, CORS-enabled. Pick a `view`:
+
+| `view` | Required | Optional | Returns |
+|---|---|---|---|
+| `status` | `season` | | ingestion counts (pending / processing / complete / failed) |
+| `arsenal` | `player`, `season` | | per-pitch-type counts and average velocity, spin, IVB, HB |
+| `pitches` | `player`, `season` | `from`, `to` (YYYY-MM-DD), `page`, `pageSize` (max 250) | paged raw pitches, newest first |
+| `game` | `game` | `page`, `pageSize` | the game row plus paged pitches (404 if unknown) |
+| `team-games` | `team`, `season` | `limit` (max 250) | the team's games, newest first |
+
+Every response carries `available` and `source`. Bad input is a 400 before any database work.
+If `DATABASE_URL` is missing, the driver fails to load, or the tables are absent (migration
+0005 not applied) the route answers **503** with `{ "available": false, "reason": ... }`
+(`database-not-configured`, `warehouse-init-failed`, `warehouse-query-failed`) rather than a
+500, so the UI can hide the panel. `arsenal` and `pitches` include `fieldNotes`: warehouse
+`avgHB` (MLB `breakHorizontal`) is **not** Savant's `pfx_x` (different sign and magnitude), so
+do not plot them together.
+
+The route must stay registered in both `server/api/routes.ts` and `api/[...path].ts`; a test
+fails if one is missing.
+
 ## Validation
 
 Before writing, each game is checked (`validate.ts`). Errors (zero pitches for a final game,
@@ -91,7 +118,7 @@ report but the data is still stored.
 
 ## Not built yet
 
-Player-season / arsenal aggregate tables, API routes and UI wiring, Savant/Statcast
+Player-season / arsenal aggregate tables, UI wiring (the read API above exists but no component calls it), Savant/Statcast
 enrichment, provider-id map, scheduled (cron) invocation, and historical seasons
 beyond whatever you choose to backfill.
 

@@ -59,6 +59,9 @@ export async function registerLegacyApiRoutes(app: Express) {
     import("./player-identity.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./lahman.js"),
+    // Read-only MLB warehouse queries; degrades to 503 when no database is configured.
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./mlb-warehouse.js"),
   ])) as ApiModule[];
 
   const paths = [
@@ -79,6 +82,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/player-advanced",
     "/api/player-identity",
     "/api/lahman",
+    "/api/mlb-warehouse",
   ] as const;
   paths.forEach((path, index) => {
     app.all(path, wrapLegacyHandler(modules[index].default));
