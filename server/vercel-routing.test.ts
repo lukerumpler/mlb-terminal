@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -28,6 +28,36 @@ describe("Vercel API routing", () => {
     for (const route of ["team-financials", "team-efficiency"]) {
       expect(catchAllSource).toContain(`"/api/${route}"`);
       expect(catchAllSource).toContain(`import("../server/api/${route}.js")`);
+    }
+  });
+
+  it("serves every path registered in server/api/routes.ts on Vercel, via the catch-all or its own api/ file", () => {
+    const routesSource = readFileSync(
+      resolve(process.cwd(), "server/api/routes.ts"),
+      "utf8"
+    );
+    const pathsBlock = routesSource.match(/const paths = \[([\s\S]*?)\] as const;/);
+    expect(pathsBlock, "could not find the paths array in routes.ts").not.toBeNull();
+    const names = [...pathsBlock![1].matchAll(/"\/api\/([a-z0-9-]+)"/g)].map(
+      match => match[1]
+    );
+    expect(names.length).toBeGreaterThan(0);
+
+    const catchAllSource = readFileSync(
+      resolve(process.cwd(), "api/[...path].ts"),
+      "utf8"
+    );
+    for (const name of names) {
+      const inCatchAll =
+        catchAllSource.includes(`"/api/${name}"`) &&
+        catchAllSource.includes(`import("../server/api/${name}.js")`);
+      const hasOwnFile = ["js", "ts"].some(ext =>
+        existsSync(resolve(process.cwd(), `api/${name}.${ext}`))
+      );
+      expect(
+        inCatchAll || hasOwnFile,
+        `/api/${name} is registered in server/api/routes.ts but not served on Vercel`
+      ).toBe(true);
     }
   });
 
