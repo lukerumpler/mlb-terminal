@@ -15,6 +15,7 @@ export const legacyHandlerLoaders: Record<string, () => Promise<LegacyModule>> =
   "/api/comparison-summary": () => import("../server/api/comparison-summary.js"),
   "/api/natural-search": () => import("../server/api/natural-search.js"),
   "/api/team-financials": () => import("../server/api/team-financials.js"),
+  "/api/team-efficiency": () => import("../server/api/team-efficiency.js"),
   "/api/fangraphs-models": () => import("../server/api/fangraphs-models.js"),
   "/api/intelligence-calculations": () => import("../server/api/intelligence-calculations.js"),
   "/api/playoffstatus-odds": () => import("../server/api/playoffstatus-odds.js"),

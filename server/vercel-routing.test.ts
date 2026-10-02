@@ -23,6 +23,14 @@ describe("Vercel API routing", () => {
     expect(primarySource).toContain("export default handler;");
   });
 
+  it("registers every Express-registered secondary route in the Vercel catch-all", () => {
+    const catchAllSource = readFileSync(resolve(process.cwd(), "api/[...path].ts"), "utf8");
+    for (const route of ["team-financials", "team-efficiency"]) {
+      expect(catchAllSource).toContain(`"/api/${route}"`);
+      expect(catchAllSource).toContain(`import("../server/api/${route}.js")`);
+    }
+  });
+
   it("handles anonymous nested tRPC auth requests before dynamic app loading", () => {
     const source = readFileSync(
       resolve(process.cwd(), "api/trpc/[...path].ts"),
