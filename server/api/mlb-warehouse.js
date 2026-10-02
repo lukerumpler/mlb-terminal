@@ -56,13 +56,18 @@ function season(query) {
 function optionalDate(query, name) {
   const raw = query?.[name];
   if (raw === undefined || raw === "") return undefined;
-  if (
-    typeof raw !== "string" ||
-    !DATE_RE.test(raw) ||
-    Number.isNaN(Date.parse(raw))
-  ) {
-    throw new BadRequest(`${name} must be YYYY-MM-DD`);
+  // Date.parse alone accepts impossible dates like 2026-02-30 (V8 rolls them
+  // over), and databases disagree on what to do with them. Round-trip the value
+  // so only real calendar dates reach the query.
+  let valid = false;
+  if (typeof raw === "string" && DATE_RE.test(raw)) {
+    const parsed = new Date(`${raw}T00:00:00Z`);
+    // toISOString() throws RangeError on an Invalid Date (e.g. month 13).
+    valid =
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().slice(0, 10) === raw;
   }
+  if (!valid) throw new BadRequest(`${name} must be a real date, YYYY-MM-DD`);
   return raw;
 }
 

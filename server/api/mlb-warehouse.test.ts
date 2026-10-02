@@ -76,6 +76,14 @@ describe("/api/mlb-warehouse", () => {
       { view: "arsenal", player: ["1", "2"], season: "2026" },
       { view: "pitches", player: "1", season: "2026", from: "yesterday" },
       { view: "pitches", player: "1", season: "2026", to: "2026-02-31x" },
+      // Well-formed but impossible calendar dates: must be a 400 on every
+      // engine, not silently rolled over (MariaDB) or a query error (MySQL strict).
+      { view: "pitches", player: "1", season: "2026", from: "2026-02-30" },
+      { view: "pitches", player: "1", season: "2026", to: "2026-04-31" },
+      { view: "pitches", player: "1", season: "2026", from: "2025-02-29" },
+      { view: "pitches", player: "1", season: "2026", from: "2026-13-01" },
+      { view: "pitches", player: "1", season: "2026", to: "2026-00-10" },
+      { view: "pitches", player: "1", season: "2026", to: "2026-01-00" },
       { view: "pitches", player: "1", season: "2026", pageSize: "9999" },
       { view: "game", game: "0" },
     ];
@@ -84,6 +92,27 @@ describe("/api/mlb-warehouse", () => {
       expect(code(res), JSON.stringify(query)).toBe(400);
     }
     expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("still accepts real dates, including a leap day and month ends", async () => {
+    queries.getPlayerPitches.mockResolvedValue({
+      page: 1,
+      pageSize: 50,
+      pitches: [],
+    });
+    for (const [from, to] of [
+      ["2024-02-29", "2024-04-30"],
+      ["2026-01-31", "2026-12-31"],
+    ]) {
+      const res = await call({
+        view: "pitches",
+        player: "1",
+        season: "2026",
+        from,
+        to,
+      });
+      expect(code(res), `${from}..${to}`).toBe(200);
+    }
   });
 
   it("rejects non-GET and answers OPTIONS", async () => {
