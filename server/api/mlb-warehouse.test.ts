@@ -17,14 +17,20 @@ vi.mock("../mlb-warehouse/queries.ts", () => ({
 // @ts-expect-error JavaScript handler has no separate declaration file.
 import handler from "./mlb-warehouse.js";
 
-function call(query: Record<string, unknown>, method = "GET") {
+// The route rate-limits per IP (30 per 10 s), so each test call gets its own address
+// unless a test is deliberately exercising the limiter.
+let nextIp = 0;
+function call(query: Record<string, unknown>, method = "GET", ip?: string) {
   const res: any = {
     status: vi.fn().mockReturnThis(),
     end: vi.fn(),
     json: vi.fn().mockReturnThis(),
     setHeader: vi.fn(),
   };
-  return handler({ method, query, headers: {} }, res).then(() => res);
+  const headers = {
+    "x-forwarded-for": ip ?? `203.0.113.${++nextIp % 250}-${nextIp}`,
+  };
+  return handler({ method, query, headers }, res).then(() => res);
 }
 const body = (res: any) => res.json.mock.calls[0][0];
 const code = (res: any) => res.status.mock.calls[0][0];
@@ -113,6 +119,68 @@ describe("/api/mlb-warehouse", () => {
       });
       expect(code(res), `${from}..${to}`).toBe(200);
     }
+  });
+
+  it("caps pagination depth so one request cannot force a huge OFFSET", async () => {
+    queries.getPlayerPitches.mockResolvedValue({
+      page: 1,
+      pageSize: 1,
+      pitches: [],
+    });
+    queries.getGamePitches.mockResolvedValue({
+      page: 1,
+      pageSize: 1,
+      pitches: [],
+    });
+    queries.getGame.mockResolvedValue({ gamePk: 1 });
+    const deep = { page: "100000", pageSize: "250" };
+    for (const query of [
+      { view: "pitches", player: "1", season: "2026", ...deep },
+      { view: "game", game: "1", ...deep },
+      {
+        view: "pitches",
+        player: "1",
+        season: "2026",
+        page: "1000",
+        pageSize: "100",
+      },
+    ]) {
+      const res = await call(query);
+      expect(code(res), JSON.stringify(query)).toBe(400);
+      expect(body(res).error).toMatch(/narrow with from\/to/);
+    }
+    expect(getDb).not.toHaveBeenCalled();
+
+    // Just inside the cap is still served.
+    const ok = await call({
+      view: "pitches",
+      player: "1",
+      season: "2026",
+      page: "500",
+      pageSize: "100",
+    });
+    expect(code(ok)).toBe(200);
+    // Default paging is unaffected.
+    expect(
+      code(await call({ view: "pitches", player: "1", season: "2026" }))
+    ).toBe(200);
+  });
+
+  it("rate-limits a single client with 429 and Retry-After", async () => {
+    queries.getIngestionStatus.mockResolvedValue({});
+    let limited: any = null;
+    for (let i = 0; i < 40 && !limited; i++) {
+      const res = await call(
+        { view: "status", season: "2026" },
+        "GET",
+        "198.51.100.7"
+      );
+      if (code(res) === 429) limited = res;
+    }
+    expect(limited).not.toBeNull();
+    expect(limited.setHeader).toHaveBeenCalledWith("Retry-After", "10");
+    // Another client is unaffected.
+    expect(code(await call({ view: "status", season: "2026" }))).toBe(200);
   });
 
   it("rejects non-GET and answers OPTIONS", async () => {

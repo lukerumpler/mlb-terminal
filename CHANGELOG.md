@@ -9,6 +9,7 @@ All notable changes to **MLB Terminal** are documented in this file.
 - **MLB warehouse**: resumable game and pitch ingestion from the MLB Stats API into MySQL (`pnpm ingest:mlb`), with migration `0005_mlb_warehouse`, atomic game claims, deadlock-safe writes and a bounded read layer. See `docs/MLB_WAREHOUSE.md`.
 - **`GET /api/mlb-warehouse`**: read-only views (`status`, `arsenal`, `pitches`, `game`, `team-games`). Returns a clean 503 `{ available: false }` when the database is not configured or not migrated. No UI calls it yet.
 - **`POST /api/scheduled/ingest-mlb`**: cron-only daily warehouse refresh (10-day schedule window, 2-day correction refresh, limit 80). Games that legitimately have zero pitches are reported as known-empty instead of failing the run.
+- `/api/mlb-warehouse` rejects impossible dates (`2026-02-30`) and caps pagination depth at a 50,000-row offset, so one request cannot force a huge `OFFSET`.
 - Arsenal responses include `avgPfxX` / `avgPfxZ` so pitch movement can be compared with Savant like for like.
 - **Team salary-to-WAR efficiency** panels (Overview and League) backed by `/api/team-efficiency`, a Baseball-Reference fallback for Team WAR, and a Statcast Snapshot panel on Overview.
 

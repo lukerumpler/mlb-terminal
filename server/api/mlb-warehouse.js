@@ -10,6 +10,13 @@ const SOURCE = "MLB Stats API (SKIP warehouse)";
 const VIEWS = ["status", "arsenal", "pitches", "game", "team-games"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Deep OFFSETs get expensive on a large pitch table. A pitcher-season is a few
+// thousand pitches and a game about 300, so this is generous while still bounding
+// the worst case (page and pageSize alone would allow ~25M rows). Callers narrow
+// with from/to instead of paging deeper.
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_OFFSET = 50_000;
+
 // Warehouse break values come straight from the MLB feed. avgHB (breakHorizontal)
 // is NOT the same quantity as Baseball Savant's pfx_x / pitcher_break_x (a recorded
 // fixture reads -4.1 vs +2.83 for the same pitch). avgPfxX / avgPfxZ are the feed's
@@ -99,6 +106,14 @@ export default async function mlbWarehouseHandler(req, res) {
       required: false,
       max: 250,
     });
+    if (view === "pitches" || view === "game") {
+      const offset = ((page ?? 1) - 1) * (pageSize ?? DEFAULT_PAGE_SIZE);
+      if (offset > MAX_OFFSET) {
+        throw new BadRequest(
+          `page is too deep (max offset ${MAX_OFFSET} rows); narrow with from/to`
+        );
+      }
+    }
     if (view === "status") {
       const s = season(query);
       run = q =>

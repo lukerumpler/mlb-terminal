@@ -118,6 +118,14 @@ Read-only, rate-limited, CORS-enabled. Pick a `view`:
 | `game` | `game` | `page`, `pageSize` | the game row plus paged pitches (404 if unknown) |
 | `team-games` | `team`, `season` | `limit` (max 250) | the team's games, newest first |
 
+Paging is bounded: `page` x `pageSize` may not exceed an offset of 50,000 rows (a pitcher-season
+is a few thousand pitches, a game about 300); deeper requests get a 400 telling the caller to narrow
+with `from`/`to`. `from`/`to` must be real calendar dates (`2026-02-30` is rejected).
+
+Caching: responses are `public` with `s-maxage` of 60 s (`status`) or 300 s (everything else), so a
+CDN may serve them; a game ingested or re-ingested inside that window appears when it expires.
+Errors and 404s are `no-store`.
+
 Every response carries `available` and `source`. Bad input is a 400 before any database work.
 If `DATABASE_URL` is missing, the driver fails to load, or the tables are absent (migration
 0005 not applied) the route answers **503** with `{ "available": false, "reason": ... }`
