@@ -222,6 +222,10 @@ describe("/api/mlb-warehouse", () => {
     expect(body(res).arsenal).toHaveLength(1);
     expect(body(res).fieldNotes.avgHB).toMatch(/do not mix/);
     expect(body(res).fieldNotes.avgPfxX).toMatch(/unconfirmed/);
+    // The feed is in inches, Savant's CSV in feet: the note must say so.
+    expect(body(res).fieldNotes.avgPfxX).toMatch(/INCHES/);
+    expect(body(res).fieldNotes.avgPfxX).toMatch(/FEET/);
+    expect(body(res).fieldNotes.avgPfxZ).toMatch(/FEET/);
   });
 
   it("passes date window and paging through for player pitches", async () => {

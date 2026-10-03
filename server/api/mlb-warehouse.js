@@ -21,15 +21,18 @@ const MAX_OFFSET = 50_000;
 // is NOT the same quantity as Baseball Savant's pfx_x / pitcher_break_x (a recorded
 // fixture reads -4.1 vs +2.83 for the same pitch). avgPfxX / avgPfxZ are the feed's
 // pfx_x / pfx_z, the same field family Savant publishes, so use those for any
-// side-by-side. The sign perspective has still not been confirmed against Savant
-// for one pitcher; do that before plotting the two sources on one axis.
+// side-by-side, but mind the units: the feed gives inches (the recorded fixture
+// has pfxX 2.83, which cannot be feet) while Savant's per-pitch CSV documents
+// feet. The sign perspective has still not been confirmed against Savant for one
+// pitcher; do that before plotting the two sources on one axis.
 const FIELD_NOTES = {
-  avgIVB: "breakVerticalInduced (MLB Stats API)",
+  avgIVB: "breakVerticalInduced (MLB Stats API), inches",
   avgHB:
-    "breakHorizontal (MLB Stats API); different quantity from Savant pfx_x, do not mix sources",
+    "breakHorizontal (MLB Stats API), inches; a different quantity from Savant pfx_x, do not mix sources",
   avgPfxX:
-    "pfx_x in inches as published in the MLB feed; same field family as Savant pfx_x, sign perspective unconfirmed",
-  avgPfxZ: "pfx_z in inches as published in the MLB feed",
+    "pfx_x as published in the MLB feed, in INCHES. Savant's per-pitch CSV documents pfx_x in FEET, so convert (x12) before any side-by-side; sign perspective is unconfirmed against Savant",
+  avgPfxZ:
+    "pfx_z as published in the MLB feed, in INCHES. Savant's per-pitch CSV documents pfx_z in FEET (x12)",
 };
 
 class BadRequest extends Error {}

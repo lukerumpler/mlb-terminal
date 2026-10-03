@@ -102,8 +102,8 @@ windowed pass for the current MLB season (January still counts as the previous s
 Responses: 200 with a run report; 503 `{ ok: false, reason: "database-not-configured" }`
 with no database; 500 only if the run itself throws (so Heartbeat retries). `ok` is `false`
 only for failures someone can act on (real feed errors or schedule-window errors). A final game
-that legitimately has zero pitches can never succeed, so it is listed under `knownEmptyGames`
-and does not flip `ok`. Run `pnpm ingest:mlb --season YYYY` once first to backfill; the heartbeat
+that has zero pitches usually never will (failed games are retried on up to 5 runs, so a feed that
+is merely late can still heal), so it is listed under `knownEmptyGames` and does not flip `ok`. Run `pnpm ingest:mlb --season YYYY` once first to backfill; the heartbeat
 timeout is unknown, which is why batches are small and resumable.
 
 ## Read API: `GET /api/mlb-warehouse`
@@ -132,8 +132,10 @@ If `DATABASE_URL` is missing, the driver fails to load, or the tables are absent
 (`database-not-configured`, `warehouse-init-failed`, `warehouse-query-failed`) rather than a
 500, so the UI can hide the panel. `arsenal` and `pitches` include `fieldNotes`: warehouse
 `avgHB` (MLB `breakHorizontal`) is **not** Savant's `pfx_x` (different sign and magnitude), so
-do not plot them together. Use `avgPfxX` / `avgPfxZ` (the feed's own `pfx_x` / `pfx_z`) for any
-side-by-side; their sign perspective is still unconfirmed against Savant for a single pitcher.
+do not plot them together. If you need a side-by-side, use `avgPfxX` / `avgPfxZ` (the feed's own `pfx_x` / `pfx_z`),
+but note the units: the MLB feed reports them in **inches** (the recorded fixture's `pfxX` is
+2.83), while Savant's per-pitch CSV documents `pfx_x` / `pfx_z` in **feet**, so multiply Savant
+by 12 first. Their sign perspective is still unconfirmed against Savant for a single pitcher.
 
 The route must stay registered in both `server/api/routes.ts` and `api/[...path].ts`; a test
 fails if one is missing.
