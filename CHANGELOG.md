@@ -10,6 +10,7 @@ All notable changes to **MLB Terminal** are documented in this file.
 - **`GET /api/mlb-warehouse`**: read-only views (`status`, `arsenal`, `pitches`, `game`, `team-games`). Returns a clean 503 `{ available: false }` when the database is not configured or not migrated. No UI calls it yet.
 - **`POST /api/scheduled/ingest-mlb`**: cron-only daily warehouse refresh (10-day schedule window, 2-day correction refresh, limit 80). Games that legitimately have zero pitches are reported as known-empty instead of failing the run.
 - `/api/mlb-warehouse` rejects impossible dates (`2026-02-30`) and caps pagination depth at a 50,000-row offset, so one request cannot force a huge `OFFSET`.
+- Deployment smoke test now checks `/api/mlb-warehouse` and `/api/team-efficiency`; run it against a Vercel preview with `VERCEL_SMOKE_BASE_URL=<preview url> pnpm vitest run server/vercel-deployment-smoke.test.ts`.
 - Arsenal responses include `avgPfxX` / `avgPfxZ` so pitch movement can be compared with Savant like for like.
 - **Team salary-to-WAR efficiency** panels (Overview and League) backed by `/api/team-efficiency`, a Baseball-Reference fallback for Team WAR, and a Statcast Snapshot panel on Overview.
 

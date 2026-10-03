@@ -47,4 +47,31 @@ describe.skipIf(!baseUrl)("Vercel deployment smoke test", () => {
     expect(response.status).not.toBe(404);
     expectJsonContentType(response);
   });
+
+  it("serves the MLB warehouse route (live data or a clean 'unavailable', never a 404)", async () => {
+    const season = new Date().getUTCFullYear();
+    const response = await fetchSmokePath(
+      `/api/mlb-warehouse?view=status&season=${season}`
+    );
+    // 200 when DATABASE_URL is set and migrated; 503 {available:false} otherwise.
+    expect([200, 503]).toContain(response.status);
+    expectJsonContentType(response);
+    const body = await response.json();
+    expect(typeof body.available).toBe("boolean");
+    expect(body.error ?? "").not.toMatch(/unknown api route/i);
+  });
+
+  it("rejects a malformed warehouse request with 400 (proves the handler, not a proxy, answered)", async () => {
+    const response = await fetchSmokePath("/api/mlb-warehouse?view=bogus");
+    expect(response.status).toBe(400);
+    expectJsonContentType(response);
+  });
+
+  it("serves the team efficiency route (the catch-all must register it)", async () => {
+    const response = await fetchSmokePath("/api/team-efficiency?team=SD");
+    expect(response.status).not.toBe(404);
+    expectJsonContentType(response);
+    const body = await response.json();
+    expect(body.error ?? "").not.toMatch(/unknown api route/i);
+  });
 });
