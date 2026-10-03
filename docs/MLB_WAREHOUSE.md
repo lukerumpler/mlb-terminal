@@ -88,7 +88,9 @@ integration files do, so run DB-gated suites with `--no-file-parallelism`.
 
 ## Scheduled ingest: `POST /api/scheduled/ingest-mlb`
 
-Cron-only (same `isCron` check as the other `/api/scheduled/*` routes; non-cron callers get 403).
+Cron-only (same `isCron` check as the other `/api/scheduled/*` routes). An authenticated non-cron
+caller gets 403; an unauthenticated one gets the same 500 `Invalid session cookie` as
+`refresh-savant` and `cleanup-cache-telemetry` (existing convention, checked on all three).
 Create an owner-managed Heartbeat job that POSTs to it once a day. It runs a bounded,
 windowed pass for the current MLB season (January still counts as the previous season):
 
