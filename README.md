@@ -69,6 +69,14 @@ pnpm dev
 | `USER_AGENT` | Outbound User-Agent for upstream data providers |
 | `BUILT_IN_FORGE_API_KEY` / `BUILT_IN_FORGE_API_URL` | AI provider credentials (natural-language query, voice transcription) |
 | `PORT` | Local dev server port |
+| `TEAM_EFFICIENCY_FRESH_SECONDS` / `TEAM_EFFICIENCY_STALE_SECONDS` | `/api/team-efficiency` cache windows (defaults 300 / 86400) |
+| `TEAM_FINANCIALS_FRESH_SECONDS` / `TEAM_FINANCIALS_STALE_SECONDS` | Spotrac payroll cache windows (defaults 1800 / 21600) |
+| `SKIP_RELEASE_BASE_URL` / `SKIP_RELEASE_SEASON` | Release-gate comparison target |
+| `STAGING_PROVIDER_FAILURE_HOOK_ENABLED` / `STAGING_PROVIDER_FAILURE_HOOK_TOKEN` | Staging-only provider failure injection |
+| `VITE_APP_ID` | Client auth app id |
+| `MLB_TEST_DATABASE_URL` | Enables the DB-gated warehouse test suites (CI provides a MariaDB service) |
+
+See `.env.example` for a copyable template.
 
 In production these are managed via platform secrets, not `.env` files — see [`docs/deployment.md`](docs/deployment.md).
 
@@ -82,7 +90,7 @@ In production these are managed via platform secrets, not `.env` files — see [
 | `pnpm check` | TypeScript type-check (`tsc --noEmit`) |
 | `pnpm lint` | Prettier check on core files |
 | `pnpm test` | Run the Vitest suite |
-| `pnpm test:e2e` | Playwright end-to-end tests |
+| `pnpm test:e2e` | End-to-end check of the published Overview (Vitest driving Playwright; not run in CI) |
 | `pnpm test:smoke` | Vercel deployment smoke test |
 | `pnpm release:gate` | Full release gate: compare → provider health → check → lint → test → build |
 | `pnpm audit:prospects` / `pnpm audit:organization-rosters` | Data coverage audits |

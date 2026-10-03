@@ -1,0 +1,78 @@
+name: MLB warehouse database tests
+
+# The warehouse's integration suites (store, queries, HTTP route) are skipped
+# unless MLB_TEST_DATABASE_URL is set, and no other workflow provides a database,
+# so without this job the concurrency/deadlock and SQL tests never run in CI.
+# MariaDB 10.11 matches the version the warehouse was developed and tested against.
+# The Manus production engine is unconfirmed; change the image here once it is.
+
+on:
+  pull_request:
+    paths:
+      - "server/mlb-warehouse/**"
+      - "server/api/mlb-warehouse*"
+      - "drizzle/**"
+      - "scripts/mlb-ingest.ts"
+      - ".github/workflows/warehouse-db-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/mlb-warehouse/**"
+      - "server/api/mlb-warehouse*"
+      - "drizzle/**"
+  workflow_dispatch:
+
+concurrency:
+  group: warehouse-db-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  warehouse-db:
+    name: Warehouse tests on MariaDB 10.11
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci_root_password
+          MARIADB_DATABASE: skip_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      # Throwaway CI database; not a production credential.
+      DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:3306/skip_test
+      MLB_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:3306/skip_test
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        run: pnpm drizzle-kit migrate
+
+      - name: Fail if the schema drifted from the migrations
+        run: pnpm drizzle-kit generate 2>&1 | tee /tmp/generate.log && grep -q "No schema changes" /tmp/generate.log
+
+      # The integration files TRUNCATE shared tables, so they must not run in parallel.
+      - name: Run warehouse suites against the real database
+        run: pnpm vitest run --no-file-parallelism server/mlb-warehouse server/api/mlb-warehouse

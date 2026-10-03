@@ -10,3 +10,11 @@
 /server/api/fangraphs-models.js @lukerumpler
 /server/api/savant.js @lukerumpler
 /server/api/scheduled-savant-refresh.ts @lukerumpler
+
+# Warehouse data layer, schema and the routes that read or write it.
+/server/mlb-warehouse/ @lukerumpler
+/drizzle/ @lukerumpler
+/server/api/mlb-warehouse.js @lukerumpler
+/server/api/scheduled-ingest-mlb.ts @lukerumpler
+/server/api/team-efficiency.js @lukerumpler
+/api/[...path].ts @lukerumpler

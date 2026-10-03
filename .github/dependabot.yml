@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Patch and minor bumps arrive as one weekly PR. Major bumps (express 5, vite 8,
+  # recharts 3, TypeScript 7, ...) are deliberately not proposed automatically:
+  # each needs its own migration PR.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
