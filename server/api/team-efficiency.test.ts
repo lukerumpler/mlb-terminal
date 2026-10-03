@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateBlendedWar, calculateSalaryWarEfficiency, normalizeEfficiencyRecord } from './team-efficiency.js';
+import { aggregateStatus, calculateBlendedWar, calculateSalaryWarEfficiency, normalizeEfficiencyRecord } from './team-efficiency.js';
 
 describe('team salary-to-WAR efficiency', () => {
   it('calculates both reciprocal efficiency measures', () => {
@@ -84,5 +84,30 @@ describe('team salary-to-WAR efficiency', () => {
       war: { total: 38, fWAR: 40, bWAR: 36, defensive: 3, methodology: 'Blended fWAR/bWAR average' },
       efficiency: { dollarsPerWar: 5_263_158, warPer100m: 19 },
     });
+  });
+});
+
+describe('team abbreviation aliases', () => {
+  const abbr = (team: string) =>
+    normalizeEfficiencyRecord({ team, season: 2026, payrollBasis: 'payroll', financials: null, warData: null, warRow: null }).teamAbbreviation;
+
+  it('maps MLB, FanGraphs and Baseball-Reference variants onto one code', () => {
+    expect(['ARI', 'AZ', 'D-backs', 'Diamondbacks'].map(abbr)).toEqual(['ARI', 'ARI', 'ARI', 'ARI']);
+    expect(['CWS', 'CHW', 'White Sox'].map(abbr)).toEqual(['CWS', 'CWS', 'CWS']);
+    expect(['WSH', 'WSN', 'WAS'].map(abbr)).toEqual(['WSH', 'WSH', 'WSH']);
+    expect(['KC', 'KCR', 'ATH', 'OAK'].map(abbr)).toEqual(['KC', 'KC', 'OAK', 'OAK']);
+  });
+});
+
+describe('aggregateStatus', () => {
+  const row = (found: boolean, status: string) => ({ found, status });
+  it('does not call a complete cached result "partial"', () => {
+    expect(aggregateStatus([row(true, 'live'), row(true, 'live')])).toBe('live');
+    expect(aggregateStatus([row(true, 'live'), row(true, 'cached')])).toBe('cached');
+    expect(aggregateStatus([row(true, 'cached'), row(true, 'stale-cached')])).toBe('stale-cached');
+  });
+  it('reserves "partial" for missing teams and "source-gap" for none', () => {
+    expect(aggregateStatus([row(true, 'live'), row(false, 'source-gap')])).toBe('partial');
+    expect(aggregateStatus([row(false, 'source-gap')])).toBe('source-gap');
   });
 });

@@ -14,12 +14,12 @@ const efficiencyCache = new Map();
 const efficiencyInFlight = new Map();
 
 const TEAM_ALIASES = {
-  ARI: ["ARI", "ARIZONA DIAMONDBACKS", "DIAMONDBACKS"],
+  ARI: ["ARI", "AZ", "ARIZONA DIAMONDBACKS", "DIAMONDBACKS", "D-BACKS"],
   ATL: ["ATL", "ATLANTA BRAVES", "BRAVES"],
   BAL: ["BAL", "BALTIMORE ORIOLES", "ORIOLES"],
   BOS: ["BOS", "BOSTON RED SOX", "RED SOX"],
   CHC: ["CHC", "CHICAGO CUBS", "CUBS"],
-  CWS: ["CWS", "CHICAGO WHITE SOX", "WHITE SOX"],
+  CWS: ["CWS", "CHW", "CHICAGO WHITE SOX", "WHITE SOX"],
   CIN: ["CIN", "CINCINNATI REDS", "REDS"],
   CLE: ["CLE", "CLEVELAND GUARDIANS", "GUARDIANS"],
   COL: ["COL", "COLORADO ROCKIES", "ROCKIES"],
@@ -43,7 +43,7 @@ const TEAM_ALIASES = {
   TB: ["TB", "TBR", "TAMPA BAY RAYS", "RAYS"],
   TEX: ["TEX", "TEXAS RANGERS", "RANGERS"],
   TOR: ["TOR", "TORONTO BLUE JAYS", "BLUE JAYS"],
-  WSH: ["WSH", "WAS", "WASHINGTON NATIONALS", "NATIONALS"],
+  WSH: ["WSH", "WAS", "WSN", "WASHINGTON NATIONALS", "NATIONALS"],
 };
 
 function token(value) {
@@ -275,6 +275,15 @@ export function __resetTeamEfficiencyStateForTests() {
   efficiencyInFlight.clear();
 }
 
+// "partial" means some requested teams have no usable row. A complete result that
+// merely came from cache keeps its own freshness instead of being called partial.
+export function aggregateStatus(rows) {
+  if (!rows.some(row => row.found)) return "source-gap";
+  if (!rows.every(row => row.found)) return "partial";
+  if (rows.some(row => row.status === "stale-cached")) return "stale-cached";
+  return rows.every(row => row.status === "live") ? "live" : "cached";
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -324,7 +333,7 @@ export default async function handler(req, res) {
     record: teams.length === 1 ? rows[0] : null,
     source: "Spotrac + FanGraphs/Baseball-Reference",
     retrievedAt: new Date().toISOString(),
-    status: rows.every(row => row.status === "live") ? "live" : rows.some(row => row.found) ? "partial" : "source-gap",
+    status: aggregateStatus(rows),
   };
   res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400");
   res.setHeader("X-Provider-Cache", rows.some(row => row.cache === "HIT" || row.cache === "DURABLE-HIT") ? "HIT" : "MISS");

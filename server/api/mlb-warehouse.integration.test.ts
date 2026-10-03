@@ -106,6 +106,13 @@ suite("/api/mlb-warehouse (real database)", () => {
     )) as any;
     const total = body.arsenal.reduce((n: number, a: any) => n + a.pitches, 0);
     expect(total).toBe(Number(rows[0].n));
+    // pfx averages ride along so panels can compare like with like against Savant.
+    expect(body.arsenal.some((a: any) => typeof a.avgPfxX === "number")).toBe(
+      true
+    );
+    expect(body.arsenal.some((a: any) => typeof a.avgPfxZ === "number")).toBe(
+      true
+    );
     expect(total).toBeGreaterThanOrEqual(
       expected.pitches.filter(
         p => p.pitcherId === pitcherId && p.skipPitchType != null

@@ -10,13 +10,19 @@ const SOURCE = "MLB Stats API (SKIP warehouse)";
 const VIEWS = ["status", "arsenal", "pitches", "game", "team-games"];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Warehouse break values come straight from the MLB feed. They are NOT the same
-// quantity as Baseball Savant's pfx_x / pitcher_break_x (a recorded fixture reads
-// -4.1 vs +2.83 for the same pitch), so consumers must not plot them together.
+// Warehouse break values come straight from the MLB feed. avgHB (breakHorizontal)
+// is NOT the same quantity as Baseball Savant's pfx_x / pitcher_break_x (a recorded
+// fixture reads -4.1 vs +2.83 for the same pitch). avgPfxX / avgPfxZ are the feed's
+// pfx_x / pfx_z, the same field family Savant publishes, so use those for any
+// side-by-side. The sign perspective has still not been confirmed against Savant
+// for one pitcher; do that before plotting the two sources on one axis.
 const FIELD_NOTES = {
   avgIVB: "breakVerticalInduced (MLB Stats API)",
   avgHB:
-    "breakHorizontal (MLB Stats API); sign and magnitude differ from Savant pfx_x, do not mix sources",
+    "breakHorizontal (MLB Stats API); different quantity from Savant pfx_x, do not mix sources",
+  avgPfxX:
+    "pfx_x in inches as published in the MLB feed; same field family as Savant pfx_x, sign perspective unconfirmed",
+  avgPfxZ: "pfx_z in inches as published in the MLB feed",
 };
 
 class BadRequest extends Error {}

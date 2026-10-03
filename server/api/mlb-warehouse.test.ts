@@ -124,6 +124,7 @@ describe("/api/mlb-warehouse", () => {
     expect(queries.getPlayerArsenal).toHaveBeenCalledWith(476454, 2026);
     expect(body(res).arsenal).toHaveLength(1);
     expect(body(res).fieldNotes.avgHB).toMatch(/do not mix/);
+    expect(body(res).fieldNotes.avgPfxX).toMatch(/unconfirmed/);
   });
 
   it("passes date window and paging through for player pitches", async () => {

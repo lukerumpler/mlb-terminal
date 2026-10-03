@@ -86,6 +86,26 @@ MLB_TEST_DATABASE_URL=mysql://user:pass@127.0.0.1:3306/scratch pnpm test server/
 database (handler -> `getDb` -> queries -> SQL). It does not truncate, but the other
 integration files do, so run DB-gated suites with `--no-file-parallelism`.
 
+## Scheduled ingest: `POST /api/scheduled/ingest-mlb`
+
+Cron-only (same `isCron` check as the other `/api/scheduled/*` routes; non-cron callers get 403).
+Create an owner-managed Heartbeat job that POSTs to it once a day. It runs a bounded,
+windowed pass for the current MLB season (January still counts as the previous season):
+
+| Setting | Value | Why |
+|---|---|---|
+| `discoverSinceDays` | 10 | ask the schedule for the last 10 days (1-2 requests), not all ten months |
+| `refreshRecentDays` | 2 | re-ingest recent finals to absorb late MLB corrections |
+| `limit` | 80 | ~15 games/day x 2 refresh days + new games must stay under this or a backlog builds |
+| `concurrency` | 2 | polite to the MLB API |
+
+Responses: 200 with a run report; 503 `{ ok: false, reason: "database-not-configured" }`
+with no database; 500 only if the run itself throws (so Heartbeat retries). `ok` is `false`
+only for failures someone can act on (real feed errors or schedule-window errors). A final game
+that legitimately has zero pitches can never succeed, so it is listed under `knownEmptyGames`
+and does not flip `ok`. Run `pnpm ingest:mlb --season YYYY` once first to backfill; the heartbeat
+timeout is unknown, which is why batches are small and resumable.
+
 ## Read API: `GET /api/mlb-warehouse`
 
 Read-only, rate-limited, CORS-enabled. Pick a `view`:
@@ -93,7 +113,7 @@ Read-only, rate-limited, CORS-enabled. Pick a `view`:
 | `view` | Required | Optional | Returns |
 |---|---|---|---|
 | `status` | `season` | | ingestion counts (pending / processing / complete / failed) |
-| `arsenal` | `player`, `season` | | per-pitch-type counts and average velocity, spin, IVB, HB |
+| `arsenal` | `player`, `season` | | per-pitch-type counts and average velocity, spin, IVB, HB, pfx_x, pfx_z |
 | `pitches` | `player`, `season` | `from`, `to` (YYYY-MM-DD), `page`, `pageSize` (max 250) | paged raw pitches, newest first |
 | `game` | `game` | `page`, `pageSize` | the game row plus paged pitches (404 if unknown) |
 | `team-games` | `team`, `season` | `limit` (max 250) | the team's games, newest first |
@@ -104,7 +124,8 @@ If `DATABASE_URL` is missing, the driver fails to load, or the tables are absent
 (`database-not-configured`, `warehouse-init-failed`, `warehouse-query-failed`) rather than a
 500, so the UI can hide the panel. `arsenal` and `pitches` include `fieldNotes`: warehouse
 `avgHB` (MLB `breakHorizontal`) is **not** Savant's `pfx_x` (different sign and magnitude), so
-do not plot them together.
+do not plot them together. Use `avgPfxX` / `avgPfxZ` (the feed's own `pfx_x` / `pfx_z`) for any
+side-by-side; their sign perspective is still unconfirmed against Savant for a single pitcher.
 
 The route must stay registered in both `server/api/routes.ts` and `api/[...path].ts`; a test
 fails if one is missing.
