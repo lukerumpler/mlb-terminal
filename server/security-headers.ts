@@ -1,7 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
 
 /**
- * Baseline response headers for the Express app (also used by the Vercel API).
+ * Baseline response headers for the Express app (the Manus deployment).
+ *
+ * Vercel does not run this middleware: the static client and the API functions
+ * get only the three simple headers, repeated in vercel.json (a test keeps the
+ * two copies identical). The Report-Only CSP and HSTS are Express-only; Vercel
+ * adds HSTS itself.
  *
  * Deliberately NOT set here:
  *  - X-Frame-Options / frame-ancestors enforcement. The repo ships a `__manus__`

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import express from "express";
 import type { AddressInfo } from "net";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +21,28 @@ async function get(headers: Record<string, string> = {}) {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("securityHeaders", () => {
+  it("keeps vercel.json's static-asset headers identical to the Express baseline", async () => {
+    // Vercel serves the static client and the API functions without this
+    // middleware, so vercel.json repeats the three simple headers. The two copies
+    // must not drift apart.
+    const vercel = JSON.parse(
+      readFileSync(resolve(process.cwd(), "vercel.json"), "utf8")
+    ) as {
+      headers?: Array<{
+        source: string;
+        headers: Array<{ key: string; value: string }>;
+      }>;
+    };
+    const rule = vercel.headers?.find(entry => entry.source === "/(.*)");
+    expect(rule, "vercel.json needs a /(.*) headers rule").toBeDefined();
+    expect(rule!.headers.length).toBeGreaterThan(0);
+
+    const res = await get();
+    for (const { key, value } of rule!.headers) {
+      expect(res.headers.get(key.toLowerCase()), key).toBe(value);
+    }
+  });
+
   it("sets the baseline headers and hides X-Powered-By", async () => {
     const res = await get();
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
