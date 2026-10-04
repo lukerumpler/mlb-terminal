@@ -1,4 +1,5 @@
 import { invokeLLM } from "../_core/llm.ts";
+import { isRateLimited, llmRateLimit, rateLimitResponse } from "./_shared.js";
 
 const MAX_AXES = 8;
 const MAX_NAME = 80;
@@ -56,6 +57,15 @@ function buildEdges(players) {
     .sort((a, b) => (b.margin ?? -1) - (a.margin ?? -1));
 }
 
+// The deterministic fallback must describe the right kind of player: hitters are
+// framed by contact quality and bat speed, pitchers by bat-missing and damage
+// avoidance. (It used to say "bat speed" for pitchers too.)
+function fallbackRecommendation(name, playerType) {
+  return playerType === "pitcher"
+    ? `${name} better suits teams prioritizing the stronger percentile profile on the axes above, while the alternative fits teams that value a different mix of bat-missing and contact management.`
+    : `${name} better suits teams prioritizing high-percentile contact quality and above-average bat speed, while the alternative fits low-whiff disciplined approaches.`;
+}
+
 export function fallbackSummary(players) {
   const edges = buildEdges(players);
   const [first, second] = players;
@@ -77,7 +87,12 @@ export function fallbackSummary(players) {
   return {
     headline,
     summary: `${first.name} vs ${second.name}: ${summary}.`,
-    recommendation: `${leader && leader !== "Even" && leader !== "Unavailable" ? leader : first.name} better suits teams prioritizing high-percentile contact quality and above-average bat speed, while the alternative fits low-whiff disciplined approaches.`,
+    recommendation: fallbackRecommendation(
+      leader && leader !== "Even" && leader !== "Unavailable"
+        ? leader
+        : first.name,
+      first.playerType
+    ),
     edges: usable.slice(0, 4),
     caveat:
       "This comparison uses only the connected 0–100 Savant percentile axes; missing fields are not inferred.",
@@ -113,6 +128,12 @@ export default async function comparisonSummary(req, res) {
       .json({
         error: "Provide two same-type players with Savant percentile axes.",
       });
+    return;
+  }
+
+  // Paid LLM call: throttle per client (validation above is cheap and runs first).
+  if (isRateLimited(req, "comparison-summary", llmRateLimit())) {
+    rateLimitResponse(res);
     return;
   }
 

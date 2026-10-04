@@ -1,0 +1,45 @@
+name: Quality gates
+
+# Fast checks that run on every pull request: formatting (pnpm lint) and the
+# TypeScript compiler. The full test suite and production build run in
+# uptime-validation.yml; the database-backed warehouse suites in
+# warehouse-db-tests.yml.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out proposed revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm check

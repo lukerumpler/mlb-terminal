@@ -3,8 +3,8 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { createHash } from 'node:crypto';
 import { readDurableCache, writeDurableCache } from '../durable-cache';
 import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
+import { currentMlbSeason } from "../season.ts";
 
-const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
 const WAR_URL = "https://www.fangraphs.com/depthcharts.aspx?position=Team";
@@ -177,7 +177,7 @@ export function parseFanGraphsProviderUpdatedText(html) {
 export function parseFanGraphsModelHtml(
   { oddsHtml, warHtml },
   teamAbbr,
-  season = DEFAULT_SEASON
+  season = currentMlbSeason()
 ) {
   const oddsDetails = findTeamRowDetails(oddsHtml, teamAbbr);
   const warDetails = findTeamRowDetails(warHtml, teamAbbr);
@@ -228,7 +228,7 @@ export function parseFanGraphsModelHtml(
 
 export function parseFanGraphsAggregateWarHtml(
   { battingHtml, pitchingHtml },
-  season = DEFAULT_SEASON
+  season = currentMlbSeason()
 ) {
   const parseRows = html => {
     const rows = new Map();
@@ -274,7 +274,7 @@ export function parseFanGraphsAggregateWarHtml(
   };
 }
 
-export function parseBaseballReferenceTeamWarHtml(html, season = DEFAULT_SEASON) {
+export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeason()) {
   const teams = [];
   const strip = value => String(value || "")
     .replace(/<[^>]+>/g, " ")
@@ -552,8 +552,8 @@ export default async function handler(req, res) {
   const teamAbbr = String(url.searchParams.get("team") || "")
     .trim()
     .toUpperCase();
-  const seasonValue = Number(url.searchParams.get("season") || DEFAULT_SEASON);
-  const season = Number.isInteger(seasonValue) ? seasonValue : DEFAULT_SEASON;
+  const seasonValue = Number(url.searchParams.get("season") || currentMlbSeason());
+  const season = Number.isInteger(seasonValue) ? seasonValue : currentMlbSeason();
   if (url.searchParams.get("mode") === "aggregate") {
     if (isRateLimited(req, "fangraphs")) return rateLimitResponse(res);
     try {

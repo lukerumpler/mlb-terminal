@@ -74,6 +74,11 @@ pnpm dev
 | `SKIP_RELEASE_BASE_URL` / `SKIP_RELEASE_SEASON` | Release-gate comparison target |
 | `STAGING_PROVIDER_FAILURE_HOOK_ENABLED` / `STAGING_PROVIDER_FAILURE_HOOK_TOKEN` | Staging-only provider failure injection |
 | `VITE_APP_ID` | Client auth app id |
+| `CSP_MODE` | `report-only` (default), `enforce` or `off`; controls the Content-Security-Policy header. Review console violations in report-only mode before enforcing |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | General API rate limit per client (defaults 30 per 10000 ms) |
+| `RATE_LIMIT_TRUSTED_PROXY_HOPS` | Number of trusted proxies in front of the app; the client address is then the Nth entry from the right of `x-forwarded-for` (default: first entry, spoofable if the edge appends) |
+| `LLM_RATE_LIMIT_MAX` / `LLM_RATE_LIMIT_WINDOW_MS` | Per-client limit for the paid-LLM routes (defaults 8 per 60000 ms) |
+| `SHUTDOWN_TIMEOUT_MS` | How long a SIGTERM drain may take before the process is forced to exit (default 10000) |
 | `MLB_TEST_DATABASE_URL` | Enables the DB-gated warehouse test suites (CI provides a MariaDB service) |
 
 See `.env.example` for a copyable template.

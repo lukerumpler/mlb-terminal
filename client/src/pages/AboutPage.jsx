@@ -3,6 +3,14 @@ import { C, px, sans } from '../constants/colors.js';
 import { Panel } from '../components/atoms.jsx';
 import Breadcrumbs from '../components/Breadcrumbs.jsx';
 
+// ---- Fill these in to turn on the LinkedIn button and the real headshot. ----
+// LINKEDIN_URL: full https URL, e.g. 'https://www.linkedin.com/in/your-handle'.
+// HEADSHOT_SRC: a file you add under client/public (e.g. '/headshot.jpg').
+// While either is empty, nothing broken is shown: no dead '#' link, and the
+// headshot panel keeps its neutral placeholder.
+const LINKEDIN_URL = '';
+const HEADSHOT_SRC = '';
+
 // Static profile content — mirrors the /about page on the live managed
 // deployment. Not sourced from any provider or API (unlike the rest of
 // SKIP), so there's no freshness/provenance badge here — this is the one
@@ -84,7 +92,18 @@ function ProfileStat({ label, value, sub, color = C.text }) {
   );
 }
 
-export default function AboutPage({ onNavigate }) {
+// Only a real https URL turns the button on; anything else (empty, '#', a typo'd
+// scheme) renders nothing instead of a dead or unsafe link.
+export function isUsableProfileUrl(value) {
+  try {
+    return new URL(String(value)).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export default function AboutPage({ onNavigate, linkedInUrl = LINKEDIN_URL, headshotSrc = HEADSHOT_SRC }) {
+  const showLinkedIn = isUsableProfileUrl(linkedInUrl);
   return (
     <div className="page-enter" style={{ display:'flex', flexDirection:'column', gap:12 }}>
       <div>
@@ -105,16 +124,19 @@ export default function AboutPage({ onNavigate }) {
             <p style={sans({ fontSize:11.5, color:C.text2, lineHeight:1.6, margin:'0 0 14px' })}>
               The platform is in development. Some phases run on live MLB Stats API and Baseball Savant data, while other tools are still being tested and refined.
             </p>
-            {/* TODO: swap in the real LinkedIn profile URL */}
-            <a href="#" target="_blank" rel="noopener noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, textDecoration:'none', ...sans({ fontSize:11, fontWeight:700 }) }}>
-              LinkedIn <span aria-hidden="true">↗</span>
-            </a>
+            {showLinkedIn && (
+              <a href={linkedInUrl} target="_blank" rel="noopener noreferrer" style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px', border:`1px solid ${C.tealMid}`, borderRadius:7, background:C.tealSoft, color:C.teal, textDecoration:'none', ...sans({ fontSize:11, fontWeight:700 }) }}>
+                LinkedIn <span aria-hidden="true">↗</span>
+              </a>
+            )}
           </div>
         </Panel>
 
         <Panel title="Professional headshot" accent={C.amber}>
           <div style={{ padding:14, display:'flex', flexDirection:'column', gap:8 }}>
-            {/* TODO: replace with the real headshot asset (client/src/assets or similar) */}
+            {headshotSrc ? (
+              <img src={headshotSrc} alt="Lucas Rumpler" style={{ width:'100%', aspectRatio:'4 / 3', objectFit:'cover', borderRadius:8, border:`1px solid ${C.border}` }} />
+            ) : (
             <div role="img" aria-label="Lucas Rumpler professional headshot placeholder" style={{
               width:'100%', aspectRatio:'4 / 3', borderRadius:8, background:`linear-gradient(135deg, ${C.surface3}, ${C.surface2})`,
               border:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'center',
@@ -122,6 +144,7 @@ export default function AboutPage({ onNavigate }) {
             }}>
               LR
             </div>
+            )}
             <div style={px({ fontSize:9, color:C.text4, letterSpacing:'.04em' })}>LUCAS RUMPLER / PROFILE ASSET</div>
           </div>
         </Panel>

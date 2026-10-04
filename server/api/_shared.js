@@ -53,24 +53,59 @@ export function applyCors(req, res) {
 // version costs nothing extra to run and stops the common case: a single
 // script hammering one endpoint.
 const hits = new Map(); // `${bucket}:${ip}` -> timestamps[]
-const WINDOW_MS = 10_000;
-const MAX_PER_WINDOW = 30;
+const DEFAULT_WINDOW_MS = 10_000;
+const DEFAULT_MAX_PER_WINDOW = 30;
 
-export function isRateLimited(req, bucket = "shared") {
-  const ip = (
-    req.headers["x-forwarded-for"] ||
-    req.socket?.remoteAddress ||
-    "unknown"
-  )
-    .split(",")[0]
-    .trim();
-  const key = `${bucket}:${ip}`;
+function envPositiveInt(name, fallback) {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * Which address identifies the caller. By default this is the first
+ * `x-forwarded-for` entry (the long-standing behavior). That entry is supplied
+ * by the client whenever the edge APPENDS to the header instead of replacing
+ * it, so it can be spoofed to dodge the limiter. If you know how many trusted
+ * proxies sit in front of the app, set RATE_LIMIT_TRUSTED_PROXY_HOPS=N: the
+ * client is then the Nth address from the RIGHT, which only trusted proxies
+ * wrote. (Vercel: 1. Confirm the hop count for any other host before setting.)
+ */
+export function clientAddress(req) {
+  const forwarded = String(req.headers?.["x-forwarded-for"] || "")
+    .split(",")
+    .map(part => part.trim())
+    .filter(Boolean);
+  const hops = envPositiveInt("RATE_LIMIT_TRUSTED_PROXY_HOPS", 0);
+  if (forwarded.length > 0) {
+    if (hops > 0) return forwarded[Math.max(0, forwarded.length - hops)];
+    return forwarded[0];
+  }
+  return req.socket?.remoteAddress || "unknown";
+}
+
+/**
+ * Routes that call a paid LLM get a much tighter budget than the general proxies.
+ * Override with LLM_RATE_LIMIT_MAX / LLM_RATE_LIMIT_WINDOW_MS.
+ */
+export function llmRateLimit() {
+  return {
+    max: envPositiveInt("LLM_RATE_LIMIT_MAX", 8),
+    windowMs: envPositiveInt("LLM_RATE_LIMIT_WINDOW_MS", 60_000),
+  };
+}
+
+export function isRateLimited(req, bucket = "shared", overrides = {}) {
+  const windowMs =
+    overrides.windowMs ?? envPositiveInt("RATE_LIMIT_WINDOW_MS", DEFAULT_WINDOW_MS);
+  const maxPerWindow =
+    overrides.max ?? envPositiveInt("RATE_LIMIT_MAX", DEFAULT_MAX_PER_WINDOW);
+  const key = `${bucket}:${clientAddress(req)}`;
   const now = Date.now();
-  const recent = (hits.get(key) || []).filter(t => now - t < WINDOW_MS);
+  const recent = (hits.get(key) || []).filter(t => now - t < windowMs);
   recent.push(now);
   hits.set(key, recent);
   if (hits.size > 5000) hits.clear(); // cheap guard against unbounded growth
-  return recent.length > MAX_PER_WINDOW;
+  return recent.length > maxPerWindow;
 }
 
 export function rateLimitResponse(res) {

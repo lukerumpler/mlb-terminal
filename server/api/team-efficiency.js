@@ -4,8 +4,8 @@ import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { getTeamFinancialSnapshot } from "./team-financials.js";
 import { loadAggregateWar } from "./fangraphs-models.js";
 import { CACHE_POLICY } from "../cache-policy.js";
+import { currentMlbSeason, isSupportedSeason } from "../season.ts";
 
-const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const FRESH_TTL_MS = CACHE_POLICY.teamEfficiencyFreshMs;
 const STALE_TTL_MS = CACHE_POLICY.teamEfficiencyStaleMs;
@@ -212,9 +212,9 @@ async function fetchEfficiencyRecord(team, season, payrollBasis) {
   return normalizeEfficiencyRecord({ team, season, payrollBasis, financials, warData, warRow, fanGraphsRow, baseballReferenceRow, warnings });
 }
 
-export async function getTeamEfficiencySnapshot(team, season = DEFAULT_SEASON, payrollBasis = "payroll") {
+export async function getTeamEfficiencySnapshot(team, season = currentMlbSeason(), payrollBasis = "payroll") {
   const normalizedTeam = canonicalTeamAbbreviation(team);
-  const normalizedSeason = Number.isInteger(Number(season)) ? Number(season) : DEFAULT_SEASON;
+  const normalizedSeason = Number.isInteger(Number(season)) ? Number(season) : currentMlbSeason();
   const normalizedBasis = String(payrollBasis || "payroll");
   const cacheKey = `${normalizedTeam}:${normalizedSeason}:${normalizedBasis}`;
   const now = Date.now();
@@ -290,8 +290,8 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   const url = new URL(req.url, "https://placeholder.invalid");
-  const seasonValue = Number(url.searchParams.get("season") || DEFAULT_SEASON);
-  const season = Number.isInteger(seasonValue) && seasonValue >= 2024 && seasonValue <= 2030 ? seasonValue : DEFAULT_SEASON;
+  const seasonValue = Number(url.searchParams.get("season") || currentMlbSeason());
+  const season = isSupportedSeason(seasonValue) ? seasonValue : currentMlbSeason();
   const payrollBasis = url.searchParams.get("payrollBasis") || "payroll";
   const requested = [
     ...String(url.searchParams.get("teams") || "").split(","),

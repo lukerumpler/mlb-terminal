@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyCors, isRateLimited } from "./_shared.js";
+import { applyCors, clientAddress, isRateLimited } from "./_shared.js";
 
 describe("legacy API shared helpers", () => {
   it("returns the permissive CORS contract when no allowlist is configured", () => {
@@ -112,5 +112,51 @@ describe("legacy API shared helpers", () => {
       expect(isRateLimited(request)).toBe(false);
     }
     expect(isRateLimited(request)).toBe(true);
+  });
+
+  describe("rate limiting configuration", () => {
+    const req = (forwarded?: string, remote = "10.0.0.9") =>
+      ({
+        headers: forwarded ? { "x-forwarded-for": forwarded } : {},
+        socket: { remoteAddress: remote },
+      }) as never;
+
+    it("keys on the first forwarded address by default (unchanged behavior)", () => {
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "");
+      expect(clientAddress(req("1.1.1.1, 2.2.2.2"))).toBe("1.1.1.1");
+      expect(clientAddress(req())).toBe("10.0.0.9");
+      vi.unstubAllEnvs();
+    });
+
+    it("uses the Nth address from the right when trusted hops are configured", () => {
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "1");
+      // A spoofed leading entry no longer decides who the client is.
+      expect(clientAddress(req("6.6.6.6, 203.0.113.5"))).toBe("203.0.113.5");
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "2");
+      expect(clientAddress(req("6.6.6.6, 203.0.113.5, 10.1.1.1"))).toBe(
+        "203.0.113.5"
+      );
+      // More hops than entries falls back to the leftmost instead of throwing.
+      expect(clientAddress(req("203.0.113.5"))).toBe("203.0.113.5");
+      vi.unstubAllEnvs();
+    });
+
+    it("honors RATE_LIMIT_MAX and ignores invalid values", () => {
+      vi.stubEnv("RATE_LIMIT_MAX", "2");
+      const caller = req("198.51.100.200");
+      expect([1, 2, 3].map(() => isRateLimited(caller, "cfg-test"))).toEqual([
+        false,
+        false,
+        true,
+      ]);
+      vi.stubEnv("RATE_LIMIT_MAX", "not-a-number");
+      const other = req("198.51.100.201");
+      const results = Array.from({ length: 31 }, () =>
+        isRateLimited(other, "cfg-test")
+      );
+      expect(results.slice(0, 30).every(r => r === false)).toBe(true);
+      expect(results[30]).toBe(true);
+      vi.unstubAllEnvs();
+    });
   });
 });

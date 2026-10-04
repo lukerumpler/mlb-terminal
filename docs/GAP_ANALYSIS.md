@@ -4,6 +4,32 @@ Date: 2026-10-03. Scope: `lukerumpler/mlb-terminal` at `main` (`59d6caf`) plus t
 Method: read the repo, branches, workflows and docs; measured what could be measured locally. Every item
 says how it was found. "Unverified" means I could not check it from here.
 
+## Status after the implementation pass
+
+Numbers refer to the items below. "Done" means implemented and tested in this branch; nothing here has run on GitHub, Vercel or Manus.
+
+**Done**
+- **#2 Security headers:** baseline headers, HSTS over HTTPS in production, a **Report-Only** CSP (`CSP_MODE=enforce` after reviewing console violations), and static headers in `vercel.json`. Framing is intentionally not restricted until the platform preview is known not to need it.
+- **#3 Graceful shutdown:** SIGTERM/SIGINT drain in-flight requests; forced exit after `SHUTDOWN_TIMEOUT_MS`.
+- **#5 Rate limiting (partly):** limits are configurable and a known proxy-hop count can be trusted. The default is unchanged, so the spoofing risk stays until `RATE_LIMIT_TRUSTED_PROXY_HOPS` is set to a confirmed value.
+- **New finding, fixed:** `/api/comparison-summary` and `/api/natural-search` call a paid LLM with no throttle. Both now limit uncached calls to 8 per minute per client.
+- **#1 About page (partly):** the dead `#` link is gone; the LinkedIn button and photo turn on when you set `LINKEDIN_URL` / `HEADSHOT_SRC` in `AboutPage.jsx`. The real values are still yours to supply.
+- **#7 DB tests in CI**, **#13 Dependabot**, **#20 env docs**, **#21 CODEOWNERS**: done.
+- **#8 Lint (partly):** `pnpm lint` covers the new code and now runs in CI (`quality.yml`). Still no ESLint.
+- **#10 Coverage (partly):** `feed.js` and `comparison-summary.js` went from 0% to tested. Two real bugs surfaced and are fixed: an unparseable date turned the whole feed into a 500, and the pitcher fallback text talked about bat speed.
+- **#11 Component tests (partly):** `TeamBadge`, `TeamNewsPanel`, `PlayerNewsPanel`, `RequestDiagnosticsPanel`. Not done: `OrganizationRosterDirectory`, `FollowListPage`.
+- **#16 Dead code (partly):** `ComponentShowcase.tsx` and `dev-mock-data.js` removed. `main.tsx`, `App.tsx`, `Home.tsx` and `NotFound.tsx` are kept because `template.json` (a platform-generated snapshot) embeds them; confirm with the host before deleting.
+- **#18 Root clutter:** 38 tracked root files down to 19; notes archived under `docs/archive/`, design notes under `docs/design/`, roadmap docs under `docs/`.
+- **#26 Hardcoded seasons:** one calendar-driven helper (`server/season.ts`) replaces the `2026` defaults and the fixed 2024-2030 range.
+
+**Not done, and why**
+- **#4 Heartbeat jobs:** an owner action on the host.
+- **#6 Vercel database**, **#19 branch cleanup**: need access I don't have. Delete the nine merged branches from the GitHub UI, or run `git push origin --delete <branch>` for each.
+- **#9 type coverage**, **#12 e2e in CI**, **#14 major upgrades**, **#17 unused UI kit**: each is its own change, and none is safe to batch here.
+- **#15 splitting `OverviewPage.jsx`:** a large refactor that needs visual checking in a browser; it should be its own PR.
+- **#22-#25, #27-#29:** product work or things that need live data.
+- **Open question:** `express.json({ limit: "50mb" })` and `urlencoded` accept 50 MB bodies on every route. I did not change it because I could not confirm whether voice notes or uploads need it. If nothing does, a small global limit with a larger one on the specific route is the safer setup.
+
 ## What I could not see
 - GitHub issues (the unauthenticated API was rate-limited), branch-protection rules, Actions run history, repository secrets.
 - The production site, the Manus deployment, its database engine, its Heartbeat schedules, and its proxy headers.

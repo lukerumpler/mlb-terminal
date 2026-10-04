@@ -11,8 +11,8 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { recordCacheOutcome } from "../cache-health";
 import { getRepeaterTier, CBT_SOURCE_URL } from "../../shared/luxuryTax.js";
+import { currentMlbSeason, isSupportedSeason } from "../season.ts";
 
-const DEFAULT_SEASON = 2026;
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const SPOTRAC_PAYROLL_URL = season =>
   `https://www.spotrac.com/mlb/payroll/_/year/${season}`;
@@ -34,7 +34,7 @@ export function __resetTeamFinancialsStateForTests() {
   spotracPageInFlight.clear();
 }
 
-export function shouldRateLimitFinancialRefresh(team, season = DEFAULT_SEASON) {
+export function shouldRateLimitFinancialRefresh(team, season = currentMlbSeason()) {
   const cached = financialCache.get(financialCacheKey(team, season));
   return !(cached?.freshUntil > Date.now()) && !financialInFlight.has(financialCacheKey(team, season));
 }
@@ -125,7 +125,7 @@ function indexOfHeader(headers, predicate) {
   return headers.findIndex(predicate);
 }
 
-export function parseTeamPayrollHtml(html, teamAbbr, season = DEFAULT_SEASON) {
+export function parseTeamPayrollHtml(html, teamAbbr, season = currentMlbSeason()) {
   const table = findTable(html, headers =>
     headers.some(header => header.includes("total payroll"))
   );
@@ -179,7 +179,7 @@ export function parseTeamPayrollHtml(html, teamAbbr, season = DEFAULT_SEASON) {
   };
 }
 
-export function parseTeamTaxHtml(html, teamAbbr, season = DEFAULT_SEASON) {
+export function parseTeamTaxHtml(html, teamAbbr, season = currentMlbSeason()) {
   const table = findTable(
     html,
     headers =>
@@ -267,7 +267,7 @@ async function fetchSpotracPage(url) {
   return request;
 }
 
-export async function getTeamFinancialSnapshot(team, season = DEFAULT_SEASON) {
+export async function getTeamFinancialSnapshot(team, season = currentMlbSeason()) {
   const key = financialCacheKey(team, season);
   const now = Date.now();
   let cached = financialCache.get(key);
@@ -363,13 +363,12 @@ export default async function handler(req, res) {
   const team = String(url.searchParams.get("team") || "")
     .trim()
     .toUpperCase();
-  const parsedSeason = Number(url.searchParams.get("season") || DEFAULT_SEASON);
-  const season =
-    Number.isInteger(parsedSeason) &&
-    parsedSeason >= 2024 &&
-    parsedSeason <= 2030
-      ? parsedSeason
-      : DEFAULT_SEASON;
+  const parsedSeason = Number(
+    url.searchParams.get("season") || currentMlbSeason()
+  );
+  const season = isSupportedSeason(parsedSeason)
+    ? parsedSeason
+    : currentMlbSeason();
   if (!TEAM_CODE.test(team))
     return res
       .status(400)

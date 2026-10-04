@@ -74,4 +74,10 @@ describe.skipIf(!baseUrl)("Vercel deployment smoke test", () => {
     const body = await response.json();
     expect(body.error ?? "").not.toMatch(/unknown api route/i);
   });
+
+  it("sends baseline security headers", async () => {
+    const response = await fetchSmokePath("/api/health");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("referrer-policy")).toBeTruthy();
+  });
 });

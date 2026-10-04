@@ -68,7 +68,13 @@ function parseRss(xml, handle) {
     // when it's actually longer.
     const text = desc.length > title.length ? desc : title;
     if (!text || !link) continue;
-    const isoDate = pubDate ? new Date(pubDate).toISOString() : null;
+    // An unparseable date must not throw: toISOString() raises RangeError on an
+    // invalid Date, which would turn one bad item into a 500 for the whole feed.
+    const parsedDate = pubDate ? new Date(pubDate) : null;
+    const isoDate =
+      parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? parsedDate.toISOString()
+        : null;
     // Stable id: last path segment of the tweet URL (the numeric tweet id)
     const id =
       link.split("/").filter(Boolean).pop() || `${Date.now()}_${items.length}`;

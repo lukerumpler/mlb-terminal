@@ -14,17 +14,32 @@ All notable changes to **MLB Terminal** are documented in this file.
 - Arsenal responses include `avgPfxX` / `avgPfxZ` so pitch movement can be compared with Savant like for like.
 - **Team salary-to-WAR efficiency** panels (Overview and League) backed by `/api/team-efficiency`, a Baseball-Reference fallback for Team WAR, and a Statcast Snapshot panel on Overview.
 
+### Security and reliability
+
+- Baseline security headers on every response (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS over HTTPS in production) plus a **Report-Only** Content-Security-Policy (`CSP_MODE=enforce` to enforce). Framing is deliberately not restricted until the platform preview is confirmed not to need it. `vercel.json` sends the same static headers.
+- Graceful shutdown: SIGTERM/SIGINT now drain in-flight requests before exit (forced after `SHUTDOWN_TIMEOUT_MS`).
+- Rate limiting is configurable (`RATE_LIMIT_*`), can trust a known number of proxy hops (`RATE_LIMIT_TRUSTED_PROXY_HOPS`), and the two paid-LLM routes (`/api/comparison-summary`, `/api/natural-search`) are now throttled (8 per minute per client; cache hits are free).
+
 ### Fixed
 
 - Team and division WAR tables no longer come back empty when the aggregate response omits `source`; division rows keep their defensive WAR; a network failure no longer throws `url is not defined`.
 - `/api/team-efficiency` is now served on Vercel (it was missing from the catch-all), and a test derives the Vercel route list from `server/api/routes.ts` so the next missed route fails CI.
 - README no longer describes `DATABASE_URL` as Postgres; SKIP uses MySQL.
 
+- `/api/feed` no longer returns a 500 for the whole feed when one item has an unparseable date.
+- The comparison fallback no longer talks about "bat speed" for pitchers.
+- Season defaults (`DEFAULT_SEASON = 2026` in three handlers, a fixed 2024-2030 range) now follow the calendar via `server/season.ts`.
+- The About page no longer renders a dead `#` LinkedIn link; set `LINKEDIN_URL` / `HEADSHOT_SRC` at the top of `AboutPage.jsx` to enable the link and photo.
 - Team-efficiency requests now accept MLB, FanGraphs and Baseball-Reference spellings (`AZ`, `CHW`, `WSN`, `D-backs`); before, `AZ` and the others matched no WAR row. The aggregate status no longer reports a fully found but cached result as `partial`.
 
-### Security
+### Security (dependencies)
 
 - `axios` 1.20, `mysql2` 3.23.1, and `dompurify` / `qs` overrides; `pnpm audit --prod` reports no known vulnerabilities (was 17).
+
+### Housekeeping
+
+- Root-level audit notes, source write-ups and task lists moved to `docs/archive/`; design notes to `docs/design/`; roadmap docs to `docs/`. Unused `ComponentShowcase.tsx` and `dev-mock-data.js` removed.
+- New CI: `quality.yml` (`pnpm lint` + typecheck on every PR) and `warehouse-db-tests.yml` (MariaDB). `dependabot.yml` added. `pnpm lint` now covers the new code.
 
 ### Known gaps
 
