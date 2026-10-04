@@ -17,4 +17,6 @@
 /server/api/mlb-warehouse.js @lukerumpler
 /server/api/scheduled-ingest-mlb.ts @lukerumpler
 /server/api/team-efficiency.js @lukerumpler
-/api/[...path].ts @lukerumpler
+# Whole directory (not /api/[...path].ts): GitHub documents [ ] as unsupported in
+# CODEOWNERS patterns, so a bracketed filename may silently match nothing.
+/api/ @lukerumpler
