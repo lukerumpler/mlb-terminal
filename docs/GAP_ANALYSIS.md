@@ -9,18 +9,18 @@ says how it was found. "Unverified" means I could not check it from here.
 Numbers refer to the items below. "Done" means implemented and tested in this branch; nothing here has run on GitHub, Vercel or Manus.
 
 **Done**
-- **#2 Security headers:** baseline headers, HSTS over HTTPS in production, a **Report-Only** CSP (`CSP_MODE=enforce` after reviewing console violations), and static headers in `vercel.json`. Framing is intentionally not restricted until the platform preview is known not to need it.
+- **#2 Security headers:** baseline headers, HSTS over HTTPS in production, a **Report-Only** CSP (`CSP_MODE=enforce` after reviewing console violations), and static headers in `vercel.json`. Framing is intentionally not restricted until the platform preview is known not to need it. Review notes: the CSP and HSTS exist only in the Express app (Vercel gets the three simple headers from `vercel.json`, kept identical by a test); the Report-Only policy has no `report-uri`, so violations appear only in the console of whoever loads the page; and `script-src 'unsafe-inline'` (needed for the inline script in `index.html`) stays even in `enforce` mode, so enforcing blocks foreign hosts but not injected inline scripts until that script is moved to a file or allowed by hash.
 - **#3 Graceful shutdown:** SIGTERM/SIGINT drain in-flight requests; forced exit after `SHUTDOWN_TIMEOUT_MS`.
 - **#5 Rate limiting (partly):** limits are configurable and a known proxy-hop count can be trusted. The default is unchanged, so the spoofing risk stays until `RATE_LIMIT_TRUSTED_PROXY_HOPS` is set to a confirmed value.
 - **New finding, fixed:** `/api/comparison-summary` and `/api/natural-search` call a paid LLM with no throttle. Both now limit uncached calls to 8 per minute per client.
 - **#1 About page (partly):** the dead `#` link is gone; the LinkedIn button and photo turn on when you set `LINKEDIN_URL` / `HEADSHOT_SRC` in `AboutPage.jsx`. The real values are still yours to supply.
-- **#7 DB tests in CI**, **#13 Dependabot**, **#20 env docs**, **#21 CODEOWNERS**: done.
+- **#7 DB tests in CI**, **#13 Dependabot**, **#20 env docs**, **#21 CODEOWNERS**: done. Review follow-ups: five client/test variables were still undocumented (`VITE_OAUTH_PORTAL_URL`, `VITE_API_BASE`, `VITE_FRONTEND_FORGE_API_KEY`/`_URL`, `VERCEL_SMOKE_TIMEOUT_MS`) and are now in `.env.example` and the README; and the CODEOWNERS rule `/api/[...path].ts` became `/api/`, because GitHub documents `[ ]` as unsupported in CODEOWNERS patterns and a bracketed filename may silently match nothing.
 - **#8 Lint (partly):** `pnpm lint` covers the new code and now runs in CI (`quality.yml`). Still no ESLint.
 - **#10 Coverage (partly):** `feed.js` and `comparison-summary.js` went from 0% to tested. Two real bugs surfaced and are fixed: an unparseable date turned the whole feed into a 500, and the pitcher fallback text talked about bat speed.
 - **#11 Component tests (partly):** `TeamBadge`, `TeamNewsPanel`, `PlayerNewsPanel`, `RequestDiagnosticsPanel`. Not done: `OrganizationRosterDirectory`, `FollowListPage`.
-- **#16 Dead code (partly):** `ComponentShowcase.tsx` and `dev-mock-data.js` removed. `main.tsx`, `App.tsx`, `Home.tsx` and `NotFound.tsx` are kept because `template.json` (a platform-generated snapshot) embeds them; confirm with the host before deleting.
+- **#16 Dead code (partly):** `ComponentShowcase.tsx` and `dev-mock-data.js` removed. `main.tsx`, `App.tsx`, `Home.tsx` and `NotFound.tsx` are kept as a precaution. `template.json` (a platform snapshot that nothing in the repo reads) embeds `main.tsx`, `App.tsx` and `Home.tsx` but not `NotFound.tsx`, so that is not a reason to keep `NotFound.tsx`; confirm with the host, then delete all four (they are reachable only from the unused `main.tsx`).
 - **#18 Root clutter:** 38 tracked root files down to 19; notes archived under `docs/archive/`, design notes under `docs/design/`, roadmap docs under `docs/`.
-- **#26 Hardcoded seasons:** one calendar-driven helper (`server/season.ts`) replaces the `2026` defaults and the fixed 2024-2030 range.
+- **#26 Hardcoded seasons:** one calendar-driven helper (`server/season.ts`) replaces the `2026` defaults and the fixed 2024-2030 range. Two caveats: from February the default becomes the new season, so the WAR and payroll panels will show empty states until the providers publish (about April); and the `fangraphs-models` season parameter never had an upper bound and still does not.
 
 **Found and fixed in the second debugging pass**
 - **Public upload and transcription (new, highest severity):** `storage.upload` and `voice.transcribe` accepted anonymous, unthrottled calls; the upload took any file type up to 50 MB and the transcription endpoint fetched any URL (SSRF). Both are now restricted (audio-only, size-capped, rate-limited, storage-path-only).
@@ -37,6 +37,20 @@ Numbers refer to the items below. "Done" means implemented and tested in this br
 - **#15 splitting `OverviewPage.jsx`:** a large refactor that needs visual checking in a browser; it should be its own PR.
 - **#22-#25, #27-#29:** product work or things that need live data.
 - **`storageProxy` is public:** `GET /manus-storage/*` serves any key without authentication; keys carry a random 8-character suffix, which is obscurity rather than access control. Recordings may contain scouting notes, so decide whether they should be private.
+
+## Review notes (independent verification)
+
+Checked against the combined branch by reading the tree and running the code. **Confirmed as written:** #1 (placeholders), #2 and #3 (no headers or signal handlers existed), #4 (two open items at todo lines 79-80), #5 (limiter keys on the first `x-forwarded-for` entry), #7 (three DB-gated files; only the new workflow has a database service), #8 (`lint` was a 10-file Prettier list), #9 (`tsconfig` has no `allowJs`/`checkJs`; 32,598 JS/JSX versus 14,554 TS/TSX lines is 69% untyped), #11 (all six components had zero test references), #15 (line counts exact), #16 (`index.html` loads `main.jsx`, which imports `./App.jsx`; `App.tsx` is reachable only from `main.tsx`), #17 (43 of 53 UI files unused), #18 (38 root files), #19 (9 merged remote branches), #26 (guards as described).
+
+**Corrected or extended:**
+- **#14 is incomplete.** `pnpm outdated` shows 20 majors behind, not 8. The other twelve: `@testing-library/jest-dom`, `@types/express`, `@types/node`, `@vitejs/plugin-react`, `@vitest/coverage-v8`, `cookie`, `dotenv`, `nanoid`, `pnpm`, `react-day-picker`, `react-resizable-panels`, `superjson`. Dependabot ignores majors by design, so none of them will ever be proposed.
+- **#10:** `@vitest/coverage-v8` is already a devDependency, so a CI coverage step needs no new package. The percentages were not re-measured.
+- **#6:** the Aug 17 note says Vercel had *no* project environment variables, not just no `DATABASE_URL`; `JWT_SECRET`, `ALLOWED_ORIGIN` and the OAuth settings were absent too.
+- **#7:** the workflow's steps were replayed against a fresh MariaDB 10.11 database: 92 tests, 0 skipped (the 90 originally counted plus two later contract tests). The drift check was also shown to fail: removing one column from `drizzle/schema.ts` makes `drizzle-kit generate` write a new migration and the workflow's command exit 1; it exits 0 on the committed schema.
+- **#5:** `hits.clear()` at 5,000 keys resets every caller's counter, but anyone who can rotate spoofed keys can already bypass the limit by changing key, and with `RATE_LIMIT_TRUSTED_PROXY_HOPS` set they cannot create arbitrary keys. It is a robustness quirk, not a separate hole.
+- **Env scan caveat:** a `process.env.X` search misses variables read by name through a helper (`envPositiveInt("RATE_LIMIT_MAX", ...)`), so those look "undocumented" or "dead" when they are neither.
+
+**Not independently verified:** coverage percentages (#10), the e2e test's behaviour (#12), anything on GitHub, Vercel or Manus.
 
 ## What I could not see
 - GitHub issues (the unauthenticated API was rate-limited), branch-protection rules, Actions run history, repository secrets.
