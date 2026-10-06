@@ -52,7 +52,7 @@ export function applyCors(req, res) {
 // with a shared store (Vercel KV, Upstash Redis) keyed the same way. This
 // version costs nothing extra to run and stops the common case: a single
 // script hammering one endpoint.
-const hits = new Map(); // `${bucket}:${ip}` -> timestamps[]
+const hits = new Map(); // `${bucket}:${ip}` -> { stamps: number[], expiresAt: number }
 const DEFAULT_WINDOW_MS = 10_000;
 const DEFAULT_MAX_PER_WINDOW = 30;
 
@@ -94,25 +94,45 @@ export function llmRateLimit() {
   };
 }
 
+const MAX_TRACKED_CLIENTS = 5000;
+
+// Keep memory bounded without handing anyone a reset. The old guard called
+// hits.clear() at 5,000 keys, which wiped EVERY client's counters at once (so a
+// burst of distinct addresses, or just busy traffic, un-throttled heavy callers).
+// Now: drop only entries whose window has already passed, then, if still over,
+// drop the least recently used until there is headroom.
+function trimTrackedClients(now) {
+  if (hits.size <= MAX_TRACKED_CLIENTS) return;
+  for (const [key, entry] of hits) {
+    if (entry.expiresAt <= now) hits.delete(key);
+  }
+  const target = Math.floor(MAX_TRACKED_CLIENTS * 0.9);
+  for (const key of hits.keys()) {
+    if (hits.size <= target) break;
+    hits.delete(key);
+  }
+}
+
 export function isRateLimited(req, bucket = "shared", overrides = {}) {
   const windowMs =
-    overrides.windowMs ?? envPositiveInt("RATE_LIMIT_WINDOW_MS", DEFAULT_WINDOW_MS);
+    overrides.windowMs ??
+    envPositiveInt("RATE_LIMIT_WINDOW_MS", DEFAULT_WINDOW_MS);
   const maxPerWindow =
     overrides.max ?? envPositiveInt("RATE_LIMIT_MAX", DEFAULT_MAX_PER_WINDOW);
   const key = `${bucket}:${clientAddress(req)}`;
   const now = Date.now();
-  const recent = (hits.get(key) || []).filter(t => now - t < windowMs);
+  const recent = (hits.get(key)?.stamps || []).filter(t => now - t < windowMs);
   recent.push(now);
-  hits.set(key, recent);
-  if (hits.size > 5000) hits.clear(); // cheap guard against unbounded growth
+  // Delete then set so Map order tracks recency (oldest first).
+  hits.delete(key);
+  hits.set(key, { stamps: recent, expiresAt: now + windowMs });
+  trimTrackedClients(now);
   return recent.length > maxPerWindow;
 }
 
 export function rateLimitResponse(res) {
   res.setHeader("Retry-After", "10");
-  return res
-    .status(429)
-    .json({
-      error: "Too many requests — please slow down and try again shortly.",
-    });
+  return res.status(429).json({
+    error: "Too many requests — please slow down and try again shortly.",
+  });
 }

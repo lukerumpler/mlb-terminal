@@ -159,4 +159,51 @@ describe("legacy API shared helpers", () => {
       vi.unstubAllEnvs();
     });
   });
+
+  describe("tracked-client eviction", () => {
+    const at = (ip: string) =>
+      ({ headers: { "x-forwarded-for": ip }, socket: {} }) as never;
+
+    it("keeps a throttled client throttled while thousands of other addresses arrive", () => {
+      vi.stubEnv("RATE_LIMIT_MAX", "2");
+      const heavy = at("203.0.113.250");
+      expect(isRateLimited(heavy, "evict")).toBe(false);
+      expect(isRateLimited(heavy, "evict")).toBe(false);
+      expect(isRateLimited(heavy, "evict")).toBe(true);
+
+      // Distinct callers push the table past its 5,000-key cap. The old code
+      // called Map.clear() here, which reset the heavy client to zero.
+      for (let i = 0; i < 5200; i++) {
+        isRateLimited(at(`10.${i >> 8}.${i & 255}.1`), "evict");
+        // The heavy client keeps calling during the flood, so it is recent.
+        if (i % 500 === 0) expect(isRateLimited(heavy, "evict")).toBe(true);
+      }
+      expect(isRateLimited(heavy, "evict")).toBe(true);
+      vi.unstubAllEnvs();
+    });
+
+    it("purges expired entries first and keeps a live entry from a longer-window bucket", () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-10-04T00:00:00Z"));
+        const longWindow = { max: 1, windowMs: 60_000 };
+        const llm = at("203.0.113.240");
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(false);
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(true);
+        // 4,000 short-window (10 s) entries fill most of the table...
+        for (let i = 0; i < 4000; i++)
+          isRateLimited(at(`172.16.${i >> 8}.${i & 255}`), "flood");
+
+        // ...30 s later every one of them has expired, but the 60 s entry has not.
+        vi.setSystemTime(new Date("2026-10-04T00:00:30Z"));
+        // 1,500 new callers take the table past 5,000, which triggers the purge.
+        for (let i = 0; i < 1500; i++)
+          isRateLimited(at(`192.168.${i >> 8}.${i & 255}`), "flood2");
+        // A purge keyed to the CURRENT call's 10 s window would have dropped it.
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

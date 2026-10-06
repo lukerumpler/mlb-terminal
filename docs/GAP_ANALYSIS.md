@@ -22,13 +22,21 @@ Numbers refer to the items below. "Done" means implemented and tested in this br
 - **#18 Root clutter:** 38 tracked root files down to 19; notes archived under `docs/archive/`, design notes under `docs/design/`, roadmap docs under `docs/`.
 - **#26 Hardcoded seasons:** one calendar-driven helper (`server/season.ts`) replaces the `2026` defaults and the fixed 2024-2030 range.
 
+**Found and fixed in the second debugging pass**
+- **Public upload and transcription (new, highest severity):** `storage.upload` and `voice.transcribe` accepted anonymous, unthrottled calls; the upload took any file type up to 50 MB and the transcription endpoint fetched any URL (SSRF). Both are now restricted (audio-only, size-capped, rate-limited, storage-path-only).
+- **Voice-note transcription was almost certainly broken:** a relative storage path was passed to a server-side `fetch`. Fixed by resolving it to a signed URL.
+- **Recorder UI trap:** a failed upload left a full-screen dialog with disabled buttons. Fixed, plus microphone release on cancel, empty-recording and Safari-format handling.
+- **413/400 reported as 500:** the API error handler ignored client-error statuses.
+- **Rate-limiter eviction** cleared everyone's counters at 5,000 keys; now expiry-then-LRU.
+- **Body limit** (the open question above) is resolved: 25 MB on `/api/trpc` only, 2 MB elsewhere.
+
 **Not done, and why**
 - **#4 Heartbeat jobs:** an owner action on the host.
 - **#6 Vercel database**, **#19 branch cleanup**: need access I don't have. Delete the nine merged branches from the GitHub UI, or run `git push origin --delete <branch>` for each.
 - **#9 type coverage**, **#12 e2e in CI**, **#14 major upgrades**, **#17 unused UI kit**: each is its own change, and none is safe to batch here.
 - **#15 splitting `OverviewPage.jsx`:** a large refactor that needs visual checking in a browser; it should be its own PR.
 - **#22-#25, #27-#29:** product work or things that need live data.
-- **Open question:** `express.json({ limit: "50mb" })` and `urlencoded` accept 50 MB bodies on every route. I did not change it because I could not confirm whether voice notes or uploads need it. If nothing does, a small global limit with a larger one on the specific route is the safer setup.
+- **`storageProxy` is public:** `GET /manus-storage/*` serves any key without authentication; keys carry a random 8-character suffix, which is obscurity rather than access control. Recordings may contain scouting notes, so decide whether they should be private.
 
 ## What I could not see
 - GitHub issues (the unauthenticated API was rate-limited), branch-protection rules, Actions run history, repository secrets.

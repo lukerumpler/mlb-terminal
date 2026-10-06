@@ -89,6 +89,23 @@ export async function registerLegacyApiRoutes(app: Express) {
   });
 }
 
+function clientErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null;
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    expose?: unknown;
+  };
+  const status = Number(candidate.status ?? candidate.statusCode);
+  // Only 4xx whose message is meant to be shown (http-errors sets expose for 4xx).
+  return Number.isInteger(status) &&
+    status >= 400 &&
+    status < 500 &&
+    candidate.expose !== false
+    ? status
+    : null;
+}
+
 export const legacyApiErrorHandler: ErrorRequestHandler = (
   error: unknown,
   _req: Request,
@@ -102,6 +119,16 @@ export const legacyApiErrorHandler: ErrorRequestHandler = (
 
   const message =
     error instanceof Error ? error.message : "Unexpected API proxy error";
+
+  // Client errors raised by middleware (body-parser: 413 entity too large, 400
+  // malformed JSON, ...) carry an http-errors status. Report them as what they
+  // are instead of a 500 "server error" with a stack trace in the logs.
+  const clientStatus = clientErrorStatus(error);
+  if (clientStatus) {
+    res.status(clientStatus).json({ error: message });
+    return;
+  }
+
   console.error("[legacy-api]", error);
   res.status(500).json({ error: message });
 };

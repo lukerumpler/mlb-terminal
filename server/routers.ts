@@ -1,7 +1,8 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, rateLimited, router } from "./_core/trpc";
+import { llmRateLimit } from "./api/_shared.js";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { storagePut } from "./storage";
@@ -121,6 +122,12 @@ function buildRosterInsightsFallback(input: {
     fallback: true,
   };
 }
+
+// Voice-note uploads: the client records with MediaRecorder, which yields webm/opus
+// (Chrome, Firefox), mp4 (Safari) or ogg. 16 MB matches the transcription limit.
+const UPLOAD_AUDIO_TYPES = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'] as const;
+const UPLOAD_MAX_BYTES = 16 * 1024 * 1024;
+const UPLOAD_MAX_BASE64_CHARS = Math.ceil(UPLOAD_MAX_BYTES / 3) * 4 + 8;
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -344,10 +351,14 @@ export const appRouter = router({
 
   voice: router({
     transcribe: publicProcedure
+      // Paid speech-to-text call: same budget as the other LLM routes.
+      .use(rateLimited("voice-transcribe", () => llmRateLimit()))
       .input(z.object({
-        audioUrl: z.string(),
-        language: z.string().optional(),
-        prompt: z.string().optional(),
+        // Only a /manus-storage/<key> path from storage.upload is accepted; the
+        // helper rejects everything else before any request is made.
+        audioUrl: z.string().min(1).max(300),
+        language: z.string().max(20).optional(),
+        prompt: z.string().max(500).optional(),
       }))
       .mutation(async ({ input }) => {
         const result = await transcribeAudio(input);
@@ -363,15 +374,24 @@ export const appRouter = router({
   }),
 
   storage: router({
+    // Anonymous voice-note upload. It is the app's only upload path, so it is
+    // limited to short audio recordings and throttled per client.
     upload: publicProcedure
+      .use(rateLimited("storage-upload", { max: 10, windowMs: 60_000 }))
       .input(z.object({
-        name: z.string(),
-        type: z.string(),
-        base64: z.string(),
+        name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, 'Invalid file name'),
+        type: z.enum(UPLOAD_AUDIO_TYPES),
+        base64: z.string().min(1).max(UPLOAD_MAX_BASE64_CHARS),
       }))
       .mutation(async ({ input }) => {
+        const buffer = Buffer.from(input.base64, 'base64');
+        if (buffer.length === 0 || buffer.length > UPLOAD_MAX_BYTES) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Audio must be between 1 byte and ${UPLOAD_MAX_BYTES / (1024 * 1024)} MB`,
+          });
+        }
         try {
-          const buffer = Buffer.from(input.base64, 'base64');
           const result = await storagePut(input.name, buffer, input.type);
           return result;
         } catch (error) {

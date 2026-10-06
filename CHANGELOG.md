@@ -20,12 +20,21 @@ All notable changes to **MLB Terminal** are documented in this file.
 - Graceful shutdown: SIGTERM/SIGINT now drain in-flight requests before exit (forced after `SHUTDOWN_TIMEOUT_MS`).
 - Rate limiting is configurable (`RATE_LIMIT_*`), can trust a known number of proxy hops (`RATE_LIMIT_TRUSTED_PROXY_HOPS`), and the two paid-LLM routes (`/api/comparison-summary`, `/api/natural-search`) are now throttled (8 per minute per client; cache hits are free).
 
+### Security hardening (voice notes and uploads)
+
+- `storage.upload` and `voice.transcribe` were public, unthrottled and unrestricted: anyone could upload any file type up to 50 MB with the platform's storage key, and `voice.transcribe` made the server fetch any URL it was given (a server-side request forgery risk). Upload now accepts only short audio (`webm`, `ogg`, `mp4`, `mpeg`, `wav`, 16 MB decoded) with a safe file name, 10 per minute per client. Transcription accepts only the `/manus-storage/<key>` path the upload returns, resolves it to a signed URL, checks the declared size before downloading, and shares the paid-LLM rate limit.
+- Request bodies are capped at 2 MB everywhere except `/api/trpc` (25 MB, for base64 voice notes); it was 50 MB on every route.
+
 ### Fixed
 
 - Team and division WAR tables no longer come back empty when the aggregate response omits `source`; division rows keep their defensive WAR; a network failure no longer throws `url is not defined`.
 - `/api/team-efficiency` is now served on Vercel (it was missing from the catch-all), and a test derives the Vercel route list from `server/api/routes.ts` so the next missed route fails CI.
 - README no longer describes `DATABASE_URL` as Postgres; SKIP uses MySQL.
 
+- **Voice-note transcription was almost certainly broken**: `storage.upload` returns a relative `/manus-storage/<key>` path, and `voice.transcribe` passed it straight to a server-side `fetch`, which rejects relative URLs (`Failed to parse URL`). It now resolves the path to a signed URL first.
+- **The voice recorder could trap the user**: a failed upload left the full-screen dialog with both buttons disabled until a page reload, because the error was thrown inside an unawaited callback. Failures are now caught and reported, and the controls come back. Closing the dialog mid-recording releases the microphone, empty recordings are rejected, and Safari's `audio/mp4` is no longer labelled `webm`.
+- Oversized or malformed request bodies returned **500** (with a stack trace in the logs) instead of 413 / 400.
+- The rate limiter's memory guard cleared every client's counters when it reached 5,000 keys, un-throttling heavy callers; it now evicts expired entries, then the least recently used.
 - `/api/feed` no longer returns a 500 for the whole feed when one item has an unparseable date.
 - The comparison fallback no longer talks about "bat speed" for pitchers.
 - Season defaults (`DEFAULT_SEASON = 2026` in three handlers, a fixed 2024-2030 range) now follow the calendar via `server/season.ts`.

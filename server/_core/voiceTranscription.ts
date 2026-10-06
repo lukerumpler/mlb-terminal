@@ -25,7 +25,28 @@
  * });
  * ```
  */
+import { storageGetSignedUrl } from "../storage";
 import { ENV } from "./env";
+
+const STORAGE_PATH_PREFIX = "/manus-storage/";
+const STORAGE_KEY_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
+
+/**
+ * The only audio source this server will fetch is a file the app itself stored:
+ * the `/manus-storage/<key>` path that `storagePut` returns. Anything else (an
+ * absolute URL, `file:`, a private/metadata address, `..` segments) is refused,
+ * so the endpoint cannot be used to make the server request arbitrary URLs.
+ * Returns the storage key, or null if the value is not an acceptable path.
+ */
+export function storageKeyFromAudioUrl(audioUrl: string): string | null {
+  if (typeof audioUrl !== "string" || audioUrl.length > 300) return null;
+  if (!audioUrl.startsWith(STORAGE_PATH_PREFIX)) return null;
+  const key = audioUrl.slice(STORAGE_PATH_PREFIX.length);
+  if (!key || key.length > 250 || !STORAGE_KEY_RE.test(key)) return null;
+  if (key.split("/").some(part => part === "." || part === "..")) return null;
+  return key;
+}
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -95,11 +116,24 @@ export async function transcribeAudio(
       };
     }
 
-    // Step 2: Download audio from URL
+    // Step 2: Download audio from the app's own storage
+    const storageKey = storageKeyFromAudioUrl(options.audioUrl);
+    if (!storageKey) {
+      return {
+        error: "audioUrl must be a recording uploaded through SKIP storage",
+        code: "INVALID_FORMAT",
+        details: `Only ${STORAGE_PATH_PREFIX}<key> paths are accepted`,
+      };
+    }
+
     let audioBuffer: Buffer;
     let mimeType: string;
     try {
-      const response = await fetch(options.audioUrl);
+      // storagePut returns a relative /manus-storage/<key> path, which a server-side
+      // fetch cannot request directly (it needs an absolute URL): resolve it to a
+      // signed download URL the same way the /manus-storage proxy does.
+      const downloadUrl = await storageGetSignedUrl(storageKey);
+      const response = await fetch(downloadUrl);
       if (!response.ok) {
         return {
           error: "Failed to download audio file",
@@ -108,12 +142,24 @@ export async function transcribeAudio(
         };
       }
 
-      audioBuffer = Buffer.from(await response.arrayBuffer());
-      mimeType = response.headers.get("content-type") || "audio/mpeg";
+      // Refuse an oversized file before buffering it.
+      const declaredBytes = Number(response.headers.get("content-length"));
+      if (Number.isFinite(declaredBytes) && declaredBytes > MAX_AUDIO_BYTES) {
+        return {
+          error: "Audio file exceeds maximum size limit",
+          code: "FILE_TOO_LARGE",
+          details: `File size is ${(declaredBytes / (1024 * 1024)).toFixed(2)}MB, maximum allowed is 16MB`,
+        };
+      }
 
-      // Check file size (16MB limit)
-      const sizeMB = audioBuffer.length / (1024 * 1024);
-      if (sizeMB > 16) {
+      audioBuffer = Buffer.from(await response.arrayBuffer());
+      // Drop parameters such as ";codecs=opus" so the extension lookup matches.
+      mimeType = (response.headers.get("content-type") || "audio/mpeg")
+        .split(";")[0]
+        .trim();
+
+      if (audioBuffer.length > MAX_AUDIO_BYTES) {
+        const sizeMB = audioBuffer.length / (1024 * 1024);
         return {
           error: "Audio file exceeds maximum size limit",
           code: "FILE_TOO_LARGE",
