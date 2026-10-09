@@ -24,3 +24,27 @@ export function isSupportedSeason(value: unknown, now: Date = new Date()) {
     season <= currentMlbSeason(now) + 1
   );
 }
+
+/** First season of the modern era; nothing older is worth an upstream lookup. */
+export const EARLIEST_PLAUSIBLE_SEASON = 1901;
+
+/**
+ * An integer season from `min` through next season. Handlers that put a season
+ * into an upstream URL or a cache key use this so a caller cannot mint unlimited
+ * distinct values (`season=-1`, `season=99999999999999999999`, ...). Unlike
+ * `isSupportedSeason` it does not assume the payroll providers' 2024 floor.
+ */
+export function isPlausibleSeason(
+  value: unknown,
+  {
+    min = EARLIEST_PLAUSIBLE_SEASON,
+    now = new Date(),
+  }: { min?: number; now?: Date } = {}
+) {
+  const season = typeof value === "number" ? value : Number.NaN;
+  return (
+    Number.isInteger(season) &&
+    season >= min &&
+    season <= currentMlbSeason(now) + 1
+  );
+}

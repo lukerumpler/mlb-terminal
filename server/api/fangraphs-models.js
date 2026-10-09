@@ -3,7 +3,7 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { createHash } from 'node:crypto';
 import { readDurableCache, writeDurableCache } from '../durable-cache';
 import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
-import { currentMlbSeason } from "../season.ts";
+import { currentMlbSeason, isPlausibleSeason } from "../season.ts";
 
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
@@ -554,6 +554,12 @@ export default async function handler(req, res) {
     .toUpperCase();
   const seasonValue = Number(url.searchParams.get("season") || currentMlbSeason());
   const season = Number.isInteger(seasonValue) ? seasonValue : currentMlbSeason();
+  // Each distinct season is an upstream fetch and a cache key; bound it.
+  if (!isPlausibleSeason(season)) {
+    return res.status(400).json({
+      error: `season must be an integer from 1901 to ${currentMlbSeason() + 1}`,
+    });
+  }
   if (url.searchParams.get("mode") === "aggregate") {
     if (isRateLimited(req, "fangraphs")) return rateLimitResponse(res);
     try {
