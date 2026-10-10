@@ -1280,7 +1280,7 @@ function MarketIntelPanel({ kpis, ct, p, teamFinancials, confidence }) {
     baseAav: ct?.aav,
     currentPlayerAav: ct?.aav,
     currentTaxPayroll: teamFinancials?.tax?.taxPayroll,
-    currentSeason: teamFinancials?.season || 2026,
+    currentSeason: teamFinancials?.season || SEASON,
     repeaterYears: teamFinancials?.tax?.repeaterYears,
     years: 5,
   });

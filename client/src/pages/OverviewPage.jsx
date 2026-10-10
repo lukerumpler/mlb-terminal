@@ -1279,7 +1279,7 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
     });
 }
 
-export function buildHistoricalTaxTrendRows(results, seasons = [2024, 2025, 2026]) {
+export function buildHistoricalTaxTrendRows(results, seasons = [CURRENT_SEASON - 2, CURRENT_SEASON - 1, CURRENT_SEASON]) {
   const numericOrNull = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   return seasons.map((season, index) => {
     const record = Array.isArray(results) ? results[index] : null;

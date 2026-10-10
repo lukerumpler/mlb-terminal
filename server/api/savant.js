@@ -391,7 +391,7 @@ function serveStaleSavant(res, stale) {
   return res.status(200).json(stale.data);
 }
 
-export async function warmSavantCache(year = '2026') {
+export async function warmSavantCache(year = String(currentMlbSeason())) {
   const endpoints = ['expected_statistics', 'statcast_leaderboard'];
   for (const endpoint of endpoints) {
     const response = {

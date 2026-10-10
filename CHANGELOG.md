@@ -40,6 +40,9 @@ All notable changes to **MLB Terminal** are documented in this file.
 - Season defaults (`DEFAULT_SEASON = 2026` in three handlers, a fixed 2024-2030 range) now follow the calendar via `server/season.ts`.
 - The About page no longer renders a dead `#` LinkedIn link; set `LINKEDIN_URL` / `HEADSHOT_SRC` at the top of `AboutPage.jsx` to enable the link and photo.
 - Team-efficiency requests now accept MLB, FanGraphs and Baseball-Reference spellings (`AZ`, `CHW`, `WSN`, `D-backs`); before, `AZ` and the others matched no WAR row. The aggregate status no longer reports a fully found but cached result as `partial`.
+- **WAR display**: a missing WAR value (null or blank) is shown as `—` instead of `0.0`. This affected the team-efficiency overview (defensive blend, the offensive/pitching split) and the comparison table (total WAR and WAR/$100M for source-gap teams). Real zeros and negative values are unchanged, and `-0.0` prints as `0.0`.
+- **WAR parsing**: negative WAR printed with a Unicode minus, en/em dash or parentheses keeps its sign (it was read as positive); league/total rows are skipped; Baseball-Reference columns are read by header, including grouped `colspan` headers; the offensive/pitching split comes from one provider (`war.splitProvider`).
+- **Seasons**: the client `SEASON` and the `player-advanced` default follow the calendar (January belongs to the prior season). The `warmSavantCache`, `buildCbtHistorySeasons`, `buildHistoricalTaxTrendRows` and Players-page fallback defaults no longer hardcode 2026.
 
 ### Security (dependencies)
 

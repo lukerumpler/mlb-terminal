@@ -13,9 +13,20 @@ export function formatDollarsPerWar(value) {
   return Number.isFinite(amount) ? `${formatMoney(amount, true)}/WAR` : '—';
 }
 
+// Number(null) and Number('') are 0, so a missing WAR would print as a real
+// "0.0". Treat null / undefined / blank strings as unavailable instead.
+function finiteOrNull(value) {
+  if (value == null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 export function formatWar(value) {
-  const war = Number(value);
-  return Number.isFinite(war) ? war.toFixed(1) : '—';
+  const war = finiteOrNull(value);
+  if (war == null) return '—';
+  const text = war.toFixed(1);
+  return text === '-0.0' ? '0.0' : text;
 }
 
 export function sourceStatusLabel(status) {
@@ -54,7 +65,7 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const splitDetail = hasSplit
     ? `Off ${formatWar(record.war.offensive)} · Pit ${formatWar(record.war.pitching)}${record.war.splitProvider ? ` (${record.war.splitProvider})` : ''}`
     : 'Offensive/pitching split unavailable';
-  const defensiveDetail = Number.isFinite(Number(record?.war?.defensive))
+  const defensiveDetail = finiteOrNull(record?.war?.defensive) != null
     ? `Defensive blend ${formatWar(record.war.defensive)}`
     : 'Comparable defensive blend unavailable';
   return <section aria-label={`${teamName} salary-to-WAR efficiency`} style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: C.surface }}>
@@ -110,9 +121,9 @@ export function TeamEfficiencyComparisonView({ rows = [], loading = false, seaso
       {loading ? <tr><td colSpan="6" style={sans({ padding: 16, color: C.text3, fontSize: 10 })}>Loading verified payroll and WAR rows.</td></tr> : sortedRows.map(row => <tr key={`${row.teamAbbreviation}-${row.season}`}>
         <th scope="row" style={{ padding: '8px 10px', textAlign: 'left', color: C.text, ...sans({ fontSize: 10, fontWeight: 700 }) }}>{row.team || row.teamAbbreviation || '—'}{row.teamAbbreviation ? <span style={sans({ marginLeft: 5, fontSize: 8.5, color: C.text4 })}>{row.teamAbbreviation}</span> : null}</th>
         <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatMoney(row.payroll?.amountUsd, true)}</td>
-        <td title={`fWAR ${formatWar(row.war?.fWAR)} · bWAR ${formatWar(row.war?.bWAR)}${Number.isFinite(Number(row.war?.defensive)) ? ` · defensive blend ${formatWar(row.war.defensive)}` : ''}`} style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatWar(row.war?.total)}</td>
+        <td title={`fWAR ${formatWar(row.war?.fWAR)} · bWAR ${formatWar(row.war?.bWAR)}${finiteOrNull(row.war?.defensive) != null ? ` · defensive blend ${formatWar(row.war.defensive)}` : ''}`} style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatWar(row.war?.total)}</td>
         <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: row.found ? C.text : C.text3 })}>{formatDollarsPerWar(row.efficiency?.dollarsPerWar)}</td>
-        <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: row.found ? C.text : C.text3 })}>{Number.isFinite(Number(row.efficiency?.warPer100m)) ? Number(row.efficiency.warPer100m).toFixed(2) : '—'}</td>
+        <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: row.found ? C.text : C.text3 })}>{finiteOrNull(row.efficiency?.warPer100m) != null ? Number(row.efficiency.warPer100m).toFixed(2) : '—'}</td>
         <td style={{ padding: '8px 10px' }}><TeamEfficiencySourceBadge provider={row.war?.provider || 'Unavailable'} status={row.status || 'source-gap'} /></td>
       </tr>)}
     </tbody></table></div>
