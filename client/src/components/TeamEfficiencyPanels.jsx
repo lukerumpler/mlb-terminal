@@ -50,6 +50,10 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const status = loading ? 'loading' : record?.status || 'unavailable';
   const complete = Boolean(record?.found && record?.efficiency);
   const warDetail = record?.war ? `fWAR ${formatWar(record.war.fWAR)} · bWAR ${formatWar(record.war.bWAR)}` : null;
+  const hasSplit = record?.war?.offensive != null || record?.war?.pitching != null;
+  const splitDetail = hasSplit
+    ? `Off ${formatWar(record.war.offensive)} · Pit ${formatWar(record.war.pitching)}${record.war.splitProvider ? ` (${record.war.splitProvider})` : ''}`
+    : 'Offensive/pitching split unavailable';
   const defensiveDetail = Number.isFinite(Number(record?.war?.defensive))
     ? `Defensive blend ${formatWar(record.war.defensive)}`
     : 'Comparable defensive blend unavailable';
@@ -70,7 +74,7 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
         <MetricCell label="WAR / $100M" value={Number(record.efficiency.warPer100m).toFixed(2)} />
       </div>
       <div style={sans({ padding: '8px 12px 10px', fontSize: 9, lineHeight: 1.45, color: C.text4 })}>
-        Payroll: {record.payroll.source || 'Unavailable'} · WAR: {record.war.provider || 'Unavailable'} · {record.war.methodology || 'Methodology unavailable'} · {defensiveDetail}. Retrieved {record.retrievedAt ? new Date(record.retrievedAt).toLocaleString() : 'unknown'}.
+        Payroll: {record.payroll.source || 'Unavailable'} · WAR: {record.war.provider || 'Unavailable'} · {record.war.methodology || 'Methodology unavailable'} · {splitDetail} · {defensiveDetail}. Retrieved {record.retrievedAt ? new Date(record.retrievedAt).toLocaleString() : 'unknown'}.
         {record.warnings?.length ? ` ${record.warnings.join(' ')}` : ''}
       </div>
     </> : <div style={sans({ padding: '12px', color: C.text3, fontSize: 10, lineHeight: 1.45 })}>

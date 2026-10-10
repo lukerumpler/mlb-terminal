@@ -36,7 +36,8 @@ import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js
 //   /game/{gamePk}/playByPlay                                    → PBP (MLB + MiLB)
 
 const BASE   = apiUrl('/api/mlb');
-export const SEASON = 2026;
+// Calendar-driven (January still belongs to the prior season), matching server/season.ts.
+export const SEASON = (() => { const d = new Date(); return d.getUTCMonth() === 0 ? d.getUTCFullYear() - 1 : d.getUTCFullYear(); })();
 const MLB_SCHEDULE_TIME_ZONE = 'America/New_York';
 
 // MLB's schedule is organized around its Eastern Time baseball day. Using a

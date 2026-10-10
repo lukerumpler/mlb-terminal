@@ -26,6 +26,14 @@ describe('team efficiency panels', () => {
     expect(screen.getByText(/Payroll: Spotrac/)).toBeTruthy();
   });
 
+  it('shows the offensive/pitching split with its provider, or says it is unavailable', () => {
+    const { unmount } = render(<TeamEfficiencyOverviewPanel record={{ ...record, war: { ...record.war, offensive: 22.1, pitching: 14.3, splitProvider: 'Baseball-Reference' } }} teamName="San Diego Padres" />);
+    expect(screen.getAllByText(/Off 22\.1 · Pit 14\.3 \(Baseball-Reference\)/).length).toBeGreaterThan(0);
+    unmount();
+    render(<TeamEfficiencyOverviewPanel record={record} teamName="San Diego Padres" />);
+    expect(screen.getAllByText(/Offensive\/pitching split unavailable/).length).toBeGreaterThan(0);
+  });
+
   it('renders an honest unavailable state without inventing a ratio', () => {
     render(<TeamEfficiencyOverviewPanel record={{ status: 'source-gap', warnings: ['No verified team WAR row matched the requested team'] }} teamName="Unknown Team" />);
     expect(screen.getByText(/No verified team WAR row matched/)).toBeTruthy();

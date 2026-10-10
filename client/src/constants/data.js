@@ -1,6 +1,7 @@
 import { C } from './colors.js';
 
-export const SEASON = 2026;
+// Calendar-driven (January still belongs to the prior season), matching server/season.ts.
+export const SEASON = (() => { const d = new Date(); return d.getUTCMonth() === 0 ? d.getUTCFullYear() - 1 : d.getUTCFullYear(); })();
 
 // Official MLB Pipeline in-season Farm System Rankings, published Aug. 16,
 // 2026. This is a dated editorial ranking snapshot, not a live stat feed.

@@ -1,4 +1,5 @@
 import { applyCors } from "./_shared.js";
+import { currentMlbSeason } from "../season.ts";
 
 const BASE_URL = "https://www.baseball-reference.com/search/search.fcgi";
 const UA =
@@ -83,7 +84,7 @@ export default async function playerAdvancedHandler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   const name = String(req.query?.name || "").trim();
-  const season = Number(req.query?.season || new Date().getUTCFullYear());
+  const season = Number(req.query?.season || currentMlbSeason());
   if (!name || !Number.isInteger(season) || season < 1900 || season > 2100) {
     return res.status(400).json({ error: "A valid player name and season are required." });
   }

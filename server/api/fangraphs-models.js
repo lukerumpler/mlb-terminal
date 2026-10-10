@@ -108,12 +108,23 @@ function tablesFromHtml(html) {
   ].map(match => match[1]);
 }
 
-function numeric(value) {
-  const match = String(value || "")
+// Providers print negative WAR with ASCII hyphens, Unicode minus signs
+// (U+2212, en/em dashes) or accounting parentheses. Reading "\u22121.2" as 1.2 would
+// silently flip the sign, so normalise before matching.
+function normalizeNegatives(value) {
+  return String(value ?? "")
+    .replace(/[\u2212\u2013\u2014\u2012]/g, "-")
     .replace(/,/g, "")
-    .match(/-?\d+(?:\.\d+)?/);
+    .replace(/^\s*\((\d+(?:\.\d+)?)\)\s*$/, "-$1");
+}
+
+function numeric(value) {
+  const match = normalizeNegatives(value).match(/-?\d+(?:\.\d+)?/);
   return match ? Number(match[0]) : null;
 }
+
+// League/total rows are not teams and must not become WAR entries.
+const NON_TEAM_ROW = /^(total|totals|league|lg|mlb|average|avg|al|nl)$/i;
 
 function findTeamRow(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
@@ -251,7 +262,9 @@ export function parseFanGraphsAggregateWarHtml(
         const cells = cellsFromRow(match[1]);
         const team = cells[teamIndex];
         const war = numeric(cells[warIndex]);
-        if (team && war != null) rows.set(team, war);
+        if (team && !NON_TEAM_ROW.test(team) && war != null && !rows.has(team)) {
+          rows.set(team, war);
+        }
       }
       if (rows.size) break;
     }
@@ -276,44 +289,71 @@ export function parseFanGraphsAggregateWarHtml(
 
 export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeason()) {
   const teams = [];
+  const seen = new Set();
   const strip = value => String(value || "")
     .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const number = value => {
-    const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
-    return match ? Number(match[0]) : null;
+  // Expand colspan so a header like <th colspan=2> keeps later columns aligned
+  // with their data cells.
+  const expandedCells = (rowHtml, transform) => {
+    const out = [];
+    for (const match of rowHtml.matchAll(/<t([dh])([^>]*)>([\s\S]*?)<\/t[dh]>/gi)) {
+      const span = Math.min(
+        Math.max(Number((match[2].match(/colspan\s*=\s*["']?(\d+)/i) || [])[1]) || 1, 1),
+        20
+      );
+      const value = transform(strip(match[3]));
+      for (let i = 0; i < span; i += 1) out.push(value);
+    }
+    return out;
   };
   const tables = [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)].map(match => match[1]);
   for (const tableHtml of tables) {
     const rows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
-    const header = rows.find(row => /<th/i.test(row[1]));
-    const headers = header
-      ? [...header[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match => strip(match[1]).toLowerCase())
-      : [];
+    // The real header row is the one that names a WAR or team column; an
+    // over-header row (grouped columns) must not be mistaken for it.
+    let headers = [];
+    for (const row of rows) {
+      if (!/<th/i.test(row[1])) continue;
+      const candidate = expandedCells(row[1], value => value.toLowerCase());
+      if (candidate.some(h => /war|^tm$|^team$/.test(h))) {
+        headers = candidate;
+        break;
+      }
+    }
+    const warHeaderIndex = headers.findIndex(header => /^(t?war|total war|war total)$/.test(header));
+    const defensiveIndex = headers.findIndex(header => /def|fld|field|dwar/.test(header) && !/off/.test(header));
+    const columnIndex = pattern => headers.findIndex(header => pattern.test(header));
+    const battingIndex = columnIndex(/^(batting war|bat war|owar|offensive war|off war)$/);
+    const pitchingIndex = columnIndex(/^(pitching war|pit war|pwar)$/);
     for (const rowMatch of rows) {
       const rowHtml = rowMatch[1];
       const teamLink = rowHtml.match(new RegExp(`<a[^>]+href=["']/teams/[^/]+/${season}\\.shtml[^"']*["'][^>]*>([\\s\\S]*?)<\\/a>`, "i"));
       if (!teamLink) continue;
       const team = strip(teamLink[1]);
-      const cells = [...rowHtml.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match => strip(match[1]));
+      if (!team || NON_TEAM_ROW.test(team) || seen.has(team)) continue;
+      const cells = expandedCells(rowHtml, value => value);
       const teamIndex = cells.findIndex(cell => cell === team);
-      const totalWar = teamIndex >= 0 ? number(cells[teamIndex + 1]) : null;
-      const defensiveIndex = headers.findIndex(header => /def|fld|field|dwar/.test(header) && !/off/.test(header));
-      const defensiveWAR = defensiveIndex >= 0 ? number(cells[defensiveIndex]) : null;
-      if (team && totalWar != null) {
-        teams.push({
-          team,
-          battingWAR: null,
-          pitchingWAR: null,
-          totalWAR: totalWar,
-          ...(defensiveWAR != null ? { defensiveWAR } : {}),
-          season,
-        });
-      }
+      const at = index => (index >= 0 && index < cells.length ? numeric(cells[index]) : null);
+      const totalWar = warHeaderIndex >= 0 && warHeaderIndex < cells.length
+        ? at(warHeaderIndex)
+        : teamIndex >= 0 ? at(teamIndex + 1) : null;
+      if (totalWar == null) continue;
+      const defensiveWAR = at(defensiveIndex);
+      seen.add(team);
+      teams.push({
+        team,
+        battingWAR: at(battingIndex),
+        pitchingWAR: at(pitchingIndex),
+        totalWAR: totalWar,
+        ...(defensiveWAR != null ? { defensiveWAR } : {}),
+        season,
+      });
     }
   }
   return teams;

@@ -100,6 +100,18 @@ export function calculateSalaryWarEfficiency({ payrollUsd, totalWar }) {
   };
 }
 
+export function selectWarSplit(fanGraphsRow, baseballReferenceRow) {
+  const has = row => row?.battingWAR != null || row?.pitchingWAR != null;
+  const pick = (row, provider) => ({
+    offensive: row.battingWAR ?? null,
+    pitching: row.pitchingWAR ?? null,
+    provider,
+  });
+  if (has(fanGraphsRow)) return pick(fanGraphsRow, "FanGraphs");
+  if (has(baseballReferenceRow)) return pick(baseballReferenceRow, "Baseball-Reference");
+  return { offensive: null, pitching: null, provider: null };
+}
+
 export function calculateBlendedWar({ fanGraphsWar, baseballReferenceWar, fanGraphsDefensiveWar = null, baseballReferenceDefensiveWar = null }) {
   const numeric = value => value == null || value === "" ? null : Number(value);
   const fWAR = numeric(fanGraphsWar);
@@ -132,6 +144,7 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
     baseballReferenceDefensiveWar: bWARRow?.defensiveWAR,
   });
   const totalWar = blend.blendedWAR;
+  const split = selectWarSplit(fWARRow, bWARRow);
   const efficiency = calculateSalaryWarEfficiency({ payrollUsd, totalWar });
   const complete = efficiency.dollarsPerWar != null && efficiency.warPer100m != null;
   const freshness = sourceFreshness(financials, warData);
@@ -153,8 +166,11 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
       total: Number.isFinite(totalWar) ? totalWar : null,
       fWAR: blend.fWAR,
       bWAR: blend.bWAR,
-      offensive: fWARRow?.battingWAR ?? null,
-      pitching: fWARRow?.pitchingWAR ?? null,
+      // Offensive/pitching come from ONE provider so the pair is internally
+      // consistent: FanGraphs when it has either value, else Baseball-Reference.
+      offensive: split.offensive,
+      pitching: split.pitching,
+      splitProvider: split.provider,
       defensive: blend.defensiveAverage,
       defensiveFanGraphs: fWARRow?.defensiveWAR ?? null,
       defensiveBaseballReference: bWARRow?.defensiveWAR ?? null,
