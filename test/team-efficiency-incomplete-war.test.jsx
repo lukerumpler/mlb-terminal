@@ -72,3 +72,26 @@ describe('WAR stays visible when payroll is what is missing', () => {
     expect(screen.getByText(/No verified team WAR row matched/)).toBeTruthy();
   });
 });
+
+describe('a missing consensus component is labeled unavailable, not silently dropped', () => {
+  const summary = (value, providers) => ({ value, median: value, min: value, max: value, spread: 0, n: providers.length, providers, sources: providers.map(provider => ({ provider, value })) });
+  const withConsensus = consensus => ({
+    ...complete,
+    war: { ...complete.war, offensive: consensus.batting?.value ?? null, pitching: consensus.pitching?.value ?? null, consensus: { agreement: 'moderate', agreementLabel: 'Sources differ (spread 4.0 WAR)', providerCount: 2, total: summary(38, ['FanGraphs', 'Baseball-Reference']), defensive: null, batting: null, pitching: null, ...consensus } },
+  });
+
+  it('shows Off as unavailable when only pitching has a consensus', () => {
+    render(<TeamEfficiencyOverviewPanel record={withConsensus({ pitching: summary(14, ['FanGraphs', 'Baseball-Reference']) })} teamName="San Diego Padres" />);
+    expect(screen.getByText(/Off unavailable · Pit 14\.0 \(FanGraphs \+ Baseball-Reference\)/)).toBeTruthy();
+  });
+
+  it('shows Pit as unavailable when only batting has a consensus', () => {
+    render(<TeamEfficiencyOverviewPanel record={withConsensus({ batting: summary(25, ['FanGraphs']) })} teamName="San Diego Padres" />);
+    expect(screen.getByText(/Off 25\.0 \(FanGraphs\) · Pit unavailable/)).toBeTruthy();
+  });
+
+  it('keeps the whole-split fallback text when neither component has a consensus', () => {
+    render(<TeamEfficiencyOverviewPanel record={withConsensus({})} teamName="San Diego Padres" />);
+    expect(screen.getByText(/Offensive\/pitching split unavailable/)).toBeTruthy();
+  });
+});

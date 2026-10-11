@@ -65,10 +65,14 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const componentDetail = (label, summary) => summary
     ? `${label} ${formatWar(summary.value)} (${[...new Set(summary.providers)].join(' + ')})`
     : null;
-  const consensusParts = [componentDetail('Off', consensus?.batting), componentDetail('Pit', consensus?.pitching)].filter(Boolean);
+  // When one component has a consensus and the other does not, say so: a missing
+  // side must read "unavailable", never vanish (or look like zero).
+  const consensusParts = [['Off', consensus?.batting], ['Pit', consensus?.pitching]]
+    .map(([label, summary]) => componentDetail(label, summary));
+  const hasConsensusPart = consensusParts.some(Boolean);
   const hasSplit = record?.war?.offensive != null || record?.war?.pitching != null;
-  const splitDetail = consensusParts.length
-    ? consensusParts.join(' · ')
+  const splitDetail = hasConsensusPart
+    ? consensusParts.map((part, index) => part ?? `${index === 0 ? 'Off' : 'Pit'} unavailable`).join(' · ')
     : hasSplit
       ? `Off ${formatWar(record.war.offensive)} · Pit ${formatWar(record.war.pitching)}${record.war.splitProvider ? ` (${record.war.splitProvider})` : ''}`
       : 'Offensive/pitching split unavailable';
