@@ -111,3 +111,30 @@ describe('aggregateStatus', () => {
     expect(aggregateStatus([row(false, 'source-gap')])).toBe('source-gap');
   });
 });
+
+describe('why a team has no salary-per-WAR ratio', () => {
+  const base = {
+    team: 'SD',
+    season: 2026,
+    payrollBasis: 'payroll',
+    financials: { found: true, source: 'Spotrac', freshness: 'live', payroll: { payroll: 200_000_000 } },
+    warData: { source: 'FanGraphs', freshness: 'live' },
+  };
+
+  it('keeps the signed WAR and explains a zero-or-negative total instead of silently reporting a gap', () => {
+    const row = normalizeEfficiencyRecord({
+      ...base,
+      fanGraphsRow: { team: 'San Diego Padres', totalWAR: -2 },
+      baseballReferenceRow: { team: 'San Diego Padres', totalWAR: -1 },
+    });
+    expect(row).toMatchObject({ found: false, status: 'source-gap', war: { fWAR: -2, bWAR: -1, total: -1.5 } });
+    expect(row.warnings.join(' ')).toMatch(/zero or negative/i);
+  });
+
+  it('does not add that warning for a positive total or when payroll is what is missing', () => {
+    const positive = normalizeEfficiencyRecord({ ...base, fanGraphsRow: { team: 'San Diego Padres', totalWAR: 40 } });
+    expect(positive.warnings.join(' ')).not.toMatch(/zero or negative/i);
+    const noPayroll = normalizeEfficiencyRecord({ ...base, financials: { found: false }, fanGraphsRow: { team: 'San Diego Padres', totalWAR: -2 } });
+    expect(noPayroll.warnings.join(' ')).not.toMatch(/zero or negative/i);
+  });
+});

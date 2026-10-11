@@ -242,6 +242,9 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
       ...(blend.fWAR == null ? ["FanGraphs fWAR unavailable; blended WAR uses Baseball-Reference only or is unavailable"] : []),
       ...(blend.bWAR == null ? ["Baseball-Reference bWAR unavailable; blended WAR uses FanGraphs only or is unavailable"] : []),
       ...(consensus.agreement === "low" ? [`Provider team WAR differs by ${consensus.total.spread.toFixed(1)}; the blended value is approximate`] : []),
+      ...(Number.isFinite(totalWar) && totalWar <= 0 && payrollUsd > 0
+        ? ["Total WAR is zero or negative, so a salary-per-WAR ratio is not defined; the WAR values are still shown"]
+        : []),
       ...(blend.defensiveAverage == null ? ["Defensive WAR blend unavailable because both comparable provider fields were not present"] : []),
       ...(financials?.freshness === "stale-cached" ? ["Payroll is stale-cached"] : []),
       ...(warData?.freshness === "stale-cached" ? ["WAR is stale-cached"] : [])],

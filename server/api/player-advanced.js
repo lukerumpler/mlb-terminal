@@ -20,7 +20,12 @@ function cleanText(value = "") {
 
 function numeric(value) {
   if (value == null || value === "") return null;
-  const parsed = Number(String(value).replace(/[%+,]/g, "").trim());
+  const parsed = Number(
+    String(value)
+      .replace(/[\u2212\u2013\u2014\u2012]/g, "-")
+      .replace(/[%+,]/g, "")
+      .trim()
+  );
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -55,10 +60,19 @@ export function parseBaseballReferenceIdentity(html, targetName) {
   return null;
 }
 
+// A printed stat: optional minus (ASCII hyphen, Unicode minus, en/em dash) then digits.
+const SIGNED_NUMBER = "[-\\u2212\\u2013\\u2014]?\\d+(?:\\.\\d+)?";
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// The summary prints a "<label> <this season> <career>" pair. Takes the first
+// figure. `label` is literal text ("wRC+"), never a pattern: escaping it here is
+// what keeps "+" from turning into "one or more backslashes".
 function currentYearValue(html, label, season) {
-  const escapedLabel = label.replace(/[+]/g, "\\+");
   const pattern = new RegExp(
-    `(?:${escapedLabel})\\s*([0-9]+(?:\\.[0-9]+)?)\\s+([0-9]+(?:\\.[0-9]+)?)`,
+    `(?<![A-Za-z0-9])${escapeRegExp(label)}(?![A-Za-z])\\s*(${SIGNED_NUMBER})\\s+(${SIGNED_NUMBER})`,
     "i"
   );
   const match = cleanText(html).match(pattern);
@@ -67,15 +81,27 @@ function currentYearValue(html, label, season) {
   return current == null ? null : { value: current, season };
 }
 
-export function parseBaseballReferenceAdvanced(html, season) {
+// The player page summary shows the most recent season, so it can only honestly
+// be labeled with that season. For any other requested season the figures are
+// withheld rather than returned under the wrong year.
+export function parseBaseballReferenceAdvanced(html, season, { currentSeason = currentMlbSeason() } = {}) {
+  const base = { season, source: "Baseball-Reference player summary" };
+  if (Number(season) !== Number(currentSeason)) {
+    return {
+      ...base,
+      war: null,
+      wrcPlus: null,
+      status: "unavailable",
+      note: "Baseball-Reference's player summary only covers the most recent season, so it is not used for other seasons.",
+    };
+  }
   const text = cleanText(html);
   const war = currentYearValue(text, "WAR", season);
-  const wrcPlus = currentYearValue(text, "wRC\\+", season);
+  const wrcPlus = currentYearValue(text, "wRC+", season);
   return {
-    season,
+    ...base,
     war: war?.value ?? null,
     wrcPlus: wrcPlus?.value ?? null,
-    source: "Baseball-Reference player summary",
     status: war?.value != null || wrcPlus?.value != null ? "live" : "unavailable",
   };
 }

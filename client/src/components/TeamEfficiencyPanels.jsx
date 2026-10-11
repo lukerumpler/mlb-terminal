@@ -77,6 +77,12 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const rangeDetail = range && finiteOrNull(range.warPer100mLow) != null && finiteOrNull(range.warPer100mHigh) != null
     ? `WAR/$100M ${Number(range.warPer100mLow).toFixed(2)}–${Number(range.warPer100mHigh).toFixed(2)} across sources`
     : null;
+  // "Blended" is only true when both providers contributed; a single-provider
+  // total is that provider's own WAR and must be labeled as such (fWAR != bWAR).
+  const hasFWar = finiteOrNull(record?.war?.fWAR) != null;
+  const hasBWar = finiteOrNull(record?.war?.bWAR) != null;
+  const warLabel = hasFWar && hasBWar ? 'Blended WAR' : hasFWar ? 'fWAR' : hasBWar ? 'bWAR' : 'Team WAR';
+  const hasAnyWar = ['total', 'fWAR', 'bWAR', 'offensive', 'pitching'].some(key => finiteOrNull(record?.war?.[key]) != null);
   const defensiveDetail = finiteOrNull(record?.war?.defensive) != null
     ? `Defensive blend ${formatWar(record.war.defensive)}`
     : 'Comparable defensive blend unavailable';
@@ -92,7 +98,7 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
     {complete ? <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', borderTop: `0.5px solid ${C.borderLight}` }}>
         <MetricCell label="Payroll" value={formatMoney(record.payroll.amountUsd, true)} detail={record.payroll.basis.replaceAll('_', ' ')} />
-        <MetricCell label="Blended WAR" value={formatWar(record.war.total)} detail={warDetail || record.war.methodology} />
+        <MetricCell label={warLabel} value={formatWar(record.war.total)} detail={warDetail || record.war.methodology} />
         <MetricCell label="Dollars / WAR" value={formatDollarsPerWar(record.efficiency.dollarsPerWar)} />
         <MetricCell label="WAR / $100M" value={Number(record.efficiency.warPer100m).toFixed(2)} />
       </div>
@@ -101,7 +107,10 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
         {record.warnings?.length ? ` ${record.warnings.join(' ')}` : ''}
       </div>
     </> : <div style={sans({ padding: '12px', color: C.text3, fontSize: 10, lineHeight: 1.45 })}>
-      {loading ? 'Loading verified payroll and team WAR inputs.' : (record?.warnings || ['Payroll and WAR inputs are not both available. No efficiency value is estimated.']).join(' ')}
+      {loading ? 'Loading verified payroll and team WAR inputs.' : <>
+        {hasAnyWar && <div style={{ marginBottom: 6, color: C.text2 }}>WAR is available without an efficiency ratio: {warLabel} {formatWar(record.war.total)} ({warDetail}) · {splitDetail}.</div>}
+        {(record?.warnings || ['Payroll and WAR inputs are not both available. No efficiency value is estimated.']).join(' ')}
+      </>}
     </div>}
   </section>;
 }

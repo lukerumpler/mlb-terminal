@@ -2507,7 +2507,8 @@ export function blendTeamWarRow(fanGraphsRow, baseballReferenceRow) {
   const bDefense = numeric(baseballReferenceRow?.defensiveWAR ?? baseballReferenceRow?.defenseWAR);
   const defensiveWAR = Number.isFinite(fDefense) && Number.isFinite(bDefense) ? Number(((fDefense + bDefense) / 2).toFixed(1)) : null;
   return {
-    totalWAR: Number.isFinite(fWAR) && Number.isFinite(bWAR) ? Number(((fWAR + bWAR) / 2).toFixed(1)) : Number.isFinite(fWAR) ? fWAR : bWAR,
+    // Never NaN: an unparseable provider value is unavailable (null), because callers filter with `!= null`.
+    totalWAR: Number.isFinite(fWAR) && Number.isFinite(bWAR) ? Number(((fWAR + bWAR) / 2).toFixed(1)) : Number.isFinite(fWAR) ? fWAR : Number.isFinite(bWAR) ? bWAR : null,
     fWAR: Number.isFinite(fWAR) ? fWAR : null,
     bWAR: Number.isFinite(bWAR) ? bWAR : null,
     defensiveWAR,
