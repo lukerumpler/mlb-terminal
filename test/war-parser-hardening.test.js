@@ -35,7 +35,7 @@ describe('Baseball-Reference WAR parser hardening', () => {
 
   it('populates batting, pitching and defensive WAR when the columns exist', () => {
     const html = brTable(
-      '<tr><th>Rk</th><th>Tm</th><th>oWAR</th><th>pWAR</th><th>Fld</th><th>WAR</th></tr>',
+      '<tr><th>Rk</th><th>Tm</th><th>Batting WAR</th><th>pWAR</th><th>Fld</th><th>WAR</th></tr>',
       brRow(1, 'Atlanta Braves', ['22.1', '14.3', '3.2', '39.6'])
     );
     expect(parseBaseballReferenceTeamWarHtml(html, 2026)[0]).toMatchObject({
@@ -44,6 +44,17 @@ describe('Baseball-Reference WAR parser hardening', () => {
       defensiveWAR: 3.2,
       totalWAR: 39.6,
     });
+  });
+
+  it('keeps oWAR (offence-only) separate from position-player batting WAR', () => {
+    // FanGraphs batting WAR includes defense; oWAR does not, so they must never be averaged.
+    const html = brTable(
+      '<tr><th>Rk</th><th>Tm</th><th>oWAR</th><th>WAR</th></tr>',
+      brRow(1, 'Atlanta Braves', ['18.0', '39.6'])
+    );
+    const row = parseBaseballReferenceTeamWarHtml(html, 2026)[0];
+    expect(row.battingWAR).toBeNull();
+    expect(row.offensiveWAR).toBe(18);
   });
 
   it('keeps the sign of negative WAR written with a Unicode minus', () => {

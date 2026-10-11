@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TeamEfficiencyComparisonView, TeamEfficiencyOverviewPanel } from '../client/src/components/TeamEfficiencyPanels.jsx';
 
 const record = {
@@ -17,6 +17,9 @@ const record = {
 };
 
 describe('team efficiency panels', () => {
+  // Vitest globals are off, so Testing Library does not unmount between tests on its own.
+  afterEach(() => cleanup());
+
   it('renders the overview metric inputs and source attribution', () => {
     render(<TeamEfficiencyOverviewPanel record={record} teamName="San Diego Padres" />);
     expect(screen.getByText('Salary-to-WAR Efficiency')).toBeTruthy();
@@ -32,6 +35,37 @@ describe('team efficiency panels', () => {
     unmount();
     render(<TeamEfficiencyOverviewPanel record={record} teamName="San Diego Padres" />);
     expect(screen.getAllByText(/Offensive\/pitching split unavailable/).length).toBeGreaterThan(0);
+  });
+
+  it('shows crowd agreement, the cross-source efficiency range and per-component providers', () => {
+    const crowd = {
+      ...record,
+      war: {
+        ...record.war,
+        total: 38,
+        consensus: {
+          agreement: 'moderate',
+          agreementLabel: 'Sources differ (spread 4.0 WAR)',
+          providerCount: 2,
+          total: { value: 38, min: 36, max: 40, spread: 4, n: 2, providers: ['FanGraphs', 'Baseball-Reference'] },
+          batting: { value: 25, n: 1, providers: ['FanGraphs'] },
+          pitching: { value: 14, n: 2, providers: ['FanGraphs', 'Baseball-Reference'] },
+          defensive: null,
+        },
+      },
+      efficiency: { ...record.efficiency, range: { warPer100mLow: 18, warPer100mHigh: 20 } },
+    };
+    render(<TeamEfficiencyOverviewPanel record={crowd} teamName="San Diego Padres" />);
+    expect(screen.getAllByText(/Sources differ \(spread 4\.0 WAR\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/WAR\/\$100M 18\.00–20\.00 across sources/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Off 25\.0 \(FanGraphs\) · Pit 14\.0 \(FanGraphs \+ Baseball-Reference\)/).length).toBeGreaterThan(0);
+  });
+
+  it('puts the agreement note in the comparison table tooltip', () => {
+    render(<TeamEfficiencyComparisonView rows={[
+      { team: 'San Diego Padres', teamAbbreviation: 'SD', found: true, status: 'live', payroll: { amountUsd: 200_000_000 }, war: { total: 38, fWAR: 40, bWAR: 36, provider: 'FanGraphs + Baseball-Reference', consensus: { agreementLabel: 'Sources differ (spread 4.0 WAR)' } }, efficiency: { dollarsPerWar: 5_000_000, warPer100m: 20 } },
+    ]} season={2026} />);
+    expect(screen.getAllByTitle(/Sources differ \(spread 4\.0 WAR\)/).length).toBeGreaterThan(0);
   });
 
   it('renders an honest unavailable state without inventing a ratio', () => {

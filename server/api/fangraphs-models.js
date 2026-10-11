@@ -329,7 +329,12 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
     const warHeaderIndex = headers.findIndex(header => /^(t?war|total war|war total)$/.test(header));
     const defensiveIndex = headers.findIndex(header => /def|fld|field|dwar/.test(header) && !/off/.test(header));
     const columnIndex = pattern => headers.findIndex(header => pattern.test(header));
-    const battingIndex = columnIndex(/^(batting war|bat war|owar|offensive war|off war)$/);
+    // FanGraphs' "batting WAR" is position-player WAR (it includes defense and
+    // positional adjustment), so only a comparable Baseball-Reference column may
+    // fill battingWAR. oWAR is the offence-only component: keep it separate and
+    // never average it with FanGraphs batting WAR.
+    const battingIndex = columnIndex(/^(batting war|bat war|position war|position players war|pos war)$/);
+    const offensiveIndex = columnIndex(/^(owar|offensive war|off war)$/);
     const pitchingIndex = columnIndex(/^(pitching war|pit war|pwar)$/);
     for (const rowMatch of rows) {
       const rowHtml = rowMatch[1];
@@ -345,6 +350,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
         : teamIndex >= 0 ? at(teamIndex + 1) : null;
       if (totalWar == null) continue;
       const defensiveWAR = at(defensiveIndex);
+      const offensiveWAR = at(offensiveIndex);
       seen.add(team);
       teams.push({
         team,
@@ -352,6 +358,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
         pitchingWAR: at(pitchingIndex),
         totalWAR: totalWar,
         ...(defensiveWAR != null ? { defensiveWAR } : {}),
+        ...(offensiveWAR != null ? { offensiveWAR } : {}),
         season,
       });
     }
@@ -412,7 +419,7 @@ export async function loadAggregateWar(season) {
   if (cached && cached.expiresAt > Date.now())
     return { data: cached.data, cache: "HIT" };
   if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
-    const durable = await readDurableCache(durableFanGraphsKey(`aggregate-blended-v2:${season}`));
+    const durable = await readDurableCache(durableFanGraphsKey(`aggregate-blended-v3:${season}`));
     if (durable) {
       cached = {
         data: durable.data,
@@ -555,7 +562,7 @@ export async function loadAggregateWar(season) {
         staleExpiresAt,
       });
       void writeDurableCache({
-        cacheKey: durableFanGraphsKey(`aggregate-blended-v2:${season}`),
+        cacheKey: durableFanGraphsKey(`aggregate-blended-v3:${season}`),
         source: data.source || 'FanGraphs',
         data,
         freshUntil: new Date(expiresAt),

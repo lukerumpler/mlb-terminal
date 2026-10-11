@@ -61,10 +61,22 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const status = loading ? 'loading' : record?.status || 'unavailable';
   const complete = Boolean(record?.found && record?.efficiency);
   const warDetail = record?.war ? `fWAR ${formatWar(record.war.fWAR)} · bWAR ${formatWar(record.war.bWAR)}` : null;
+  const consensus = record?.war?.consensus;
+  const componentDetail = (label, summary) => summary
+    ? `${label} ${formatWar(summary.value)} (${[...new Set(summary.providers)].join(' + ')})`
+    : null;
+  const consensusParts = [componentDetail('Off', consensus?.batting), componentDetail('Pit', consensus?.pitching)].filter(Boolean);
   const hasSplit = record?.war?.offensive != null || record?.war?.pitching != null;
-  const splitDetail = hasSplit
-    ? `Off ${formatWar(record.war.offensive)} · Pit ${formatWar(record.war.pitching)}${record.war.splitProvider ? ` (${record.war.splitProvider})` : ''}`
-    : 'Offensive/pitching split unavailable';
+  const splitDetail = consensusParts.length
+    ? consensusParts.join(' · ')
+    : hasSplit
+      ? `Off ${formatWar(record.war.offensive)} · Pit ${formatWar(record.war.pitching)}${record.war.splitProvider ? ` (${record.war.splitProvider})` : ''}`
+      : 'Offensive/pitching split unavailable';
+  const agreementDetail = consensus?.agreementLabel || null;
+  const range = record?.efficiency?.range;
+  const rangeDetail = range && finiteOrNull(range.warPer100mLow) != null && finiteOrNull(range.warPer100mHigh) != null
+    ? `WAR/$100M ${Number(range.warPer100mLow).toFixed(2)}–${Number(range.warPer100mHigh).toFixed(2)} across sources`
+    : null;
   const defensiveDetail = finiteOrNull(record?.war?.defensive) != null
     ? `Defensive blend ${formatWar(record.war.defensive)}`
     : 'Comparable defensive blend unavailable';
@@ -85,7 +97,7 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
         <MetricCell label="WAR / $100M" value={Number(record.efficiency.warPer100m).toFixed(2)} />
       </div>
       <div style={sans({ padding: '8px 12px 10px', fontSize: 9, lineHeight: 1.45, color: C.text4 })}>
-        Payroll: {record.payroll.source || 'Unavailable'} · WAR: {record.war.provider || 'Unavailable'} · {record.war.methodology || 'Methodology unavailable'} · {splitDetail} · {defensiveDetail}. Retrieved {record.retrievedAt ? new Date(record.retrievedAt).toLocaleString() : 'unknown'}.
+        Payroll: {record.payroll.source || 'Unavailable'} · WAR: {record.war.provider || 'Unavailable'} · {record.war.methodology || 'Methodology unavailable'}{agreementDetail ? ` · ${agreementDetail}` : ''}{rangeDetail ? ` · ${rangeDetail}` : ''} · {splitDetail} · {defensiveDetail}. Retrieved {record.retrievedAt ? new Date(record.retrievedAt).toLocaleString() : 'unknown'}.
         {record.warnings?.length ? ` ${record.warnings.join(' ')}` : ''}
       </div>
     </> : <div style={sans({ padding: '12px', color: C.text3, fontSize: 10, lineHeight: 1.45 })}>
@@ -121,7 +133,7 @@ export function TeamEfficiencyComparisonView({ rows = [], loading = false, seaso
       {loading ? <tr><td colSpan="6" style={sans({ padding: 16, color: C.text3, fontSize: 10 })}>Loading verified payroll and WAR rows.</td></tr> : sortedRows.map(row => <tr key={`${row.teamAbbreviation}-${row.season}`}>
         <th scope="row" style={{ padding: '8px 10px', textAlign: 'left', color: C.text, ...sans({ fontSize: 10, fontWeight: 700 }) }}>{row.team || row.teamAbbreviation || '—'}{row.teamAbbreviation ? <span style={sans({ marginLeft: 5, fontSize: 8.5, color: C.text4 })}>{row.teamAbbreviation}</span> : null}</th>
         <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatMoney(row.payroll?.amountUsd, true)}</td>
-        <td title={`fWAR ${formatWar(row.war?.fWAR)} · bWAR ${formatWar(row.war?.bWAR)}${finiteOrNull(row.war?.defensive) != null ? ` · defensive blend ${formatWar(row.war.defensive)}` : ''}`} style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatWar(row.war?.total)}</td>
+        <td title={`fWAR ${formatWar(row.war?.fWAR)} · bWAR ${formatWar(row.war?.bWAR)}${row.war?.consensus?.agreementLabel ? ` · ${row.war.consensus.agreementLabel}` : ''}${finiteOrNull(row.war?.defensive) != null ? ` · defensive blend ${formatWar(row.war.defensive)}` : ''}`} style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: C.text })}>{formatWar(row.war?.total)}</td>
         <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: row.found ? C.text : C.text3 })}>{formatDollarsPerWar(row.efficiency?.dollarsPerWar)}</td>
         <td style={px({ padding: '8px 10px', textAlign: 'right', fontSize: 10, color: row.found ? C.text : C.text3 })}>{finiteOrNull(row.efficiency?.warPer100m) != null ? Number(row.efficiency.warPer100m).toFixed(2) : '—'}</td>
         <td style={{ padding: '8px 10px' }}><TeamEfficiencySourceBadge provider={row.war?.provider || 'Unavailable'} status={row.status || 'source-gap'} /></td>

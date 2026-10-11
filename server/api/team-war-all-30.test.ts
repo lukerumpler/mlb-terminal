@@ -65,8 +65,11 @@ const TEAMS = [
 // 0.0 (a real zero); teams 21-29 total below zero.
 const fgBatTenths = (i: number) => 120 - 6 * i;
 const fgPitTenths = (i: number) => 100 - 5 * i;
-const brOffTenths = (i: number) => 110 - 6 * i;
-const brPitTenths = (i: number) => 95 - 5 * i;
+const brOffTenths = (i: number) => 110 - 6 * i; // oWAR: offence-only, never blended
+const brBatTenths = (i: number) => 130 - 6 * i; // position-player WAR, comparable to FanGraphs batting WAR
+const brPitTenths = (i: number) => 96 - 5 * i;
+// Mean of two providers' tenths; the fixtures are built so the sum is always even.
+const blendTenths = (a: number, b: number) => (a + b) / 2 / 10;
 const brFldTenths = (i: number) => 20 - i; // goes negative too
 const brTotalTenths = (i: number) => 225 - 11 * i;
 
@@ -83,13 +86,14 @@ const fgTable = (tenths: (i: number) => number) =>
   ).join("")}<tr><td></td><td>Total</td><td>999.9</td></tr></table>`;
 
 const brTable = () =>
-  `<table><thead><tr><th></th><th colspan="3">Position players / pitchers</th><th></th></tr>` +
-  `<tr><th>Rk</th><th>Tm</th><th>oWAR</th><th>pWAR</th><th>Fld</th><th>WAR</th></tr></thead><tbody>${TEAMS.map(
+  `<table><thead><tr><th></th><th colspan="5">Position players / pitchers</th><th></th></tr>` +
+  `<tr><th>Rk</th><th>Tm</th><th>oWAR</th><th>Batting WAR</th><th>pWAR</th><th>Fld</th><th>WAR</th></tr></thead><tbody>${TEAMS.map(
     (team, i) =>
       `<tr><th>${i + 1}</th><td><a href="/teams/${team.fg}/${SEASON}.shtml">${team.br}</a></td>` +
-      `<td>${printed(brOffTenths(i), i)}</td><td>${printed(brPitTenths(i), i + 1)}</td>` +
+      `<td>${printed(brOffTenths(i), i)}</td><td>${printed(brBatTenths(i), i + 4)}</td>` +
+      `<td>${printed(brPitTenths(i), i + 1)}</td>` +
       `<td>${printed(brFldTenths(i), i + 2)}</td><td>${printed(brTotalTenths(i), i + 3)}</td></tr>`
-  ).join("")}<tr><td>Lg Avg</td><td>Average</td><td>1</td><td>1</td><td>1</td><td>999.9</td></tr></tbody></table>`;
+  ).join("")}<tr><td>Lg Avg</td><td>Average</td><td>1</td><td>1</td><td>1</td><td>1</td><td>999.9</td></tr></tbody></table>`;
 
 const fgParsed = () =>
   parseFanGraphsAggregateWarHtml(
@@ -146,7 +150,8 @@ describe("parsers on a full 30-team table", () => {
     TEAMS.forEach((team, i) => {
       const row = teams.find(item => item.team === team.br)!;
       expect(row.totalWAR).toBe(brTotalTenths(i) / 10);
-      expect(row.battingWAR).toBe(brOffTenths(i) / 10);
+      expect(row.battingWAR).toBe(brBatTenths(i) / 10);
+      expect(row.offensiveWAR).toBe(brOffTenths(i) / 10);
       expect(row.pitchingWAR).toBe(brPitTenths(i) / 10);
       expect(row.defensiveWAR).toBe(brFldTenths(i) / 10);
     });
@@ -155,16 +160,24 @@ describe("parsers on a full 30-team table", () => {
 
 describe("team efficiency for every club, both providers present", () => {
   it.each(TEAMS.map((team, i) => [team.canonical, i] as const))(
-    "%s keeps exact signed fWAR, bWAR and split",
+    "%s keeps exact signed fWAR and bWAR and blends the comparable split",
     async (canonical, i) => {
       mockProviders();
       const record = await getTeamEfficiencySnapshot(canonical, SEASON);
       expect(record.teamAbbreviation).toBe(canonical);
       expect(record.war.fWAR).toBe((fgBatTenths(i) + fgPitTenths(i)) / 10);
       expect(record.war.bWAR).toBe(brTotalTenths(i) / 10);
-      expect(record.war.offensive).toBe(fgBatTenths(i) / 10);
-      expect(record.war.pitching).toBe(fgPitTenths(i) / 10);
-      expect(record.war.splitProvider).toBe("FanGraphs");
+      // Both providers publish position-player and pitcher WAR, so each is the mean of the two.
+      expect(record.war.offensive).toBe(blendTenths(fgBatTenths(i), brBatTenths(i)));
+      expect(record.war.pitching).toBe(blendTenths(fgPitTenths(i), brPitTenths(i)));
+      expect(record.war.splitProvider).toBe("FanGraphs + Baseball-Reference");
+      // oWAR is offence-only (no defense) and must not leak into either blend.
+      expect(record.war.offensive).not.toBe(blendTenths(fgBatTenths(i), brOffTenths(i)));
+      // The crowd view carries every provider's number and how far apart they are.
+      expect(record.war.consensus.providerCount).toBe(2);
+      expect(record.war.consensus.total.sources.map(source => source.provider)).toEqual(["FanGraphs", "Baseball-Reference"]);
+      expect(record.war.consensus.total.spread).toBe(0.5);
+      expect(record.war.consensus.agreement).toBe("high");
       // Whatever the total rule is, it must sit between the two providers' values
       // and a negative-WAR club must never be reported as a positive one.
       const lo = Math.min(record.war.fWAR, record.war.bWAR);
@@ -205,9 +218,11 @@ describe("team efficiency for every club, FanGraphs blocked", () => {
       expect(record.war.fWAR).toBeNull();
       expect(record.war.bWAR).toBe(brTotalTenths(i) / 10);
       expect(record.war.total).toBe(brTotalTenths(i) / 10);
-      expect(record.war.offensive).toBe(brOffTenths(i) / 10);
+      expect(record.war.offensive).toBe(brBatTenths(i) / 10);
       expect(record.war.pitching).toBe(brPitTenths(i) / 10);
       expect(record.war.splitProvider).toBe("Baseball-Reference");
+      expect(record.war.consensus.agreement).toBe("single-source");
+      expect(record.efficiency.range).toBeNull();
       expect(record.war.provider).toBe("Baseball-Reference");
     }
   );

@@ -2,6 +2,7 @@
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
 import { percentile } from '../lib/percentile.js';
+import { buildWarConsensus, describeAgreement } from '../lib/warConsensus.js';
 import {
   getStoredPlayerProviderIdentity,
   isUsablePlayerProviderIdentity,
@@ -2514,6 +2515,29 @@ export function blendTeamWarRow(fanGraphsRow, baseballReferenceRow) {
     defensiveMethodology: defensiveWAR == null ? 'Comparable defensive blend unavailable' : 'Average of comparable defensive WAR',
   };
 }
+// One provider row per source, in the shape buildWarConsensus expects.
+export function teamWarConsensus(fanGraphsRow, baseballReferenceRow) {
+  const asSource = (provider, row) => row && {
+    provider,
+    total: row.totalWAR,
+    batting: row.battingWAR,
+    pitching: row.pitchingWAR,
+    defensive: row.defensiveWAR ?? row.defenseWAR,
+  };
+  const consensus = buildWarConsensus([
+    asSource('FanGraphs', fanGraphsRow),
+    asSource('Baseball-Reference', baseballReferenceRow),
+  ]);
+  return {
+    agreement: consensus.agreement,
+    agreementLabel: describeAgreement(consensus),
+    providerCount: consensus.providerCount,
+    total: consensus.total,
+    batting: consensus.batting,
+    pitching: consensus.pitching,
+    defensive: consensus.defensive,
+  };
+}
 export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
   const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
@@ -2547,9 +2571,20 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
       const divRows = primaryWarTeams.filter(row => divisionKeys.has(canonicalTeamName(row.team)));
       divisionTeams = divRows.map(row => {
         const referenceRow = baseballReferenceTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team));
-        const blend = blendTeamWarRow(row, referenceRow);
+        // `row` is Baseball-Reference's own row when FanGraphs is blocked; passing it as
+        // the FanGraphs side labelled a bWAR value "fWAR" and claimed a two-source blend
+        // of one source. Only a genuine FanGraphs row (or an unlabelled flat `teams`
+        // array, the legacy shape) may stand in for the FanGraphs side.
+        const fanGraphsRow = fanGraphsTeams.length
+          ? fanGraphsTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team))
+          : baseballReferenceTeams.length ? null : row;
+        const blend = blendTeamWarRow(fanGraphsRow, referenceRow);
+        const rowConsensus = teamWarConsensus(fanGraphsRow, referenceRow);
         return {
           team: row.team,
+          agreement: rowConsensus.agreement,
+          // A lone source has no spread; null, not a misleading 0.
+          spread: rowConsensus.total?.n >= 2 ? rowConsensus.total.spread : null,
           totalWAR: blend.totalWAR,
           fWAR: blend.fWAR,
           bWAR: blend.bWAR,
@@ -2580,6 +2615,7 @@ export async function getTeamAggregateWar(teamName, divisionTeamNames = [], seas
       defensiveWAR: selectedBlend.defensiveWAR ?? selected?.defenseWAR ?? selected?.defensiveWAR ?? null,
       warMethodology: selectedBlend.methodology,
       defensiveWARMethodology: selectedBlend.defensiveMethodology,
+      warConsensus: teamWarConsensus(selectedFanGraphs, selectedBaseballReference),
       divisionAverageWAR,
       divisionTeams,
       source: selectedBlend.fWAR != null && selectedBlend.bWAR != null ? 'FanGraphs + Baseball-Reference blended Team WAR' : data.source || 'FanGraphs aggregate Team WAR',
@@ -2649,7 +2685,12 @@ export async function getLeagueTeamsWar(season = SEASON) {
       .filter(row => row?.team)
       .map(row => {
         const referenceRow = baseballReferenceTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team));
-        const blend = blendTeamWarRow(row, referenceRow);
+        // Same rule as getTeamAggregateWar(): when FanGraphs is blocked `row` IS the
+        // Baseball-Reference row, so it must not be passed as the FanGraphs side.
+        const fanGraphsRow = fanGraphsTeams.length
+          ? fanGraphsTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team))
+          : baseballReferenceTeams.length ? null : row;
+        const blend = blendTeamWarRow(fanGraphsRow, referenceRow);
         return { team: canonicalTeamName(row.team), totalWAR: blend.totalWAR, fWAR: blend.fWAR, bWAR: blend.bWAR, methodology: blend.methodology };
       })
       .filter(row => row.totalWAR != null && Number.isFinite(Number(row.totalWAR)));

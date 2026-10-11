@@ -69,3 +69,38 @@ Spotrac payroll and tax pages are deduplicated across simultaneous league compar
 ## Production follow-up
 
 Before public release, configure durable cache storage, add scheduled refresh telemetry for `/api/team-efficiency`, document provider terms of use, test every payroll basis against current Spotrac markup, and add end-to-end tests for offline local-storage recovery in the browser.
+
+## Crowd consensus ("wisdom of the crowd")
+
+`war.total` is the mean of the providers' team WAR (FanGraphs fWAR, Baseball-Reference bWAR). The two
+systems measure the same thing differently, so each is treated as an independent estimate and the spread
+between them is reported instead of hidden.
+
+`war.consensus` fields: `total` / `batting` / `pitching` / `defensive`, each `{ value, median, min, max,
+spread, n, providers, sources }` (or `null` when no provider supplied it), plus `agreement`,
+`agreementLabel` and `providerCount`.
+
+| agreement | meaning |
+|---|---|
+| `high` | spread <= 3 WAR |
+| `moderate` | spread <= 6 WAR |
+| `low` | spread > 6 WAR; a warning is added and the blended value should be read as approximate |
+| `single-source` | only one provider; no cross-check |
+| `unavailable` | no provider value |
+
+The 3 and 6 WAR cut-offs are a judgement call (`AGREEMENT_THRESHOLDS`), not figures published by either
+provider; tune them once real data is available.
+
+`efficiency.range` repeats the efficiency at the lowest and highest provider WAR (two or more providers, both
+above 0 WAR).
+
+Component rules:
+- **Pitching** is blended across providers.
+- **Batting (position players)** is blended only when two providers publish a comparable column. FanGraphs'
+  batting WAR includes defense; Baseball-Reference's `oWAR` does not, so `oWAR` is stored as `offensiveWAR`
+  and is never averaged with it.
+- **Defensive** counts as a blend only with two or more providers.
+
+To add a source, pass another `{ provider, total, batting, pitching, defensive }` row to
+`buildWarConsensus`. Nothing in the module assumes two providers. A new provider still needs a parser that has
+been checked against a real page.

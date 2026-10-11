@@ -6,6 +6,7 @@ All notable changes to **MLB Terminal** are documented in this file.
 
 ### Added
 
+- **Crowd-consensus team WAR** (`server/war-consensus.js`, mirrored in `client/src/lib/warConsensus.js`). Every provider's number is kept as one independent estimate; the headline `war.total` is still their mean, and `war.consensus` now adds each provider's value, the median, min/max, the spread and an agreement grade (`high` within 3 WAR, `moderate` within 6, else `low`; `single-source` and `unavailable` are explicit). `efficiency.range` gives WAR/$100M and $/WAR at the lowest and highest provider WAR, and a `low` grade adds a warning. Pitching WAR is blended across providers; position-player (batting) WAR only when two providers publish a comparable column. The Overview panel and comparison tooltip show agreement, the range and per-component providers. Adding a provider means passing one more source to `buildWarConsensus`.
 - **MLB warehouse**: resumable game and pitch ingestion from the MLB Stats API into MySQL (`pnpm ingest:mlb`), with migration `0005_mlb_warehouse`, atomic game claims, deadlock-safe writes and a bounded read layer. See `docs/MLB_WAREHOUSE.md`.
 - **`GET /api/mlb-warehouse`**: read-only views (`status`, `arsenal`, `pitches`, `game`, `team-games`). Returns a clean 503 `{ available: false }` when the database is not configured or not migrated. No UI calls it yet.
 - **`POST /api/scheduled/ingest-mlb`**: cron-only daily warehouse refresh (10-day schedule window, 2-day correction refresh, limit 80). Games that legitimately have zero pitches are reported as known-empty instead of failing the run.
@@ -27,6 +28,9 @@ All notable changes to **MLB Terminal** are documented in this file.
 
 ### Fixed
 
+- Baseball-Reference `oWAR` (offence only) was mapped to batting WAR, but FanGraphs batting WAR is position-player WAR including defense, so the two were not comparable. `oWAR` is now kept separately as `offensiveWAR` and never averaged with FanGraphs batting WAR; batting WAR is read only from a position-player column.
+- With FanGraphs blocked, division and league rows passed the Baseball-Reference row as the FanGraphs side, labelling a bWAR value "fWAR" and claiming a two-source blend. They now report `fWAR: null` and a single-source grade.
+- Durable aggregate-WAR cache key bumped to `aggregate-blended-v3` because parsed Baseball-Reference rows gained fields.
 - Team and division WAR tables no longer come back empty when the aggregate response omits `source`; division rows keep their defensive WAR; a network failure no longer throws `url is not defined`.
 - `/api/team-efficiency` is now served on Vercel (it was missing from the catch-all), and a test derives the Vercel route list from `server/api/routes.ts` so the next missed route fails CI.
 - README no longer describes `DATABASE_URL` as Postgres; SKIP uses MySQL.

@@ -5,6 +5,7 @@ import { getTeamFinancialSnapshot } from "./team-financials.js";
 import { loadAggregateWar } from "./fangraphs-models.js";
 import { CACHE_POLICY } from "../cache-policy.js";
 import { currentMlbSeason, isSupportedSeason } from "../season.ts";
+import { buildWarConsensus, describeAgreement } from "../war-consensus.js";
 
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const FRESH_TTL_MS = CACHE_POLICY.teamEfficiencyFreshMs;
@@ -100,16 +101,38 @@ export function calculateSalaryWarEfficiency({ payrollUsd, totalWar }) {
   };
 }
 
-export function selectWarSplit(fanGraphsRow, baseballReferenceRow) {
-  const has = row => row?.battingWAR != null || row?.pitchingWAR != null;
-  const pick = (row, provider) => ({
-    offensive: row.battingWAR ?? null,
-    pitching: row.pitchingWAR ?? null,
-    provider,
-  });
-  if (has(fanGraphsRow)) return pick(fanGraphsRow, "FanGraphs");
-  if (has(baseballReferenceRow)) return pick(baseballReferenceRow, "Baseball-Reference");
-  return { offensive: null, pitching: null, provider: null };
+/**
+ * Salary efficiency at the lowest and highest provider WAR, so the single blended
+ * figure is shown alongside how much it moves depending on which source is right.
+ * Only produced when two or more providers agree the team is above replacement.
+ */
+export function calculateEfficiencyRange({ payrollUsd, totalSummary }) {
+  if (!totalSummary || totalSummary.n < 2 || !(totalSummary.min > 0)) return null;
+  const atLow = calculateSalaryWarEfficiency({ payrollUsd, totalWar: totalSummary.min });
+  const atHigh = calculateSalaryWarEfficiency({ payrollUsd, totalWar: totalSummary.max });
+  if (atLow.warPer100m == null || atHigh.warPer100m == null) return null;
+  return {
+    warPer100mLow: atLow.warPer100m,
+    warPer100mHigh: atHigh.warPer100m,
+    // Fewer dollars per win at the higher WAR.
+    dollarsPerWarLow: atHigh.dollarsPerWar,
+    dollarsPerWarHigh: atLow.dollarsPerWar,
+  };
+}
+
+function providerLabel(summary) {
+  return summary ? [...new Set(summary.providers)].join(" + ") : null;
+}
+
+// One string for the offensive/pitching pair: a single label when both components
+// come from the same providers, otherwise each is named.
+function describeSplitProviders(consensus) {
+  const batting = providerLabel(consensus.batting);
+  const pitching = providerLabel(consensus.pitching);
+  if (batting && pitching) {
+    return batting === pitching ? batting : `${batting} (batting) · ${pitching} (pitching)`;
+  }
+  return batting || pitching || null;
 }
 
 export function calculateBlendedWar({ fanGraphsWar, baseballReferenceWar, fanGraphsDefensiveWar = null, baseballReferenceDefensiveWar = null }) {
@@ -144,8 +167,12 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
     baseballReferenceDefensiveWar: bWARRow?.defensiveWAR,
   });
   const totalWar = blend.blendedWAR;
-  const split = selectWarSplit(fWARRow, bWARRow);
+  const consensus = buildWarConsensus([
+    fWARRow && { provider: "FanGraphs", total: fWARRow.totalWAR, batting: fWARRow.battingWAR, pitching: fWARRow.pitchingWAR, defensive: fWARRow.defensiveWAR },
+    bWARRow && { provider: "Baseball-Reference", total: bWARRow.totalWAR, batting: bWARRow.battingWAR, pitching: bWARRow.pitchingWAR, defensive: bWARRow.defensiveWAR },
+  ]);
   const efficiency = calculateSalaryWarEfficiency({ payrollUsd, totalWar });
+  const efficiencyRange = calculateEfficiencyRange({ payrollUsd, totalSummary: consensus.total });
   const complete = efficiency.dollarsPerWar != null && efficiency.warPer100m != null;
   const freshness = sourceFreshness(financials, warData);
   return {
@@ -166,11 +193,22 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
       total: Number.isFinite(totalWar) ? totalWar : null,
       fWAR: blend.fWAR,
       bWAR: blend.bWAR,
-      // Offensive/pitching come from ONE provider so the pair is internally
-      // consistent: FanGraphs when it has either value, else Baseball-Reference.
-      offensive: split.offensive,
-      pitching: split.pitching,
-      splitProvider: split.provider,
+      // Crowd view: every provider's estimate, their mean/median, the spread, and an
+      // agreement grade. `total` above stays the headline mean.
+      consensus: {
+        agreement: consensus.agreement,
+        agreementLabel: describeAgreement(consensus),
+        providerCount: consensus.providerCount,
+        total: consensus.total,
+        batting: consensus.batting,
+        pitching: consensus.pitching,
+        defensive: consensus.defensive,
+      },
+      // Offensive = position-player (batting) WAR, blended only when two providers
+      // publish a comparable column; pitching is blended across providers.
+      offensive: consensus.batting?.value ?? null,
+      pitching: consensus.pitching?.value ?? null,
+      splitProvider: describeSplitProviders(consensus),
       defensive: blend.defensiveAverage,
       defensiveFanGraphs: fWARRow?.defensiveWAR ?? null,
       defensiveBaseballReference: bWARRow?.defensiveWAR ?? null,
@@ -190,6 +228,7 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
     },
     efficiency: {
       ...efficiency,
+      range: efficiencyRange,
       calculationVersion: "salary-war-v2-blended-fwar-bwar",
     },
     sourceUrls: {
@@ -202,6 +241,7 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
     warnings: [...warnings,
       ...(blend.fWAR == null ? ["FanGraphs fWAR unavailable; blended WAR uses Baseball-Reference only or is unavailable"] : []),
       ...(blend.bWAR == null ? ["Baseball-Reference bWAR unavailable; blended WAR uses FanGraphs only or is unavailable"] : []),
+      ...(consensus.agreement === "low" ? [`Provider team WAR differs by ${consensus.total.spread.toFixed(1)}; the blended value is approximate`] : []),
       ...(blend.defensiveAverage == null ? ["Defensive WAR blend unavailable because both comparable provider fields were not present"] : []),
       ...(financials?.freshness === "stale-cached" ? ["Payroll is stale-cached"] : []),
       ...(warData?.freshness === "stale-cached" ? ["WAR is stale-cached"] : [])],
