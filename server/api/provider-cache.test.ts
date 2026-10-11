@@ -85,10 +85,12 @@ describe("FanGraphs provider cache", () => {
 
   it("falls back to Baseball-Reference totals when FanGraphs aggregate pages fail", async () => {
     const baseballReference = `<table><tr><th>Rk</th><th>Total</th><th>All P</th></tr><tr><td>1</td><td><a href="/teams/SDP/2009.shtml">San Diego Padres</a></td><td>12.4</td><td>7.1</td></tr></table>`;
-    const fetchMock = vi.fn()
-      .mockRejectedValueOnce(Object.assign(new Error("FanGraphs blocked"), { status: 403 }))
-      .mockRejectedValueOnce(Object.assign(new Error("FanGraphs blocked"), { status: 403 }))
-      .mockResolvedValueOnce(new Response(baseballReference, { status: 200 }));
+    // Route by URL, not call order: the Baseball-Reference request now starts in
+    // parallel with FanGraphs, so which call comes first is not part of the contract.
+    const fetchMock = vi.fn(async (input: unknown) => {
+      if (String(input).includes("baseball-reference.com")) return new Response(baseballReference, { status: 200 });
+      throw Object.assign(new Error("FanGraphs blocked"), { status: 403 });
+    });
     vi.stubGlobal("fetch", fetchMock);
     const result = response();
     await fangraphsHandler(req("/api/fangraphs-models?mode=aggregate&season=2009"), result);

@@ -35,10 +35,12 @@ describe('Baseball-Reference aggregate WAR fallback', () => {
   });
 
   it('falls back after FanGraphs failure and labels the response source', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response('Cloudflare challenge', { status: 403 }))
-      .mockResolvedValueOnce(new Response('Cloudflare challenge', { status: 403 }))
-      .mockResolvedValueOnce(new Response(baseballReferenceHtml, { status: 200 }));
+    // Route by URL, not call order: the Baseball-Reference request now starts in
+    // parallel with FanGraphs, so which call comes first is not part of the contract.
+    const fetchMock = vi.fn(async input =>
+      String(input).includes('baseball-reference.com')
+        ? new Response(baseballReferenceHtml, { status: 200 })
+        : new Response('Cloudflare challenge', { status: 403 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const response = makeResponse();
