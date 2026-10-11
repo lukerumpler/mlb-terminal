@@ -25,7 +25,7 @@ export function buildBaseballReferencePlayerUrl(value) {
 
 function cleanText(value) {
   return String(value || "")
-    .replace(/<[^>]*>/g, " ")
+    .replace(/<[^<>]*>/g, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&quot;/gi, '"')

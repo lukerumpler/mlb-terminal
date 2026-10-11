@@ -9,7 +9,7 @@ const UA =
 
 function cleanText(value = "") {
   return String(value)
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#39;/g, "'")
@@ -41,9 +41,15 @@ function normalizeName(value = "") {
 export function parseBaseballReferenceIdentity(html, targetName) {
   const target = normalizeName(targetName);
   if (!target) return null;
-  const linkPattern = new RegExp('<a[^>]+href="(\\/players\\/[a-z]\\/[^" ]+\\.shtml)"[^>]*>([\\s\\S]*?)<\\/a>', 'gi');
+  // Linear on garbled pages: openers never run across another tag, and only text up
+  // to the last </a> is searched (see upToLastClose in fangraphs-models.js).
+  const linkPattern = new RegExp('<a[^<>]+href="(\\/players\\/[a-z]\\/[^" ]+\\.shtml)"[^<>]*>([\\s\\S]*?)<\\/a>', 'gi');
+  let searchable = "";
+  let lastClose = -1;
+  for (const close of String(html).matchAll(/<\/a>/gi)) lastClose = close.index + close[0].length;
+  if (lastClose > 0) searchable = String(html).slice(0, lastClose);
   let match;
-  while ((match = linkPattern.exec(String(html))) !== null) {
+  while ((match = linkPattern.exec(searchable)) !== null) {
     const displayName = cleanText(match[2]);
     if (normalizeName(displayName) !== target) continue;
     const path = match[1];
@@ -70,12 +76,12 @@ function escapeRegExp(value) {
 // The summary prints a "<label> <this season> <career>" pair. Takes the first
 // figure. `label` is literal text ("wRC+"), never a pattern: escaping it here is
 // what keeps "+" from turning into "one or more backslashes".
-function currentYearValue(html, label, season) {
+function currentYearValue(text, label, season) {
   const pattern = new RegExp(
     `(?<![A-Za-z0-9])${escapeRegExp(label)}(?![A-Za-z])\\s*(${SIGNED_NUMBER})\\s+(${SIGNED_NUMBER})`,
     "i"
   );
-  const match = cleanText(html).match(pattern);
+  const match = text.match(pattern); // `text` is already cleaned by the caller (once, not per label)
   if (!match) return null;
   const current = numeric(match[1]);
   return current == null ? null : { value: current, season };

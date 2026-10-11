@@ -147,7 +147,7 @@ export function hasVerifiedContractData(scraped, mlbData) {
 // Lightweight HTML tag stripper — mirrors BeautifulSoup .get_text()
 function stripTags(html) {
   return (html || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&lt;/g, "<")

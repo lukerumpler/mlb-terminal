@@ -117,7 +117,7 @@ function sourcesFor(kind, team, handle = null) {
 function stripHtml(value = "") {
   return String(value)
     .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^<>]+>/g, "")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")

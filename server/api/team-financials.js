@@ -60,7 +60,7 @@ function setFinancialHeaders(res, freshness) {
 
 function stripTags(html) {
   return (html || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#39;/g, "'")

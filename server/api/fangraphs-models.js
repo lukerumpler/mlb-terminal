@@ -88,7 +88,7 @@ function staleModel(cacheEntry) {
 
 function stripTags(value) {
   return String(value || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
@@ -96,16 +96,37 @@ function stripTags(value) {
     .trim();
 }
 
+// Provider pages are parsed with regexes, so a truncated or garbled response must
+// cost a scan, not a rescan per tag. Two rules keep every pattern linear:
+//  1. opener classes are `[^<>]*` (they never run across another tag), and
+//  2. only text up to the LAST closing tag is searched: an unclosed opener after
+//     it can never match, but would otherwise rescan the whole remainder each time.
+const TABLE_BLOCK = /<table[^<>]*>([\s\S]*?)<\/table>/gi;
+const TABLE_CLOSE = /<\/table>/gi;
+const ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/gi;
+const ROW_CLOSE = /<\/tr>/gi;
+const CELL_BLOCK = /<t[dh][^<>]*>([\s\S]*?)<\/t[dh]>/gi;
+const CELL_WITH_ATTRS_BLOCK = /<t([dh])([^<>]*)>([\s\S]*?)<\/t[dh]>/gi;
+const CELL_CLOSE = /<\/t[dh]>/gi;
+const ANCHOR_CLOSE = /<\/a>/gi;
+
+function upToLastClose(text, closing) {
+  const source = String(text || "");
+  let end = -1;
+  for (const match of source.matchAll(closing)) end = match.index + match[0].length;
+  return end < 0 ? "" : source.slice(0, end);
+}
+
+function closedBlocks(text, pattern, closing) {
+  return [...upToLastClose(text, closing).matchAll(pattern)];
+}
+
 function cellsFromRow(row) {
-  return [
-    ...String(row || "").matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi),
-  ].map(match => stripTags(match[1]));
+  return closedBlocks(row, CELL_BLOCK, CELL_CLOSE).map(match => stripTags(match[1]));
 }
 
 function tablesFromHtml(html) {
-  return [
-    ...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi),
-  ].map(match => match[1]);
+  return closedBlocks(html, TABLE_BLOCK, TABLE_CLOSE).map(match => match[1]);
 }
 
 // Providers print negative WAR with ASCII hyphens, Unicode minus signs
@@ -128,7 +149,7 @@ const NON_TEAM_ROW = /^(total|totals|league|lg|mlb|average|avg|al|nl)$/i;
 
 function findTeamRow(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
-    for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    for (const row of closedBlocks(table, ROW_BLOCK, ROW_CLOSE)) {
       const cells = cellsFromRow(row[1]);
       if (cells.some(cell => matchesTeamName(cell, teamAbbr))) return cells;
     }
@@ -161,9 +182,10 @@ function matchesTeamName(cell, teamAbbr) {
 
 function findTeamRowDetails(html, teamAbbr) {
   for (const table of tablesFromHtml(html)) {
-    const headerMatch = table.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
+    const tableRows = closedBlocks(table, ROW_BLOCK, ROW_CLOSE);
+    const headerMatch = tableRows[0];
     const headers = headerMatch ? cellsFromRow(headerMatch[1]) : [];
-    for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    for (const row of tableRows) {
       const cells = cellsFromRow(row[1]);
       if (cells.some(cell => matchesTeamName(cell, teamAbbr))) {
         const metrics = {};
@@ -244,7 +266,7 @@ export function parseFanGraphsAggregateWarHtml(
   const parseRows = html => {
     const rows = new Map();
     for (const table of tablesFromHtml(html)) {
-      const matches = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+      const matches = closedBlocks(table, ROW_BLOCK, ROW_CLOSE);
       if (!matches.length) continue;
       const headers = cellsFromRow(matches[0][1]);
       const teamIndex = headers.findIndex(
@@ -291,7 +313,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
   const teams = [];
   const seen = new Set();
   const strip = value => String(value || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
@@ -302,7 +324,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
   // with their data cells.
   const expandedCells = (rowHtml, transform) => {
     const out = [];
-    for (const match of rowHtml.matchAll(/<t([dh])([^>]*)>([\s\S]*?)<\/t[dh]>/gi)) {
+    for (const match of closedBlocks(rowHtml, CELL_WITH_ATTRS_BLOCK, CELL_CLOSE)) {
       const span = Math.min(
         Math.max(Number((match[2].match(/colspan\s*=\s*["']?(\d+)/i) || [])[1]) || 1, 1),
         20
@@ -312,9 +334,9 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
     }
     return out;
   };
-  const tables = [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)].map(match => match[1]);
+  const tables = tablesFromHtml(html);
   for (const tableHtml of tables) {
-    const rows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+    const rows = closedBlocks(tableHtml, ROW_BLOCK, ROW_CLOSE);
     // The real header row is the one that names a WAR or team column; an
     // over-header row (grouped columns) must not be mistaken for it.
     let headers = [];
@@ -338,7 +360,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
     const pitchingIndex = columnIndex(/^(pitching war|pit war|pwar)$/);
     for (const rowMatch of rows) {
       const rowHtml = rowMatch[1];
-      const teamLink = rowHtml.match(new RegExp(`<a[^>]+href=["']/teams/[^/]+/${season}\\.shtml[^"']*["'][^>]*>([\\s\\S]*?)<\\/a>`, "i"));
+      const teamLink = upToLastClose(rowHtml, ANCHOR_CLOSE).match(new RegExp(`<a[^<>]+href=["']/teams/[^/<>]+/${season}\\.shtml[^"'<>]*["'][^<>]*>([\\s\\S]*?)<\\/a>`, "i"));
       if (!teamLink) continue;
       const team = strip(teamLink[1]);
       if (!team || NON_TEAM_ROW.test(team) || seen.has(team)) continue;
@@ -456,6 +478,15 @@ export async function loadAggregateWar(season) {
   }
   aggregateDailyAttemptDay.set(key, day);
   const request = (async () => {
+    // Baseball-Reference is independent of FanGraphs, so start it now instead of
+    // after FanGraphs finishes: cold-load latency becomes max(FG, BR) rather than
+    // FG + BR. Still exactly one BR request per refresh (it also serves as the
+    // fallback below). The attempt is wrapped so it can never reject: an early BR
+    // failure must not become an unhandled rejection while FanGraphs is pending.
+    const baseballReferenceAttempt = loadBaseballReferenceAggregateWar(season).then(
+      value => value,
+      () => null
+    );
     const [battingResult, pitchingResult] = await Promise.allSettled([
       fetchHtml(AGGREGATE_WAR_URL(season, "bat")),
       fetchHtml(AGGREGATE_WAR_URL(season, "pit")),
@@ -484,8 +515,8 @@ export async function loadAggregateWar(season) {
     );
     const hasRows = parsed.teams.some(team => team.totalWAR != null);
     if (!hasRows) {
-      try {
-        const baseballReference = await loadBaseballReferenceAggregateWar(season);
+      const baseballReference = await baseballReferenceAttempt;
+      if (baseballReference) {
         return {
           ...baseballReference,
           providerSnapshots: {
@@ -493,10 +524,9 @@ export async function loadAggregateWar(season) {
             baseballReference,
           },
         };
-      } catch (fallbackError) {
-        // Preserve the FanGraphs error contract when both providers fail.
-        // The caller will serve an already-cached aggregate snapshot if one exists.
       }
+      // Preserve the FanGraphs error contract when both providers fail.
+      // The caller will serve an already-cached aggregate snapshot if one exists.
       const providerBlocked = [battingResult, pitchingResult].some(
         result => result.status === "rejected" && result.reason?.providerBlocked
       );
@@ -517,12 +547,7 @@ export async function loadAggregateWar(season) {
         );
       throw error;
     }
-    const baseballReferenceResult = await Promise.allSettled([
-      loadBaseballReferenceAggregateWar(season),
-    ]);
-    const baseballReference = baseballReferenceResult[0].status === "fulfilled"
-      ? baseballReferenceResult[0].value
-      : null;
+    const baseballReference = await baseballReferenceAttempt;
     const fanGraphs = {
       found: hasRows,
       season,

@@ -21,7 +21,7 @@ const memoryCache = new Map();
 
 function stripTags(value) {
   return String(value || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&gt;/g, ">")
     .replace(/&lt;/g, "<")
