@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { expect, vi } from "vitest";
 
 // Provider proxy tests must not read shared production durable-cache rows.
 // The application still uses durable caching in development and production.
@@ -9,6 +10,29 @@ const isBrowserTest =
   typeof window !== "undefined" && typeof document !== "undefined";
 
 if (isBrowserTest) {
+  // Testing Library waits 1 s by default for findBy*/waitFor. Mounting a whole page
+  // (Overview, Prospects, App) can take longer than that when CPU is contended
+  // (CI, or a full parallel run on few cores), so a correct test fails at random.
+  // A longer limit costs nothing when the element appears; it only delays a test that
+  // is actually broken. Explicit per-call { timeout } values still win.
+  //
+  // Only files that can use Testing Library pay for loading it (about 90 ms each): any
+  // .jsx test, any file that mentions it, or any file we cannot inspect.
+  let usesTestingLibrary = true;
+  try {
+    const testPath = expect.getState().testPath || "";
+    usesTestingLibrary =
+      !testPath ||
+      testPath.endsWith(".jsx") ||
+      readFileSync(testPath, "utf8").includes("@testing-library");
+  } catch {
+    usesTestingLibrary = true;
+  }
+  if (usesTestingLibrary) {
+    const { configure } = await import("@testing-library/dom");
+    configure({ asyncUtilTimeout: 10_000 });
+  }
+
   // Simulate a fully offline environment for browser tests so fallback-to-static-data
   // code paths remain deterministic.
   global.fetch = vi.fn(() =>
