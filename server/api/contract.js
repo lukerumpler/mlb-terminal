@@ -32,6 +32,14 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { recordCacheOutcome } from "../cache-health";
 import { hasAttemptedProviderToday, utcDayKey } from "./daily-provider-policy.js";
+import { ROW_BLOCK, ROW_CLOSE, TABLE_CLOSE, closedBlocks, firstClosedBlock } from "./html-scan.js";
+
+const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;
+const TBODY_CLOSE = /<\/tbody>/gi;
+const TH_BLOCK = /<th[^<>]*>([\s\S]*?)<\/th>/i;
+const TH_CLOSE = /<\/th>/gi;
+const TD_BLOCK = /<td[^<>]*>([\s\S]*?)<\/td>/gi;
+const TD_CLOSE = /<\/td>/gi;
 
 const SPOTRAC_CONTRACTS_URL = "https://www.spotrac.com/mlb/contracts/";
 const BREF_CONTRACTS_URL =
@@ -221,28 +229,29 @@ export function parseSpotracTable(html, playerName) {
   const normTarget = normalizeName(playerName);
 
   // Extract the #table section
-  const tableMatch = html.match(
-    /<table[^>]*id=["']table["'][^>]*>([\s\S]*?)<\/table>/i
+  const tableMatch = firstClosedBlock(
+    html,
+    /<table[^<>]*id=["']table["'][^<>]*>([\s\S]*?)<\/table>/i,
+    TABLE_CLOSE
   );
   if (!tableMatch) return null;
   const tableHtml = tableMatch[1];
 
   // Extract tbody rows — mirrors: for tr in table.find("tbody").find_all("tr")
-  const tbodyMatch = tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const tbodyMatch = firstClosedBlock(tableHtml, TBODY_BLOCK, TBODY_CLOSE);
   if (!tbodyMatch) return null;
 
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let best = null,
+    bestCandidate = null,
     bestDist = Infinity;
 
-  let rowMatch;
-  while ((rowMatch = rowRegex.exec(tbodyMatch[1])) !== null) {
+  for (const rowMatch of closedBlocks(tbodyMatch[1], ROW_BLOCK, ROW_CLOSE)) {
     const rowHtml = rowMatch[1];
 
     // Python: first_col = tr.find("th") then cols = [td.text for td in tr.find_all("td")]
     // then cols.insert(0, first_col.text) if first_col
-    const thMatch = rowHtml.match(/<th[^>]*>([\s\S]*?)<\/th>/i);
-    const tds = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(m =>
+    const thMatch = firstClosedBlock(rowHtml, TH_BLOCK, TH_CLOSE);
+    const tds = closedBlocks(rowHtml, TD_BLOCK, TD_CLOSE).map(m =>
       stripTags(m[1])
     );
     if (thMatch) tds.unshift(stripTags(thMatch[1])); // rank goes first
@@ -286,31 +295,33 @@ export function parseSpotracTable(html, playerName) {
 export function parseBRefTable(html, playerName) {
   const normTarget = normalizeName(playerName);
 
-  const tableMatch = html.match(
-    /<table[^>]*id=["']largest_contracts["'][^>]*>([\s\S]*?)<\/table>/i
+  const tableMatch = firstClosedBlock(
+    html,
+    /<table[^<>]*id=["']largest_contracts["'][^<>]*>([\s\S]*?)<\/table>/i,
+    TABLE_CLOSE
   );
   if (!tableMatch) return null;
 
-  const tbodyMatch = tableMatch[1].match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const tbodyMatch = firstClosedBlock(tableMatch[1], TBODY_BLOCK, TBODY_CLOSE);
   if (!tbodyMatch) return null;
 
   // Helper: pull a single data-stat field from a row's HTML
   const getStat = (rowHtml, stat) => {
-    const m = rowHtml.match(
+    const m = firstClosedBlock(
+      rowHtml,
       new RegExp(
-        `<td[^>]*data-stat=["']${stat}["'][^>]*>([\\s\\S]*?)<\\/td>`,
+        `<td[^<>]*data-stat=["']${stat}["'][^<>]*>([\\s\\S]*?)<\\/td>`,
         "i"
-      )
+      ),
+      TD_CLOSE
     );
     return m ? stripTags(m[1]) : "";
   };
 
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let best = null,
     bestDist = Infinity;
 
-  let rowMatch;
-  while ((rowMatch = rowRegex.exec(tbodyMatch[1])) !== null) {
+  for (const rowMatch of closedBlocks(tbodyMatch[1], ROW_BLOCK, ROW_CLOSE)) {
     const rowHtml = rowMatch[1];
 
     // Python: player_td = tr.find("td", {"data-stat": "player"})

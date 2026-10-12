@@ -1035,7 +1035,7 @@ function LeaguePage() {
     standings,
     source: 'MLB Stats API',
     retrievedAt: standingsRetrievedAt,
-    formatWinPct,
+    formatWinPct: fmtWinPct,
   });
 
   function gameStatusLabel(g) {

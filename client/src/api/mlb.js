@@ -750,7 +750,7 @@ export async function getBaseballReferenceAdvancedSafe(name, season, { mlbId } =
   try {
     const params = new URLSearchParams({ name, season: String(season) });
     if (mlbId != null) params.set('mlbId', String(mlbId));
-    const data = await providerJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
+    const data = await fetchProviderJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
     return { ...normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary'), providerIds: data?.providerIds || {} };
   } catch {
     return unavailable;

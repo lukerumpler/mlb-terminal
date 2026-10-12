@@ -12,6 +12,22 @@ import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { recordCacheOutcome } from "../cache-health";
 import { getRepeaterTier, CBT_SOURCE_URL } from "../../shared/luxuryTax.js";
 import { currentMlbSeason, isSupportedSeason } from "../season.ts";
+import {
+  CELL_BLOCK,
+  CELL_CLOSE,
+  ROW_BLOCK,
+  ROW_CLOSE,
+  TABLE_BLOCK,
+  TABLE_CLOSE,
+  closedBlocks,
+  firstClosedBlock,
+} from "./html-scan.js";
+
+const THEAD_BLOCK = /<thead[^<>]*>([\s\S]*?)<\/thead>/i;
+const THEAD_CLOSE = /<\/thead>/gi;
+const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;
+const TBODY_CLOSE = /<\/tbody>/gi;
+const FIRST_ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/i;
 
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const SPOTRAC_PAYROLL_URL = season =>
@@ -83,20 +99,20 @@ export function parseMoney(value) {
 }
 
 function headerText(tableHtml) {
-  const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || "";
+  const thead = firstClosedBlock(tableHtml, THEAD_BLOCK, THEAD_CLOSE)?.[1] || "";
   const source =
-    thead || tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || "";
-  return [...source.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map(match =>
+    thead || firstClosedBlock(tableHtml, FIRST_ROW_BLOCK, ROW_CLOSE)?.[1] || "";
+  return closedBlocks(source, CELL_BLOCK, CELL_CLOSE).map(match =>
     stripTags(match[1]).toLowerCase()
   );
 }
 
 function tableRows(tableHtml) {
   const tbody =
-    tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)?.[1] || tableHtml;
-  return [...tbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+    firstClosedBlock(tableHtml, TBODY_BLOCK, TBODY_CLOSE)?.[1] || tableHtml;
+  return closedBlocks(tbody, ROW_BLOCK, ROW_CLOSE)
     .map(match =>
-      [...match[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(cell =>
+      closedBlocks(match[1], CELL_BLOCK, CELL_CLOSE).map(cell =>
         stripTags(cell[1])
       )
     )
@@ -104,7 +120,7 @@ function tableRows(tableHtml) {
 }
 
 function findTable(html, predicate) {
-  return [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)]
+  return closedBlocks(html, TABLE_BLOCK, TABLE_CLOSE)
     .map(match => match[0])
     .find(table => predicate(headerText(table)));
 }

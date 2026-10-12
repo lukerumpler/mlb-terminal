@@ -2442,7 +2442,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         offset += pageHeight;
       }
       const safeTeamName = String(team.name || selTeam || 'team').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-      pdf.save(`skip-${safeTeamName}-overview-${SEASON}.pdf`);
+      pdf.save(`skip-${safeTeamName}-overview-${CURRENT_SEASON}.pdf`);
       setPdfExportState('ready');
       window.setTimeout(() => setPdfExportState(current => current === 'ready' ? 'idle' : current), 2200);
     } catch (error) {

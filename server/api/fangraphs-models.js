@@ -4,6 +4,18 @@ import { createHash } from 'node:crypto';
 import { readDurableCache, writeDurableCache } from '../durable-cache';
 import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
 import { currentMlbSeason, isPlausibleSeason } from "../season.ts";
+import {
+  ANCHOR_CLOSE,
+  CELL_BLOCK,
+  CELL_CLOSE,
+  CELL_WITH_ATTRS_BLOCK,
+  ROW_BLOCK,
+  ROW_CLOSE,
+  TABLE_BLOCK,
+  TABLE_CLOSE,
+  closedBlocks,
+  upToLastClose,
+} from "./html-scan.js";
 
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const ODDS_URL = "https://www.fangraphs.com/standings/playoff-odds/fg/mlb";
@@ -94,31 +106,6 @@ function stripTags(value) {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, " ")
     .trim();
-}
-
-// Provider pages are parsed with regexes, so a truncated or garbled response must
-// cost a scan, not a rescan per tag. Two rules keep every pattern linear:
-//  1. opener classes are `[^<>]*` (they never run across another tag), and
-//  2. only text up to the LAST closing tag is searched: an unclosed opener after
-//     it can never match, but would otherwise rescan the whole remainder each time.
-const TABLE_BLOCK = /<table[^<>]*>([\s\S]*?)<\/table>/gi;
-const TABLE_CLOSE = /<\/table>/gi;
-const ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/gi;
-const ROW_CLOSE = /<\/tr>/gi;
-const CELL_BLOCK = /<t[dh][^<>]*>([\s\S]*?)<\/t[dh]>/gi;
-const CELL_WITH_ATTRS_BLOCK = /<t([dh])([^<>]*)>([\s\S]*?)<\/t[dh]>/gi;
-const CELL_CLOSE = /<\/t[dh]>/gi;
-const ANCHOR_CLOSE = /<\/a>/gi;
-
-function upToLastClose(text, closing) {
-  const source = String(text || "");
-  let end = -1;
-  for (const match of source.matchAll(closing)) end = match.index + match[0].length;
-  return end < 0 ? "" : source.slice(0, end);
-}
-
-function closedBlocks(text, pattern, closing) {
-  return [...upToLastClose(text, closing).matchAll(pattern)];
 }
 
 function cellsFromRow(row) {

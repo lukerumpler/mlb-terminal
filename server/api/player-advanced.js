@@ -1,5 +1,6 @@
 import { applyCors } from "./_shared.js";
 import { currentMlbSeason } from "../season.ts";
+import { ANCHOR_CLOSE, upToLastClose } from "./html-scan.js";
 
 const BASE_URL = "https://www.baseball-reference.com/search/search.fcgi";
 const UA =
@@ -41,13 +42,9 @@ function normalizeName(value = "") {
 export function parseBaseballReferenceIdentity(html, targetName) {
   const target = normalizeName(targetName);
   if (!target) return null;
-  // Linear on garbled pages: openers never run across another tag, and only text up
-  // to the last </a> is searched (see upToLastClose in fangraphs-models.js).
+  // Linear on garbled pages (see html-scan.js).
   const linkPattern = new RegExp('<a[^<>]+href="(\\/players\\/[a-z]\\/[^" ]+\\.shtml)"[^<>]*>([\\s\\S]*?)<\\/a>', 'gi');
-  let searchable = "";
-  let lastClose = -1;
-  for (const close of String(html).matchAll(/<\/a>/gi)) lastClose = close.index + close[0].length;
-  if (lastClose > 0) searchable = String(html).slice(0, lastClose);
+  const searchable = upToLastClose(html, ANCHOR_CLOSE);
   let match;
   while ((match = linkPattern.exec(searchable)) !== null) {
     const displayName = cleanText(match[2]);

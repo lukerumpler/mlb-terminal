@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { CELL_BLOCK, CELL_CLOSE, ROW_BLOCK, ROW_CLOSE, TABLE_BLOCK, TABLE_CLOSE, closedBlocks } from "./html-scan.js";
 
 const SOURCE = "PlayoffStatus";
 const SOURCE_URL = "https://www.playoffstatus.com/mlb/mlbpostseasonprob.html";
@@ -32,7 +33,7 @@ function stripTags(value) {
 }
 
 function cellsFromRow(row) {
-  return [...String(row || "").matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+  return closedBlocks(row, CELL_BLOCK, CELL_CLOSE)
     .map(match => stripTags(match[1]));
 }
 
@@ -48,11 +49,11 @@ function parseProviderUpdatedText(html) {
 }
 
 export function parsePlayoffStatusOddsHtml(html, teamAbbr) {
-  const table = [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)]
+  const table = closedBlocks(html, TABLE_BLOCK, TABLE_CLOSE)
     .map(match => match[1])
     .find(candidate => /Wildcard Series|WC Series/i.test(stripTags(candidate)));
   if (!table) return null;
-  for (const row of table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+  for (const row of closedBlocks(table, ROW_BLOCK, ROW_CLOSE)) {
     const cells = cellsFromRow(row[1]);
     if (!cells.length || !cells.some(cell => matchesTeamName(cell, teamAbbr))) continue;
     const playoffOddsDisplay = [...cells].reverse().find(cell => /^(?:>|<)?\s*\d+(?:\.\d+)?%$/i.test(cell.replace(/\s/g, ""))) || null;
