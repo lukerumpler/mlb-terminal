@@ -28,6 +28,8 @@ async function goToProspects(user) {
   await screen.findByText(/Top Prospect Batters/, {}, { timeout: 8000 });
 }
 
+// These render the whole Prospects page; on a slow or loaded runner they need far longer than
+// the 5 s default (they take ~5 s each when idle). Timeouts only; assertions are unchanged.
 describe("Prospects page — merged feature interactions", () => {
   it("renders the compact Farm System Summary score card", async () => {
     const user = userEvent.setup();
@@ -36,7 +38,7 @@ describe("Prospects page — merged feature interactions", () => {
     expect(screen.getByText(/Score model:/)).toBeInTheDocument();
     expect(screen.getByText(/tracked prospects across/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  }, 15000);
+  }, 60_000);
 
   it("opens a scouting card from the batter table and closes it", async () => {
     const user = userEvent.setup();
@@ -53,7 +55,7 @@ describe("Prospects page — merged feature interactions", () => {
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
 
     await user.click(closeBtn);
-  }, 15000);
+  }, 60_000);
 
   it("toggles a watchlist star without crashing and persists to localStorage", async () => {
     const user = userEvent.setup();
@@ -69,7 +71,7 @@ describe("Prospects page — merged feature interactions", () => {
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
     const keys = Object.keys(localStorage);
     expect(keys.some(k => k.toLowerCase().includes("watch"))).toBe(true);
-  });
+  }, 60_000);
 
   it("selects two prospects and opens the Compare tool", async () => {
     const user = userEvent.setup();
@@ -89,7 +91,7 @@ describe("Prospects page — merged feature interactions", () => {
       expect(document.body.textContent).toMatch(/eFV/);
     });
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  }, 15000);
+  }, 60_000);
 
   it("opens the Scatterplot builder", async () => {
     const user = userEvent.setup();
@@ -107,7 +109,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  }, 15000);
+  }, 60_000);
 
   it("colors the Scatterplot builder by a chosen stat (Roadmap #4) without crashing", async () => {
     const user = userEvent.setup();
@@ -144,7 +146,7 @@ describe("Prospects page — merged feature interactions", () => {
     await user.click(pitchersBtn);
     expect(screen.getByText(/Color = position/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  }, 15000);
+  }, 60_000);
 
   it("shows sortable Trend and ETA columns on both batter and pitcher tables (Roadmap #6)", async () => {
     const user = userEvent.setup();
@@ -179,7 +181,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  }, 30000);
+  }, 60_000);
 
   it("filters by level and by watchlist-only without crashing", async () => {
     const user = userEvent.setup();
@@ -195,7 +197,7 @@ describe("Prospects page — merged feature interactions", () => {
     });
     await user.click(watchOnlyBtn);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  }, 15000);
+  }, 60_000);
 
   it("filters by position, age, ETA, and changes the sort order", async () => {
     const user = userEvent.setup();
@@ -224,7 +226,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  });
+  }, 60_000);
 });
 
 describe("Command palette", () => {

@@ -11,6 +11,8 @@ All notable changes to **MLB Terminal** are documented in this file.
 
 ### Fixed
 
+- RSS/Atom parsing in `news.js` and `feed.js` was quadratic on garbled or truncated feeds (a 140 KB feed with stray `<title ` took 4-8 s of event-loop time; 20,000 unclosed `<item>` took 1-3 s). Items and tags are now found with linear scans (shared `html-scan.js`); the same inputs take about 1 ms. A differential test over 4,000 random well-formed RSS/Atom feeds (19,932 items) shows identical output. `feed.js` also drops a repeated item instead of emitting duplicate ids.
+- `prospects.interaction` tests render the whole Prospects page and timed out under load; they now have realistic timeouts (assertions unchanged).
 - With both WAR providers unavailable the efficiency warnings said "blended WAR uses Baseball-Reference only" and "uses FanGraphs only" at once; each is now emitted only when that provider really supplied the number.
 - Baseball-Reference HTTP failures were reported as "FanGraphs returned HTTP ...".
 
