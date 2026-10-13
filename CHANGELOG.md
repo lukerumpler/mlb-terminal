@@ -4,8 +4,19 @@ All notable changes to **MLB Terminal** are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Team WAR no longer goes dark for the whole UTC day after one transient failure.** When both FanGraphs and the Baseball-Reference fallback fail, the aggregate loader may retry (default 3 attempts per UTC day, at least 30 minutes apart; `PROVIDER_RETRY_MAX_PER_DAY` / `PROVIDER_RETRY_MIN_GAP_SECONDS`, `1` restores the old behaviour). A successful refresh and a provider-blocked refresh remain final for the day. See `docs/provider-refresh-policy.md` (this relaxes the documented once-per-day rule for that one path).
+- The browser reuses a stale-local WAR snapshot for 15 minutes after a failed refresh instead of until UTC midnight, so a long-lived tab recovers when the server does.
+
+### Fixed
+
+- With both WAR providers unavailable the efficiency warnings said "blended WAR uses Baseball-Reference only" and "uses FanGraphs only" at once; each is now emitted only when that provider really supplied the number.
+- Baseball-Reference HTTP failures were reported as "FanGraphs returned HTTP ...".
+
 ### Added
 
+- End-to-end test of the real `/api/team-efficiency` handler (stubbed FanGraphs, Baseball-Reference and Spotrac pages): all-up, either WAR provider down, payroll down, both down, request counts and cache reuse, and the retry policy.
 - **Crowd-consensus team WAR** (`server/war-consensus.js`, mirrored in `client/src/lib/warConsensus.js`). Every provider's number is kept as one independent estimate; the headline `war.total` is still their mean, and `war.consensus` now adds each provider's value, the median, min/max, the spread and an agreement grade (`high` within 3 WAR, `moderate` within 6, else `low`; `single-source` and `unavailable` are explicit). `efficiency.range` gives WAR/$100M and $/WAR at the lowest and highest provider WAR, and a `low` grade adds a warning. Pitching WAR is blended across providers; position-player (batting) WAR only when two providers publish a comparable column. The Overview panel and comparison tooltip show agreement, the range and per-component providers. Adding a provider means passing one more source to `buildWarConsensus`.
 - **MLB warehouse**: resumable game and pitch ingestion from the MLB Stats API into MySQL (`pnpm ingest:mlb`), with migration `0005_mlb_warehouse`, atomic game claims, deadlock-safe writes and a bounded read layer. See `docs/MLB_WAREHOUSE.md`.
 - **`GET /api/mlb-warehouse`**: read-only views (`status`, `arsenal`, `pitches`, `game`, `team-games`). Returns a clean 503 `{ available: false }` when the database is not configured or not migrated. No UI calls it yet.

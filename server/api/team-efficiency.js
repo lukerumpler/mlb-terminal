@@ -239,8 +239,10 @@ export function normalizeEfficiencyRecord({ team, season, payrollBasis, financia
     retrievedAt: new Date().toISOString(),
     freshness,
     warnings: [...warnings,
-      ...(blend.fWAR == null ? ["FanGraphs fWAR unavailable; blended WAR uses Baseball-Reference only or is unavailable"] : []),
-      ...(blend.bWAR == null ? ["Baseball-Reference bWAR unavailable; blended WAR uses FanGraphs only or is unavailable"] : []),
+      // Name the missing provider only when the other one really supplied the number;
+      // when neither did, the "Team WAR unavailable" warnings above already say so.
+      ...(blend.fWAR == null && blend.bWAR != null ? ["FanGraphs fWAR unavailable; WAR uses Baseball-Reference only"] : []),
+      ...(blend.bWAR == null && blend.fWAR != null ? ["Baseball-Reference bWAR unavailable; WAR uses FanGraphs only"] : []),
       ...(consensus.agreement === "low" ? [`Provider team WAR differs by ${consensus.total.spread.toFixed(1)}; the blended value is approximate`] : []),
       ...(Number.isFinite(totalWar) && totalWar <= 0 && payrollUsd > 0
         ? ["Total WAR is zero or negative, so a salary-per-WAR ratio is not defined; the WAR values are still shown"]

@@ -2,7 +2,15 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 
 import { createHash } from 'node:crypto';
 import { readDurableCache, writeDurableCache } from '../durable-cache';
-import { hasAttemptedProviderToday, nextUtcMidnightMs, utcDayKey } from './daily-provider-policy.js';
+import {
+  canAttemptProvider,
+  hasAttemptedProviderToday,
+  nextUtcMidnightMs,
+  recordProviderAttempt,
+  secondsUntilNextProviderAttempt,
+  settleProviderAttempt,
+  utcDayKey,
+} from './daily-provider-policy.js';
 import { currentMlbSeason, isPlausibleSeason } from "../season.ts";
 import {
   ANCHOR_CLOSE,
@@ -36,7 +44,7 @@ const aggregateWarInFlight = new Map();
 let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
 const modelDailyAttemptDay = new Map();
-const aggregateDailyAttemptDay = new Map();
+const aggregateAttempts = new Map();
 const TEAM_NAME_ALIASES = {
   ARI: ["Diamondbacks"], ATH: ["Athletics"], ATL: ["Braves"],
   BAL: ["Orioles"], BOS: ["Red Sox"], CHC: ["Cubs"], CIN: ["Reds"],
@@ -64,7 +72,7 @@ export function __resetFanGraphsProviderStateForTests() {
   aggregateWarInFlight.clear();
   modelFailureCooldownUntil.clear();
   modelDailyAttemptDay.clear();
-  aggregateDailyAttemptDay.clear();
+  aggregateAttempts.clear();
   fanGraphsCooldownUntil = 0;
 }
 
@@ -377,7 +385,7 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
 
 async function loadBaseballReferenceAggregateWar(season) {
   const sourceUrl = BASEBALL_REFERENCE_TEAM_WAR_URL(season);
-  const html = await fetchHtml(sourceUrl);
+  const html = await fetchHtml(sourceUrl, "Baseball-Reference");
   const teams = parseBaseballReferenceTeamWarHtml(html, season);
   if (!teams.length) {
     const error = new Error("Baseball-Reference aggregate Team WAR unavailable");
@@ -397,7 +405,7 @@ async function loadBaseballReferenceAggregateWar(season) {
   };
 }
 
-async function fetchHtml(url) {
+async function fetchHtml(url, provider = "FanGraphs") {
   const response = await fetch(url, {
     headers: {
       "User-Agent": UA,
@@ -415,7 +423,7 @@ async function fetchHtml(url) {
       providerBlocked = isFanGraphsProviderBlockedResponse(response.status, body);
     }
     throw Object.assign(
-      new Error(`FanGraphs returned HTTP ${response.status}`),
+      new Error(`${provider} returned HTTP ${response.status}`),
       { status: response.status, retryAfterMs, providerBlocked }
     );
   }
@@ -442,10 +450,13 @@ export async function loadAggregateWar(season) {
   const day = utcDayKey();
   const existing = aggregateWarInFlight.get(key);
   if (existing) return { data: await existing, cache: "COALESCED" };
-  if (hasAttemptedProviderToday(aggregateDailyAttemptDay.get(key), Date.now())) {
+  const attemptState = aggregateAttempts.get(key);
+  if (!canAttemptProvider(attemptState, Date.now())) {
     if (cached) return { data: { ...cached.data, freshness: 'daily-cached' }, cache: 'DAILY' };
     const error = new Error('FanGraphs aggregate daily refresh already attempted');
     error.status = 503;
+    const wait = secondsUntilNextProviderAttempt(attemptState, Date.now());
+    if (wait != null) error.retryAfter = wait;
     throw error;
   }
   if (fanGraphsCooldownUntil > Date.now()) {
@@ -463,7 +474,7 @@ export async function loadAggregateWar(season) {
     error.retryAfter = Math.ceil((fanGraphsCooldownUntil - Date.now()) / 1000);
     throw error;
   }
-  aggregateDailyAttemptDay.set(key, day);
+  aggregateAttempts.set(key, recordProviderAttempt(attemptState, Date.now()));
   const request = (async () => {
     // Baseball-Reference is independent of FanGraphs, so start it now instead of
     // after FanGraphs finishes: cold-load latency becomes max(FG, BR) rather than
@@ -566,6 +577,7 @@ export async function loadAggregateWar(season) {
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
+      aggregateAttempts.set(key, settleProviderAttempt(aggregateAttempts.get(key), "success"));
       const expiresAt = nextUtcMidnightMs();
       const staleExpiresAt = expiresAt + STALE_TTL_MS;
       aggregateWarCache.set(key, {
@@ -583,6 +595,12 @@ export async function loadAggregateWar(season) {
       });
     return { data, cache: "MISS" };
   } catch (error) {
+    // A block (Cloudflare challenge) is final for the day; any other failure may be
+    // retried later within the bounded budget.
+    aggregateAttempts.set(
+      key,
+      settleProviderAttempt(aggregateAttempts.get(key), error.providerBlocked ? "blocked" : "failed")
+    );
     if (cached && cached.staleExpiresAt > Date.now())
       return {
         data: {

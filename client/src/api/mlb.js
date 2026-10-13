@@ -102,6 +102,8 @@ const FANGRAPHS_MODEL_LOCAL_CACHE_KEY = 'skip-fangraphs-model-snapshot-v1';
 const FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY = 'skip-fangraphs-aggregate-snapshot-v1';
 const FANGRAPHS_LOCAL_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
+const STALE_LOCAL_RETRY_MS = 15 * 60_000;
+
 function nextUtcMidnightMs(now = Date.now()) {
   const next = new Date(now);
   next.setUTCHours(24, 0, 0, 0);
@@ -208,7 +210,11 @@ async function fetchProviderJson(url, {
           staleAgeMs: Math.max(0, Date.now() - persistent.savedAt),
           servedAt: new Date().toISOString(),
         };
-        providerJsonCache.set(url, { data: staleData, expiresAt: nextUtcMidnightMs() });
+        // Serve the stale snapshot for a short window, not until UTC midnight: the server
+        // now retries failed WAR refreshes, and a long-lived tab pinned to stale data
+        // until midnight would never see the recovery. The window still stops a failing
+        // provider from being re-requested on every render.
+        providerJsonCache.set(url, { data: staleData, expiresAt: Math.min(nextUtcMidnightMs(), Date.now() + STALE_LOCAL_RETRY_MS) });
         return staleData;
       }
       throw error;
