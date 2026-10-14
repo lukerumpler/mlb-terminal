@@ -33,7 +33,6 @@ const AGGREGATE_WAR_URL = (season, stats) =>
 const BASEBALL_REFERENCE_TEAM_WAR_URL = season =>
   `https://www.baseball-reference.com/leagues/team_compare.cgi?year=${season}&lg=MLB&stat=WAR`;
 const UA = "Mozilla/5.0 (compatible; SKIPBaseball/1.0)";
-const CACHE_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 60 * 60_000;
 const DEFAULT_COOLDOWN_MS = 30_000;
 const FANGRAPHS_FAILURE_COOLDOWN_MS = 15_000;

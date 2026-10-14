@@ -9,13 +9,6 @@ All notable changes to **MLB Terminal** are documented in this file.
 - **Team WAR no longer goes dark for the whole UTC day after one transient failure.** When both FanGraphs and the Baseball-Reference fallback fail, the aggregate loader may retry (default 3 attempts per UTC day, at least 30 minutes apart; `PROVIDER_RETRY_MAX_PER_DAY` / `PROVIDER_RETRY_MIN_GAP_SECONDS`, `1` restores the old behaviour). A successful refresh and a provider-blocked refresh remain final for the day. See `docs/provider-refresh-policy.md` (this relaxes the documented once-per-day rule for that one path).
 - The browser reuses a stale-local WAR snapshot for 15 minutes after a failed refresh instead of until UTC midnight, so a long-lived tab recovers when the server does.
 
-### Fixed
-
-- RSS/Atom parsing in `news.js` and `feed.js` was quadratic on garbled or truncated feeds (a 140 KB feed with stray `<title ` took 4-8 s of event-loop time; 20,000 unclosed `<item>` took 1-3 s). Items and tags are now found with linear scans (shared `html-scan.js`); the same inputs take about 1 ms. A differential test over 4,000 random well-formed RSS/Atom feeds (19,932 items) shows identical output. `feed.js` also drops a repeated item instead of emitting duplicate ids.
-- Test wait limits are set once instead of per test: Testing Library `asyncUtilTimeout` 10 s (`test/setup.js`, only for files that can use Testing Library) and vitest `testTimeout`/`hookTimeout` 30 s. The page-mounting UI tests (Overview, Prospects, App) failed at random on a contended single-core runner because of the 1 s and 5 s defaults; about a dozen scattered per-test overrides were removed. Assertions are unchanged; a test that waits for something that never renders now fails after 10 s instead of 1 s.
-- With both WAR providers unavailable the efficiency warnings said "blended WAR uses Baseball-Reference only" and "uses FanGraphs only" at once; each is now emitted only when that provider really supplied the number.
-- Baseball-Reference HTTP failures were reported as "FanGraphs returned HTTP ...".
-
 ### Added
 
 - End-to-end test of the real `/api/team-efficiency` handler (stubbed FanGraphs, Baseball-Reference and Spotrac pages): all-up, either WAR provider down, payroll down, both down, request counts and cache reuse, and the retry policy.
@@ -41,6 +34,10 @@ All notable changes to **MLB Terminal** are documented in this file.
 
 ### Fixed
 
+- RSS/Atom parsing in `news.js` and `feed.js` was quadratic on garbled or truncated feeds (a 140 KB feed with stray `<title ` took 4-8 s of event-loop time; 20,000 unclosed `<item>` took 1-3 s). Items and tags are now found with linear scans (shared `html-scan.js`); the same inputs take about 1 ms. A differential test over 4,000 random well-formed RSS/Atom feeds (19,932 items) shows identical output. `feed.js` also drops a repeated item instead of emitting duplicate ids.
+- Test wait limits are set once instead of per test: Testing Library `asyncUtilTimeout` 10 s (`test/setup.js`, only for files that can use Testing Library) and vitest `testTimeout`/`hookTimeout` 60 s (the heaviest Prospects test measured 33 s with two CPU hogs on one core, so 30 s was not enough). The page-mounting UI tests (Overview, Prospects, App) failed at random on a contended single-core runner because of the 1 s and 5 s defaults; about a dozen scattered per-test overrides were removed. Assertions are unchanged; a test that waits for something that never renders now fails after 10 s instead of 1 s.
+- With both WAR providers unavailable the efficiency warnings said "blended WAR uses Baseball-Reference only" and "uses FanGraphs only" at once; each is now emitted only when that provider really supplied the number.
+- Baseball-Reference HTTP failures were reported as "FanGraphs returned HTTP ...".
 - Baseball-Reference `oWAR` (offence only) was mapped to batting WAR, but FanGraphs batting WAR is position-player WAR including defense, so the two were not comparable. `oWAR` is now kept separately as `offensiveWAR` and never averaged with FanGraphs batting WAR; batting WAR is read only from a position-player column.
 - With FanGraphs blocked, division and league rows passed the Baseball-Reference row as the FanGraphs side, labelling a bWAR value "fWAR" and claiming a two-source blend. They now report `fWAR: null` and a single-source grade.
 - Durable aggregate-WAR cache key bumped to `aggregate-blended-v3` because parsed Baseball-Reference rows gained fields.
