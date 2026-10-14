@@ -475,14 +475,14 @@ export async function loadAggregateWar(season) {
   }
   aggregateAttempts.set(key, recordProviderAttempt(attemptState, Date.now()));
   const request = (async () => {
-    // Baseball-Reference is independent of FanGraphs, so start it now instead of
-    // after FanGraphs finishes: cold-load latency becomes max(FG, BR) rather than
-    // FG + BR. Still exactly one BR request per refresh (it also serves as the
-    // fallback below). The attempt is wrapped so it can never reject: an early BR
-    // failure must not become an unhandled rejection while FanGraphs is pending.
+    // Baseball-Reference does not depend on FanGraphs, so we ask it right now instead of waiting for FanGraphs to finish.
+    // A cold load then takes as long as the slower website instead of both added together. We still make exactly one
+    // Baseball-Reference request per refresh, because this same request is also our backup further down.
+    // We catch its failure right here, so an error that shows up while FanGraphs is still loading can never become an
+    // unhandled rejection that nobody was waiting for.
     const baseballReferenceAttempt = loadBaseballReferenceAggregateWar(season).then(
-      value => value,
-      () => null
+      value => value,                                                         // It worked, keep the answer
+      () => null                                                              // It failed, keep null instead of an error
     );
     const [battingResult, pitchingResult] = await Promise.allSettled([
       fetchHtml(AGGREGATE_WAR_URL(season, "bat")),

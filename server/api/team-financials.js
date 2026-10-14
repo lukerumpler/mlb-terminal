@@ -23,11 +23,13 @@ import {
   firstClosedBlock,
 } from "./html-scan.js";
 
-const THEAD_BLOCK = /<thead[^<>]*>([\s\S]*?)<\/thead>/i;
-const THEAD_CLOSE = /<\/thead>/gi;
-const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;
-const TBODY_CLOSE = /<\/tbody>/gi;
-const FIRST_ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/i;
+// Patterns for the parts of a table we read here (see html-scan.js for why each one is built this way).
+// A BLOCK pattern finds a whole <tag> ... </tag> piece and a CLOSE pattern finds only the closing tag.
+const THEAD_BLOCK = /<thead[^<>]*>([\s\S]*?)<\/thead>/i;       // The header section of a table
+const THEAD_CLOSE = /<\/thead>/gi;                              // Just the closing header section tag
+const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;       // The body of a table
+const TBODY_CLOSE = /<\/tbody>/gi;                              // Just the closing body tag
+const FIRST_ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/i;        // The first row, used as the header when a table has no header section
 
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const SPOTRAC_PAYROLL_URL = season =>

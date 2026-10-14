@@ -2512,9 +2512,18 @@ export function blendTeamWarRow(fanGraphsRow, baseballReferenceRow) {
   const fDefense = numeric(fanGraphsRow?.defensiveWAR ?? fanGraphsRow?.defenseWAR);
   const bDefense = numeric(baseballReferenceRow?.defensiveWAR ?? baseballReferenceRow?.defenseWAR);
   const defensiveWAR = Number.isFinite(fDefense) && Number.isFinite(bDefense) ? Number(((fDefense + bDefense) / 2).toFixed(1)) : null;
+  // The total is never NaN. If a website's number cannot be read we treat it as missing (null), because the code that
+  // uses this total checks for null with `!= null` and NaN would slip straight through that check.
+  let totalWAR = null;                                                            // Unknown unless at least one website gave a real number
+  if (Number.isFinite(fWAR) && Number.isFinite(bWAR)) {
+    totalWAR = Number(((fWAR + bWAR) / 2).toFixed(1));                            // Both websites, so we average them
+  } else if (Number.isFinite(fWAR)) {
+    totalWAR = fWAR;                                                              // FanGraphs only
+  } else if (Number.isFinite(bWAR)) {
+    totalWAR = bWAR;                                                              // Baseball-Reference only
+  }
   return {
-    // Never NaN: an unparseable provider value is unavailable (null), because callers filter with `!= null`.
-    totalWAR: Number.isFinite(fWAR) && Number.isFinite(bWAR) ? Number(((fWAR + bWAR) / 2).toFixed(1)) : Number.isFinite(fWAR) ? fWAR : Number.isFinite(bWAR) ? bWAR : null,
+    totalWAR,
     fWAR: Number.isFinite(fWAR) ? fWAR : null,
     bWAR: Number.isFinite(bWAR) ? bWAR : null,
     defensiveWAR,

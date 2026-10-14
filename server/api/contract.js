@@ -34,12 +34,14 @@ import { recordCacheOutcome } from "../cache-health";
 import { hasAttemptedProviderToday, utcDayKey } from "./daily-provider-policy.js";
 import { ROW_BLOCK, ROW_CLOSE, TABLE_CLOSE, closedBlocks, firstClosedBlock } from "./html-scan.js";
 
-const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;
-const TBODY_CLOSE = /<\/tbody>/gi;
-const TH_BLOCK = /<th[^<>]*>([\s\S]*?)<\/th>/i;
-const TH_CLOSE = /<\/th>/gi;
-const TD_BLOCK = /<td[^<>]*>([\s\S]*?)<\/td>/gi;
-const TD_CLOSE = /<\/td>/gi;
+// Patterns for the parts of a table we read here (see html-scan.js for why each one is built this way).
+// A BLOCK pattern finds a whole <tag> ... </tag> piece and a CLOSE pattern finds only the closing tag.
+const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;       // The body of a table, we only need the first one
+const TBODY_CLOSE = /<\/tbody>/gi;                              // Just the closing body tag
+const TH_BLOCK = /<th[^<>]*>([\s\S]*?)<\/th>/i;                // A header cell, we only need the first one in a row
+const TH_CLOSE = /<\/th>/gi;                                    // Just the closing header cell tag
+const TD_BLOCK = /<td[^<>]*>([\s\S]*?)<\/td>/gi;               // Every normal cell in a row
+const TD_CLOSE = /<\/td>/gi;                                    // Just the closing cell tag
 
 const SPOTRAC_CONTRACTS_URL = "https://www.spotrac.com/mlb/contracts/";
 const BREF_CONTRACTS_URL =

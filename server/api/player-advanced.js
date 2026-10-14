@@ -42,7 +42,7 @@ function normalizeName(value = "") {
 export function parseBaseballReferenceIdentity(html, targetName) {
   const target = normalizeName(targetName);
   if (!target) return null;
-  // Linear on garbled pages (see html-scan.js).
+  // We only search the part of the page that can still hold a link, so a garbled page cannot slow us down (see html-scan.js)
   const linkPattern = new RegExp('<a[^<>]+href="(\\/players\\/[a-z]\\/[^" ]+\\.shtml)"[^<>]*>([\\s\\S]*?)<\\/a>', 'gi');
   const searchable = upToLastClose(html, ANCHOR_CLOSE);
   let match;
@@ -63,31 +63,47 @@ export function parseBaseballReferenceIdentity(html, targetName) {
   return null;
 }
 
-// A printed stat: optional minus (ASCII hyphen, Unicode minus, en/em dash) then digits.
+// One printed number: an optional minus sign (a hyphen, a real minus sign, or an en or em dash) followed by digits and an optional decimal part
 const SIGNED_NUMBER = "[-\\u2212\\u2013\\u2014]?\\d+(?:\\.\\d+)?";
 
 function escapeRegExp(value) {
+  /*
+  Our "escapeRegExp" is a function that makes plain text safe to put inside a pattern. When we give it:
+                  plain text like "wRC+"
+  it returns to us:
+                  the same text with every special character (like +) marked as ordinary, so the pattern matches the text itself
+  */
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// The summary prints a "<label> <this season> <career>" pair. Takes the first
-// figure. `label` is literal text ("wRC+"), never a pattern: escaping it here is
-// what keeps "+" from turning into "one or more backslashes".
 function currentYearValue(text, label, season) {
+  /*
+  Our "currentYearValue" is a function that reads one stat off the player summary. When we give it:
+                  the cleaned page text, the stat's label ("WAR" or "wRC+"), and the season
+  it returns to us:
+                  the first number after the label (this season's value) together with its season, or null if there is none
+  The summary prints each stat as "label this-season career", so we only accept a label followed by two numbers.
+  The label is plain text and never a pattern. We escape it so the "+" in "wRC+" is not read as "one or more of the
+  letter before it", which is the mistake that kept wRC+ from ever being found.
+  */
   const pattern = new RegExp(
     `(?<![A-Za-z0-9])${escapeRegExp(label)}(?![A-Za-z])\\s*(${SIGNED_NUMBER})\\s+(${SIGNED_NUMBER})`,
     "i"
   );
-  const match = text.match(pattern); // `text` is already cleaned by the caller (once, not per label)
+  const match = text.match(pattern);                                             // The caller already cleaned the page, once for the whole page and not once per label
   if (!match) return null;
   const current = numeric(match[1]);
   return current == null ? null : { value: current, season };
 }
 
-// The player page summary shows the most recent season, so it can only honestly
-// be labeled with that season. For any other requested season the figures are
-// withheld rather than returned under the wrong year.
 export function parseBaseballReferenceAdvanced(html, season, { currentSeason = currentMlbSeason() } = {}) {
+  /*
+  Our "parseBaseballReferenceAdvanced" is a function that reads a player's WAR and wRC+ off a Baseball-Reference page. When we give it:
+                  the page text, the season we want, and (for tests) which season counts as the current one
+  it returns to us:
+                  the numbers and where they came from. The page only shows the most recent season, so for any other
+                  season we hold the numbers back (null) instead of showing them under the wrong year
+  */
   const base = { season, source: "Baseball-Reference player summary" };
   if (Number(season) !== Number(currentSeason)) {
     return {

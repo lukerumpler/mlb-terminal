@@ -13,13 +13,18 @@ export function formatDollarsPerWar(value) {
   return Number.isFinite(amount) ? `${formatMoney(amount, true)}/WAR` : '—';
 }
 
-// Number(null) and Number('') are 0, so a missing WAR would print as a real
-// "0.0". Treat null / undefined / blank strings as unavailable instead.
 function finiteOrNull(value) {
-  if (value == null) return null;
-  if (typeof value === 'string' && value.trim() === '') return null;
+  /*
+  Our "finiteOrNull" is a function that turns a value into a real number, or null when there is no real number. When we give it:
+                  anything (a number, text, null, undefined, blank text)
+  it returns to us:
+                  the number, or null if it is missing or not a real number
+  We need this because JavaScript says Number(null) and Number('') are 0, so a missing WAR would print as a real "0.0".
+  */
+  if (value == null) return null;                                                // Missing
+  if (typeof value === 'string' && value.trim() === '') return null;             // Blank text counts as missing too
   const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return Number.isFinite(number) ? number : null;                                // Text like "n/a" becomes NaN, so we call it missing
 }
 
 export function formatWar(value) {
@@ -65,8 +70,8 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const componentDetail = (label, summary) => summary
     ? `${label} ${formatWar(summary.value)} (${[...new Set(summary.providers)].join(' + ')})`
     : null;
-  // When one component has a consensus and the other does not, say so: a missing
-  // side must read "unavailable", never vanish (or look like zero).
+  // When only one of offense and pitching has a consensus, we still say so for the other one. A missing side has to read
+  // "unavailable", it must never just disappear or look like a zero.
   const consensusParts = [['Off', consensus?.batting], ['Pit', consensus?.pitching]]
     .map(([label, summary]) => componentDetail(label, summary));
   const hasConsensusPart = consensusParts.some(Boolean);
@@ -81,11 +86,18 @@ export function TeamEfficiencyOverviewPanel({ record, loading = false, teamName 
   const rangeDetail = range && finiteOrNull(range.warPer100mLow) != null && finiteOrNull(range.warPer100mHigh) != null
     ? `WAR/$100M ${Number(range.warPer100mLow).toFixed(2)}–${Number(range.warPer100mHigh).toFixed(2)} across sources`
     : null;
-  // "Blended" is only true when both providers contributed; a single-provider
-  // total is that provider's own WAR and must be labeled as such (fWAR != bWAR).
-  const hasFWar = finiteOrNull(record?.war?.fWAR) != null;
-  const hasBWar = finiteOrNull(record?.war?.bWAR) != null;
-  const warLabel = hasFWar && hasBWar ? 'Blended WAR' : hasFWar ? 'fWAR' : hasBWar ? 'bWAR' : 'Team WAR';
+  // The headline can only be called "Blended" when both websites gave a number. With one website it is that website's own
+  // WAR and we have to say which one, because fWAR and bWAR are not the same thing.
+  const hasFWar = finiteOrNull(record?.war?.fWAR) != null;                       // FanGraphs gave a real number
+  const hasBWar = finiteOrNull(record?.war?.bWAR) != null;                       // Baseball-Reference gave a real number
+  let warLabel = 'Team WAR';                                                     // Neither number is known
+  if (hasFWar && hasBWar) {
+    warLabel = 'Blended WAR';                                                    // Both websites, so it really is a blend
+  } else if (hasFWar) {
+    warLabel = 'fWAR';                                                           // FanGraphs only
+  } else if (hasBWar) {
+    warLabel = 'bWAR';                                                           // Baseball-Reference only
+  }
   const hasAnyWar = ['total', 'fWAR', 'bWAR', 'offensive', 'pitching'].some(key => finiteOrNull(record?.war?.[key]) != null);
   const defensiveDetail = finiteOrNull(record?.war?.defensive) != null
     ? `Defensive blend ${formatWar(record.war.defensive)}`
