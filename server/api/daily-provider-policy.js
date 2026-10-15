@@ -40,7 +40,10 @@ export function providerRetryPolicy(env = process.env) {
   };
 }
 
-/** State shape: { day, attempts, lastAttemptAt, outcome: "pending"|"success"|"failed"|"blocked" } */
+/**
+ * State shape: { day, attempts, lastAttemptAt, outcome: "pending"|"success"|"failed"|"partial"|"blocked" }
+ * "partial" means one provider answered and the other did not, so the missing one may be asked again (within the same budget).
+ */
 export function canAttemptProvider(
   state,
   now = Date.now(),
@@ -60,7 +63,10 @@ export function secondsUntilNextProviderAttempt(
   policy = providerRetryPolicy()
 ) {
   if (!state || state.day !== utcDayKey(now)) return 0;
-  if (state.outcome !== "failed" || state.attempts >= policy.maxAttemptsPerDay)
+  if (
+    (state.outcome !== "failed" && state.outcome !== "partial") ||
+    state.attempts >= policy.maxAttemptsPerDay
+  )
     return null;
   return Math.max(
     0,

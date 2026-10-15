@@ -296,3 +296,132 @@ describe("WAR provider retry policy (bounded, never hammering)", () => {
     expect(calls.fg).toBe(before);
   });
 });
+
+// Section: When only Baseball-Reference is missing
+// FanGraphs answered but Baseball-Reference failed once. We should be able to ask Baseball-Reference again (inside the same
+// daily budget and 30 minute gap as any other retry) without ever asking FanGraphs again, because FanGraphs already gave
+// us its data for the day and it is the provider we protect the most.
+
+describe("Baseball-Reference-only backfill (FanGraphs is never reopened)", () => {
+  beforeEach(() =>
+    vi
+      .useFakeTimers({ toFake: ["Date"] })
+      .setSystemTime(new Date("2026-10-12T10:00:00Z"))
+  );
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+  const advance = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
+  const flush = () => __resetTeamEfficiencyStateForTests();      // The per-team 5 minute cache is not what these tests probe
+
+  it("fills in bWAR once Baseball-Reference recovers, without asking FanGraphs again", async () => {
+    modes.br = "http500";                                          // Baseball-Reference fails once, FanGraphs is fine
+    const first = SD((await call("team=SD&season=2026")).body);
+    expect(first.war).toMatchObject({ fWAR: 36, bWAR: null });     // The first answer is FanGraphs alone, as before
+
+    const before = { ...calls };
+    modes.br = "ok";                                               // Baseball-Reference recovers
+    advance(HALF_HOUR + 1000);
+    flush();
+    const second = SD((await call("team=SD&season=2026")).body);
+
+    expect(second.war).toMatchObject({ fWAR: 36, bWAR: 36, provider: "FanGraphs + Baseball-Reference" });
+    expect(second.war.consensus.providerCount).toBe(2);
+    expect(calls.fg).toBe(before.fg);                              // FanGraphs was not asked again
+    expect(calls.br).toBe(before.br + 1);                          // Exactly one more Baseball-Reference request
+  });
+
+  it("does not retry inside the minimum gap", async () => {
+    modes.br = "http500";
+    await call("team=SD&season=2026");
+    const before = calls.br;
+    modes.br = "ok";
+    advance(10 * 60_000);                                          // Only 10 minutes, the gap is 30
+    flush();
+    expect(SD((await call("team=SD&season=2026")).body).war.bWAR).toBeNull();
+    expect(calls.br).toBe(before);
+  });
+
+  it("stops after the daily attempt budget, never touches FanGraphs, and resets on the next UTC day", async () => {
+    modes.br = "http500";                                          // Baseball-Reference stays down all day
+    for (let i = 0; i < 6; i += 1) {
+      await call("team=SD&season=2026");
+      advance(HALF_HOUR + 1000);
+      flush();
+    }
+    // 3 attempts in total (the first refresh plus 2 backfills), and FanGraphs only ever answered the first refresh
+    expect(calls.br).toBe(3);
+    expect(calls.fg).toBe(2);
+
+    vi.setSystemTime(new Date("2026-10-13T00:05:00Z"));            // The next UTC day starts a fresh refresh
+    flush();
+    await call("team=SD&season=2026");
+    expect(calls.fg).toBe(4);
+  });
+
+  it("PROVIDER_RETRY_MAX_PER_DAY=1 turns the backfill off", async () => {
+    vi.stubEnv("PROVIDER_RETRY_MAX_PER_DAY", "1");
+    modes.br = "http500";
+    await call("team=SD&season=2026");
+    const before = calls.br;
+    modes.br = "ok";
+    advance(HALF_HOUR + 1000);
+    flush();
+    expect(SD((await call("team=SD&season=2026")).body).war.bWAR).toBeNull();
+    expect(calls.br).toBe(before);                                 // Strictly once per day, exactly as it used to be
+  });
+
+  it("a recovered backfill is final for the day", async () => {
+    modes.br = "http500";
+    await call("team=SD&season=2026");
+    modes.br = "ok";
+    advance(HALF_HOUR + 1000);
+    flush();
+    await call("team=SD&season=2026");                             // This one fills in bWAR
+    const before = { ...calls };
+    advance(6 * 60 * 60_000);
+    flush();
+    __resetTeamFinancialsStateForTests();
+    expect(SD((await call("team=SD&season=2026")).body).war.bWAR).toBe(36);
+    expect(calls.fg).toBe(before.fg);                              // Nothing more is requested
+    expect(calls.br).toBe(before.br);
+  });
+
+  it("requests that arrive together share one backfill", async () => {
+    modes.br = "http500";
+    await call("team=SD&season=2026");
+    const before = calls.br;
+    modes.br = "ok";
+    advance(HALF_HOUR + 1000);
+    flush();
+    await Promise.all([call("team=SD&season=2026"), call("team=NYY&season=2026"), call("team=SD&season=2026")]);
+    expect(calls.br).toBe(before + 1);                             // Three callers, one Baseball-Reference request
+  });
+
+  it("a Baseball-Reference block in the first refresh is final for the day", async () => {
+    modes.br = "cloudflare";                                       // Baseball-Reference actively blocks us
+    await call("team=SD&season=2026");
+    const before = calls.br;
+    modes.br = "ok";
+    advance(HALF_HOUR + 1000);
+    flush();
+    expect(SD((await call("team=SD&season=2026")).body).war.bWAR).toBeNull();
+    expect(calls.br).toBe(before);                                 // We never retry a block, that would only make it last longer
+  });
+
+  it("a backfill that gets blocked is final for the day too", async () => {
+    modes.br = "http500";                                          // First a plain failure, so a retry is allowed
+    await call("team=SD&season=2026");
+    modes.br = "cloudflare";                                       // Then the retry runs into a block
+    advance(HALF_HOUR + 1000);
+    flush();
+    await call("team=SD&season=2026");
+    const before = calls.br;
+    modes.br = "ok";                                               // Even if it recovers, the budget for the day says stop
+    advance(HALF_HOUR + 1000);
+    flush();
+    expect(SD((await call("team=SD&season=2026")).body).war.bWAR).toBeNull();
+    expect(calls.br).toBe(before);
+  });
+});

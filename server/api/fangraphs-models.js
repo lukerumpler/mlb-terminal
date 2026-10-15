@@ -40,6 +40,7 @@ const modelCache = new Map();
 const modelInFlight = new Map();
 const aggregateWarCache = new Map();
 const aggregateWarInFlight = new Map();
+const aggregateBackfillInFlight = new Map();                                    // A Baseball-Reference-only retry that is running right now
 let fanGraphsCooldownUntil = 0;
 const modelFailureCooldownUntil = new Map();
 const modelDailyAttemptDay = new Map();
@@ -69,6 +70,7 @@ export function __resetFanGraphsProviderStateForTests() {
   modelInFlight.clear();
   aggregateWarCache.clear();
   aggregateWarInFlight.clear();
+  aggregateBackfillInFlight.clear();
   modelFailureCooldownUntil.clear();
   modelDailyAttemptDay.clear();
   aggregateAttempts.clear();
@@ -382,9 +384,9 @@ export function parseBaseballReferenceTeamWarHtml(html, season = currentMlbSeaso
   return teams;
 }
 
-async function loadBaseballReferenceAggregateWar(season) {
+async function loadBaseballReferenceAggregateWar(season, { timeoutMs = 10_000 } = {}) {
   const sourceUrl = BASEBALL_REFERENCE_TEAM_WAR_URL(season);
-  const html = await fetchHtml(sourceUrl, "Baseball-Reference");
+  const html = await fetchHtml(sourceUrl, "Baseball-Reference", timeoutMs);
   const teams = parseBaseballReferenceTeamWarHtml(html, season);
   if (!teams.length) {
     const error = new Error("Baseball-Reference aggregate Team WAR unavailable");
@@ -404,14 +406,14 @@ async function loadBaseballReferenceAggregateWar(season) {
   };
 }
 
-async function fetchHtml(url, provider = "FanGraphs") {
+async function fetchHtml(url, provider = "FanGraphs", timeoutMs = 10_000) {
   const response = await fetch(url, {
     headers: {
       "User-Agent": UA,
       Accept: "text/html,application/xhtml+xml,*/*",
     },
     redirect: "follow",
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
     const retryAfterMs =
@@ -429,11 +431,79 @@ async function fetchHtml(url, provider = "FanGraphs") {
   return response.text();
 }
 
+// Section: Asking only Baseball-Reference again
+// A refresh where FanGraphs answered but Baseball-Reference did not leaves bWAR missing. FanGraphs already gave us its data for
+// the day (and it is the provider we protect the most), so we never ask it again. We only ask Baseball-Reference again,
+// inside the same budget as any other retry (PROVIDER_RETRY_MAX_PER_DAY attempts, PROVIDER_RETRY_MIN_GAP_SECONDS apart).
+
+function baseballReferenceBackfillDue(key, cached) {
+  const snapshots = cached.data?.providerSnapshots;
+  if (!snapshots?.fanGraphs || snapshots.baseballReference) {
+    return false;                                                             // Nothing is missing, or FanGraphs is the one that is missing
+  }
+  if (cached.fromDurable) {
+    return false;                                                             // Another instance made this snapshot, its own budget is not ours to spend
+  }
+  return canAttemptProvider(aggregateAttempts.get(key), Date.now());          // Still inside the daily budget and past the minimum gap
+}
+
+async function backfillBaseballReference(key, season, cached) {
+  /*
+  Our "backfillBaseballReference" is a function that asks Baseball-Reference again for a snapshot that is missing it. When we give it:
+                  the cache key, the season, and the snapshot we already have (it has FanGraphs but not Baseball-Reference)
+  it returns to us:
+                  the snapshot with Baseball-Reference filled in, or the same snapshot if Baseball-Reference is still down
+  */
+  aggregateAttempts.set(key, recordProviderAttempt(aggregateAttempts.get(key), Date.now()));   // Count this attempt and mark it as running
+  let outcome = "partial";                                                    // Still missing unless it works
+  let data = cached.data;
+  try {
+    const baseballReference = await loadBaseballReferenceAggregateWar(season, { timeoutMs: 5_000 });   // A shorter wait, because a visitor is waiting on this
+    data = {
+      ...cached.data,
+      providerSnapshots: { ...cached.data.providerSnapshots, baseballReference },
+      statuses: { ...cached.data.statuses, baseballReference: "live" },
+    };
+    outcome = "success";                                                      // Both providers are in now, so this is final for the day
+    aggregateWarCache.set(key, { ...cached, data });                          // Same freshness as before, it still ends at UTC midnight
+    void writeDurableCache({
+      cacheKey: durableFanGraphsKey(`aggregate-blended-v3:${season}`),
+      source: data.source || "FanGraphs",
+      data,
+      freshUntil: new Date(cached.expiresAt),
+      staleUntil: new Date(cached.staleExpiresAt),
+      lastAttemptDay: utcDayKey(),
+    });
+  } catch (error) {
+    if (error?.providerBlocked) {
+      outcome = "blocked";                                                    // A block is final for the day, retrying it only makes it last longer
+    }
+  }
+  aggregateAttempts.set(key, settleProviderAttempt(aggregateAttempts.get(key), outcome));
+  return data;
+}
+
 export async function loadAggregateWar(season) {
   const key = String(season);
   let cached = aggregateWarCache.get(key);
-  if (cached && cached.expiresAt > Date.now())
+  if (cached && cached.expiresAt > Date.now()) {
+    const backfill = aggregateBackfillInFlight.get(key);                      // Someone is already asking Baseball-Reference again
+    if (backfill) {
+      return { data: await backfill, cache: "COALESCED" };                    // Wait for that one answer instead of asking again
+    }
+    if (baseballReferenceBackfillDue(key, cached)) {
+      const attempt = backfillBaseballReference(key, season, cached);
+      aggregateBackfillInFlight.set(key, attempt);
+      try {
+        return { data: await attempt, cache: "MISS" };                        // We went upstream, so this is not a plain hit
+      } finally {
+        if (aggregateBackfillInFlight.get(key) === attempt) {
+          aggregateBackfillInFlight.delete(key);
+        }
+      }
+    }
     return { data: cached.data, cache: "HIT" };
+  }
   if (process.env.NODE_ENV !== "test" && (!cached || cached.expiresAt <= Date.now())) {
     const durable = await readDurableCache(durableFanGraphsKey(`aggregate-blended-v3:${season}`));
     if (durable) {
@@ -441,6 +511,7 @@ export async function loadAggregateWar(season) {
         data: durable.data,
         expiresAt: new Date(durable.freshUntil).getTime(),
         staleExpiresAt: new Date(durable.staleUntil).getTime(),
+        fromDurable: true,                                                    // Another instance made this one, so we do not retry on its behalf
       };
       aggregateWarCache.set(key, cached);
       if (cached.expiresAt > Date.now()) return { data: cached.data, cache: "DURABLE-HIT" };
@@ -474,6 +545,7 @@ export async function loadAggregateWar(season) {
     throw error;
   }
   aggregateAttempts.set(key, recordProviderAttempt(attemptState, Date.now()));
+  let baseballReferenceBlocked = false;                                       // Did Baseball-Reference actively block us in this refresh?
   const request = (async () => {
     // Baseball-Reference does not depend on FanGraphs, so we ask it right now instead of waiting for FanGraphs to finish.
     // A cold load then takes as long as the slower website instead of both added together. We still make exactly one
@@ -482,7 +554,10 @@ export async function loadAggregateWar(season) {
     // unhandled rejection that nobody was waiting for.
     const baseballReferenceAttempt = loadBaseballReferenceAggregateWar(season).then(
       value => value,                                                         // It worked, keep the answer
-      () => null                                                              // It failed, keep null instead of an error
+      error => {
+        baseballReferenceBlocked = Boolean(error?.providerBlocked);           // Remember if it was a block, a block is final for the day
+        return null;                                                          // It failed, keep null instead of an error
+      }
     );
     const [battingResult, pitchingResult] = await Promise.allSettled([
       fetchHtml(AGGREGATE_WAR_URL(season, "bat")),
@@ -576,7 +651,13 @@ export async function loadAggregateWar(season) {
   aggregateWarInFlight.set(key, request);
   try {
     const data = await request;
-      aggregateAttempts.set(key, settleProviderAttempt(aggregateAttempts.get(key), "success"));
+      // FanGraphs answered but Baseball-Reference did not: we may ask Baseball-Reference again later, unless it blocked us
+      const onlyBaseballReferenceMissing = Boolean(data.providerSnapshots?.fanGraphs) && !data.providerSnapshots?.baseballReference;
+      let outcome = "success";
+      if (onlyBaseballReferenceMissing) {
+        outcome = baseballReferenceBlocked ? "blocked" : "partial";
+      }
+      aggregateAttempts.set(key, settleProviderAttempt(aggregateAttempts.get(key), outcome));
       const expiresAt = nextUtcMidnightMs();
       const staleExpiresAt = expiresAt + STALE_TTL_MS;
       aggregateWarCache.set(key, {
