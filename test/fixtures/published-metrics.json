@@ -1,0 +1,53 @@
+{
+  "note": "Worked examples that appear in published articles, with every input the article states. The engine must reproduce each published figure. These test the formulas, not any provider's database. Tally of what is still missing is in docs/METRICS_ENGINE.md.",
+  "target": { "mlbPlayerSeasons": 5, "haveMlbPlayerSeasons": 1 },
+  "wrcPlus": [
+    {
+      "id": "vogelbach-2022",
+      "level": "MLB player-season",
+      "source": "FanGraphs fantasy article 'The Possibilities and Limitations of wRC+ for Fantasy Managers' (fantasy.fangraphs.com)",
+      "inputs": {
+        "wraa": 14.4,
+        "pa": 461,
+        "lgRPerPa": 0.114,
+        "parkFactor": 0.975,
+        "lgWrc": 10600,
+        "lgPaExPitchers": 91118
+      },
+      "published": 128,
+      "tolerance": 1,
+      "why": "The article prints '~128'; its inputs are rounded (for example 0.114), so the exact result is a little under."
+    },
+    {
+      "id": "sweeney-2017-frontier",
+      "level": "Frontier League player-season (not MLB)",
+      "source": "KRUI article on Frontier League wRC+ leaders (krui.fm)",
+      "inputs": {
+        "wraa": 42.45,
+        "pa": 398,
+        "lgRPerPa": 0.127,
+        "parkFactor": 0.88,
+        "lgWrc": 5561.711,
+        "lgPaExPitchers": 43790
+      },
+      "published": 196,
+      "tolerance": 0.5
+    }
+  ],
+  "fip": [
+    {
+      "id": "crick-2013-milb",
+      "level": "Minor-league season (not MLB)",
+      "source": "MiLB.com article 'What's FIP got to do with it anyway?' (milb.com); the article states its own constant of 3.38",
+      "inputs": {
+        "hrPer9": 0.13,
+        "bbPer9": 5.11,
+        "hbpPer9": 0.13,
+        "kPer9": 12.45,
+        "constant": 3.38
+      },
+      "published": 2.55,
+      "tolerance": 0.005
+    }
+  ]
+}

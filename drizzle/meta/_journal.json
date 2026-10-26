@@ -40,8 +40,22 @@
     {
       "idx": 5,
       "version": "5",
-      "when": 1793024612917,
-      "tag": "0005_groovy_captain_stacy",
+      "when": 1790801991460,
+      "tag": "0005_mlb_warehouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1792744401147,
+      "tag": "0006_mlb_plate_appearances",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1793049141882,
+      "tag": "0007_mlb_season_stat_snapshots",
       "breakpoints": true
     }
   ]
