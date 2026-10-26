@@ -2082,7 +2082,7 @@ function PlayerProfile({ player, derived, boxscoreStatus = 'unavailable', isFavo
     : [['G',s.gamesPlayed],['PA',s.plateAppearances],['AB',s.atBats],
        ['H',s.hits],['2B',s.doubles],['3B',s.triples],
        ['HR',s.homeRuns],['RBI',s.rbi],['R',s.runs],
-       ['BB',s.baseOnBalls],['K',s.strikeOuts],['SB',s.stolenBases],
+       ['BB',s.baseOnBalls],['K',s.strikeOuts],['SB',s.stolenBases],['HBP',s.hitByPitch],['SF',s.sacFlies],
        ['AVG',fmt(s.avg)],['OBP',fmt(s.obp)],['SLG',fmt(s.slg)],['OPS',fmt(s.ops)]];
 
   const dashIfMissing = (v) => (v === null || v === undefined || v === '') ? '—' : v;

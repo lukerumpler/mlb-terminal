@@ -7,6 +7,7 @@ import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerLegacyApiRoutes, legacyApiErrorHandler } from "./api/routes";
 import { scheduledSavantRefresh } from "./api/scheduled-savant-refresh";
+import { scheduledSnapshotStats } from "./api/scheduled-snapshot-stats";
 import { scheduledCacheTelemetryCleanup } from "./api/scheduled-cache-telemetry-cleanup";
 import { registerUptimeMonitorRoutes } from "./api/uptime-monitor";
 
@@ -34,6 +35,7 @@ export async function createApp({
   });
 
   app.post("/api/scheduled/refresh-savant", scheduledSavantRefresh);
+  app.post("/api/scheduled/snapshot-stats", scheduledSnapshotStats);
   app.post("/api/scheduled/cleanup-cache-telemetry", scheduledCacheTelemetryCleanup);
   registerUptimeMonitorRoutes(app);
 

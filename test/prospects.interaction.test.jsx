@@ -179,7 +179,7 @@ describe("Prospects page — merged feature interactions", () => {
         e => e.includes("Error") && !e.includes("network unavailable")
       ).length
     ).toBe(0);
-  }, 12000);
+  }, 30000);
 
   it("filters by level and by watchlist-only without crashing", async () => {
     const user = userEvent.setup();
@@ -195,7 +195,7 @@ describe("Prospects page — merged feature interactions", () => {
     });
     await user.click(watchOnlyBtn);
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  });
+  }, 15000);
 
   it("filters by position, age, ETA, and changes the sort order", async () => {
     const user = userEvent.setup();

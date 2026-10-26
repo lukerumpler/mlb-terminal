@@ -1,10 +1,14 @@
 import {
   boolean,
+  date,
+  datetime,
+  double,
   index,
   int,
   mysqlEnum,
   mysqlTable,
   longtext,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -132,3 +136,98 @@ export const scoutingNotes = mysqlTable("scoutingNotes", {
 
 export type ScoutingNote = typeof scoutingNotes.$inferSelect;
 export type InsertScoutingNote = typeof scoutingNotes.$inferInsert;
+/**
+ * PASTE at the end of drizzle/schema.ts (all imports used here are already
+ * imported at the top of that file: date, datetime, double, index, int,
+ * longtext, mysqlEnum, mysqlTable, primaryKey, varchar).
+ *
+ * One row = the provider's season line for one player, one stat group, one team,
+ * as observed on one UTC day. team_id 0 = the provider's all-teams total row.
+ * Readers must pick the total row OR the team rows, never sum both.
+ * Pitching and hitting columns share the table; the other group's are NULL.
+ */
+export const mlbSeasonStatSnapshots = mysqlTable(
+  "mlb_season_stat_snapshots",
+  {
+    playerId: int("player_id").notNull(),
+    season: int("season").notNull(),
+    statGroup: mysqlEnum("stat_group", ["hitting", "pitching"]).notNull(),
+    teamId: int("team_id").default(0).notNull(),
+    snapshotDate: date("snapshot_date", { mode: "string" }).notNull(),
+    source: varchar("source", { length: 32 }).notNull(),
+    ingestedAt: datetime("ingested_at", { mode: "date", fsp: 3 }).notNull(),
+    sourceUpdatedAt: datetime("source_updated_at", { mode: "date", fsp: 3 }),
+    definitionVersion: int("definition_version").default(1).notNull(),
+    numTeams: int("num_teams"),
+    /** Provider stat object verbatim (JSON text; engine-agnostic on purpose). */
+    rawStat: longtext("raw_stat"),
+    games: int("games"),
+    // hitting
+    plateAppearances: int("plate_appearances"),
+    atBats: int("at_bats"),
+    runs: int("runs"),
+    hits: int("hits"),
+    doubles: int("doubles"),
+    triples: int("triples"),
+    homeRuns: int("home_runs"),
+    rbi: int("rbi"),
+    walks: int("walks"),
+    intentionalWalks: int("intentional_walks"),
+    strikeOuts: int("strike_outs"),
+    stolenBases: int("stolen_bases"),
+    caughtStealing: int("caught_stealing"),
+    hitByPitch: int("hit_by_pitch"),
+    sacFlies: int("sac_flies"),
+    sacBunts: int("sac_bunts"),
+    groundIntoDoublePlay: int("ground_into_double_play"),
+    totalBases: int("total_bases"),
+    avg: double("avg"),
+    obp: double("obp"),
+    slg: double("slg"),
+    ops: double("ops"),
+    // pitching
+    gamesStarted: int("games_started"),
+    wins: int("wins"),
+    losses: int("losses"),
+    outsPitched: int("outs_pitched"),
+    hitsAllowed: int("hits_allowed"),
+    earnedRuns: int("earned_runs"),
+    homeRunsAllowed: int("home_runs_allowed"),
+    walksAllowed: int("walks_allowed"),
+    strikeOutsPitched: int("strike_outs_pitched"),
+    battersFaced: int("batters_faced"),
+    wildPitches: int("wild_pitches"),
+    balks: int("balks"),
+    saves: int("saves"),
+    holds: int("holds"),
+    blownSaves: int("blown_saves"),
+    qualityStarts: int("quality_starts"),
+    inheritedRunners: int("inherited_runners"),
+    inheritedRunnersScored: int("inherited_runners_scored"),
+    era: double("era"),
+    whip: double("whip"),
+  },
+  table => [
+    primaryKey({
+      name: "mlb_season_stat_snapshots_pk",
+      columns: [
+        table.playerId,
+        table.season,
+        table.statGroup,
+        table.teamId,
+        table.snapshotDate,
+        table.source,
+      ],
+    }),
+    index("mlb_snap_date_idx").on(
+      table.season,
+      table.statGroup,
+      table.snapshotDate
+    ),
+    index("mlb_snap_player_idx").on(table.playerId, table.season),
+  ]
+);
+
+export type MlbSeasonStatSnapshot = typeof mlbSeasonStatSnapshots.$inferSelect;
+export type InsertMlbSeasonStatSnapshot =
+  typeof mlbSeasonStatSnapshots.$inferInsert;

@@ -199,3 +199,20 @@ describe("source-safe player video cards", () => {
     expect(loadPlayerPlaylists(660271)).toEqual(playlists);
   });
 });
+
+describe("HBP and sacrifice-fly rollups", () => {
+  it("preserves real zeroes, skips missing values, and returns null when all are missing", () => {
+    expect(deriveTeamPlayerRollups({
+      hitting: [{ stat: { hitByPitch: 2 } }, { stat: { hitByPitch: null } }, { stat: {} }],
+      pitching: [],
+    }).hitByPitch).toBe(2);
+    expect(deriveTeamPlayerRollups({
+      hitting: [{ stat: { hitByPitch: null } }, { stat: {} }],
+      pitching: [],
+    }).hitByPitch).toBeNull();
+    expect(deriveTeamPlayerRollups({
+      hitting: [{ stat: { hitByPitch: 0, sacFlies: 0 } }],
+      pitching: [],
+    })).toMatchObject({ hitByPitch: 0, sacFlies: 0 });
+  });
+});
