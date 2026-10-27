@@ -32,7 +32,7 @@ describe('Padres Operations context', () => {
   });
 
   it('shows verified Petco Park context and a sourced completed-game result after Operations is opened', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Operations' }));
 
     await waitFor(() => expect(screen.getByText(/Petco Park context/)).toBeInTheDocument());

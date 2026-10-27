@@ -25,6 +25,11 @@ describe('App default Team Overview preference', () => {
     vi.restoreAllMocks();
   });
 
+  it('defaults to Milwaukee when no browser preference is saved', async () => {
+    render(<App />);
+    expect(await screen.findByRole('combobox', { name: 'Select team' }, { timeout: 8000 })).toHaveValue('mil');
+  });
+
   it('uses the saved browser preference when the initial Team Overview mounts', async () => {
     window.localStorage.setItem(DEFAULT_TEAM_PREFERENCE_KEY, 'nyy');
     render(<App />);

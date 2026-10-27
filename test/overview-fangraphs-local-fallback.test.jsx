@@ -57,7 +57,7 @@ describe('rendered FanGraphs local fallback', () => {
       return jsonResponse({});
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect((await screen.findAllByText('42.4', {}, { timeout: 8000 })).length).toBeGreaterThanOrEqual(1);
     expect((await screen.findAllByText(/local cached/i, {}, { timeout: 8000 })).length).toBeGreaterThanOrEqual(1);
@@ -81,7 +81,7 @@ describe('rendered FanGraphs local fallback', () => {
       return jsonResponse({});
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect(await screen.findByText('>99%')).toBeInTheDocument();
     expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/PlayoffStatus secondary odds · last verified/i);
@@ -99,7 +99,7 @@ describe('rendered FanGraphs local fallback', () => {
       return jsonResponse({});
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect(await screen.findByText('>99%')).toBeInTheDocument();
     const teamWarCell = screen.getAllByText('Team WAR')
@@ -122,7 +122,7 @@ describe('rendered FanGraphs local fallback', () => {
       return jsonResponse({});
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect((await screen.findAllByText('Unavailable')).length).toBeGreaterThan(0);
     expect(screen.queryByText('51.2')).toBeNull();
@@ -146,7 +146,7 @@ describe('rendered FanGraphs local fallback', () => {
       return jsonResponse({});
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect(await screen.findByText('81–45')).toBeInTheDocument();
     expect(screen.getByText('700')).toBeInTheDocument();
