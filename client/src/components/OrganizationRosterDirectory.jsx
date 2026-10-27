@@ -139,7 +139,7 @@ export default function OrganizationRosterDirectory() {
                   {['Player','Pos','Age','B/T','Roster status','Profile'].map((label, index) => <th key={label} style={{ padding:'8px 9px', textAlign:index === 0 ? 'left' : 'center', borderBottom:`0.5px solid ${C.border}`, color:C.text3, fontSize:9.5, textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</th>)}
                 </tr></thead>
                 <tbody>
-                  {visiblePlayers.slice(0, 150).map(player => {
+                  {visiblePlayers.map(player => {
                     const tone = statusTone(player.rosterStatus);
                     return <tr key={player.id} style={{ borderBottom:`0.5px solid ${C.borderLight}` }}>
                       <td style={{ padding:'8px 9px' }}><div style={{ display:'flex', alignItems:'center', gap:8 }}><TeamLogo abbr={selectedTeam?.abbr} size={18}/><span style={sans({ fontSize:11.5, fontWeight:750, color:C.text })}>{player.name}</span></div></td>
@@ -153,7 +153,6 @@ export default function OrganizationRosterDirectory() {
                 </tbody>
               </table>
             </div>
-            {visiblePlayers.length > 150 && <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.border}`, ...sans({ fontSize:10, color:C.text3 }) }}>Showing the first 150 matches. Refine the directory search to narrow results.</div>}
             {visiblePlayers.length === 0 && <div style={{ padding:'22px 14px', textAlign:'center', ...sans({ fontSize:11, color:C.text3 }) }}>No verified roster record matches this search.</div>}
           </>
         )}
