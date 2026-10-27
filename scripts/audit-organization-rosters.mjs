@@ -24,6 +24,7 @@ async function auditOrganization(organization) {
         ok: response.ok && validIds.size > 0,
         rosterRecords: records.length,
         uniquePlayerIds: validIds.size,
+        duplicateRecords: records.length - validIds.size,
         latencyMs: Math.round(performance.now() - startedAt),
         attempts: attempt,
       };
@@ -63,11 +64,12 @@ const report = {
   organizationsAvailable: results.filter(result => result.ok).length,
   aggregateRosterRecords: results.reduce((sum, result) => sum + result.rosterRecords, 0),
   aggregateUniquePlayerIdsByOrganization: results.reduce((sum, result) => sum + result.uniquePlayerIds, 0),
+  organizationsWithDuplicateRecords: results.filter(result => result.duplicateRecords > 0).map(result => result.organization),
   failures: results.filter(result => !result.ok),
   results,
 };
 
-const outputDirectory = resolve(process.cwd(), 'artifacts');
+const outputDirectory = resolve(process.env.AUDIT_OUTPUT_DIR || resolve(process.cwd(), 'artifacts'));
 await mkdir(outputDirectory, { recursive: true });
 const outputPath = resolve(outputDirectory, 'organization-roster-api-audit.json');
 await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);

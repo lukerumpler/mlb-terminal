@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS } from '../constants/data.js';
 import { getAllOrganizationRosters, getOrganizationRoster } from '../api/mlb.js';
@@ -6,14 +6,17 @@ import TeamLogo from './TeamLogo.jsx';
 import { Panel, SkeletonRows } from './atoms.jsx';
 import { openPlayerProfile } from '../lib/navigation.js';
 
+export const ROSTER_PAGE_SIZE = 100;
+
 function normalize(value) {
   return String(value || '').toLocaleLowerCase('en-US').trim();
 }
 
-function statusTone(status = '') {
+// Order matters: "Inactive" contains "active", so negative states are checked first.
+export function statusTone(status = '') {
   const value = normalize(status);
-  if (value.includes('active')) return { color: C.teal, background: C.tealSoft };
   if (value.includes('injured') || value.includes('inactive')) return { color: C.rust, background: `color-mix(in srgb, ${C.rust} 10%, transparent)` };
+  if (value.includes('active')) return { color: C.teal, background: C.tealSoft };
   return { color: C.slate, background: C.surface3 };
 }
 
@@ -34,6 +37,11 @@ export default function OrganizationRosterDirectory() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [failures, setFailures] = useState([]);
   const [error, setError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(ROSTER_PAGE_SIZE);
+  const [statusFilter, setStatusFilter] = useState('all');
+  // Teams we've already tried to auto-load. Without this, a failed request
+  // re-triggers the auto-load effect forever once loadingKey clears.
+  const attemptedRef = useRef(new Set());
 
   const selectedTeam = teams.find(team => team.key === selectedKey) || teams[0];
   const selectedRecord = selectedTeam ? recordsByOrganization[selectedTeam.key] : null;
@@ -42,6 +50,7 @@ export default function OrganizationRosterDirectory() {
 
   const loadTeam = useCallback(async team => {
     if (!team || loadingKey || bulkLoading) return;
+    attemptedRef.current.add(team.key);
     setError('');
     setLoadingKey(team.key);
     try {
@@ -56,7 +65,7 @@ export default function OrganizationRosterDirectory() {
   }, [bulkLoading, loadingKey]);
 
   useEffect(() => {
-    if (selectedTeam && !recordsByOrganization[selectedTeam.key] && !loadingKey && !bulkLoading) {
+    if (selectedTeam && !recordsByOrganization[selectedTeam.key] && !attemptedRef.current.has(selectedTeam.key) && !loadingKey && !bulkLoading) {
       void loadTeam(selectedTeam);
     }
   }, [selectedTeam, recordsByOrganization, loadingKey, bulkLoading, loadTeam]);
@@ -67,6 +76,7 @@ export default function OrganizationRosterDirectory() {
     setBulkLoading(true);
     try {
       const result = await getAllOrganizationRosters(teams);
+      Object.keys(result.byOrganization).forEach(key => attemptedRef.current.add(key));
       setRecordsByOrganization(previous => ({ ...previous, ...result.byOrganization }));
       setFailures(result.failures);
       if (result.failures.length) setError(`${result.failures.length} official roster${result.failures.length === 1 ? '' : 's'} could not be loaded. Select an organization and retry it.`);
@@ -79,11 +89,27 @@ export default function OrganizationRosterDirectory() {
 
   const visiblePlayers = useMemo(() => {
     const term = normalize(query);
-    const players = selectedRecord?.players || [];
+    const players = (selectedRecord?.players || []).filter(player => statusFilter === 'all' || player.rosterStatus === statusFilter);
     if (!term) return players;
     return players.filter(player => [player.name, player.position, player.rosterStatus, player.currentTeamName]
       .some(value => normalize(value).includes(term)));
-  }, [query, selectedRecord]);
+  }, [query, selectedRecord, statusFilter]);
+
+  // Status options come from the loaded roster itself, with counts, so the
+  // filter never offers a status the official feed did not return.
+  const statusOptions = useMemo(() => {
+    const counts = new Map();
+    (selectedRecord?.players || []).forEach(player => counts.set(player.rosterStatus, (counts.get(player.rosterStatus) || 0) + 1));
+    return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  }, [selectedRecord]);
+
+  // Start from the first page whenever the team or search changes.
+  useEffect(() => { setVisibleCount(ROSTER_PAGE_SIZE); }, [selectedKey, query, statusFilter]);
+  useEffect(() => { setStatusFilter('all'); }, [selectedKey]);
+
+  const shownPlayers = visiblePlayers.slice(0, visibleCount);
+  const hiddenCount = Math.max(0, visiblePlayers.length - shownPlayers.length);
+  const selectedFailed = Boolean(selectedTeam && !selectedRecord && loadingKey !== selectedTeam.key && !bulkLoading && attemptedRef.current.has(selectedTeam.key));
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -101,8 +127,9 @@ export default function OrganizationRosterDirectory() {
 
           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
             <label style={{ display:'flex', alignItems:'center', gap:7, minWidth:220, flex:'1 1 250px' }}>
+              <TeamLogo abbr={selectedTeam?.abbr} size={22} />
               <span style={sans({ fontSize:10, fontWeight:800, color:C.text3, textTransform:'uppercase', letterSpacing:'.06em' })}>Organization</span>
-              <select aria-label="Organization roster" value={selectedTeam?.key || ''} onChange={event => setSelectedKey(event.target.value)} style={{ flex:1, padding:'7px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5 }}>
+              <select aria-label="Organization roster" value={selectedTeam?.key || ''} onChange={event => { setError(''); setSelectedKey(event.target.value); }} style={{ flex:1, padding:'7px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5 }}>
                 {teams.map(team => <option key={team.key} value={team.key}>{team.abbr} · {team.name}</option>)}
               </select>
             </label>
@@ -128,21 +155,26 @@ export default function OrganizationRosterDirectory() {
       <Panel title={`${selectedTeam?.name || 'Organization'} roster`} accent={selectedTeam?.color || C.teal} badge={selectedRecord ? `${selectedRecord.players.length} verified players` : 'Official source'}>
         <div style={{ padding:'10px 14px', borderBottom:`0.5px solid ${C.border}`, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           <input aria-label="Search selected organization roster" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a player, position, or roster status" style={{ flex:'1 1 260px', padding:'7px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface2, color:C.text, fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:11 }} />
+          <select aria-label="Filter roster by status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)} disabled={!selectedRecord} style={{ padding:'7px 9px', borderRadius:6, border:`0.5px solid ${C.border}`, background:C.surface, color:C.text, fontFamily:"'DM Mono',monospace", fontSize:10.5 }}>
+            <option value="all">All statuses ({selectedRecord?.players.length || 0})</option>
+            {statusOptions.map(([status, count]) => <option key={status} value={status}>{status} ({count})</option>)}
+          </select>
           <span style={sans({ fontSize:10.5, color:C.text3 })}>{visiblePlayers.length} match{visiblePlayers.length === 1 ? '' : 'es'}</span>
         </div>
-        {!selectedRecord && <SkeletonRows rows={6} />}
+        {!selectedRecord && !selectedFailed && <SkeletonRows rows={6} />}
+        {selectedFailed && <div style={{ padding:'22px 14px', textAlign:'center', ...sans({ fontSize:11, color:C.text3 }) }}>The {selectedTeam.name} roster did not load. Use “Refresh team” to retry.</div>}
         {selectedRecord && (
           <>
             <div className="skip-long-table">
-              <table style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
+              <table aria-label={`${selectedTeam?.name || 'Organization'} official roster`} style={{ width:'100%', borderCollapse:'collapse', minWidth:760 }}>
                 <thead><tr style={{ background:C.surface2 }}>
                   {['Player','Pos','Age','B/T','Roster status','Profile'].map((label, index) => <th key={label} style={{ padding:'8px 9px', textAlign:index === 0 ? 'left' : 'center', borderBottom:`0.5px solid ${C.border}`, color:C.text3, fontSize:9.5, textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</th>)}
                 </tr></thead>
                 <tbody>
-                  {visiblePlayers.map(player => {
+                  {shownPlayers.map(player => {
                     const tone = statusTone(player.rosterStatus);
-                    return <tr key={player.id} style={{ borderBottom:`0.5px solid ${C.borderLight}` }}>
-                      <td style={{ padding:'8px 9px' }}><div style={{ display:'flex', alignItems:'center', gap:8 }}><TeamLogo abbr={selectedTeam?.abbr} size={18}/><span style={sans({ fontSize:11.5, fontWeight:750, color:C.text })}>{player.name}</span></div></td>
+                    return <tr key={`${selectedTeam?.key}-${player.id}`} style={{ borderBottom:`0.5px solid ${C.borderLight}` }}>
+                      <td style={{ padding:'8px 9px' }}><div style={{ display:'flex', alignItems:'center', gap:8 }}><span style={sans({ fontSize:11.5, fontWeight:750, color:C.text })}>{player.name}</span></div></td>
                       <td style={{ padding:'8px 9px', textAlign:'center', ...px({ fontSize:10.5, fontWeight:800, color:C.text2 }) }}>{player.position}</td>
                       <td style={{ padding:'8px 9px', textAlign:'center', ...px({ fontSize:10.5, color:C.text2 }) }}>{player.age ?? '—'}</td>
                       <td style={{ padding:'8px 9px', textAlign:'center', ...px({ fontSize:10.5, color:C.text2 }) }}>{player.bats || '—'}/{player.throws || '—'}</td>
@@ -153,6 +185,11 @@ export default function OrganizationRosterDirectory() {
                 </tbody>
               </table>
             </div>
+            {visiblePlayers.length > 0 && <div style={{ padding:'8px 14px', borderTop:`0.5px solid ${C.border}`, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', ...sans({ fontSize:10, color:C.text3 }) }}>
+              <span data-testid="roster-showing">Showing {shownPlayers.length} of {visiblePlayers.length}</span>
+              {hiddenCount > 0 && <button type="button" onClick={() => setVisibleCount(count => count + ROSTER_PAGE_SIZE)} style={{ cursor:'pointer', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.teal, padding:'3px 8px', ...sans({ fontSize:9.5, fontWeight:800 }) }}>Show {Math.min(ROSTER_PAGE_SIZE, hiddenCount)} more</button>}
+              {hiddenCount > 0 && <button type="button" onClick={() => setVisibleCount(visiblePlayers.length)} style={{ cursor:'pointer', border:`0.5px solid ${C.border}`, borderRadius:5, background:C.surface2, color:C.teal, padding:'3px 8px', ...sans({ fontSize:9.5, fontWeight:800 }) }}>Show all {visiblePlayers.length}</button>}
+            </div>}
             {visiblePlayers.length === 0 && <div style={{ padding:'22px 14px', textAlign:'center', ...sans({ fontSize:11, color:C.text3 }) }}>No verified roster record matches this search.</div>}
           </>
         )}

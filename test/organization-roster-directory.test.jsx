@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import OrganizationRosterDirectory from '../client/src/components/OrganizationRosterDirectory.jsx';
 import { getOrganizationRoster } from '../client/src/api/mlb.js';
 
@@ -17,7 +17,7 @@ describe('OrganizationRosterDirectory', () => {
 
   afterEach(() => cleanup());
 
-  it('renders the full roster response instead of silently stopping at 150 players', async () => {
+  it('pages the full roster response and can reveal every player instead of stopping at 150', async () => {
     const players = Array.from({ length: 200 }, (_, index) => ({
       id: index + 1,
       name: `Player ${String(index + 1).padStart(3, '0')}`,
@@ -34,6 +34,12 @@ describe('OrganizationRosterDirectory', () => {
     });
 
     render(<OrganizationRosterDirectory />);
+
+    expect(await screen.findByTestId('roster-showing')).toHaveTextContent('Showing 100 of 200');
+    expect(screen.queryByText('Player 200')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(101);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 200' }));
 
     expect(await screen.findByText('Player 200')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(201);
