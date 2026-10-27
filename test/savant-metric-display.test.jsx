@@ -23,7 +23,7 @@ describe('Savant metric display and source badge separation', () => {
     }));
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok:true, status:200, headers:{ get:() => null }, json:async()=>({}), text:async()=>JSON.stringify({}) })));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(await screen.findByText('cached 2h ago')).toBeInTheDocument();
   });
 
@@ -35,7 +35,7 @@ describe('Savant metric display and source badge separation', () => {
     localStorage.setItem('skip-team-savant-against-cache-v1', JSON.stringify({ '2026:SD': { updatedAt, data:[] } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await screen.findByText('cached 2h ago');
     const beforeRetry = fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/savant')).length;
     fireEvent(window, new CustomEvent('skip-provider-retry', { detail:{ provider:'savant' } }));
@@ -54,7 +54,7 @@ describe('Savant metric display and source badge separation', () => {
       }))
     );
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     
     const xwobaLabel = await screen.findByText(/xwOBA/i);
     expect(xwobaLabel).toBeInTheDocument();

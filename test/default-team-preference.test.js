@@ -10,10 +10,11 @@ import {
 describe('default Team Overview preference', () => {
   beforeEach(() => window.localStorage.clear());
 
-  it('keeps San Diego as the product fallback while accepting valid saved team keys', () => {
-    expect(PRODUCT_DEFAULT_TEAM_KEY).toBe('sd');
+  it('uses Milwaukee as the product fallback while accepting valid saved team keys', () => {
+    expect(PRODUCT_DEFAULT_TEAM_KEY).toBe('mil');
     expect(normalizeDefaultTeamKey('SD')).toBe('sd');
-    expect(normalizeDefaultTeamKey('not-a-team')).toBe('sd');
+    expect(normalizeDefaultTeamKey('not-a-team')).toBe('mil');
+    expect(readDefaultTeamPreference()).toBe('mil');
     window.localStorage.setItem(DEFAULT_TEAM_PREFERENCE_KEY, 'lad');
     expect(readDefaultTeamPreference()).toBe('lad');
   });

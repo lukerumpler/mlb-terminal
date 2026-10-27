@@ -23,7 +23,7 @@ describe('MLB parent team selection routing', () => {
       }))
     );
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     const heading = await screen.findByText(/Season overview/i);
     expect(heading).toBeInTheDocument();
     expect(screen.queryByText(/Minor-League Affiliate Overview/i)).not.toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('MLB parent team selection routing', () => {
       }))
     );
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     const teamSelect = await screen.findByRole('combobox', { name: 'Select team' });
     const minorLeagueButton = screen.getByRole('button', { name: /minor league/i });
 
@@ -91,7 +91,7 @@ describe('MLB parent team selection routing', () => {
       }))
     );
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await screen.findByRole('button', { name: /minor league/i });
     expect(screen.queryByRole('combobox', { name: 'Select minor league affiliate' })).not.toBeInTheDocument();
 
@@ -112,7 +112,7 @@ describe('MLB parent team selection routing', () => {
       json: async () => ({ teams: [] }),
       text: async () => JSON.stringify({}),
     })));
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await screen.findByRole('button', { name: /minor league/i });
 
     fireEvent(window, new CustomEvent('skip-select-affiliate', {

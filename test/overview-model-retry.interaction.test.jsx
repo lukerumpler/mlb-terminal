@@ -159,7 +159,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("shows a page-shaped Team Overview skeleton during the initial aggregate fetch", async () => {
     localStorage.clear();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(
       screen.getByRole("status", { name: "Loading team overview" })
     ).toHaveAttribute("aria-busy", "true");
@@ -171,7 +171,7 @@ describe("Team Overview model source and retry interaction", () => {
   });
 
   it("removes the visible Sources control while preserving inline source context", async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(
       screen.queryByRole("button", { name: "Open source provenance" })
     ).not.toBeInTheDocument();
@@ -210,7 +210,7 @@ describe("Team Overview model source and retry interaction", () => {
       hitting: [{ id: 1, name: "Cached hitter" }],
       pitching: [{ id: 2, name: "Cached pitcher" }],
     });
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await waitFor(() =>
       expect(
         screen.getByText("Season overview", { exact: false })
@@ -223,7 +223,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("does not re-request the global daily schedule when the selected team changes", async () => {
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await waitFor(() => expect(mlbApi.getTodaysGames).toHaveBeenCalledTimes(1));
 
     await user.selectOptions(
@@ -241,7 +241,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("keeps an explicit official-schedule panel visible when MLB returns no games", async () => {
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await user.click(screen.getByRole("button", { name: "Operations" }));
     expect(await screen.findByText("Today's Schedule")).toBeInTheDocument();
@@ -251,7 +251,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("commits available aggregate data when one provider fails instead of waiting for all feeds", async () => {
     partialAggregate = true;
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect((await screen.findAllByText(".802", { exact: false })).length).toBeGreaterThan(0);
     await waitFor(() => expect(mlbApi.getAllTeamStats).toHaveBeenCalledWith("pitching"));
     expect(screen.queryByRole("status", { name: "Loading team overview" })).not.toBeInTheDocument();
@@ -259,7 +259,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("updates the roster sort when quick filters are clicked", async () => {
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await user.click(screen.getByRole("button", { name: "Roster" }));
     const sortSelect = screen.getByRole("combobox", {
       name: "Sort roster insights by player statistic",
@@ -284,7 +284,7 @@ describe("Team Overview model source and retry interaction", () => {
       ],
       pitching: [],
     });
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await user.click(screen.getByRole("button", { name: "Roster" }));
 
     const table = await screen.findByRole("table", {
@@ -308,7 +308,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("shows explicit loading states for Batted Ball Profile and Pitch Arsenal while Savant is pending", async () => {
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -320,7 +320,7 @@ describe("Team Overview model source and retry interaction", () => {
   it("renders verified team spray and opponent contact-quality rollups when Savant returns rows", async () => {
     savantMode = "ready";
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(
       await screen.findByRole("img", {
         name: "Verified Baseball Savant batted-ball spray coordinates",
@@ -335,7 +335,7 @@ describe("Team Overview model source and retry interaction", () => {
   it("shows explicit unavailable states when Savant returns no verified rows", async () => {
     savantMode = "empty";
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(
       await screen.findByText("Team batted-ball rows")
     ).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe("Team Overview model source and retry interaction", () => {
   it("leaves model panels in explicit unavailable state after a FanGraphs 502", async () => {
     modelMode = "502";
     const user = userEvent.setup();
-    const { container } = render(<OverviewPage />);
+    const { container } = render(<OverviewPage defaultTeamKey="sd" />);
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
     );
@@ -382,7 +382,7 @@ describe("Team Overview model source and retry interaction", () => {
       status: "live",
     });
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(await screen.findByText(/div avg/)).toBeInTheDocument();
   });
 
@@ -407,7 +407,7 @@ describe("Team Overview model source and retry interaction", () => {
       ],
     });
     const user = userEvent.setup();
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     expect(await screen.findByText("2 teams")).toBeInTheDocument();
     expect(screen.getByText(/SD highlighted/i)).toBeInTheDocument();
@@ -419,7 +419,7 @@ describe("Team Overview model source and retry interaction", () => {
 
   it("shows explicit unavailable model states, exposes retry, and recovers MLB data without refreshing FanGraphs", async () => {
     const user = userEvent.setup();
-    const { container } = render(<OverviewPage />);
+    const { container } = render(<OverviewPage defaultTeamKey="sd" />);
 
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Model source:\s*FanGraphs/)
