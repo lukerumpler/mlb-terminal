@@ -26,7 +26,7 @@ jobs:
       DATABASE_URL: mysql://migration_check:migration_check@127.0.0.1:3306/migration_check
     steps:
       - name: Check out proposed revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
       BUILT_IN_FORGE_API_KEY: test-only-key
     steps:
       - name: Check out proposed revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
