@@ -1,6 +1,6 @@
 # Data repair and UI optimization verification
 
-Desktop Overview verification shows the live aggregate status returning to `LIVE MLB DATA` when the MLB Stats API resolves. Team W-L, win percentage, runs scored, runs allowed, run differential, OPS, home runs, ERA, WHIP, batting average, strikeouts, stolen bases, leaders, front-office evaluation, and the strength radar render with source-backed values. The Team Leaders panel clearly identifies a cached roster snapshot with an age label rather than presenting stale values as live.
+Desktop Overview verification shows the live aggregate status returning to `LIVE MLB DATA` when the MLB Stats API resolves. Team W-L, win percentage, runs scored, runs allowed, run differential, OPS, home runs, ERA, WHIP, batting average, strikeouts, stolen bases, leaders, front-office evaluation, and the strength radar render with source-backed values. The Team Leaders panel labels live or cached leader statistics and shows an age label when results are cached, rather than presenting a roster snapshot.
 
 Unavailable model-dependent values such as Team WAR and playoff odds are now compact dashes with contextual labels/tooltips instead of repeated wrapped `Source gap` text. The overall rating cards use compact dashes for unavailable defense, depth, and future value while preserving the verified offense, pitching, and baserunning grades.
 

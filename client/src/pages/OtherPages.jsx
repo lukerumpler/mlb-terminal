@@ -1926,7 +1926,7 @@ function SettingsPage({ theme, toggleTheme, scoutingMode = false, toggleScouting
         <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:14 }}>
           <div>
             <div style={sans({ fontSize:12.5, fontWeight:700, color:C.text })}>Low Data Mode</div>
-            <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>Skips player video thumbnails and high-resolution headshots while keeping text, statistics, external search links, and PDF exports available.</div>
+            <div style={sans({ fontSize:11, color:C.text3, marginTop:2, lineHeight:1.45 })}>Hides remote team logos, player video thumbnails, and high-resolution headshots while keeping text, statistics, external search links, and PDF exports available.</div>
           </div>
           {toggleLowDataMode && (
             <button type="button" onClick={toggleLowDataMode} role="switch" aria-checked={lowDataMode} aria-label="Toggle Low Data Mode"
