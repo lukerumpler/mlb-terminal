@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const baseUrl = (process.env.VERCEL_SMOKE_BASE_URL ?? "").replace(/\/$/, "");
 const smokeTimeoutMs = Number(process.env.VERCEL_SMOKE_TIMEOUT_MS ?? 15_000);
+const smokeSkipped = process.env.VERCEL_SMOKE_SKIP === "true";
 
 async function fetchSmokePath(path: string) {
   const controller = new AbortController();
@@ -22,7 +23,7 @@ function expectJsonContentType(response: Response) {
   );
 }
 
-describe.skipIf(!baseUrl)("Vercel deployment smoke test", () => {
+describe.skipIf(!baseUrl || smokeSkipped)("Vercel deployment smoke test", () => {
   it("serves the API health contract", async () => {
     const response = await fetchSmokePath("/api/health");
     expect(response.status).toBe(200);
