@@ -39,7 +39,7 @@ describe('MLB-first team loading sequence', () => {
       })
     );
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     expect(screen.getByText(/LOADING MLB TEAM/i)).toBeInTheDocument();
     expect(screen.queryByText('Minor-League Affiliate Overview')).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Select team' })).toHaveValue('sd');
@@ -58,7 +58,7 @@ describe('MLB-first team loading sequence', () => {
       }
       return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => '{}' };
     }));
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: /minor league/i }).every(button => button.getAttribute('aria-expanded') === 'false')).toBe(true);
     });

@@ -38,7 +38,7 @@ describe('OverviewPage Savant retry helper policy', () => {
       '2026:SD': { updatedAt, data:[] },
     }));
 
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
     await screen.findByText('cached 2h ago');
     const before = {
       summary: savantHelpers.getTeamSavantMetrics.mock.calls.length,
