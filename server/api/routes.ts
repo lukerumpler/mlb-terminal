@@ -44,6 +44,8 @@ export async function registerLegacyApiRoutes(app: Express) {
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./team-financials.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./team-efficiency.js"),
+    // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./fangraphs-models.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./intelligence-calculations.js"),
@@ -57,6 +59,9 @@ export async function registerLegacyApiRoutes(app: Express) {
     import("./player-identity.js"),
     // @ts-expect-error JavaScript handler has no separate declaration file.
     import("./lahman.js"),
+    // Read-only MLB warehouse queries; degrades to 503 when no database is configured.
+    // @ts-expect-error JavaScript handler has no separate declaration file.
+    import("./mlb-warehouse.js"),
   ])) as ApiModule[];
 
   const paths = [
@@ -69,6 +74,7 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/comparison-summary",
     "/api/natural-search",
     "/api/team-financials",
+    "/api/team-efficiency",
     "/api/fangraphs-models",
     "/api/intelligence-calculations",
     "/api/playoffstatus-odds",
@@ -76,10 +82,28 @@ export async function registerLegacyApiRoutes(app: Express) {
     "/api/player-advanced",
     "/api/player-identity",
     "/api/lahman",
+    "/api/mlb-warehouse",
   ] as const;
   paths.forEach((path, index) => {
     app.all(path, wrapLegacyHandler(modules[index].default));
   });
+}
+
+function clientErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null;
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    expose?: unknown;
+  };
+  const status = Number(candidate.status ?? candidate.statusCode);
+  // Only 4xx whose message is meant to be shown (http-errors sets expose for 4xx).
+  return Number.isInteger(status) &&
+    status >= 400 &&
+    status < 500 &&
+    candidate.expose !== false
+    ? status
+    : null;
 }
 
 export const legacyApiErrorHandler: ErrorRequestHandler = (
@@ -95,6 +119,16 @@ export const legacyApiErrorHandler: ErrorRequestHandler = (
 
   const message =
     error instanceof Error ? error.message : "Unexpected API proxy error";
+
+  // Client errors raised by middleware (body-parser: 413 entity too large, 400
+  // malformed JSON, ...) carry an http-errors status. Report them as what they
+  // are instead of a 500 "server error" with a stack trace in the logs.
+  const clientStatus = clientErrorStatus(error);
+  if (clientStatus) {
+    res.status(clientStatus).json({ error: message });
+    return;
+  }
+
   console.error("[legacy-api]", error);
   res.status(500).json({ error: message });
 };
@@ -108,6 +142,8 @@ export const legacyApiPaths = [
   "/api/contract",
   "/api/comparison-summary",
   "/api/natural-search",
+  "/api/team-financials",
+  "/api/team-efficiency",
   "/api/playoffstatus-odds",
   "/api/player-advanced",
   "/api/player-identity",

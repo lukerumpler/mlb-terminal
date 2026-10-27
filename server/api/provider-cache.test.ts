@@ -8,6 +8,7 @@ vi.mock('../durable-cache', () => ({ readDurableCache, writeDurableCache }));
 
 import fangraphsHandler, {
   __resetFanGraphsProviderStateForTests,
+  parseBaseballReferenceTeamWarHtml,
 } from "./fangraphs-models.js";
 import savantHandler, { __resetSavantStateForTests } from "./savant.js";
 import ncaaHandler from "./ncaa.js";
@@ -70,6 +71,40 @@ afterEach(() => {
 });
 
 describe("FanGraphs provider cache", () => {
+  it("parses Baseball-Reference team WAR totals", () => {
+    const body = `<table><tr><th>Rk</th><th>Total</th><th>All P</th></tr><tr><td>1</td><td><a href="/teams/SDP/2026.shtml">San Diego Padres</a></td><td>12.4</td><td>7.1</td></tr></table>`;
+    expect(parseBaseballReferenceTeamWarHtml(body, 2026)).toEqual([
+      expect.objectContaining({
+        team: "San Diego Padres",
+        battingWAR: null,
+        pitchingWAR: null,
+        totalWAR: 12.4,
+      }),
+    ]);
+  });
+
+  it("falls back to Baseball-Reference totals when FanGraphs aggregate pages fail", async () => {
+    const baseballReference = `<table><tr><th>Rk</th><th>Total</th><th>All P</th></tr><tr><td>1</td><td><a href="/teams/SDP/2009.shtml">San Diego Padres</a></td><td>12.4</td><td>7.1</td></tr></table>`;
+    // Route by URL, not call order: the Baseball-Reference request now starts in
+    // parallel with FanGraphs, so which call comes first is not part of the contract.
+    const fetchMock = vi.fn(async (input: unknown) => {
+      if (String(input).includes("baseball-reference.com")) return new Response(baseballReference, { status: 200 });
+      throw Object.assign(new Error("FanGraphs blocked"), { status: 403 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = response();
+    await fangraphsHandler(req("/api/fangraphs-models?mode=aggregate&season=2009"), result);
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({
+      found: true,
+      source: "Baseball-Reference",
+      teams: [{ team: "San Diego Padres", totalWAR: 12.4 }],
+      fallback: true,
+      statuses: { teamWar: "fallback-live" },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("coalesces identical model loads and serves the second read from cache", async () => {
     const fetchMock = vi.fn(
       async (url: string) =>
@@ -82,11 +117,11 @@ describe("FanGraphs provider cache", () => {
     const first = response();
     const second = response();
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=TST&season=2099"),
+      req("/api/fangraphs-models?team=TST&season=2009"),
       first
     );
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=TST&season=2099"),
+      req("/api/fangraphs-models?team=TST&season=2009"),
       second
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -102,12 +137,12 @@ describe("FanGraphs provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
     const first = response();
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=LAD&season=2093"),
+      req("/api/fangraphs-models?team=LAD&season=2003"),
       first
     );
     const second = response();
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=LAD&season=2093"),
+      req("/api/fangraphs-models?team=LAD&season=2003"),
       second
     );
     expect(first.statusCode).toBe(502);
@@ -126,9 +161,9 @@ describe("FanGraphs provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const first = response();
-    await fangraphsHandler(req("/api/fangraphs-models?team=AAA&season=2091"), first);
+    await fangraphsHandler(req("/api/fangraphs-models?team=AAA&season=2001"), first);
     const differentKey = response();
-    await fangraphsHandler(req("/api/fangraphs-models?team=BBB&season=2091"), differentKey);
+    await fangraphsHandler(req("/api/fangraphs-models?team=BBB&season=2001"), differentKey);
     expect(first.statusCode).toBe(429);
     expect(differentKey.statusCode).toBe(429);
     expect(differentKey.headers["Retry-After"]).toBeDefined();
@@ -147,16 +182,16 @@ describe("FanGraphs provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const first = response();
-    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), first);
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2007"), first);
     vi.setSystemTime(new Date("2026-08-16T23:59:59.000Z"));
     const sameDay = response();
-    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), sameDay);
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2007"), sameDay);
     expect(sameDay.headers["X-Provider-Cache"]).toBe("HIT");
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     vi.setSystemTime(new Date("2026-08-17T00:00:01.000Z"));
     const nextDay = response();
-    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2097"), nextDay);
+    await fangraphsHandler(req("/api/fangraphs-models?team=DAY&season=2007"), nextDay);
     expect(nextDay.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
@@ -181,13 +216,13 @@ describe("FanGraphs provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
     const seeded = response();
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=STA&season=2098"),
+      req("/api/fangraphs-models?team=STA&season=2008"),
       seeded
     );
     vi.setSystemTime(new Date("2026-08-17T00:00:01.000Z"));
     const stale = response();
     await fangraphsHandler(
-      req("/api/fangraphs-models?team=STA&season=2098"),
+      req("/api/fangraphs-models?team=STA&season=2008"),
       stale
     );
     expect(stale.statusCode).toBe(200);
@@ -228,7 +263,7 @@ describe("Baseball Savant provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
     const first = response();
     const second = response();
-    const url = "/api/savant?endpoint=team_exit_velocity&year=2097&team=TST";
+    const url = "/api/savant?endpoint=team_exit_velocity&year=2013&team=TST";
     await savantHandler(req(url), first);
     await savantHandler(req(url), second);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -258,7 +293,7 @@ describe("Baseball Savant provider cache", () => {
     vi.stubGlobal("fetch", fetchMock);
     const result = response();
     await savantHandler(
-      req("/api/savant?endpoint=team_batted_balls&year=2095&team=LAD"),
+      req("/api/savant?endpoint=team_batted_balls&year=2011&team=LAD"),
       result
     );
     expect(result.statusCode).toBe(200);
@@ -291,7 +326,7 @@ describe("Baseball Savant provider cache", () => {
         Object.assign(new Error("terminated"), { name: "AbortError" })
       );
     vi.stubGlobal("fetch", fetchMock);
-    const url = "/api/savant?endpoint=team_exit_velocity&year=2094&team=LAX";
+    const url = "/api/savant?endpoint=team_exit_velocity&year=2010&team=LAX";
     const first = response();
     await savantHandler(req(url), first);
     vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
@@ -319,7 +354,7 @@ describe("Baseball Savant provider cache", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     const result = response();
-    await savantHandler(req("/api/savant?endpoint=oaa&year=2096"), result);
+    await savantHandler(req("/api/savant?endpoint=oaa&year=2012"), result);
     expect(result.statusCode).toBe(429);
     expect(result.headers["Retry-After"]).toBe("8");
     expect(result.body).toMatchObject({ error: "Savant returned 429" });

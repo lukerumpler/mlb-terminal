@@ -35,6 +35,23 @@ const UPSTREAM_TIMEOUT_MS = {
   default: 12_000,
 };
 
+// WHATWG URL parsing collapses "..", "%2e%2e" and "\" into dot-segments, so a
+// substring check cannot tell whether `${base}${path}` stays under the base
+// path. Resolve it the way fetch will and compare the result instead.
+export function resolvesInsideBase(base, path) {
+  try {
+    const baseUrl = new URL(base);
+    const resolved = new URL(`${base}${path}`);
+    return (
+      resolved.origin === baseUrl.origin &&
+      (resolved.pathname === baseUrl.pathname ||
+        resolved.pathname.startsWith(`${baseUrl.pathname}/`))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getUpstreamTimeoutMs(path) {
   for (const [prefix, timeoutMs] of Object.entries(UPSTREAM_TIMEOUT_MS)) {
     if (prefix !== "default" && path.startsWith(prefix)) return timeoutMs;
@@ -109,7 +126,11 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!path.startsWith("/") || path.includes("://")) {
+  if (
+    !path.startsWith("/") ||
+    path.includes("://") ||
+    !resolvesInsideBase(MLB_BASE, path)
+  ) {
     return res.status(400).json({ error: "Invalid path parameter" });
   }
 

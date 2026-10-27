@@ -12,7 +12,7 @@ import {
   Badge, PosBadge, FVBadge,
   Panel, StatStrip, KVRow, SkeletonRows,
 } from '../components/atoms.jsx';
-import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits, getLeagueTeamsWar, normalizeFanGraphsTeamName } from '../api/mlb.js';
+import { searchAndGetStats, getTodaysGames, getStandings, getAllLeaders, getAllTeamStats, getFirstRoundResults, getCareerSplits, getLeagueTeamsWar, normalizeFanGraphsTeamName, fetchTeamEfficiencyComparison } from '../api/mlb.js';
 import { getScoreboard, getRankings } from '../api/ncaa.js';
 import { fmt, fmtScorebookRate, fmtWinPct } from '../lib/formatting.js';
 import { downloadMlbStandingsCsv } from '../lib/csvExports.js';
@@ -21,6 +21,7 @@ import { FeedFreshnessPanel } from '../components/FeedFreshnessPanel.jsx';
 import DataSourceStatusCenter from '../components/DataSourceStatusCenter.jsx';
 import CacheHealthDashboard from '../components/CacheHealthDashboard.jsx';
 import NaturalLanguageMlbQuery from '../components/NaturalLanguageMlbQuery.jsx';
+import { TeamEfficiencyComparisonView } from '../components/TeamEfficiencyPanels.jsx';
 
 // FIX: Global tooltip config — z-index 9999 prevents clip behind sibling panels
 const TT = {
@@ -807,6 +808,9 @@ function LeaguePage() {
   const [comparisonDivision, setComparisonDivision] = useState('all');
   const [comparisonSortDirection, setComparisonSortDirection] = useState('desc');
   const [leagueWarRows, setLeagueWarRows] = useState([]);
+  const [teamEfficiencyRows, setTeamEfficiencyRows] = useState([]);
+  const [teamEfficiencyLoading, setTeamEfficiencyLoading] = useState(true);
+  const [teamEfficiencyRefreshToken, setTeamEfficiencyRefreshToken] = useState(0);
   const [compactMobile, setCompactMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches || false);
 
   useEffect(() => {
@@ -816,6 +820,25 @@ function LeaguePage() {
     query.addEventListener?.('change', sync);
     return () => query.removeEventListener?.('change', sync);
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    setTeamEfficiencyLoading(true);
+    fetchTeamEfficiencyComparison(Object.values(TEAMS).map(team => team.abbr), SEASON, 'payroll', {
+      priority: 'background',
+      stage: 'background',
+      screen: 'league',
+    }).then(data => {
+      if (!alive) return;
+      setTeamEfficiencyRows(Array.isArray(data?.rows) ? data.rows : []);
+      setTeamEfficiencyLoading(false);
+    }).catch(() => {
+      if (!alive) return;
+      setTeamEfficiencyRows([]);
+      setTeamEfficiencyLoading(false);
+    });
+    return () => { alive = false; };
+  }, [teamEfficiencyRefreshToken]);
 
 
   const liveHitterRows = useMemo(() => {
@@ -1012,7 +1035,7 @@ function LeaguePage() {
     standings,
     source: 'MLB Stats API',
     retrievedAt: standingsRetrievedAt,
-    formatWinPct,
+    formatWinPct: fmtWinPct,
   });
 
   function gameStatusLabel(g) {
@@ -1245,6 +1268,14 @@ function LeaguePage() {
         )}
       </Panel>
       </div>
+
+      <TeamEfficiencyComparisonView
+        rows={teamEfficiencyRows}
+        loading={teamEfficiencyLoading}
+        season={SEASON}
+        payrollBasis="payroll"
+        onRefresh={() => setTeamEfficiencyRefreshToken(value => value + 1)}
+      />
 
       {/* ── Stat charts row ── */}
       <div className="skip-balanced-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>

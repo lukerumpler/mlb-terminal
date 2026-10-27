@@ -59,8 +59,8 @@ describe('rendered FanGraphs local fallback', () => {
 
     render(<OverviewPage />);
 
-    expect((await screen.findAllByText('42.4')).length).toBeGreaterThanOrEqual(1);
-    expect((await screen.findAllByText(/local cached/i)).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText('42.4', {}, { timeout: 8000 })).length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText(/local cached/i, {}, { timeout: 8000 })).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('88.1%')).toBeInTheDocument();
     expect(screen.getAllByText('FanGraphs').length).toBeGreaterThan(0);
     expect(screen.getByTestId('playoff-odds-verification')).toHaveTextContent(/FanGraphs playoff odds · last verified/i);

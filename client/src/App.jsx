@@ -44,16 +44,92 @@ function PageLoading() {
   );
 }
 
+// Audio formats the upload endpoint accepts, keyed by what MediaRecorder reports.
+// Chrome/Edge/Firefox-on-desktop record webm, Firefox can record ogg, Safari records mp4.
+// The recorder used to label everything "audio/webm", which mislabels Safari recordings.
+const RECORDING_FORMATS = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+};
+
+export function uploadFormatFor(mimeType) {
+  const base = String(mimeType || '').split(';')[0].trim().toLowerCase();
+  return RECORDING_FORMATS[base]
+    ? { type: base, ext: RECORDING_FORMATS[base] }
+    : { type: 'audio/webm', ext: 'webm' };
+}
+
+// Resolves with the base64 payload; rejects if the browser cannot read the blob.
+// (Reading inside an unawaited FileReader callback meant failures were never caught.)
+export function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('Could not read the recording'));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : '');
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function VoiceNoteRecorder({ onTranscribed, onCancel }) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribed] = useState(false);
   const [error, setError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const cancelledRef = useRef(false);
   const uploadMutation = trpc.storage.upload.useMutation();
   const transcribeMutation = trpc.voice.transcribe.useMutation();
 
+  // Closing the dialog mid-recording must release the microphone (the browser's
+  // recording indicator stays on otherwise) and must not upload what was captured.
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop(); } catch { /* already stopped */ }
+      }
+      recorder?.stream?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  const processRecording = async (chunks, mimeType) => {
+    setTranscribed(true);
+    setError(null);
+    // try/catch/finally around the WHOLE pipeline: the controls below are disabled
+    // while transcribing, so a failure that skipped the reset trapped the user in a
+    // full-screen dialog with no working button.
+    try {
+      const { type, ext } = uploadFormatFor(mimeType);
+      const blob = new Blob(chunks, { type });
+      if (blob.size === 0) throw Object.assign(new Error('empty'), { empty: true });
+      const base64 = await blobToBase64(blob);
+      const { url } = await uploadMutation.mutateAsync({
+        name: `voice-note-${Date.now()}.${ext}`,
+        type,
+        base64,
+      });
+      const result = await transcribeMutation.mutateAsync({ audioUrl: url });
+      onTranscribed(result.text);
+    } catch (err) {
+      if (err?.empty) setError('No audio was captured. Hold the mic a little longer and try again.');
+      else if (err?.data?.code === 'TOO_MANY_REQUESTS') setError('Too many voice notes in a short time. Wait a minute and try again.');
+      else setError('Transcription failed. Please try again.');
+    } finally {
+      setTranscribed(false);
+    }
+  };
+
   const startRecording = async () => {
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -64,28 +140,9 @@ export function VoiceNoteRecorder({ onTranscribed, onCancel }) {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setTranscribed(true);
-        try {
-          // Convert to base64 for tRPC upload
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
-          reader.onloadend = async () => {
-            const base64 = reader.result.split(',')[1];
-            const { url } = await uploadMutation.mutateAsync({
-              name: `voice-note-${Date.now()}.webm`,
-              type: 'audio/webm',
-              base64
-            });
-            
-            const result = await transcribeMutation.mutateAsync({ audioUrl: url });
-            onTranscribed(result.text);
-          };
-        } catch (err) {
-          setError('Transcription failed. Please try again.');
-          setTranscribed(false);
-        }
+      mediaRecorder.onstop = () => {
+        if (cancelledRef.current) return;
+        void processRecording(chunksRef.current, mediaRecorder.mimeType);
       };
 
       mediaRecorder.start();

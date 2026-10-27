@@ -13,6 +13,7 @@
  */
 
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { closedBlocks } from "./html-scan.js";
 
 const FRESH_TTL_MS = 15 * 60_000;
 const STALE_TTL_MS = 24 * 60 * 60_000;
@@ -117,7 +118,7 @@ function sourcesFor(kind, team, handle = null) {
 function stripHtml(value = "") {
   return String(value)
     .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^<>]+>/g, "")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
@@ -129,14 +130,25 @@ function stripHtml(value = "") {
     .trim();
 }
 
+// Text between <tag ...> and the first following </tag>. Found with one forward search
+// each (no backtracking), so garbled XML cannot make this quadratic: the opener may not
+// span another tag, and the closer is searched for once from the end of the opener.
+function tagContent(block, tag) {
+  const opener = new RegExp(`<${tag}(?:\\s[^<>]*)?>`, "i").exec(block);
+  if (!opener) return null;
+  const start = opener.index + opener[0].length;
+  const closer = new RegExp(`</${tag}>`, "gi");
+  closer.lastIndex = start;
+  const end = closer.exec(block);
+  return end ? block.slice(start, end.index) : null;
+}
+
 function tagValue(block, tags) {
   for (const tag of tags) {
-    const pattern = new RegExp(
-      `<${tag}[^>]*>(?:<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>|([\\s\\S]*?))</${tag}>`,
-      "i"
-    );
-    const match = pattern.exec(block);
-    const value = match?.[1] ?? match?.[2];
+    const raw = tagContent(block, tag);
+    if (raw == null) continue;
+    const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw);
+    const value = cdata ? cdata[1] : raw;
     if (value) return value.trim();
   }
   return "";
@@ -149,8 +161,8 @@ function parseDate(value) {
 
 function parseFeed(xml, feedSource, limit) {
   const blocks = [
-    ...String(xml).matchAll(/<item\b[\s\S]*?<\/item>/gi),
-    ...String(xml).matchAll(/<entry\b[\s\S]*?<\/entry>/gi),
+    ...closedBlocks(xml, /<item\b[^<>]*>[\s\S]*?<\/item>/gi, /<\/item>/gi),
+    ...closedBlocks(xml, /<entry\b[^<>]*>[\s\S]*?<\/entry>/gi, /<\/entry>/gi),
   ].map(match => match[0]);
 
   const items = [];
@@ -315,6 +327,11 @@ function completeSourceStatuses(configuredSources, attempts) {
         durationMs: 0,
       }
   );
+}
+
+// Test hook: the parser is otherwise only reachable through the network handler.
+export function __parseFeedForTests(xml, feedSource, limit = 20) {
+  return parseFeed(xml, feedSource, limit);
 }
 
 export function __resetNewsStateForTests() {

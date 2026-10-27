@@ -119,3 +119,72 @@ describe("MLB proxy upstream protection", () => {
     expect(result.body).toMatchObject({ error: "MLB API responded with 429" });
   });
 });
+
+describe("MLB proxy path validation", () => {
+  const withIp = (ip: string, req: ReturnType<typeof request>) => ({
+    ...req,
+    headers: { ...req.headers, "x-forwarded-for": ip },
+    socket: { remoteAddress: ip },
+  });
+
+  // WHATWG URL parsing collapses "..", "%2e%2e" and "\", so each of these would
+  // otherwise resolve outside /api/v1 on statsapi.mlb.com.
+  const escaping = [
+    "/../../x",
+    "/a/../../b",
+    "/..",
+    "/%2e%2e/x",
+    "/%2E%2e/%2e%2E/x",
+    "/a\\..\\..\\x",
+  ];
+
+  escaping.forEach((path, index) => {
+    it(`rejects ${JSON.stringify(path)} before any upstream request`, async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const res = response();
+      await handler(withIp(`203.0.113.${index + 10}`, request(path)), res);
+      expect(res.statusCode).toBe(400);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it("rejects a dot-segment sent single-encoded in the raw URL", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const res = response();
+    const req = withIp("203.0.113.40", request("/x"));
+    req.url = "/api/mlb?path=/%2e%2e/%2e%2e/x";
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still forwards ordinary paths, and stays under /api/v1", async () => {
+    const paths = [
+      "/people/805299",
+      "/teams/147/roster",
+      "/schedule?sportId=1&date=2026-07-04",
+      "/a/./b",
+      "/a/..",
+      "/",
+    ];
+    for (const [index, path] of paths.entries()) {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response("{}", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      __resetMlbProxyStateForTests();
+      const res = response();
+      await handler(withIp(`203.0.113.${index + 50}`, request(path)), res);
+      expect(res.statusCode, path).toBe(200);
+      const upstream = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      expect(upstream.origin).toBe("https://statsapi.mlb.com");
+      expect(upstream.pathname.startsWith("/api/v1/"), path).toBe(true);
+    }
+  });
+});

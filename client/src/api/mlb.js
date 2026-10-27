@@ -2,6 +2,7 @@
 import { inferMlbFeedKey, recordFeedSuccess } from '../lib/feedFreshness.js';
 import { apiUrl } from '../lib/apiOrigin.js';
 import { percentile } from '../lib/percentile.js';
+import { buildWarConsensus, describeAgreement } from '../lib/warConsensus.js';
 import {
   getStoredPlayerProviderIdentity,
   isUsablePlayerProviderIdentity,
@@ -36,7 +37,8 @@ import { recordPlayerIdentityTelemetry } from '../lib/playerIdentityTelemetry.js
 //   /game/{gamePk}/playByPlay                                    → PBP (MLB + MiLB)
 
 const BASE   = apiUrl('/api/mlb');
-export const SEASON = 2026;
+// Calendar-driven (January still belongs to the prior season), matching server/season.ts.
+export const SEASON = (() => { const d = new Date(); return d.getUTCMonth() === 0 ? d.getUTCFullYear() - 1 : d.getUTCFullYear(); })();
 const MLB_SCHEDULE_TIME_ZONE = 'America/New_York';
 
 // MLB's schedule is organized around its Eastern Time baseball day. Using a
@@ -99,6 +101,8 @@ const PROVIDER_JSON_TTL_MS = 10 * 60_000;
 const FANGRAPHS_MODEL_LOCAL_CACHE_KEY = 'skip-fangraphs-model-snapshot-v1';
 const FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY = 'skip-fangraphs-aggregate-snapshot-v1';
 const FANGRAPHS_LOCAL_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+const STALE_LOCAL_RETRY_MS = 15 * 60_000;
 
 function nextUtcMidnightMs(now = Date.now()) {
   const next = new Date(now);
@@ -206,7 +210,11 @@ async function fetchProviderJson(url, {
           staleAgeMs: Math.max(0, Date.now() - persistent.savedAt),
           servedAt: new Date().toISOString(),
         };
-        providerJsonCache.set(url, { data: staleData, expiresAt: nextUtcMidnightMs() });
+        // Serve the stale snapshot for a short window, not until UTC midnight: the server
+        // now retries failed WAR refreshes, and a long-lived tab pinned to stale data
+        // until midnight would never see the recovery. The window still stops a failing
+        // provider from being re-requested on every render.
+        providerJsonCache.set(url, { data: staleData, expiresAt: Math.min(nextUtcMidnightMs(), Date.now() + STALE_LOCAL_RETRY_MS) });
         return staleData;
       }
       throw error;
@@ -748,7 +756,7 @@ export async function getBaseballReferenceAdvancedSafe(name, season, { mlbId } =
   try {
     const params = new URLSearchParams({ name, season: String(season) });
     if (mlbId != null) params.set('mlbId', String(mlbId));
-    const data = await providerJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
+    const data = await fetchProviderJson(`/api/player-advanced?${params.toString()}`, { timeoutMs: 8_500, ttlMs: PROVIDER_JSON_TTL_MS });
     return { ...normalizeSeasonAdvancedStat(data || {}, season, data?.source || 'Baseball-Reference player summary'), providerIds: data?.providerIds || {} };
   } catch {
     return unavailable;
@@ -896,6 +904,10 @@ export async function getPlayerProfile(id, requestOptions = {}) {
  */
 const teamFinancialsCache = new Map();
 const TEAM_FINANCIALS_CLIENT_TTL_MS = 30 * 60_000;
+const teamEfficiencyCache = new Map();
+const TEAM_EFFICIENCY_CLIENT_TTL_MS = 5 * 60_000;
+const TEAM_EFFICIENCY_LOCAL_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+const teamEfficiencyComparisonCache = new Map();
 const contractClientCache = new Map();
 const CONTRACT_CLIENT_TTL_MS = 6 * 60 * 60_000;
 const playerProviderIdentityCache = new Map();
@@ -937,6 +949,100 @@ export async function fetchTeamFinancials(teamAbbreviation, season = SEASON, {
     promise,
     expiresAt: Date.now() + TEAM_FINANCIALS_CLIENT_TTL_MS,
   });
+  return promise;
+}
+
+export async function fetchTeamEfficiency(teamAbbreviation, season = SEASON, payrollBasis = 'payroll', {
+  priority = 'important',
+  stage = 'important',
+  screen = 'overview',
+} = {}) {
+  const team = String(teamAbbreviation || '').trim().toUpperCase();
+  if (!team) return null;
+  const cacheKey = `${team}:${season}:${payrollBasis}`;
+  const localKey = `skip-team-efficiency:${cacheKey}`;
+  const readLocalSnapshot = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(localKey) || 'null');
+      if (!parsed?.savedAt || Date.now() - parsed.savedAt > TEAM_EFFICIENCY_LOCAL_MAX_AGE_MS) return null;
+      return { ...parsed.data, status: 'stale-cached', freshness: 'stale-cached', warnings: [...(parsed.data?.warnings || []), 'Using a local offline snapshot'] };
+    } catch { return null; }
+  };
+  const cached = teamEfficiencyCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) teamEfficiencyCache.delete(cacheKey);
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return readLocalSnapshot();
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ team, season: String(season), payrollBasis });
+      const response = await scheduledFetch(`/api/team-efficiency?${params}`, 20_000, {
+        priority,
+        stage,
+        screen,
+        resource: 'team-efficiency',
+        pauseGlobalQueueOn429: false,
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      const record = data?.record || null;
+      if (record && typeof window !== 'undefined') {
+        try { window.localStorage.setItem(localKey, JSON.stringify({ savedAt: Date.now(), data: record })); } catch { /* local storage is optional */ }
+      }
+      return record;
+    } catch {
+      return readLocalSnapshot();
+    }
+  })().then(result => {
+    if (result == null) teamEfficiencyCache.delete(cacheKey);
+    return result;
+  });
+  teamEfficiencyCache.set(cacheKey, { promise, expiresAt: Date.now() + TEAM_EFFICIENCY_CLIENT_TTL_MS });
+  return promise;
+}
+
+export async function fetchTeamEfficiencyComparison(teamAbbreviations, season = SEASON, payrollBasis = 'payroll', {
+  priority = 'background',
+  stage = 'background',
+  screen = 'overview',
+} = {}) {
+  const teams = [...new Set((Array.isArray(teamAbbreviations) ? teamAbbreviations : []).map(team => String(team || '').trim().toUpperCase()).filter(Boolean))];
+  if (!teams.length) return null;
+  const cacheKey = `${teams.sort().join(',')}:${season}:${payrollBasis}`;
+  const localKey = `skip-team-efficiency-comparison:${cacheKey}`;
+  const readLocalSnapshot = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(localKey) || 'null');
+      if (!parsed?.savedAt || Date.now() - parsed.savedAt > TEAM_EFFICIENCY_LOCAL_MAX_AGE_MS) return null;
+      return { ...parsed.data, status: 'stale-cached', freshness: 'stale-cached' };
+    } catch { return null; }
+  };
+  const cached = teamEfficiencyComparisonCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.promise;
+  if (cached) teamEfficiencyComparisonCache.delete(cacheKey);
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return readLocalSnapshot();
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams({ teams: teams.join(','), season: String(season), payrollBasis });
+      const response = await scheduledFetch(`/api/team-efficiency?${params}`, 30_000, {
+        priority,
+        stage,
+        screen,
+        resource: 'team-efficiency-comparison',
+        pauseGlobalQueueOn429: false,
+      });
+      if (!response.ok) return readLocalSnapshot();
+      const data = await response.json();
+      if (data && typeof window !== 'undefined') {
+        try { window.localStorage.setItem(localKey, JSON.stringify({ savedAt: Date.now(), data })); } catch { /* local storage is optional */ }
+      }
+      return data;
+    } catch {
+      return readLocalSnapshot();
+    }
+  })();
+  teamEfficiencyComparisonCache.set(cacheKey, { promise, expiresAt: Date.now() + TEAM_EFFICIENCY_CLIENT_TTL_MS });
   return promise;
 }
 
@@ -2399,44 +2505,172 @@ function canonicalTeamName(value) {
 export function normalizeFanGraphsTeamName(value) {
   return canonicalTeamName(value);
 }
-
+export function blendTeamWarRow(fanGraphsRow, baseballReferenceRow) {
+  const numeric = value => value == null || value === '' ? null : Number(value);
+  const fWAR = numeric(fanGraphsRow?.totalWAR);
+  const bWAR = numeric(baseballReferenceRow?.totalWAR);
+  const fDefense = numeric(fanGraphsRow?.defensiveWAR ?? fanGraphsRow?.defenseWAR);
+  const bDefense = numeric(baseballReferenceRow?.defensiveWAR ?? baseballReferenceRow?.defenseWAR);
+  const defensiveWAR = Number.isFinite(fDefense) && Number.isFinite(bDefense) ? Number(((fDefense + bDefense) / 2).toFixed(1)) : null;
+  // The total is never NaN. If a website's number cannot be read we treat it as missing (null), because the code that
+  // uses this total checks for null with `!= null` and NaN would slip straight through that check.
+  let totalWAR = null;                                                            // Unknown unless at least one website gave a real number
+  if (Number.isFinite(fWAR) && Number.isFinite(bWAR)) {
+    totalWAR = Number(((fWAR + bWAR) / 2).toFixed(1));                            // Both websites, so we average them
+  } else if (Number.isFinite(fWAR)) {
+    totalWAR = fWAR;                                                              // FanGraphs only
+  } else if (Number.isFinite(bWAR)) {
+    totalWAR = bWAR;                                                              // Baseball-Reference only
+  }
+  return {
+    totalWAR,
+    fWAR: Number.isFinite(fWAR) ? fWAR : null,
+    bWAR: Number.isFinite(bWAR) ? bWAR : null,
+    defensiveWAR,
+    methodology: Number.isFinite(fWAR) && Number.isFinite(bWAR) ? 'Blended fWAR/bWAR average' : Number.isFinite(fWAR) ? 'fWAR' : Number.isFinite(bWAR) ? 'bWAR/rWAR' : 'Unavailable',
+    defensiveMethodology: defensiveWAR == null ? 'Comparable defensive blend unavailable' : 'Average of comparable defensive WAR',
+  };
+}
+// One provider row per source, in the shape buildWarConsensus expects.
+export function teamWarConsensus(fanGraphsRow, baseballReferenceRow) {
+  const asSource = (provider, row) => row && {
+    provider,
+    total: row.totalWAR,
+    batting: row.battingWAR,
+    pitching: row.pitchingWAR,
+    defensive: row.defensiveWAR ?? row.defenseWAR,
+  };
+  const consensus = buildWarConsensus([
+    asSource('FanGraphs', fanGraphsRow),
+    asSource('Baseball-Reference', baseballReferenceRow),
+  ]);
+  return {
+    agreement: consensus.agreement,
+    agreementLabel: describeAgreement(consensus),
+    providerCount: consensus.providerCount,
+    total: consensus.total,
+    batting: consensus.batting,
+    pitching: consensus.pitching,
+    defensive: consensus.defensive,
+  };
+}
 export async function getTeamAggregateWar(teamName, divisionTeamNames = [], season = SEASON) {
   if (!teamName) return null;
-    const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
+  const params = new URLSearchParams({ mode: 'aggregate', season: String(season) });
+  const url = `/api/fangraphs-models?${params.toString()}`;
   try {
-    const url = `/api/fangraphs-models?${params.toString()}`;
     const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
     const teams = data?.teams || [];
     const selected = teams.find(row => canonicalTeamName(row.team) === canonicalTeamName(teamName));
+    const fanGraphsTeams = data?.providerSnapshots?.fanGraphs?.teams || (data?.source === 'FanGraphs' ? teams : []);
+    const baseballReferenceTeams = data?.providerSnapshots?.baseballReference?.teams || (data?.source === 'Baseball-Reference' ? teams : []);
+    const selectedFanGraphs = fanGraphsTeams.find(row => canonicalTeamName(row.team) === canonicalTeamName(teamName));
+    const selectedBaseballReference = baseballReferenceTeams.find(row => canonicalTeamName(row.team) === canonicalTeamName(teamName));
+    const selectedBlend = blendTeamWarRow(selectedFanGraphs, selectedBaseballReference);
+    const primaryWarTeams = fanGraphsTeams.length
+      ? fanGraphsTeams
+      : baseballReferenceTeams.length
+        ? baseballReferenceTeams
+        // Neither providerSnapshots nor an exact data.source match told us
+        // which provider `teams` came from - but `teams` itself is real,
+        // already-fetched data for a season that succeeded. Silently
+        // treating it as empty (the previous behavior) meant a response
+        // shape that doesn't literally set source to "FanGraphs" or
+        // "Baseball-Reference" - which is possible for perfectly valid
+        // responses - lost every division-average figure for no real
+        // reason. Fall back to the flat array rather than nothing.
+        : teams;
     let divisionAverageWAR = null;
     let divisionTeams = [];
     if (divisionTeamNames.length && teams.length) {
       const divisionKeys = new Set(divisionTeamNames.map(canonicalTeamName));
-      const divRows = teams.filter(row => divisionKeys.has(canonicalTeamName(row.team)) && row.totalWAR != null);
-      divisionTeams = divRows.map(row => ({
-        team: row.team,
-        totalWAR: row.totalWAR ?? null,
-        offensiveWAR: row.battingWAR ?? row.offensiveWAR ?? row.offenseWAR ?? null,
-        defensiveWAR: row.defenseWAR ?? row.defensiveWAR ?? null,
-        pitchingWAR: row.pitchingWAR ?? null,
-      }));
-      if (divRows.length) {
-        divisionAverageWAR = Number((divRows.reduce((sum, r) => sum + Number(r.totalWAR), 0) / divRows.length).toFixed(1));
+      const divRows = primaryWarTeams.filter(row => divisionKeys.has(canonicalTeamName(row.team)));
+      divisionTeams = divRows.map(row => {
+        const referenceRow = baseballReferenceTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team));
+        // `row` is Baseball-Reference's own row when FanGraphs is blocked; passing it as
+        // the FanGraphs side labelled a bWAR value "fWAR" and claimed a two-source blend
+        // of one source. Only a genuine FanGraphs row (or an unlabelled flat `teams`
+        // array, the legacy shape) may stand in for the FanGraphs side.
+        const fanGraphsRow = fanGraphsTeams.length
+          ? fanGraphsTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team))
+          : baseballReferenceTeams.length ? null : row;
+        const blend = blendTeamWarRow(fanGraphsRow, referenceRow);
+        const rowConsensus = teamWarConsensus(fanGraphsRow, referenceRow);
+        return {
+          team: row.team,
+          agreement: rowConsensus.agreement,
+          // A lone source has no spread; null, not a misleading 0.
+          spread: rowConsensus.total?.n >= 2 ? rowConsensus.total.spread : null,
+          totalWAR: blend.totalWAR,
+          fWAR: blend.fWAR,
+          bWAR: blend.bWAR,
+          offensiveWAR: row.battingWAR ?? row.offensiveWAR ?? row.offenseWAR ?? null,
+          // Same fallback as the single selected team's defensiveWAR below:
+          // blend.defensiveWAR requires BOTH providers' values, which is
+          // often unavailable (see the structural FanGraphs gap in
+          // team-efficiency.js's calculateBlendedWar - same root issue).
+          // Without this fallback, division-comparison rows silently lost
+          // defensive WAR that the raw row actually had, while the single
+          // selected team recovered the exact same data via its own
+          // fallback a few lines down - an inconsistency between two code
+          // paths in this same function, not an intentional difference.
+          defensiveWAR: blend.defensiveWAR ?? row.defenseWAR ?? row.defensiveWAR ?? null,
+          pitchingWAR: row.pitchingWAR ?? null,
+          methodology: blend.methodology,
+        };
+      }).filter(row => row.totalWAR != null);
+      if (divisionTeams.length) {
+        divisionAverageWAR = Number((divisionTeams.reduce((sum, r) => sum + Number(r.totalWAR), 0) / divisionTeams.length).toFixed(1));
       }
     }
     return {
-      teamWar: selected?.totalWAR ?? null,
+      teamWar: selectedBlend.totalWAR ?? selected?.totalWAR ?? null,
+      fWAR: selectedBlend.fWAR,
+      bWAR: selectedBlend.bWAR,
       offensiveWAR: selected?.battingWAR ?? selected?.offensiveWAR ?? selected?.offenseWAR ?? null,
-      defensiveWAR: selected?.defenseWAR ?? selected?.defensiveWAR ?? null,
+      defensiveWAR: selectedBlend.defensiveWAR ?? selected?.defenseWAR ?? selected?.defensiveWAR ?? null,
+      warMethodology: selectedBlend.methodology,
+      defensiveWARMethodology: selectedBlend.defensiveMethodology,
+      warConsensus: teamWarConsensus(selectedFanGraphs, selectedBaseballReference),
       divisionAverageWAR,
       divisionTeams,
-      source: 'FanGraphs aggregate Team WAR',
+      source: selectedBlend.fWAR != null && selectedBlend.bWAR != null ? 'FanGraphs + Baseball-Reference blended Team WAR' : data.source || 'FanGraphs aggregate Team WAR',
+      sourceUrl: data.sourceUrls?.aggregate || data.sourceUrls?.teamWar || data.sourceUrls?.batting || null,
       freshness: data.freshness || 'live',
       retrievedAt: data.retrievedAt || data.servedAt,
-      status: data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial',
+      status: data.statuses?.teamWar === 'fallback-live'
+        ? 'fallback-live'
+        : data.statuses?.batting === 'live' && data.statuses?.pitching === 'live' ? 'live' : 'partial',
+      providerBlocked: Boolean(data.providerBlocked),
     };
-  } catch {
-    return null;
+  } catch (error) {
+    // Every other return path from this function carries teamWar, status,
+    // sourceUrl, and so on - collapsing every failure to a bare `null`
+    // here throws all of that away, even for failures where fetchProviderJson
+    // already worked out a useful sourceUrl or reason. The caller
+    // (OverviewPage) already treats this object's individual fields as
+    // possibly-null throughout, so a fuller "unavailable" shape here is a
+    // safe, strict improvement over `null` - not a behavior change for
+    // any field the caller currently reads.
+    const unavailable = error?.payload || {};
+    return {
+      teamWar: null,
+      fWAR: null,
+      bWAR: null,
+      offensiveWAR: null,
+      defensiveWAR: null,
+      warMethodology: null,
+      defensiveWARMethodology: null,
+      divisionAverageWAR: null,
+      divisionTeams: [],
+      source: unavailable.source || 'FanGraphs aggregate Team WAR',
+      sourceUrl: unavailable.sourceUrls?.aggregate || unavailable.sourceUrls?.batting || url,
+      freshness: 'unavailable',
+      retrievedAt: null,
+      status: 'unavailable',
+      reason: error?.message || 'Team WAR request failed',
+      providerBlocked: Boolean(unavailable.providerBlocked),
+    };
   }
 }
 
@@ -2453,9 +2687,29 @@ export async function getLeagueTeamsWar(season = SEASON) {
     const url = `/api/fangraphs-models?${params.toString()}`;
     const data = await fetchProviderJson(url, { timeoutMs: 15_000, ttlMs: fanGraphsDailyTtlMs(), persistentCacheKey: `${FANGRAPHS_AGGREGATE_LOCAL_CACHE_KEY}:${url}` });
     const teams = Array.isArray(data?.teams) ? data.teams : [];
-    return teams
-      .filter(row => row?.team && row.totalWAR != null && Number.isFinite(Number(row.totalWAR)))
-      .map(row => ({ team: canonicalTeamName(row.team), totalWAR: Number(row.totalWAR) }));
+    const fanGraphsTeams = data?.providerSnapshots?.fanGraphs?.teams || (data?.source === 'FanGraphs' ? teams : []);
+    const baseballReferenceTeams = data?.providerSnapshots?.baseballReference?.teams || (data?.source === 'Baseball-Reference' ? teams : []);
+    const primaryWarTeams = fanGraphsTeams.length
+      ? fanGraphsTeams
+      : baseballReferenceTeams.length
+        ? baseballReferenceTeams
+        // Same fallback reasoning as getTeamAggregateWar() above: don't
+        // silently drop the whole league table just because the response
+        // shape didn't set an exact, recognized data.source string.
+        : teams;
+    return primaryWarTeams
+      .filter(row => row?.team)
+      .map(row => {
+        const referenceRow = baseballReferenceTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team));
+        // Same rule as getTeamAggregateWar(): when FanGraphs is blocked `row` IS the
+        // Baseball-Reference row, so it must not be passed as the FanGraphs side.
+        const fanGraphsRow = fanGraphsTeams.length
+          ? fanGraphsTeams.find(candidate => canonicalTeamName(candidate.team) === canonicalTeamName(row.team))
+          : baseballReferenceTeams.length ? null : row;
+        const blend = blendTeamWarRow(fanGraphsRow, referenceRow);
+        return { team: canonicalTeamName(row.team), totalWAR: blend.totalWAR, fWAR: blend.fWAR, bWAR: blend.bWAR, methodology: blend.methodology };
+      })
+      .filter(row => row.totalWAR != null && Number.isFinite(Number(row.totalWAR)));
   } catch {
     return [];
   }

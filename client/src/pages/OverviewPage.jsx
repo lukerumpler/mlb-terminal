@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback, memo, lazy, S
 import { C, px, sans } from '../constants/colors.js';
 import { TEAMS, SEASON as CURRENT_SEASON, PROSPECT_BATTERS, PROSPECT_PITCHERS, MLB_PIPELINE_FARM_SYSTEM_RANKINGS, sortTeamsByLeagueDivisionName } from '../constants/data.js';
 import { computeFV, fvBaselines, getProspectAgeForLevelContext } from '../engine/skip.js';
-import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSnapshot, getTeamSavantMetrics, getTeamSavantOaa, getTeamSavantRunning, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
+import { getTodaysGames, getStandings, getAllTeamStats, getTeamPlayerStats, getTeamRecentPlayerStats, getTeamExitVelocity, getTeamBattedBalls, getTeamBattedBallsAgainst, getPlayerContactPoints, getPitcherPitches, fetchTeamFinancials, fetchTeamEfficiency, getTeamModelSources, getSecondaryPlayoffOdds, getTeamAffiliates, getMinorLeagueTeamOverview, getMinorLeagueTeamStandings, getMinorLeagueTeamSchedule, getTeamScheduleSnapshot, getTeamSavantMetrics, getTeamSavantOaa, getTeamSavantRunning, getTeamAggregateWar, getTeamCalculatedIntelligence, getGameFeedMetadata, getTeamVenueMetadata } from '../api/mlb.js';
 import { Panel, StatStrip, KVRow, SkeletonBlock } from '../components/atoms.jsx';
 import { RosterInsightsTableSkeleton, TeamOverviewSkeleton } from '../components/PageSkeletons.jsx';
 import TeamLogo from '../components/TeamLogo.jsx';
@@ -32,6 +32,7 @@ import WorkshopViewControl from '../components/WorkshopViewControl.jsx';
 import { useWorkshopPreferences } from '../lib/workshopPreferences.js';
 import DefensiveOaaFieldMap from '../components/DefensiveOaaFieldMap.jsx';
 import BallparkWeatherPanel from '../components/BallparkWeatherPanel.jsx';
+import { TeamEfficiencyOverviewPanel } from '../components/TeamEfficiencyPanels.jsx';
 
 // Deferred-loading split (2026-08-12): these six charts are the only things
 // on this page that need recharts (~85KB gzip, the largest chunk in the
@@ -89,6 +90,19 @@ export function OverviewEmptyState({ message, detail, status = 'Unavailable' }) 
       {detail && (detailIsLong ? <details className="skip-overview-empty-note"><summary>More detail</summary><span className="skip-overview-empty-detail">{detail}</span></details> : <span className="skip-overview-empty-detail">{detail}</span>)}
     </div>
   </div>;
+}
+
+export function buildTeamSavantSnapshotRows(data = {}) {
+  const finite = value => value == null || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
+  return [
+    { label: 'xBA', value: finite(data.expectedBA), format: value => value.toFixed(3) },
+    { label: 'xSLG', value: finite(data.expectedSLG), format: value => value.toFixed(3) },
+    { label: 'xwOBA', value: finite(data.expectedWOBA), format: value => value.toFixed(3) },
+    { label: 'Exit velo', value: finite(data.exitVelocity), format: value => `${value.toFixed(1)} mph` },
+    { label: 'Hard-hit', value: finite(data.hardHitPercent), format: value => `${value.toFixed(1)}%` },
+    { label: 'Barrel', value: finite(data.barrelPercent), format: value => `${value.toFixed(1)}%` },
+    { label: 'Launch angle', value: finite(data.launchAngle), format: value => `${value.toFixed(1)}°` },
+  ].map(row => ({ ...row, display: row.value == null ? '—' : row.format(row.value) }));
 }
 
 export function derivePetcoParkGameContext(games, teamId = 135) {
@@ -1265,7 +1279,7 @@ export function buildRosterRows(players, positions, sortKey, minBattingPa = 0, m
     });
 }
 
-export function buildHistoricalTaxTrendRows(results, seasons = [2024, 2025, 2026]) {
+export function buildHistoricalTaxTrendRows(results, seasons = [CURRENT_SEASON - 2, CURRENT_SEASON - 1, CURRENT_SEASON]) {
   const numericOrNull = value => value == null || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   return seasons.map((season, index) => {
     const record = Array.isArray(results) ? results[index] : null;
@@ -1388,6 +1402,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   }, []);
   const [teamModelData, setTeamModelData] = useState(null);
   const [teamModelState, setTeamModelState] = useState('idle');
+  const [teamEfficiencyData, setTeamEfficiencyData] = useState(null);
+  const [teamEfficiencyState, setTeamEfficiencyState] = useState('idle');
   const [secondaryPlayoffOddsData, setSecondaryPlayoffOddsData] = useState(null);
   const [secondaryPlayoffOddsState, setSecondaryPlayoffOddsState] = useState('idle');
   const [calculatedIntelligence, setCalculatedIntelligence] = useState(null);
@@ -1912,6 +1928,27 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
     return () => { alive = false; };
   }, [overviewView, mergedPerformanceDataReady, teamBase?.abbr, teamBase?.name, teamBase?.div, fangraphsRetryToken]);
   useEffect(() => {
+    if (overviewView !== 'briefing' || !teamBase?.abbr) return undefined;
+    let alive = true;
+    setTeamEfficiencyState('loading');
+    const timer = setTimeout(() => {
+      fetchTeamEfficiency(teamBase.abbr, CURRENT_SEASON, 'payroll', {
+        priority: 'background',
+        stage: 'background',
+        screen: 'overview',
+      }).then(data => {
+        if (!alive) return;
+        setTeamEfficiencyData(data);
+        setTeamEfficiencyState(data?.found ? 'ready' : 'source-gap');
+      }).catch(() => {
+        if (!alive) return;
+        setTeamEfficiencyData(null);
+        setTeamEfficiencyState('unavailable');
+      });
+    }, 250);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [overviewView, teamBase?.abbr, mlbRetryToken, fangraphsRetryToken]);
+  useEffect(() => {
     let alive = true;
     setCalculatedIntelligence(null);
     setCalculatedIntelligenceState(teamBase?.id ? 'loading' : 'idle');
@@ -1941,11 +1978,11 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   }, [teamBase?.abbr]);
 
   useEffect(() => {
-    if (overviewView !== 'briefing' || !mergedPerformanceDataReady) return undefined;
+    if (overviewView !== 'briefing') return undefined;
     let alive = true;
     const cached = readTeamSavantSummaryCache(teamBase?.abbr, CURRENT_SEASON);
     setTeamSavantData(cached?.data || null);
-    if (cached && !shouldRefreshDailyCache(cached)) {
+    if (!mergedPerformanceDataReady || (cached && !shouldRefreshDailyCache(cached))) {
       return () => { alive = false; };
     }
     getTeamSavantMetrics(teamBase?.abbr, CURRENT_SEASON).then(data => {
@@ -2405,7 +2442,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         offset += pageHeight;
       }
       const safeTeamName = String(team.name || selTeam || 'team').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-      pdf.save(`skip-${safeTeamName}-overview-${SEASON}.pdf`);
+      pdf.save(`skip-${safeTeamName}-overview-${CURRENT_SEASON}.pdf`);
       setPdfExportState('ready');
       window.setTimeout(() => setPdfExportState(current => current === 'ready' ? 'idle' : current), 2200);
     } catch (error) {
@@ -2798,13 +2835,13 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         {val:<MetricValue value={fmtScorebookRate(team.avg)} loading={liveTeamDataMode === 'loading'} />,lbl:'Batting Avg',sub:'Contact'},
         {val:<MetricValue value={formatTeamMetric(team.k)} loading={liveTeamDataMode === 'loading'} />,     lbl:'Strikeouts', sub:'K'},
         {val:<MetricValue value={formatTeamMetric(team.sb)} loading={liveTeamDataMode === 'loading'} />,    lbl:'Stolen Bases',sub:'Speed'},
-        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR', sub:<div><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} title={`FanGraphs Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple, emphasis:teamWarValue !== 'Unavailable'},
+        {val:<MetricValue value={teamWarValue} loading={liveTeamDataMode === 'loading'} />,lbl:'Team WAR', sub:<div><OverviewSourceBadge provider={teamModelData?.source?.includes('Baseball-Reference') ? 'Baseball-Reference' : 'FanGraphs'} status={teamModelData?.status === 'fallback-live' ? 'live' : fanGraphsHealthStatus} title={`${teamModelData?.source || 'FanGraphs'} Team WAR source: ${humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}`} />{teamModelData?.divisionAverageWAR != null && teamModelData?.teamWar != null && <div style={{fontSize:8,color:C.text3,marginTop:2}}>{team.div}: {Number(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)) >= 0 ? `+${(Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)}` : (Number(teamModelData.teamWar) - Number(teamModelData.divisionAverageWAR)).toFixed(1)} div avg</div>}</div>, color:teamWarValue === 'Unavailable' ? C.text4 : C.purple, emphasis:teamWarValue !== 'Unavailable'},
       ]}/>}
 
       {overviewView === 'briefing' && <>
       {/* Moved Unavailable / FanGraphs model panels toward the bottom as requested */}
       <div style={{display:'flex',justifyContent:'space-between',gap:12,flexWrap:'wrap',padding:'7px 10px',border:`1px solid ${C.borderLight}`,borderRadius:7,background:C.surface2,...sans({fontSize:9.5,color:C.text3})}}>
-        <span>Model source: <strong style={{color:C.text2}}>FanGraphs</strong> · {modelFreshness}</span>
+        <span>Model source: <strong style={{color:C.text2}}>{teamModelData?.source || 'FanGraphs'}</strong> · {modelFreshness}</span>
         <span>Playoff odds: {playoffOddsSource} · Team WAR: {humanizeFeedStatus(teamModelData?.statuses?.teamWar || teamModelState)}</span>
       </div>
       <Panel title="Postseason Standing Context" accent={C.teal} badge="MLB Stats API">
@@ -2822,7 +2859,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
           <div style={sans({padding:'0 14px 10px',fontSize:9,color:C.text3,lineHeight:1.4})}>{standingsContext.divisionName} leader: <strong style={{color:C.text2}}>{standingsContext.divisionLeader} ({standingsContext.divisionLeaderRecord})</strong> · verified MLB standings context, not a projected probability.</div>
         </> : <OverviewEmptyState status={liveTeamDataMode === 'loading' ? 'Loading' : 'Unavailable'} message="Postseason standings context" detail="Verified division and Wild Card position will appear when the current MLB standings snapshot is available." />}
       </Panel>
-      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider="FanGraphs" status={fanGraphsHealthStatus} /></span>}>
+      <Panel title="Divisional WAR Comparison" accent={C.purple} badge={<span className="skip-overview-source-badges" style={{gap:10}}><OverviewSourceBadge provider={teamModelData?.source?.includes('Baseball-Reference') ? 'Baseball-Reference' : 'FanGraphs'} status={teamModelData?.status === 'fallback-live' ? 'live' : fanGraphsHealthStatus} /></span>}>
         <div style={{ padding:'8px 14px 0', display:'flex', justifyContent:'space-between', gap:10, flexWrap:'wrap', alignItems:'baseline' }}>
           <span style={sans({ fontSize:9.5, color:C.text3 })}>{teamModelData?.providerBlocked ? (divisionWarData.length ? 'Cached verified rows · provider blocked' : 'Provider blocked · no verified rows') : 'Verified WAR by division'}</span>
           <span style={px({ fontSize:9, color:C.text4 })}>{divisionWarData.length ? `${divisionWarData.length} teams` : 'No verified rows'}</span>
@@ -2860,6 +2897,15 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
         </div>
         <div title="Playoff odds and Team WAR are shown only when FanGraphs returns a source-backed team-specific value. Current win pace and Pythagorean pace are calculated from verified MLB standings and shown separately." style={{padding:'0 14px 10px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',...sans({fontSize:9,color:C.text3})}}>{(calculatedModelSource === 'MLB Stats API · calculated' || pythagoreanWinsValue != null) ? 'MLB calculated · pace: record · pythag: RS/RA · Team WAR: FanGraphs only · playoff odds: FanGraphs only' : `FanGraphs projections · ${modelFreshness}`} · {teamSavantDisplayData?.source || 'Baseball Savant'} · <SavantFreshnessText data={teamSavantDisplayData} /></div>
       </Panel>
+      <Panel title="Statcast Snapshot" accent={C.teal} badge={<OverviewSourceBadge provider="Baseball Savant" status={teamSavantDisplayData?.status === 'live' || teamSavantDisplayData?.status === 'cached' ? 'live' : teamSavantState === 'loading' ? 'loading' : 'coverage-gap'} />}>
+        {teamSavantDisplayData?.status === 'live' || teamSavantDisplayData?.status === 'cached' ? <>
+          <div className="skip-balanced-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(100px,1fr))',borderTop:`0.5px solid ${C.borderLight}`}}>
+            {buildTeamSavantSnapshotRows(teamSavantDisplayData).map(row => <div key={row.label} style={{padding:'10px 9px',borderRight:`0.5px solid ${C.borderLight}`}}><div style={px({fontSize:14,fontWeight:800,color:row.value == null ? C.text3 : C.text})}>{row.display}</div><div style={sans({fontSize:8.5,color:C.text3,textTransform:'uppercase',letterSpacing:'.04em',marginTop:3})}>{row.label}</div></div>)}
+          </div>
+          <div style={sans({padding:'7px 14px 9px',fontSize:9,color:C.text4,lineHeight:1.4})}>Source: {teamSavantDisplayData.source || 'Baseball Savant'} · {teamSavantDisplayData.sampleSize?.toLocaleString?.() || '—'} verified rows · {teamSavantDisplayData.freshness === 'stale-cached' ? 'cached snapshot' : 'current provider response'}.</div>
+        </> : <OverviewEmptyState status={teamSavantState === 'loading' ? 'Loading' : 'Unavailable'} message="Statcast snapshot" detail="Baseball Savant did not return a verified team batted-ball summary for this season. No WAR or traditional MLB totals are substituted." />}
+      </Panel>
+      <TeamEfficiencyOverviewPanel record={teamEfficiencyData} loading={teamEfficiencyState === 'loading'} teamName={team.name} onRefresh={() => setFangraphsRetryToken(token => token + 1)} />
       </>}
       {overviewView === 'operations' && <BallparkWeatherPanel teamKey={selTeam} />}
       {overviewView === 'operations' && <Panel title="Ballpark Environment" accent={OVERVIEW_ACCENTS.context} badge={teamVenueState === 'loading' ? 'Loading…' : teamVenueState === 'ready' ? (teamVenueMetadata?.freshness === 'stale-cached' ? 'Cached MLB Stats API' : 'MLB Stats API') : 'Unavailable'}>

@@ -24,5 +24,5 @@ describe('Organization player directory', () => {
     expect(screen.getByRole('button', { name: /Load all 30 official rosters/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Search selected organization roster')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/This tab failed to load/);
-  }, 15000);
+  });
 });

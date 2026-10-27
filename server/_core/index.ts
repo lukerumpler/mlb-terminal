@@ -1,6 +1,7 @@
 import { createServer } from "http";
 import net from "net";
 import { createApp } from "../app";
+import { installGracefulShutdown } from "./shutdown";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+  installGracefulShutdown(server);
 }
 
 startServer().catch(error => {

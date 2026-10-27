@@ -109,3 +109,61 @@ describe("natural-language search handler", () => {
     expect(queryRes.statusCode).toBe(400);
   });
 });
+
+describe("natural-language search cost protection", () => {
+  const llmReply = {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({
+            intent: "page",
+            tab: "league",
+            entity: null,
+            metric: null,
+            confidence: 0.9,
+          }),
+        },
+      },
+    ],
+  };
+  async function search(query: string, ip: string) {
+    const res = response();
+    await naturalSearch(
+      {
+        method: "POST",
+        body: { query },
+        headers: { "x-forwarded-for": ip },
+      } as never,
+      res as never
+    );
+    return res;
+  }
+
+  beforeEach(() => {
+    clearNaturalSearchCache();
+    vi.clearAllMocks();
+  });
+
+  it("throttles uncached LLM calls per client with 429", async () => {
+    vi.mocked(invokeLLM).mockResolvedValue(llmReply as never);
+    const results = [];
+    for (let i = 0; i < 12; i++)
+      results.push(await search(`unique query ${i}`, "198.51.100.90"));
+    const limitedAt = results.findIndex(r => r.statusCode === 429);
+    expect(limitedAt).toBeGreaterThan(0);
+    expect(results[limitedAt].headers["Retry-After"]).toBe("10");
+    expect(vi.mocked(invokeLLM).mock.calls.length).toBe(limitedAt);
+  });
+
+  it("does not count cache hits against the limit", async () => {
+    vi.mocked(invokeLLM).mockResolvedValue(llmReply as never);
+    const first = await search("same query", "198.51.100.91");
+    expect(first.statusCode).toBe(200);
+    for (let i = 0; i < 15; i++) {
+      const hit = await search("same query", "198.51.100.91");
+      expect(hit.statusCode).toBe(200);
+      expect(hit.headers["X-Search-Cache"]).toBe("HIT");
+    }
+    expect(vi.mocked(invokeLLM)).toHaveBeenCalledTimes(1);
+  });
+});

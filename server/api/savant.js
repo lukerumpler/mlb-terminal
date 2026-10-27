@@ -212,6 +212,7 @@ import { createHash } from "node:crypto";
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { authorizeProviderFailureHook, failureInjectionResponse, isFailureInjectionRequested } from "./provider-failure-hook.js";
+import { currentMlbSeason, isPlausibleSeason } from "../season.ts";
 
 const ENDPOINTS = {
   expected_statistics: y =>
@@ -390,7 +391,7 @@ function serveStaleSavant(res, stale) {
   return res.status(200).json(stale.data);
 }
 
-export async function warmSavantCache(year = '2026') {
+export async function warmSavantCache(year = String(currentMlbSeason())) {
   const endpoints = ['expected_statistics', 'statcast_leaderboard'];
   for (const endpoint of endpoints) {
     const response = {
@@ -409,14 +410,29 @@ export default async function handler(req, res) {
   if (req.method !== "GET")
     return res.status(405).json({ error: "Method not allowed" });
 
-  const { endpoint, year, playerId, team } = req.query ?? {};
-  const y = String(year || "2026");
+  const { endpoint: rawEndpoint, year, playerId, team } = req.query ?? {};
+  const y = String(year || currentMlbSeason());
 
-  if (!endpoint || !ENDPOINTS[endpoint]) {
+  // ENDPOINTS is a plain object, so `ENDPOINTS[name]` is truthy for every
+  // Object.prototype member ("__proto__", "constructor", "toString", ...). Accept
+  // only an own key, and only a single string (not an array).
+  const endpoint =
+    typeof rawEndpoint === "string" && Object.hasOwn(ENDPOINTS, rawEndpoint)
+      ? rawEndpoint
+      : "";
+  if (!endpoint) {
     return res.status(400).json({
       error: "Invalid endpoint",
       valid: Object.keys(ENDPOINTS),
       example: "/api/savant?endpoint=expected_statistics&year=2025",
+    });
+  }
+
+  // `y` is interpolated straight into the upstream URL, so it must be a plain
+  // four-digit season (no "2026&csv=false") within Savant's data range.
+  if (!/^\d{4}$/.test(y) || !isPlausibleSeason(Number(y), { min: 2008 })) {
+    return res.status(400).json({
+      error: `year must be a four-digit season from 2008 to ${currentMlbSeason() + 1}`,
     });
   }
 

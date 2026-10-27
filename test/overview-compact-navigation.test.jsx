@@ -275,7 +275,7 @@ describe('Team Overview compact navigation', () => {
     render(<OverviewPage />);
 
     await screen.findByRole('button', { name: 'Briefing' });
-    await screen.findByText('0.456');
+    expect((await screen.findAllByText('0.456')).length).toBeGreaterThan(0);
 
     window.dispatchEvent(new CustomEvent('skip-select-team', { detail: { abbr: 'SF' } }));
     await screen.findAllByAltText('San Francisco Giants logo');

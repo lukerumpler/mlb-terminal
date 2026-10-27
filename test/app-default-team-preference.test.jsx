@@ -29,8 +29,8 @@ describe('App default Team Overview preference', () => {
     window.localStorage.setItem(DEFAULT_TEAM_PREFERENCE_KEY, 'nyy');
     render(<App />);
 
-    // App loads the initial Overview through Suspense; allow the unbundled
-    // jsdom transform to finish without weakening the preference assertion.
+    // Mounting the whole App can take longer than Testing Library's 1 s default on a slow
+    // runner (it measured ~1.2 s here), so wait up to 8 s. The assertion is unchanged.
     expect(await screen.findByRole('combobox', { name: 'Select team' }, { timeout: 8000 })).toHaveValue('nyy');
   });
 });

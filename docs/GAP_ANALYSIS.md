@@ -1,0 +1,116 @@
+# SKIP gap analysis: what stands between this repo and "perfect"
+
+Date: 2026-10-03. Scope: `lukerumpler/mlb-terminal` at `main` (`59d6caf`) plus the combined branch (`combined2`).
+Method: read the repo, branches, workflows and docs; measured what could be measured locally. Every item
+says how it was found. "Unverified" means I could not check it from here.
+
+## Status after the implementation pass
+
+Numbers refer to the items below. "Done" means implemented and tested in this branch; nothing here has run on GitHub, Vercel or Manus.
+
+**Done**
+- **#2 Security headers:** baseline headers, HSTS over HTTPS in production, a **Report-Only** CSP (`CSP_MODE=enforce` after reviewing console violations), and static headers in `vercel.json`. Framing is intentionally not restricted until the platform preview is known not to need it. Review notes: the CSP and HSTS exist only in the Express app (Vercel gets the three simple headers from `vercel.json`, kept identical by a test); the Report-Only policy has no `report-uri`, so violations appear only in the console of whoever loads the page; and `script-src 'unsafe-inline'` (needed for the inline script in `index.html`) stays even in `enforce` mode, so enforcing blocks foreign hosts but not injected inline scripts until that script is moved to a file or allowed by hash.
+- **#3 Graceful shutdown:** SIGTERM/SIGINT drain in-flight requests; forced exit after `SHUTDOWN_TIMEOUT_MS`.
+- **#5 Rate limiting (partly):** limits are configurable and a known proxy-hop count can be trusted. The default is unchanged, so the spoofing risk stays until `RATE_LIMIT_TRUSTED_PROXY_HOPS` is set to a confirmed value.
+- **New finding, fixed:** `/api/comparison-summary` and `/api/natural-search` call a paid LLM with no throttle. Both now limit uncached calls to 8 per minute per client.
+- **#1 About page (partly):** the dead `#` link is gone; the LinkedIn button and photo turn on when you set `LINKEDIN_URL` / `HEADSHOT_SRC` in `AboutPage.jsx`. The real values are still yours to supply.
+- **#7 DB tests in CI**, **#13 Dependabot**, **#20 env docs**, **#21 CODEOWNERS**: done. Review follow-ups: five client/test variables were still undocumented (`VITE_OAUTH_PORTAL_URL`, `VITE_API_BASE`, `VITE_FRONTEND_FORGE_API_KEY`/`_URL`, `VERCEL_SMOKE_TIMEOUT_MS`) and are now in `.env.example` and the README; and the CODEOWNERS rule `/api/[...path].ts` became `/api/`, because GitHub documents `[ ]` as unsupported in CODEOWNERS patterns and a bracketed filename may silently match nothing.
+- **#8 Lint (partly):** `pnpm lint` covers the new code and now runs in CI (`quality.yml`). Still no ESLint.
+- **#10 Coverage (partly):** `feed.js` and `comparison-summary.js` went from 0% to tested. Two real bugs surfaced and are fixed: an unparseable date turned the whole feed into a 500, and the pitcher fallback text talked about bat speed.
+- **#11 Component tests (partly):** `TeamBadge`, `TeamNewsPanel`, `PlayerNewsPanel`, `RequestDiagnosticsPanel`. Not done: `OrganizationRosterDirectory`, `FollowListPage`.
+- **#16 Dead code (partly):** `ComponentShowcase.tsx` and `dev-mock-data.js` removed. `main.tsx`, `App.tsx`, `Home.tsx` and `NotFound.tsx` are kept as a precaution. `template.json` (a platform snapshot that nothing in the repo reads) embeds `main.tsx`, `App.tsx` and `Home.tsx` but not `NotFound.tsx`, so that is not a reason to keep `NotFound.tsx`; confirm with the host, then delete all four (they are reachable only from the unused `main.tsx`).
+- **#18 Root clutter:** 38 tracked root files down to 19; notes archived under `docs/archive/`, design notes under `docs/design/`, roadmap docs under `docs/`.
+- **#26 Hardcoded seasons:** one calendar-driven helper (`server/season.ts`) replaces the `2026` defaults and the fixed 2024-2030 range. Two caveats: from February the default becomes the new season, so the WAR and payroll panels will show empty states until the providers publish (about April); and the `fangraphs-models` season parameter never had an upper bound and still does not.
+
+**Found and fixed in the second debugging pass**
+- **Public upload and transcription (new, highest severity):** `storage.upload` and `voice.transcribe` accepted anonymous, unthrottled calls; the upload took any file type up to 50 MB and the transcription endpoint fetched any URL (SSRF). Both are now restricted (audio-only, size-capped, rate-limited, storage-path-only).
+- **Voice-note transcription was almost certainly broken:** a relative storage path was passed to a server-side `fetch`. Fixed by resolving it to a signed URL.
+- **Recorder UI trap:** a failed upload left a full-screen dialog with disabled buttons. Fixed, plus microphone release on cancel, empty-recording and Safari-format handling.
+- **413/400 reported as 500:** the API error handler ignored client-error statuses.
+- **Rate-limiter eviction** cleared everyone's counters at 5,000 keys; now expiry-then-LRU.
+- **Body limit** (the open question above) is resolved: 25 MB on `/api/trpc` only, 2 MB elsewhere.
+
+**Not done, and why**
+- **#4 Heartbeat jobs:** an owner action on the host.
+- **#6 Vercel database**, **#19 branch cleanup**: need access I don't have. Delete the nine merged branches from the GitHub UI, or run `git push origin --delete <branch>` for each.
+- **#9 type coverage**, **#12 e2e in CI**, **#14 major upgrades**, **#17 unused UI kit**: each is its own change, and none is safe to batch here.
+- **#15 splitting `OverviewPage.jsx`:** a large refactor that needs visual checking in a browser; it should be its own PR.
+- **#22-#25, #27-#29:** product work or things that need live data.
+- **`storageProxy` is public:** `GET /manus-storage/*` serves any key without authentication; keys carry a random 8-character suffix, which is obscurity rather than access control. Recordings may contain scouting notes, so decide whether they should be private.
+
+## Review notes (independent verification)
+
+Checked against the combined branch by reading the tree and running the code. **Confirmed as written:** #1 (placeholders), #2 and #3 (no headers or signal handlers existed), #4 (two open items at todo lines 79-80), #5 (limiter keys on the first `x-forwarded-for` entry), #7 (three DB-gated files; only the new workflow has a database service), #8 (`lint` was a 10-file Prettier list), #9 (`tsconfig` has no `allowJs`/`checkJs`; 32,598 JS/JSX versus 14,554 TS/TSX lines is 69% untyped), #11 (all six components had zero test references), #15 (line counts exact), #16 (`index.html` loads `main.jsx`, which imports `./App.jsx`; `App.tsx` is reachable only from `main.tsx`), #17 (43 of 53 UI files unused), #18 (38 root files), #19 (9 merged remote branches), #26 (guards as described).
+
+**Corrected or extended:**
+- **#14 is incomplete.** `pnpm outdated` shows 20 majors behind, not 8. The other twelve: `@testing-library/jest-dom`, `@types/express`, `@types/node`, `@vitejs/plugin-react`, `@vitest/coverage-v8`, `cookie`, `dotenv`, `nanoid`, `pnpm`, `react-day-picker`, `react-resizable-panels`, `superjson`. Dependabot ignores majors by design, so none of them will ever be proposed.
+- **#10:** `@vitest/coverage-v8` is already a devDependency, so a CI coverage step needs no new package. The percentages were not re-measured.
+- **#6:** the Aug 17 note says Vercel had *no* project environment variables, not just no `DATABASE_URL`; `JWT_SECRET`, `ALLOWED_ORIGIN` and the OAuth settings were absent too.
+- **#7:** the workflow's steps were replayed against a fresh MariaDB 10.11 database: 92 tests, 0 skipped (the 90 originally counted plus two later contract tests). The drift check was also shown to fail: removing one column from `drizzle/schema.ts` makes `drizzle-kit generate` write a new migration and the workflow's command exit 1; it exits 0 on the committed schema.
+- **#5:** `hits.clear()` at 5,000 keys resets every caller's counter, but anyone who can rotate spoofed keys can already bypass the limit by changing key, and with `RATE_LIMIT_TRUSTED_PROXY_HOPS` set they cannot create arbitrary keys. It is a robustness quirk, not a separate hole.
+- **Env scan caveat:** a `process.env.X` search misses variables read by name through a helper (`envPositiveInt("RATE_LIMIT_MAX", ...)`), so those look "undocumented" or "dead" when they are neither.
+
+**Not independently verified:** coverage percentages (#10), the e2e test's behaviour (#12), anything on GitHub, Vercel or Manus.
+
+## What I could not see
+- GitHub issues (the unauthenticated API was rate-limited), branch-protection rules, Actions run history, repository secrets.
+- The production site, the Manus deployment, its database engine, its Heartbeat schedules, and its proxy headers.
+- Live MLB, Savant, FanGraphs, Baseball-Reference and Spotrac responses (blocked from my sandbox).
+
+## P0: visible to users or risky in production
+
+| # | Gap | Evidence | Action |
+|---|---|---|---|
+| 1 | **About page ships placeholders.** The LinkedIn link is `href="#"` and the "headshot" is an "LR" box. | `client/src/pages/AboutPage.jsx` lines 108-125, two `TODO`s | Needs your real profile URL and photo. Only you can supply these. |
+| 2 | **No security headers.** No CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options` or `Referrer-Policy` anywhere. | `grep` of `server/app.ts`, `server/_core/*`, `vercel.json` finds none | The salary PR notes an unrelated hardening pass (headers, configurable rate limiting, graceful shutdown, rewritten `docs/deployment.md`) was left out of its diff. Land it as its own PR; if you have that snapshot, upload it. |
+| 3 | **No graceful shutdown.** No `SIGTERM`/`SIGINT` handler on a host that autoscales. | `server/_core/index.ts` | Scale-in can drop in-flight requests and ingestion batches. Part of the same hardening pass. |
+| 4 | **Heartbeat jobs are not confirmed.** `todo-pybhwqcf.md` still has two open items about verifying the 09:00 UTC schedule; the new `POST /api/scheduled/ingest-mlb` has no job at all. | `todo-pybhwqcf.md` lines 79-80 | Create and verify the Heartbeat call, then check one run's JSON report. |
+| 5 | **Rate limiting is per instance and trusts `x-forwarded-for`.** In-memory map, keyed on the first forwarded address. | `server/api/_shared.js` `isRateLimited` | Under autoscaling the real limit is N times higher. If the edge appends rather than overwrites that header, a client can spoof it. Unverified: depends on how Manus sets it. |
+| 6 | **Vercel previews likely have no database.** An Aug 17 audit note says `DATABASE_URL` was absent on Vercel. | `docs/optimization-baseline-2026-08-17.md` (quoted in the warehouse plan) | The warehouse routes now degrade to a clean 503, but previews will never show warehouse data until it is set. |
+
+## P1: quality gates
+
+| # | Gap | Evidence | Action |
+|---|---|---|---|
+| 7 | **DB tests never ran in CI.** Three suites are skipped without `MLB_TEST_DATABASE_URL` and no workflow starts a database, so the deadlock and SQL tests are never exercised. | `describe.skip` gate in 3 files; 4 workflows, none with a service | **Done:** `.github/workflows/warehouse-db-tests.yml` (MariaDB 10.11, migrate, drift check, suites). Steps replayed locally: 90 tests, 0 skipped. Not yet run on GitHub. |
+| 8 | **"Lint" is Prettier on 10 files.** No ESLint, no a11y lint, no CI step for `pnpm lint` or `release:gate`. | `package.json` scripts; `uptime-validation.yml` runs check/test/build only | Add ESLint (with `jsx-a11y`) scoped to changed files first; run `pnpm lint` in CI. |
+| 9 | **Most source is not type-checked.** About 31k lines of JS/JSX versus 13k of TS/TSX (roughly 70% untyped). `tsconfig` has no `allowJs`/`checkJs` and excludes `*.test.ts`. | line counts by extension | Start with `// @ts-check` on `server/api/*.js`, the data-facing layer. |
+| 10 | **Coverage is unmeasured.** Locally, `server/api` + `server/mlb-warehouse`: 66.6% lines (store/queries look low only because DB suites skip). Handlers at 0%: `feed.js`, `comparison-summary.js`. Low: `player-advanced.js` 19%, `player-identity.js` 28%, `contract.js` 43%, `uptime-monitor.ts` 44%. | `vitest --coverage` | Add a coverage report to CI and a floor for new code. Write tests for the two 0% handlers first. |
+| 11 | **Untested UI.** No test references: `FollowListPage`, `OrganizationRosterDirectory`, `PlayerNewsPanel`, `RequestDiagnosticsPanel`, `TeamBadge`, `TeamNewsPanel`. | name search across `test/` | Smoke-render tests for each. |
+| 12 | **One e2e test, not in CI.** `test:e2e` runs one file; the README called it "Playwright tests" (**fixed**). | `test/published-overview.e2e.test.js` | Run it in the Vercel-smoke workflow against the preview. |
+| 13 | **No dependency automation; 17 prod vulnerabilities on `main`.** The combined branch clears them. | reviewer's audit log | **Done:** `.github/dependabot.yml` (weekly minor/patch group; majors excluded). Merge the branch for the vulnerability fixes. |
+| 14 | **Major versions behind** (each its own migration PR): express 4 to 5, vite 7 to 8, recharts 2 to 3, vitest 2 to 5, TypeScript 5.9 to 7, jsdom 24 to 30, framer-motion 12 to 14, lucide-react 0.x to 1.x. | `pnpm outdated` | Do not batch. Express 5 and recharts 3 have real breaking changes. |
+
+## P2: maintainability (and your visual-control goal)
+
+| # | Gap | Evidence | Action |
+|---|---|---|---|
+| 15 | **Monolith files.** `OverviewPage.jsx` 3,623 lines, `PlayersPage.jsx` 3,078, `api/mlb.js` 2,972, `OtherPages.jsx` 1,990, `index.css` 1,638. | `wc -l` | This is the biggest blocker for the visual roadmap: you cannot move or swap cards that are 3,600 lines of one file. Split Overview into one component per card plus a small registry, **then** add `react-grid-layout` (not installed; roadmap phase 3 not started). |
+| 16 | **Dead scaffold code.** `client/src/main.tsx`, `App.tsx`, `pages/Home.tsx`, `pages/NotFound.tsx` (only reference each other; `index.html` loads `main.jsx`), `pages/ComponentShowcase.tsx` (1,437 lines, not routed), `dev-mock-data.js` (unreferenced), the `TODO` scaffold in `server/routers.ts`. | reference search | Delete after one more look; `NotFound` may be worth keeping as a real 404. |
+| 17 | **Template UI kit mostly unused.** 53 files in `components/ui`; 43 are not used outside `ui/` and the showcase. About 25 Radix packages ride along and now get update PRs. | reference search | Remove unused components and their packages. |
+| 18 | **Root clutter.** 38 markdown/JSON files at the root; 12 tracked notes/audits (`todo.md` is 11,421 lines; four todo files; `data_audit_*`, `qa-notes*`). | `git ls-files` | Move to `docs/archive/`; keep README, CHANGELOG, `docs/`. |
+| 19 | **Stale branches.** 9 remote branches are fully merged (0 commits ahead of `main`); PR #32 is superseded by the salary-war branch. | `git rev-list --count` | Delete the 9 merged branches; close #32 after the combined PR merges. |
+| 20 | **Undocumented env vars.** Eight were read in code but absent from the README. | `process.env.*` scan | **Done:** README table updated and `.env.example` added. |
+| 21 | **New code had no owner.** `CODEOWNERS` covered only provider-cache files. | `.github/CODEOWNERS` | **Done:** warehouse, schema, new routes and the Vercel catch-all added. |
+
+## P3: product and data (from the work in this thread)
+
+| # | Gap | Notes |
+|---|---|---|
+| 22 | **No component calls the warehouse.** Pitch-panel adapter not written. | First compare one pitcher's `avgPfxX` with Savant to settle the sign perspective; the warehouse's `breakHorizontal` is a different quantity. |
+| 23 | **Warehouse health is invisible.** | `view=status` has it; surface it in the cache-health and source-status views. |
+| 24 | **Warehouse layers not built:** plays, teams dimension, batting/pitching/fielding lines, provider ID map, aggregates. | Deliberately deferred; build when a feature needs them. |
+| 25 | **Blended defensive WAR is null** when FanGraphs is the only provider. | Needs a real defensive-WAR source. |
+| 26 | **Hardcoded seasons.** `DEFAULT_SEASON = 2026` in `team-efficiency.js`, `team-financials.js`, `fangraphs-models.js`; efficiency route rejects seasons outside 2024-2030. | Becomes wrong in 2027. `currentMlbSeason()` already exists in `server/mlb-warehouse/ingest.ts`. |
+| 27 | **Deep pagination.** Offset is capped at 50,000 rows; keyset pagination is the real fix if a UI needs deep paging. | |
+| 28 | **Scraped sources are fixture-tested only.** Baseball-Reference, FanGraphs and Spotrac parsers have never been exercised against the live sites from CI. | The provider-health smoke script exists (`release:providers`); run it on a schedule. |
+| 29 | **Production DB engine unconfirmed.** | Tests ran on MariaDB 10.11; `withLockRetry` only recognises InnoDB codes 1213 and 1205. |
+
+## Suggested order
+1. **Merge the combined branch** (security fixes, warehouse, efficiency panels), then delete the 9 merged branches and close #32.
+2. **Land the hardening pass** (security headers, graceful shutdown, configurable rate limiting): #2, #3, #5.
+3. **Fix the About page** (#1) and **create the Heartbeat jobs** (#4).
+4. **Gates:** run `warehouse-db-tests` on GitHub, add `pnpm lint` and coverage to CI, add ESLint (#7-#12).
+5. **Cleanup:** dead scaffold, unused UI kit, root clutter (#16-#18). This also makes step 6 possible.
+6. **Visual control:** split `OverviewPage.jsx` into card components, then add drag-and-drop (#15).
+7. **Product:** pitch-panel adapter, warehouse health, season defaults (#22, #23, #26).

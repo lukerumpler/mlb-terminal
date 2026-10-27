@@ -71,6 +71,35 @@ describe("browser provider request cache", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("serves a stale snapshot briefly after a failed refresh, then tries the server again", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T10:00:00Z"));
+    try {
+      localStorage.setItem("skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=LAD&season=2026", JSON.stringify({
+        savedAt: Date.now() - 60 * 60_000,
+        data: { found: true, teamWar: 40.1, playoffOdds: 80.2 },
+      }));
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(new Response("temporary failure", { status: 502 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ found: true, teamWar: 42.4, playoffOdds: 88.1, freshness: "live" }), { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      expect((await getTeamModelSources("LAD", 2026)).freshness).toBe("stale-local");
+      // Inside the window the stale answer is reused without hitting the server again.
+      vi.setSystemTime(new Date("2026-10-12T10:10:00Z"));
+      expect((await getTeamModelSources("LAD", 2026)).freshness).toBe("stale-local");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // After the window a recovered server is picked up; the tab is not pinned to stale until midnight.
+      vi.setSystemTime(new Date("2026-10-12T10:16:00Z"));
+      const fresh = await getTeamModelSources("LAD", 2026);
+      expect(fresh.freshness).toBe("live");
+      expect(fresh.teamWar).toBe(42.4);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not use a local snapshot older than seven days", async () => {
     localStorage.setItem("skip-fangraphs-model-snapshot-v1:/api/fangraphs-models?team=LAD&season=2026", JSON.stringify({
       savedAt: Date.now() - 8 * 24 * 60 * 60_000,
@@ -117,5 +146,25 @@ describe("browser provider request cache", () => {
       expect.objectContaining({ teamWar: 42.4, divisionAverageWAR: 42.4 }),
       expect.objectContaining({ teamWar: 42.4, divisionAverageWAR: 42.4 }),
     ]);
+  });
+
+  // Regression test: a genuine transport-level failure (fetch() itself
+  // rejecting - offline, DNS, timeout) previously collapsed to a bare
+  // `null` here, discarding status/source/reason detail every other
+  // return path from this function provides. It also referenced `url`
+  // from inside the try block's scope as a fallback, the same
+  // out-of-scope bug fixed upstream in the fallback-only implementation -
+  // any failure lacking a structured error payload would have thrown
+  // "ReferenceError: url is not defined" instead of returning gracefully.
+  it("reports team WAR as an unavailable object (not null, not a thrown error) when the network request fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+
+    const result = await getTeamAggregateWar("Los Angeles Dodgers", ["Los Angeles Dodgers"], 2026);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: "unavailable",
+      teamWar: null,
+      sourceUrl: "/api/fangraphs-models?mode=aggregate&season=2026",
+    }));
   });
 });

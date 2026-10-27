@@ -1,3 +1,5 @@
+import { SEASON } from '../constants/data.js';
+
 const STORAGE_KEY = 'skip-cbt-history-range';
 
 export const CBT_HISTORY_OPTIONS = Object.freeze([5, 10, 15]);
@@ -24,7 +26,7 @@ export function saveCbtHistoryRange(value) {
   return normalized;
 }
 
-export function buildCbtHistorySeasons(range = 5, currentSeason = 2026) {
+export function buildCbtHistorySeasons(range = 5, currentSeason = SEASON) {
   const count = normalizeCbtHistoryRange(range);
   const current = Number(currentSeason);
   if (!Number.isInteger(current)) return [];

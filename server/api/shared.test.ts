@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyCors, isRateLimited } from "./_shared.js";
+import { applyCors, clientAddress, isRateLimited } from "./_shared.js";
 
 describe("legacy API shared helpers", () => {
   it("returns the permissive CORS contract when no allowlist is configured", () => {
@@ -112,5 +112,98 @@ describe("legacy API shared helpers", () => {
       expect(isRateLimited(request)).toBe(false);
     }
     expect(isRateLimited(request)).toBe(true);
+  });
+
+  describe("rate limiting configuration", () => {
+    const req = (forwarded?: string, remote = "10.0.0.9") =>
+      ({
+        headers: forwarded ? { "x-forwarded-for": forwarded } : {},
+        socket: { remoteAddress: remote },
+      }) as never;
+
+    it("keys on the first forwarded address by default (unchanged behavior)", () => {
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "");
+      expect(clientAddress(req("1.1.1.1, 2.2.2.2"))).toBe("1.1.1.1");
+      expect(clientAddress(req())).toBe("10.0.0.9");
+      vi.unstubAllEnvs();
+    });
+
+    it("uses the Nth address from the right when trusted hops are configured", () => {
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "1");
+      // A spoofed leading entry no longer decides who the client is.
+      expect(clientAddress(req("6.6.6.6, 203.0.113.5"))).toBe("203.0.113.5");
+      vi.stubEnv("RATE_LIMIT_TRUSTED_PROXY_HOPS", "2");
+      expect(clientAddress(req("6.6.6.6, 203.0.113.5, 10.1.1.1"))).toBe(
+        "203.0.113.5"
+      );
+      // More hops than entries falls back to the leftmost instead of throwing.
+      expect(clientAddress(req("203.0.113.5"))).toBe("203.0.113.5");
+      vi.unstubAllEnvs();
+    });
+
+    it("honors RATE_LIMIT_MAX and ignores invalid values", () => {
+      vi.stubEnv("RATE_LIMIT_MAX", "2");
+      const caller = req("198.51.100.200");
+      expect([1, 2, 3].map(() => isRateLimited(caller, "cfg-test"))).toEqual([
+        false,
+        false,
+        true,
+      ]);
+      vi.stubEnv("RATE_LIMIT_MAX", "not-a-number");
+      const other = req("198.51.100.201");
+      const results = Array.from({ length: 31 }, () =>
+        isRateLimited(other, "cfg-test")
+      );
+      expect(results.slice(0, 30).every(r => r === false)).toBe(true);
+      expect(results[30]).toBe(true);
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe("tracked-client eviction", () => {
+    const at = (ip: string) =>
+      ({ headers: { "x-forwarded-for": ip }, socket: {} }) as never;
+
+    it("keeps a throttled client throttled while thousands of other addresses arrive", () => {
+      vi.stubEnv("RATE_LIMIT_MAX", "2");
+      const heavy = at("203.0.113.250");
+      expect(isRateLimited(heavy, "evict")).toBe(false);
+      expect(isRateLimited(heavy, "evict")).toBe(false);
+      expect(isRateLimited(heavy, "evict")).toBe(true);
+
+      // Distinct callers push the table past its 5,000-key cap. The old code
+      // called Map.clear() here, which reset the heavy client to zero.
+      for (let i = 0; i < 5200; i++) {
+        isRateLimited(at(`10.${i >> 8}.${i & 255}.1`), "evict");
+        // The heavy client keeps calling during the flood, so it is recent.
+        if (i % 500 === 0) expect(isRateLimited(heavy, "evict")).toBe(true);
+      }
+      expect(isRateLimited(heavy, "evict")).toBe(true);
+      vi.unstubAllEnvs();
+    });
+
+    it("purges expired entries first and keeps a live entry from a longer-window bucket", () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-10-04T00:00:00Z"));
+        const longWindow = { max: 1, windowMs: 60_000 };
+        const llm = at("203.0.113.240");
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(false);
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(true);
+        // 4,000 short-window (10 s) entries fill most of the table...
+        for (let i = 0; i < 4000; i++)
+          isRateLimited(at(`172.16.${i >> 8}.${i & 255}`), "flood");
+
+        // ...30 s later every one of them has expired, but the 60 s entry has not.
+        vi.setSystemTime(new Date("2026-10-04T00:00:30Z"));
+        // 1,500 new callers take the table past 5,000, which triggers the purge.
+        for (let i = 0; i < 1500; i++)
+          isRateLimited(at(`192.168.${i >> 8}.${i & 255}`), "flood2");
+        // A purge keyed to the CURRENT call's 10 s window would have dropped it.
+        expect(isRateLimited(llm, "llm-evict", longWindow)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

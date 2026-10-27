@@ -26,6 +26,7 @@ const NITTER_HOSTS = [
 ];
 
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { closedBlocks } from "./html-scan.js";
 
 const CACHE_TTL_S = 5 * 60;
 const CACHE_SWR_S = 2 * 60;
@@ -34,7 +35,7 @@ const FETCH_MS = 7_000;
 function stripHtml(html = "") {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^<>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -47,18 +48,28 @@ function stripHtml(html = "") {
 
 function parseRss(xml, handle) {
   const items = [];
-  const itemRe = /<item>([\s\S]*?)<\/item>/g;
-  let match;
-  while ((match = itemRe.exec(xml)) !== null) {
+  const seenIds = new Set();
+  for (const match of closedBlocks(
+    xml,
+    /<item>([\s\S]*?)<\/item>/g,
+    /<\/item>/g
+  )) {
     const block = match[1];
     const get = tag => {
-      // Match CDATA or plain text variants
-      const re = new RegExp(
-        `<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>` +
-          `|<${tag}[^>]*>([^<]*)</${tag}>`
-      );
-      const m = re.exec(block);
-      return m ? (m[1] ?? m[2] ?? "").trim() : "";
+      // Text between <tag ...> and the first </tag>, found without backtracking so a
+      // garbled feed cannot make parsing quadratic. A CDATA section is unwrapped; plain
+      // text may not contain markup (same acceptance rule as before).
+      const opener = new RegExp(`<${tag}(?:\\s[^<>]*)?>`).exec(block);
+      if (!opener) return "";
+      const start = opener.index + opener[0].length;
+      const closer = new RegExp(`</${tag}>`, "g");
+      closer.lastIndex = start;
+      const end = closer.exec(block);
+      if (!end) return "";
+      const raw = block.slice(start, end.index);
+      const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(raw);
+      if (cdata) return cdata[1].trim();
+      return raw.includes("<") ? "" : raw.trim();
     };
     const title = stripHtml(get("title"));
     const link = get("link") || get("guid");
@@ -68,10 +79,19 @@ function parseRss(xml, handle) {
     // when it's actually longer.
     const text = desc.length > title.length ? desc : title;
     if (!text || !link) continue;
-    const isoDate = pubDate ? new Date(pubDate).toISOString() : null;
+    // An unparseable date must not throw: toISOString() raises RangeError on an
+    // invalid Date, which would turn one bad item into a 500 for the whole feed.
+    const parsedDate = pubDate ? new Date(pubDate) : null;
+    const isoDate =
+      parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? parsedDate.toISOString()
+        : null;
     // Stable id: last path segment of the tweet URL (the numeric tweet id)
     const id =
       link.split("/").filter(Boolean).pop() || `${Date.now()}_${items.length}`;
+    // The same item twice in one feed would hand the client duplicate ids (and React keys).
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
     items.push({ id, handle, text, url: link, isoDate });
   }
   return items;
@@ -90,6 +110,11 @@ async function tryFetch(handle, host) {
   if (!xml.includes("<channel>"))
     throw new Error(`Non-RSS response from ${host}`);
   return xml;
+}
+
+// Test hook: the parser is otherwise only reachable through the network handler.
+export function __parseRssForTests(xml, handle) {
+  return parseRss(xml, handle);
 }
 
 export default async function handler(req, res) {

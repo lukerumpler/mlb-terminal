@@ -11,8 +11,26 @@ import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
 import { readDurableCache, writeDurableCache } from "../durable-cache";
 import { recordCacheOutcome } from "../cache-health";
 import { getRepeaterTier, CBT_SOURCE_URL } from "../../shared/luxuryTax.js";
+import { currentMlbSeason, isSupportedSeason } from "../season.ts";
+import {
+  CELL_BLOCK,
+  CELL_CLOSE,
+  ROW_BLOCK,
+  ROW_CLOSE,
+  TABLE_BLOCK,
+  TABLE_CLOSE,
+  closedBlocks,
+  firstClosedBlock,
+} from "./html-scan.js";
 
-const DEFAULT_SEASON = 2026;
+// Patterns for the parts of a table we read here (see html-scan.js for why each one is built this way).
+// A BLOCK pattern finds a whole <tag> ... </tag> piece and a CLOSE pattern finds only the closing tag.
+const THEAD_BLOCK = /<thead[^<>]*>([\s\S]*?)<\/thead>/i;       // The header section of a table
+const THEAD_CLOSE = /<\/thead>/gi;                              // Just the closing header section tag
+const TBODY_BLOCK = /<tbody[^<>]*>([\s\S]*?)<\/tbody>/i;       // The body of a table
+const TBODY_CLOSE = /<\/tbody>/gi;                              // Just the closing body tag
+const FIRST_ROW_BLOCK = /<tr[^<>]*>([\s\S]*?)<\/tr>/i;        // The first row, used as the header when a table has no header section
+
 const TEAM_CODE = /^[A-Z]{2,3}$/;
 const SPOTRAC_PAYROLL_URL = season =>
   `https://www.spotrac.com/mlb/payroll/_/year/${season}`;
@@ -24,10 +42,19 @@ const FRESH_TTL_MS = 30 * 60_000;
 const STALE_TTL_MS = 6 * 60 * 60_000;
 const financialCache = new Map();
 const financialInFlight = new Map();
+const spotracPageCache = new Map();
+const spotracPageInFlight = new Map();
 
 export function __resetTeamFinancialsStateForTests() {
   financialCache.clear();
   financialInFlight.clear();
+  spotracPageCache.clear();
+  spotracPageInFlight.clear();
+}
+
+export function shouldRateLimitFinancialRefresh(team, season = currentMlbSeason()) {
+  const cached = financialCache.get(financialCacheKey(team, season));
+  return !(cached?.freshUntil > Date.now()) && !financialInFlight.has(financialCacheKey(team, season));
 }
 
 function financialCacheKey(team, season) {
@@ -51,7 +78,7 @@ function setFinancialHeaders(res, freshness) {
 
 function stripTags(html) {
   return (html || "")
-    .replace(/<[^>]+>/g, " ")
+    .replace(/<[^<>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#39;/g, "'")
@@ -74,20 +101,20 @@ export function parseMoney(value) {
 }
 
 function headerText(tableHtml) {
-  const thead = tableHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead>/i)?.[1] || "";
+  const thead = firstClosedBlock(tableHtml, THEAD_BLOCK, THEAD_CLOSE)?.[1] || "";
   const source =
-    thead || tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || "";
-  return [...source.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map(match =>
+    thead || firstClosedBlock(tableHtml, FIRST_ROW_BLOCK, ROW_CLOSE)?.[1] || "";
+  return closedBlocks(source, CELL_BLOCK, CELL_CLOSE).map(match =>
     stripTags(match[1]).toLowerCase()
   );
 }
 
 function tableRows(tableHtml) {
   const tbody =
-    tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)?.[1] || tableHtml;
-  return [...tbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+    firstClosedBlock(tableHtml, TBODY_BLOCK, TBODY_CLOSE)?.[1] || tableHtml;
+  return closedBlocks(tbody, ROW_BLOCK, ROW_CLOSE)
     .map(match =>
-      [...match[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(cell =>
+      closedBlocks(match[1], CELL_BLOCK, CELL_CLOSE).map(cell =>
         stripTags(cell[1])
       )
     )
@@ -95,7 +122,7 @@ function tableRows(tableHtml) {
 }
 
 function findTable(html, predicate) {
-  return [...String(html || "").matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)]
+  return closedBlocks(html, TABLE_BLOCK, TABLE_CLOSE)
     .map(match => match[0])
     .find(table => predicate(headerText(table)));
 }
@@ -116,7 +143,7 @@ function indexOfHeader(headers, predicate) {
   return headers.findIndex(predicate);
 }
 
-export function parseTeamPayrollHtml(html, teamAbbr, season = DEFAULT_SEASON) {
+export function parseTeamPayrollHtml(html, teamAbbr, season = currentMlbSeason()) {
   const table = findTable(html, headers =>
     headers.some(header => header.includes("total payroll"))
   );
@@ -170,7 +197,7 @@ export function parseTeamPayrollHtml(html, teamAbbr, season = DEFAULT_SEASON) {
   };
 }
 
-export function parseTeamTaxHtml(html, teamAbbr, season = DEFAULT_SEASON) {
+export function parseTeamTaxHtml(html, teamAbbr, season = currentMlbSeason()) {
   const table = findTable(
     html,
     headers =>
@@ -244,34 +271,25 @@ async function fetchHtml(url, timeoutMs = 12_000) {
   return response.text();
 }
 
-export default async function handler(req, res) {
-  applyCors(req, res);
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "GET")
-    return res.status(405).json({ error: "Method not allowed" });
-  const url = new URL(req.url, "https://placeholder.invalid");
-  const team = String(url.searchParams.get("team") || "")
-    .trim()
-    .toUpperCase();
-  const parsedSeason = Number(url.searchParams.get("season") || DEFAULT_SEASON);
-  const season =
-    Number.isInteger(parsedSeason) &&
-    parsedSeason >= 2024 &&
-    parsedSeason <= 2030
-      ? parsedSeason
-      : DEFAULT_SEASON;
-  if (!TEAM_CODE.test(team))
-    return res
-      .status(400)
-      .json({ error: "Missing or invalid team abbreviation" });
+async function fetchSpotracPage(url) {
+  const cached = spotracPageCache.get(url);
+  if (cached?.expiresAt > Date.now()) return cached.html;
+  const existing = spotracPageInFlight.get(url);
+  if (existing) return existing;
+  const request = fetchHtml(url).then(html => {
+    spotracPageCache.set(url, { html, expiresAt: Date.now() + FRESH_TTL_MS });
+    return html;
+  });
+  spotracPageInFlight.set(url, request);
+  request.finally(() => spotracPageInFlight.delete(url)).catch(() => {});
+  return request;
+}
 
+export async function getTeamFinancialSnapshot(team, season = currentMlbSeason()) {
   const key = financialCacheKey(team, season);
   const now = Date.now();
   let cached = financialCache.get(key);
-  if (cached?.freshUntil > now) {
-    setFinancialHeaders(res, cached.freshness);
-    return res.status(200).json(cached.payload);
-  }
+  if (cached?.freshUntil > now) return cached.payload;
 
   if (!process.env.VITEST && process.env.DATABASE_URL) {
     const durable = await readDurableCache(durableFinancialCacheKey(team, season));
@@ -285,29 +303,20 @@ export default async function handler(req, res) {
       financialCache.set(key, cached);
       if (cached.freshUntil > now) {
         recordCacheOutcome("team-financials", "durable-hit");
-        res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=3600");
-        res.setHeader("X-Provider-Cache", "DURABLE-HIT");
-        res.setHeader("X-Provider-Freshness", "cached");
-        return res.status(200).json(cached.payload);
+        return { ...cached.payload, freshness: "cached" };
       }
     }
   }
 
   const existing = financialInFlight.get(key);
-  if (existing) {
-    const payload = await existing;
-    setFinancialHeaders(res, payload.freshness || "live");
-    return res.status(200).json(payload);
-  }
-
-  if (isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+  if (existing) return existing;
 
   const request = (async () => {
     const [payrollResult, taxResult] = await Promise.allSettled([
-      fetchHtml(SPOTRAC_PAYROLL_URL(season)).then(html =>
+      fetchSpotracPage(SPOTRAC_PAYROLL_URL(season)).then(html =>
         parseTeamPayrollHtml(html, team, season)
       ),
-      fetchHtml(SPOTRAC_TAX_URL(season)).then(html =>
+      fetchSpotracPage(SPOTRAC_TAX_URL(season)).then(html =>
         parseTeamTaxHtml(html, team, season)
       ),
     ]);
@@ -360,7 +369,30 @@ export default async function handler(req, res) {
   })();
   financialInFlight.set(key, request);
   request.finally(() => financialInFlight.delete(key)).catch(() => {});
-  const payload = await request;
+  return request;
+}
+
+export default async function handler(req, res) {
+  applyCors(req, res);
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET")
+    return res.status(405).json({ error: "Method not allowed" });
+  const url = new URL(req.url, "https://placeholder.invalid");
+  const team = String(url.searchParams.get("team") || "")
+    .trim()
+    .toUpperCase();
+  const parsedSeason = Number(
+    url.searchParams.get("season") || currentMlbSeason()
+  );
+  const season = isSupportedSeason(parsedSeason)
+    ? parsedSeason
+    : currentMlbSeason();
+  if (!TEAM_CODE.test(team))
+    return res
+      .status(400)
+      .json({ error: "Missing or invalid team abbreviation" });
+  if (shouldRateLimitFinancialRefresh(team, season) && isRateLimited(req, "team-financials")) return rateLimitResponse(res);
+  const payload = await getTeamFinancialSnapshot(team, season);
   setFinancialHeaders(res, payload.freshness || "live");
   return res.status(200).json(payload);
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { currentMlbSeason } from "../mlb-warehouse/ingest";
 
 const { authenticateRequest, warmSavantCache } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
@@ -49,7 +50,8 @@ describe("scheduled Savant refresh", () => {
     await scheduledSavantRefresh({} as never, res as never);
 
     expect(warmSavantCache).toHaveBeenCalledTimes(1);
-    expect(warmSavantCache).toHaveBeenCalledWith("2026");
+    // The season follows the calendar (January is still last season) instead of a hardcoded year.
+    expect(warmSavantCache).toHaveBeenCalledWith(String(currentMlbSeason()));
     expect(res.payload.statusCode).toBe(200);
     expect(res.payload.body).toEqual({ ok: true, refreshed: "savant", policy: "nightly-utc" });
   });

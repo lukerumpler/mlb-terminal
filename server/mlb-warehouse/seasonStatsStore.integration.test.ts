@@ -31,7 +31,10 @@ const feed = (hits: number) => async (u: string) => {
           {
             player: { id: 2 },
             team: { id: 111 },
-            stat: { wins: 0, inningsPitched: "10.1" },
+            stat: {
+              wins: hits === 100 ? 0 : hits === 103 ? 1 : 2,
+              inningsPitched: "10.1",
+            },
           },
         ];
   return {

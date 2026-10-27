@@ -1,3 +1,4 @@
+import { isRateLimited, llmRateLimit, rateLimitResponse } from "./_shared.js";
 import { invokeLLM } from "../_core/llm.ts";
 
 const CACHE_TTL_MS = 60_000;
@@ -77,6 +78,12 @@ export default async function naturalSearch(req, res) {
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader("X-Search-Cache", "HIT");
     res.json({ ...cached.data, cached: true });
+    return;
+  }
+
+  // Cache hits above are free; only an uncached paid LLM call is throttled.
+  if (isRateLimited(req, "natural-search", llmRateLimit())) {
+    rateLimitResponse(res);
     return;
   }
 

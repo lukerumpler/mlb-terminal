@@ -1,4 +1,5 @@
 import { applyCors, isRateLimited, rateLimitResponse } from "./_shared.js";
+import { ANCHOR_CLOSE, closedBlocks, firstClosedBlock } from "./html-scan.js";
 
 const BREF_ORIGIN = "https://www.baseball-reference.com";
 const BREF_ID_PATTERN = /^[a-z][a-z0-9]{8}$/;
@@ -25,7 +26,7 @@ export function buildBaseballReferencePlayerUrl(value) {
 
 function cleanText(value) {
   return String(value || "")
-    .replace(/<[^>]*>/g, " ")
+    .replace(/<[^<>]*>/g, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&nbsp;/gi, " ")
     .replace(/&quot;/gi, '"')
@@ -35,7 +36,7 @@ function cleanText(value) {
 }
 
 export function parseBaseballReferenceSearchCandidates(html) {
-  return [...String(html || "").matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+  return closedBlocks(html, /<a\b[^<>]*href=["']([^"']+)["'][^<>]*>([\s\S]*?)<\/a>/gi, ANCHOR_CLOSE)
     .map(match => {
       const path = match[1].split(/[?#]/, 1)[0];
       const id = path.match(/^\/players\/[a-z]\/([a-z][a-z0-9]{8})\.shtml$/i)?.[1]?.toLowerCase();
@@ -50,7 +51,7 @@ export function selectExactBaseballReferenceCandidate(candidates, expectedName) 
 }
 
 export function parseBaseballReferencePlayerPageName(html) {
-  const match = String(html || "").match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+  const match = firstClosedBlock(html, /<h1\b[^<>]*>([\s\S]*?)<\/h1>/i, /<\/h1>/gi);
   return match ? cleanText(match[1]) || null : null;
 }
 
