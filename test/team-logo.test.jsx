@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import TeamLogo from '../client/src/components/TeamLogo.jsx';
+import { TEAMS } from '../client/src/constants/data.js';
 import { setLowDataMode } from '../client/src/lib/lowData.js';
 
 // Regression coverage for a real gap: unlike PlayerPhoto.jsx's existing
@@ -24,6 +25,29 @@ describe('TeamLogo', () => {
     const img = screen.getByRole('img', { name: 'Los Angeles Dodgers logo' });
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', expect.stringContaining('mlbstatic.com/team-logos/119.svg'));
+  });
+
+  it('maps every canonical team abbreviation to its official MLB logo ID', () => {
+    for (const team of Object.values(TEAMS)) {
+      const { unmount } = render(<TeamLogo abbr={team.abbr} />);
+      expect(screen.getByRole('img', { name: `${team.name} logo` })).toHaveAttribute(
+        'src',
+        expect.stringContaining(`/team-logos/${team.id}.svg`),
+      );
+      unmount();
+    }
+  });
+
+  it.each([
+    ['AZ', 'Arizona Diamondbacks', 109],
+    ['OAK', 'Athletics', 133],
+    ['TBR', 'Tampa Bay Rays', 139],
+  ])('resolves the %s abbreviation alias to the right team logo', (abbr, name, id) => {
+    render(<TeamLogo abbr={abbr} />);
+    expect(screen.getByRole('img', { name: `${name} logo` })).toHaveAttribute(
+      'src',
+      expect.stringContaining(`/team-logos/${id}.svg`),
+    );
   });
 
   it('falls back to a text badge if the logo image fails to load', () => {

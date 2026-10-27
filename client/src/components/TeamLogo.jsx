@@ -7,12 +7,13 @@ const TEAM_BY_ABBR = Object.values(TEAMS).reduce((map, team) => {
   map[team.abbr] = team;
   return map;
 }, {});
+const TEAM_ABBR_ALIASES = Object.freeze({ AZ: 'ARI', OAK: 'ATH', TBR: 'TB' });
 
 export default function TeamLogo({ abbr, size = 28, showFallback = true, className = '' }) {
   const lowDataMode = useLowDataMode();
   const [failed, setFailed] = useState(false);
   const code = String(abbr || '').toUpperCase();
-  const team = TEAM_BY_ABBR[code];
+  const team = TEAM_BY_ABBR[TEAM_ABBR_ALIASES[code] || code];
 
   // Reset the failure flag when the logo we're pointed at actually changes
   // (e.g. switching selected team), so a prior 404 doesn't stick around and

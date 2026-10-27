@@ -5,6 +5,7 @@ import { placeholderColors } from '../lib/theme.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, TEAMS, SEASON } from '../constants/data.js';
 import { getTopProspectStats, getMiLBGames } from '../api/mlb.js';
 import { PosBadge, Panel, StatStrip, SkeletonRows, FVBadge, RiskDot, WatchStar, TrendBadge } from '../components/atoms.jsx';
+import SharedTeamLogo from '../components/TeamLogo.jsx';
 import { computeFV, fvBaselines, projectedWAR, fvRiskBand, fvETA, fvETAYear } from '../engine/skip.js';
 import ProspectCard from '../components/ProspectCard.jsx';
 import CompareModal from '../components/CompareModal.jsx';
@@ -115,16 +116,8 @@ function MiLBScoreboardPanel() {
 }
 
 
-/* ── team-id lookup for logos ─────────────────────────────────── */
-const TEAM_ID = {
-  LAD:119,NYY:147,BOS:111,ATL:144,SEA:136,HOU:117,CLE:114,BAL:110,SD:135,PHI:143,
-  MIL:158,OAK:133,WSH:120,DET:116,MIN:142,STL:138,CWS:145,MIA:146,TEX:140,TB:139,
-  TOR:141,KC:118,CHC:112,CIN:113,COL:115,SF:137,PIT:134,NYM:121,ARI:109,LAA:108,
-};
 function TeamLogo({ abbr, size = 20 }) {
-  const id = TEAM_ID[abbr];
-  if (!id) return <span style={sans({ fontSize:10, color:C.text3 })}>{abbr}</span>;
-  return <img src={`https://www.mlbstatic.com/team-logos/${id}.svg`} alt={abbr} width={size} height={size} loading="lazy" style={{ flexShrink:0, objectFit:'contain' }} />;
+  return <SharedTeamLogo abbr={abbr} size={size} />;
 }
 
 function ProspectMobileCards({ rows, kind, selectedId, onSelect, onCard, isWatched, onToggleWatch, compareIds, onToggleCompare }) {
