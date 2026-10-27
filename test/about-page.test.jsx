@@ -19,6 +19,7 @@ describe("AboutPage", () => {
     expect(screen.getByText("Selected experience")).toBeInTheDocument();
     expect(screen.getByText("San Diego Padres")).toBeInTheDocument();
     expect(screen.getByText("lukerumpler@gmail.com")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /LinkedIn/ })).toHaveAttribute("href", "https://www.linkedin.com/in/lucasrumpler/");
   });
 
   it("calls onNavigate when the Overview breadcrumb is clicked", async () => {
@@ -30,8 +31,8 @@ describe("AboutPage", () => {
     expect(calls).toEqual(["overview"]);
   });
 
-  it("shows no dead LinkedIn link until a real https URL is configured", () => {
-    const { container, rerender } = render(<AboutPage />);
+  it("shows no dead LinkedIn link unless a real https URL is given", () => {
+    const { container, rerender } = render(<AboutPage linkedInUrl="" />);
     expect(screen.queryByText(/LinkedIn/)).not.toBeInTheDocument();
     expect(container.querySelector('a[href="#"]')).toBeNull();
 
@@ -44,8 +45,10 @@ describe("AboutPage", () => {
     expect(screen.queryByText(/LinkedIn/)).not.toBeInTheDocument();
   });
 
-  it("keeps the neutral headshot placeholder until an image is configured", () => {
+  it("uses the bundled headshot by default and keeps the placeholder for an empty source", () => {
     const { rerender } = render(<AboutPage />);
+    expect(screen.getByRole("img", { name: "Lucas Rumpler" })).toHaveAttribute("src", "/headshot.jpg");
+    rerender(<AboutPage headshotSrc="" />);
     expect(screen.getByRole("img", { name: /headshot placeholder/ })).toBeInTheDocument();
 
     rerender(<AboutPage headshotSrc="/headshot.jpg" />);
