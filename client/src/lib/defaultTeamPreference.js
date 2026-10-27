@@ -1,7 +1,7 @@
 import { TEAMS } from '../constants/data.js';
 
 export const DEFAULT_TEAM_PREFERENCE_KEY = 'skip-default-team-key-v1';
-export const PRODUCT_DEFAULT_TEAM_KEY = 'sd';
+export const PRODUCT_DEFAULT_TEAM_KEY = 'mil';
 
 export function normalizeDefaultTeamKey(value, fallback = PRODUCT_DEFAULT_TEAM_KEY) {
   const key = String(value || '').trim().toLowerCase();
