@@ -504,7 +504,9 @@ function humanizeFeedStatus(status, fallback = 'Unavailable') {
 function sumPlayerStat(rows = [], keys = []) {
   const values = rows.map(row => {
     for (const key of keys) {
-      const value = Number(row?.stat?.[key]);
+      const raw = row?.stat?.[key];
+      if (raw === null || raw === undefined || raw === '') continue;
+      const value = Number(raw);
       if (Number.isFinite(value)) return value;
     }
     return null;
@@ -517,6 +519,8 @@ export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
   const pitchers = Array.isArray(players.pitching) ? players.pitching : [];
   const stolenBases = sumPlayerStat(hitters, ['stolenBases', 'sb']);
   const caughtStealing = sumPlayerStat(hitters, ['caughtStealing', 'cs']);
+  const hitByPitch = sumPlayerStat(hitters, ['hitByPitch', 'hbp']);
+  const sacFlies = sumPlayerStat(hitters, ['sacFlies', 'sf']);
   const hits = sumPlayerStat(hitters, ['hits', 'h']);
   const extraBaseHits = [
     sumPlayerStat(hitters, ['doubles', '2B']),
@@ -537,6 +541,8 @@ export function deriveTeamPlayerRollups(players = { hitting:[], pitching:[] }) {
   return {
     stolenBases,
     caughtStealing,
+    hitByPitch,
+    sacFlies,
     stolenBaseAttempts: stolenBases != null && caughtStealing != null ? stolenBases + caughtStealing : null,
     plateAppearances: sumPlayerStat(hitters, ['plateAppearances', 'pa']),
     extraBaseHits,
@@ -3418,6 +3424,8 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
               ['Sprint Speed','Unavailable', C.text4],
               ['Stolen Base Attempts',teamRollups.stolenBaseAttempts ?? 'Unavailable', teamRollups.stolenBaseAttempts == null ? C.text4 : C.teal],
               ['Caught Stealing', teamRollups.caughtStealing ?? 'Unavailable', teamRollups.caughtStealing == null ? C.text4 : C.teal],
+              ['Hit By Pitch', teamRollups.hitByPitch ?? 'Unavailable', teamRollups.hitByPitch == null ? C.text4 : C.teal],
+              ['Sacrifice Flies', teamRollups.sacFlies ?? 'Unavailable', teamRollups.sacFlies == null ? C.text4 : C.teal],
               ['MLB Rank (BsR)',  'Unavailable', C.text4],
               ['Extra Base Rate', teamRollups.extraBaseRate == null ? 'Unavailable' : `${(teamRollups.extraBaseRate * 100).toFixed(1)}%`, teamRollups.extraBaseRate == null ? C.text4 : C.teal],
             ].map(([l,v,c],i,arr)=>(
