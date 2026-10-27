@@ -61,7 +61,7 @@ export const OVERVIEW_ACCENTS = Object.freeze({
   context: C.purple,
 });
 
-export const DEFAULT_OVERVIEW_TEAM_KEY = 'sd';
+export const DEFAULT_OVERVIEW_TEAM_KEY = 'mil';
 
 const OVERVIEW_VIEW_OPTIONS = [
   { id: 'briefing', label: 'Briefing', detail: 'Core signals, models & field play' },

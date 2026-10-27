@@ -38,7 +38,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('opens on a combined briefing that includes performance sections through compact view controls', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     const briefing = await screen.findByRole('button', { name: 'Briefing' });
     expect(briefing).toHaveAttribute('aria-pressed', 'true');
@@ -63,7 +63,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('keeps the compact executive briefing ahead of the detailed card workspace on first load', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     const briefing = await screen.findByRole('region', { name: 'Front Office Read' });
     const detailedCardsHeading = screen.getByRole('heading', { name: 'Detailed team cards' });
@@ -95,7 +95,7 @@ describe('Team Overview compact navigation', () => {
         },
       },
     });
-    const { container } = render(<OverviewPage />);
+    const { container } = render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     expect(screen.getAllByText('Verified Hitter').length).toBeGreaterThan(0);
@@ -127,7 +127,7 @@ describe('Team Overview compact navigation', () => {
   it('keeps all compact Executive Briefing items as direct workspace shortcuts across views', async () => {
     const onNavigate = vi.fn();
     window.addEventListener('skip-navigate', onNavigate);
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /open performance: posture/i }));
@@ -142,7 +142,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('loads FanGraphs model requests immediately now that Performance is part of the combined Briefing view', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     await waitFor(() => {
@@ -151,7 +151,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('defers the official club-news request until Team News is explicitly opened', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     const teamNewsCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes('/api/news?team=SD&n=8'));
@@ -170,7 +170,7 @@ describe('Team Overview compact navigation', () => {
       pitching: { era: 3.69, whip: 1.16, strikeOuts: 1088 },
     };
     saveTeamAggregateCache({ byAbbr: { SD: teamSnapshot }, byId: { 135: teamSnapshot } }, 2026);
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     await waitFor(() => {
@@ -182,7 +182,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('defers multi-window completed-game split requests until Operations is explicitly opened', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     const completedGameSplitCalls = () => fetch.mock.calls.filter(([url]) => {
@@ -198,7 +198,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('defers official ballpark metadata until Operations is explicitly opened', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     const venueCalls = () => fetch.mock.calls.filter(([url]) => {
@@ -214,7 +214,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('loads heavyweight team Statcast rollups immediately now that Performance is part of the combined Briefing view', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     const teamStatcastCalls = () => fetch.mock.calls.filter(([url]) => {
@@ -238,7 +238,7 @@ describe('Team Overview compact navigation', () => {
       hitting: [{ id: 1, name: 'Verified Hitter', position: 'OF', stat: { ops: 0.9, plateAppearances: 200 } }],
       pitching: [{ id: 2, name: 'Verified Pitcher', position: 'SP', stat: { era: 3, inningsPitched: 50 } }],
     });
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     const aiCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes('/api/trpc/ai.rosterInsights'));
@@ -253,7 +253,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('keeps a single canonical team rating by routing Performance to Front Office Evaluation instead of rendering a second grade grid', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     expect(screen.queryByText('Overall Team Rating')).not.toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('Team Overview compact navigation', () => {
       exitVelocity: 91.2,
       retrievedAt: new Date().toISOString(),
     });
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     expect((await screen.findAllByText('0.456')).length).toBeGreaterThan(0);
@@ -288,7 +288,7 @@ describe('Team Overview compact navigation', () => {
   });
 
   it('uses Statcast OAA only when available and opens a closable Future Value depth modal', async () => {
-    render(<OverviewPage />);
+    render(<OverviewPage defaultTeamKey="sd" />);
 
     await screen.findByRole('button', { name: 'Briefing' });
     fireEvent.click(screen.getByRole('button', { name: /defense/i }));
