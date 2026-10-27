@@ -5,7 +5,6 @@ import { placeholderColors } from '../lib/theme.js';
 import { PROSPECT_BATTERS, PROSPECT_PITCHERS, TEAMS, SEASON } from '../constants/data.js';
 import { getTopProspectStats, getMiLBGames } from '../api/mlb.js';
 import { PosBadge, Panel, StatStrip, SkeletonRows, FVBadge, RiskDot, WatchStar, TrendBadge } from '../components/atoms.jsx';
-import SharedTeamLogo from '../components/TeamLogo.jsx';
 import { computeFV, fvBaselines, projectedWAR, fvRiskBand, fvETA, fvETAYear } from '../engine/skip.js';
 import ProspectCard from '../components/ProspectCard.jsx';
 import CompareModal from '../components/CompareModal.jsx';
@@ -14,6 +13,7 @@ import { useWatchlist } from '../lib/watchlist.js';
 import { compareValues } from '../lib/sorting.js';
 import { buildFarmSystemSummary } from '../lib/farmSystemScore.js';
 import OrganizationRosterDirectory from '../components/OrganizationRosterDirectory.jsx';
+import TeamLogo from '../components/TeamLogo.jsx';
 
 /* ── Live MiLB Scoreboard ─────────────────────────────────────── */
 const MILB_LEVEL_COLOR = {
@@ -115,10 +115,6 @@ function MiLBScoreboardPanel() {
   );
 }
 
-
-function TeamLogo({ abbr, size = 20 }) {
-  return <SharedTeamLogo abbr={abbr} size={size} />;
-}
 
 function ProspectMobileCards({ rows, kind, selectedId, onSelect, onCard, isWatched, onToggleWatch, compareIds, onToggleCompare }) {
   const isPitcher = kind === 'pitcher';

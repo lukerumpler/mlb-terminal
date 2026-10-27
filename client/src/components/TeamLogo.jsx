@@ -1,19 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { TEAMS } from '../constants/data.js';
 import { C, sans } from '../constants/colors.js';
 import { useLowDataMode } from '../lib/lowData.js';
-
-const TEAM_BY_ABBR = Object.values(TEAMS).reduce((map, team) => {
-  map[team.abbr] = team;
-  return map;
-}, {});
-const TEAM_ABBR_ALIASES = Object.freeze({ AZ: 'ARI', OAK: 'ATH', TBR: 'TB' });
+import { getTeamByAbbr, getTeamLogoUrl } from '../lib/teamLookup.js';
 
 export default function TeamLogo({ abbr, size = 28, showFallback = true, className = '' }) {
   const lowDataMode = useLowDataMode();
   const [failed, setFailed] = useState(false);
   const code = String(abbr || '').toUpperCase();
-  const team = TEAM_BY_ABBR[TEAM_ABBR_ALIASES[code] || code];
+  const team = getTeamByAbbr(code);
 
   // Reset the failure flag when the logo we're pointed at actually changes
   // (e.g. switching selected team), so a prior 404 doesn't stick around and
@@ -34,7 +28,7 @@ export default function TeamLogo({ abbr, size = 28, showFallback = true, classNa
   return (
     <img
       className={className}
-      src={`https://www.mlbstatic.com/team-logos/${team.id}.svg`}
+      src={getTeamLogoUrl(code)}
       alt={`${team.name} logo`}
       width={size}
       height={size}

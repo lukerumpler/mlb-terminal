@@ -2235,6 +2235,18 @@ export function normalizeOrganizationRosterEntry(entry, organization = {}) {
   };
 }
 
+// The official fullRoster payload can list the same player twice (e.g. a
+// player attached to two affiliates). Keep the first record per player ID so
+// counts and React keys stay unique.
+export function dedupeOrganizationPlayers(players = []) {
+  const seen = new Set();
+  return players.filter(player => {
+    if (seen.has(player.id)) return false;
+    seen.add(player.id);
+    return true;
+  });
+}
+
 export async function getOrganizationRoster(organization, season = SEASON) {
   if (!organization?.id) throw new Error('An MLB organization ID is required to load its official roster.');
   const data = await mlb(`/teams/${organization.id}/roster`, {
@@ -2249,13 +2261,16 @@ export async function getOrganizationRoster(organization, season = SEASON) {
     screen: 'prospects',
   });
   const responseMeta = getMlbResponseMeta(data);
-  const players = (data.roster || [])
+  const rawRecords = data.roster || [];
+  const players = dedupeOrganizationPlayers(rawRecords
     .map(entry => normalizeOrganizationRosterEntry(entry, organization))
-    .filter(player => player.id && player.name)
+    .filter(player => player.id && player.name))
     .sort((left, right) => left.name.localeCompare(right.name, 'en', { sensitivity: 'base' }));
   return {
     organization,
     players,
+    rawRecordCount: rawRecords.length,
+    duplicateRecordCount: Math.max(0, rawRecords.length - players.length),
     freshness: responseMeta?.freshness || 'live',
     retrievedAt: responseMeta?.retrievedAt || Date.now(),
     source: 'MLB Stats API · fullRoster',

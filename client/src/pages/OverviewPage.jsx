@@ -2638,7 +2638,7 @@ function OverviewPage({ rosterDefaults = { battingPa:0, pitchingIp:0 }, defaultT
   const aggregateTone = liveTeamDataMode === 'live' ? C.teal : liveTeamDataMode === 'cached' ? C.amberDark : liveTeamDataMode === 'error' ? C.rust : C.amberDark;
   const aggregateSurface = liveTeamDataMode === 'live' ? C.tealSoft : liveTeamDataMode === 'cached' ? C.amberSoft : liveTeamDataMode === 'error' ? C.rustSoft : C.amberSoft;
   const aggregateBorder = liveTeamDataMode === 'live' ? C.tealMid : liveTeamDataMode === 'cached' ? C.amberMid : liveTeamDataMode === 'error' ? C.rustMid : C.amberMid;
-  const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'LIVE LEADER STATS' : teamPlayersDataMode === 'cached' ? `CACHED LEADER STATS${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
+  const teamPlayersBadge = teamPlayersDataMode === 'live' ? 'LIVE SEASON STATS' : teamPlayersDataMode === 'cached' ? `CACHED${teamPlayersUpdatedAt && formatDataAge(teamPlayersUpdatedAt) ? ` · ${formatDataAge(teamPlayersUpdatedAt)}` : ''}` : teamPlayersDataMode === 'error' ? 'UNAVAILABLE' : 'LOADING';
   const showInitialSkeleton = liveTeamDataMode === 'loading' && !liveTeamData && !liveTeamError;
   const mlbParentReadyForAffiliate = liveTeamDataMode !== 'loading' || Boolean(liveTeamData);
   const openExecutiveDestination = (view, targetId) => {

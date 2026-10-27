@@ -69,6 +69,7 @@ All notable changes to **MLB Terminal** are documented in this file.
 - **WAR display**: a missing WAR value (null or blank) is shown as `—` instead of `0.0`. This affected the team-efficiency overview (defensive blend, the offensive/pitching split) and the comparison table (total WAR and WAR/$100M for source-gap teams). Real zeros and negative values are unchanged, and `-0.0` prints as `0.0`.
 - **WAR parsing**: negative WAR printed with a Unicode minus, en/em dash or parentheses keeps its sign (it was read as positive); league/total rows are skipped; Baseball-Reference columns are read by header, including grouped `colspan` headers; the offensive/pitching split comes from one provider (`war.splitProvider`).
 - **Seasons**: the client `SEASON` and the `player-advanced` default follow the calendar (January belongs to the prior season). The `warmSavantCache`, `buildCbtHistorySeasons`, `buildHistoricalTaxTrendRows` and Players-page fallback defaults no longer hardcode 2026.
+- **Organization rosters and team logos**: the directory pages official `fullRoster` results 100 at a time with status filtering and “Show all,” avoids retry loops after failed loads, and keeps the first row for duplicate player IDs while reporting duplicate counts. Shared team lookup covers legacy abbreviations, the roster status filter distinguishes inactive players, and Overview’s Team Leaders badge now identifies season statistics rather than verified roster rows.
 
 ### Security (dependencies)
 

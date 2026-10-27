@@ -31,6 +31,10 @@ const indexSource = fs.readFileSync(
   path.join(projectRoot, "client/src/index.css"),
   "utf8"
 );
+const teamLookupSource = fs.readFileSync(
+  path.join(projectRoot, "client/src/lib/teamLookup.js"),
+  "utf8"
+);
 const teamLogoSource = fs.readFileSync(
   path.join(projectRoot, "client/src/components/TeamLogo.jsx"),
   "utf8"
@@ -176,6 +180,8 @@ describe("SKIP motion and responsive UI hooks", () => {
     expect(playersSource).toContain(
       "import TeamLogo from '../components/TeamLogo.jsx';"
     );
-    expect(teamLogoSource).toContain("team-logos/${team.id}.svg");
+    // The logo URL now lives in the shared lookup so TeamLogo and every page agree.
+    expect(teamLogoSource).toContain("getTeamLogoUrl");
+    expect(teamLookupSource).toContain("team-logos/${team.id}.svg");
   });
 });
