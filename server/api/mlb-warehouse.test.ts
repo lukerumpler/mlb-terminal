@@ -9,8 +9,8 @@ const queries = {
   getGamePitches: vi.fn(),
   getTeamGames: vi.fn(),
 };
-vi.mock("../db.ts", () => ({ getDb: () => getDb() }));
-vi.mock("../mlb-warehouse/queries.ts", () => ({
+vi.mock("../db.js", () => ({ getDb: () => getDb() }));
+vi.mock("../mlb-warehouse/queries.js", () => ({
   createMlbWarehouseQueries: () => queries,
 }));
 

@@ -121,12 +121,12 @@ describe("Vercel API routing", () => {
       "utf8"
     );
     const runtimeSource = readFileSync(
-      resolve(process.cwd(), "server/api/mlb-warehouse-runtime.js"),
+      resolve(process.cwd(), "server/api/mlb-warehouse-runtime.ts"),
       "utf8"
     );
 
-    expect(routeSource).toContain('await import("./mlb-warehouse-runtime.js")');
-    expect(runtimeSource).toContain('from "../db.ts"');
-    expect(runtimeSource).toContain('from "../mlb-warehouse/queries.ts"');
+    expect(routeSource).toContain('await import("./mlb-warehouse-runtime.ts")');
+    expect(runtimeSource).toContain('from "../db.js"');
+    expect(runtimeSource).toContain('from "../mlb-warehouse/queries.js"');
   });
 });
