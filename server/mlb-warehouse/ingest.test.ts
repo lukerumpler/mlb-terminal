@@ -304,6 +304,40 @@ describe("runIngestion", () => {
     expect(r2.status.complete).toBe(3);
   });
 
+  it("stops claiming new games at the time budget and leaves remaining work resumable", async () => {
+    const mem = memoryStore();
+    await mem.store.registerGames(
+      schedule().map(g => ({
+        gamePk: g.gamePk,
+        season: SEASON,
+        officialDate: g.officialDate,
+      }))
+    );
+    let clock = 0;
+    const fetchJson = async (url: string) => {
+      if (url.includes("/feed/live")) clock += 10;
+      return feedFor(Number(url.match(/game\/(\d+)\/feed/)![1]));
+    };
+    const report = await runIngestion(
+      {
+        season: SEASON,
+        skipDiscovery: true,
+        limit: 3,
+        concurrency: 1,
+        timeBudgetMs: 5,
+      },
+      { store: mem.store, fetchJson, clock: () => clock }
+    );
+    expect(report).toMatchObject({
+      attempted: 1,
+      succeeded: 1,
+      unprocessed: 2,
+      timeBudgetExceeded: true,
+      batchElapsedMs: 10,
+    });
+    expect(report.status).toMatchObject({ complete: 1, pending: 2 });
+  });
+
   it("fails a game whose feed is not actually final, instead of storing it", async () => {
     const mem = memoryStore();
     const fetchJson = async (url: string) => {

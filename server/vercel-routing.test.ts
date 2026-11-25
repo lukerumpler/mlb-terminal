@@ -17,14 +17,19 @@ describe("Vercel API routing", () => {
     expect(catchAllSource).not.toContain("../server/vercel-handler");
     expect(catchAllSource).toContain("export default async function handler");
     expect(catchAllSource).not.toContain('from "./index"');
-    expect(primarySource).toContain('import handler, {');
+    expect(primarySource).toContain("import handler, {");
     expect(primarySource).toContain('} from "../server/vercel-handler";');
-    expect(primarySource).toContain("export { normalizeServerlessRequestUrl };");
+    expect(primarySource).toContain(
+      "export { normalizeServerlessRequestUrl };"
+    );
     expect(primarySource).toContain("export default handler;");
   });
 
   it("registers every Express-registered secondary route in the Vercel catch-all", () => {
-    const catchAllSource = readFileSync(resolve(process.cwd(), "api/[...path].ts"), "utf8");
+    const catchAllSource = readFileSync(
+      resolve(process.cwd(), "api/[...path].ts"),
+      "utf8"
+    );
     for (const route of ["team-financials", "team-efficiency"]) {
       expect(catchAllSource).toContain(`"/api/${route}"`);
       expect(catchAllSource).toContain(`import("../server/api/${route}.js")`);
@@ -36,8 +41,13 @@ describe("Vercel API routing", () => {
       resolve(process.cwd(), "server/api/routes.ts"),
       "utf8"
     );
-    const pathsBlock = routesSource.match(/const paths = \[([\s\S]*?)\] as const;/);
-    expect(pathsBlock, "could not find the paths array in routes.ts").not.toBeNull();
+    const pathsBlock = routesSource.match(
+      /const paths = \[([\s\S]*?)\] as const;/
+    );
+    expect(
+      pathsBlock,
+      "could not find the paths array in routes.ts"
+    ).not.toBeNull();
     const names = [...pathsBlock![1].matchAll(/"\/api\/([a-z0-9-]+)"/g)].map(
       match => match[1]
     );
@@ -82,18 +92,41 @@ describe("Vercel API routing", () => {
 
     expect(dashboardSource).toContain('from "../server/api/uptime-monitor.js"');
     expect(dashboardSource).toContain("serveUptimeMonitorDashboard");
-    expect(scheduledSource).toContain('from "../../server/api/uptime-monitor.js"');
+    expect(scheduledSource).toContain(
+      'from "../../server/api/uptime-monitor.js"'
+    );
     expect(scheduledSource).toContain("scheduledDailyUptimeMonitor");
   });
 
   it("keeps uptime database access handler-bound so initialization errors become controlled responses", () => {
-    const source = readFileSync(resolve(process.cwd(), "server/api/uptime-monitor.ts"), "utf8");
-    const databaseSource = readFileSync(resolve(process.cwd(), "server/db.ts"), "utf8");
+    const source = readFileSync(
+      resolve(process.cwd(), "server/api/uptime-monitor.ts"),
+      "utf8"
+    );
+    const databaseSource = readFileSync(
+      resolve(process.cwd(), "server/db.ts"),
+      "utf8"
+    );
 
     expect(source).not.toContain('from "../db"');
     expect(source).not.toContain('from "express"');
     expect(source).toContain('await import("../db.js")');
     expect(databaseSource).toContain('from "../drizzle/schema.js"');
     expect(databaseSource).toContain('from "./_core/env.js"');
+  });
+
+  it("keeps warehouse TypeScript dependencies behind a traceable lazy boundary", () => {
+    const routeSource = readFileSync(
+      resolve(process.cwd(), "server/api/mlb-warehouse.js"),
+      "utf8"
+    );
+    const runtimeSource = readFileSync(
+      resolve(process.cwd(), "server/api/mlb-warehouse-runtime.js"),
+      "utf8"
+    );
+
+    expect(routeSource).toContain('await import("./mlb-warehouse-runtime.js")');
+    expect(runtimeSource).toContain('from "../db.ts"');
+    expect(runtimeSource).toContain('from "../mlb-warehouse/queries.ts"');
   });
 });

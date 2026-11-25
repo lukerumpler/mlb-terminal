@@ -8,8 +8,10 @@ import {
 } from "../mlb-warehouse/ingest";
 import { createDrizzleWarehouseStore } from "../mlb-warehouse/store";
 
-// Sizing: ~15 games/day, so a 2-day refresh window requeues ~30 plus ~15 new games;
-// the limit must stay above that or the backlog grows every night.
+// A season-wide schedule reconciliation is only ten small, sequential monthly
+// requests and recovers games missed during arbitrarily long discovery outages.
+// Registration is idempotent; completed facts are only re-ingested in the
+// separate recent-corrections window below.
 // Daily, bounded warehouse refresh for owner-managed Heartbeat. Small batches are
 // safe because every game carries its own resumable state; leftover work is picked
 // up on the next call. Autoscaled instances may overlap: the atomic game claim in
@@ -17,8 +19,8 @@ import { createDrizzleWarehouseStore } from "../mlb-warehouse/store";
 const DEFAULTS = {
   limit: 80,
   refreshRecentDays: 2,
-  discoverSinceDays: 10,
   concurrency: 2,
+  timeBudgetMs: 4 * 60_000,
 };
 
 export async function scheduledIngestMlb(req: Request, res: Response) {
@@ -51,6 +53,9 @@ export async function scheduledIngestMlb(req: Request, res: Response) {
       succeeded: report.succeeded,
       skipped: report.skipped,
       requeuedForRefresh: report.requeuedForRefresh,
+      batchElapsedMs: report.batchElapsedMs,
+      timeBudgetExceeded: report.timeBudgetExceeded,
+      unprocessed: report.unprocessed,
       discoveryErrors: report.discoveryErrors,
       actionableFailures: actionable.slice(0, 20),
       knownEmptyGames: knownEmpty.map(f => f.gamePk),

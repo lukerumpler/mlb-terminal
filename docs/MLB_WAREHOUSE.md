@@ -9,12 +9,12 @@ facts, per-game resumable state), reimplemented in SKIP's own stack
 
 ## Tables (`drizzle/0005_mlb_warehouse.sql`)
 
-| Table | Holds |
-| --- | --- |
-| `mlb_games` | one row per `gamePk`: teams, venue, weather, final score, `parser_version` |
-| `mlb_players` | MLB person id, name, position, bats/throws (id is identity, never name) |
-| `mlb_pitches` | one row per pitch; PK `(game_pk, at_bat_index, event_index)` |
-| `mlb_ingestion_state` | per-game `pending/processing/complete/failed`, attempts, last error |
+| Table                 | Holds                                                                      |
+| --------------------- | -------------------------------------------------------------------------- |
+| `mlb_games`           | one row per `gamePk`: teams, venue, weather, final score, `parser_version` |
+| `mlb_players`         | MLB person id, name, position, bats/throws (id is identity, never name)    |
+| `mlb_pitches`         | one row per pitch; PK `(game_pk, at_bat_index, event_index)`               |
+| `mlb_ingestion_state` | per-game `pending/processing/complete/failed`, attempts, last error        |
 
 Rules baked in:
 
@@ -39,7 +39,7 @@ pnpm ingest:mlb --season 2026 --requeue-failed # give games that exhausted --max
 Exit code is `1` if any game failed **or any schedule window could not be read** (see
 `discoveryErrors` in the report), `2` on config/DB errors. Re-running is always safe:
 completed games are skipped, failed games retry up to `--max-attempts` (default 5), games
-stuck in `processing` for 30+ minutes are recovered, and re-ingesting a game *replaces*
+stuck in `processing` for 30+ minutes are recovered, and re-ingesting a game _replaces_
 its pitches inside one transaction (no duplicates, no stale rows after a correction).
 
 ## Failure handling
@@ -94,31 +94,32 @@ caller gets 403; an unauthenticated one gets the same 500 `Invalid session cooki
 Create an owner-managed Heartbeat job that POSTs to it once a day. It runs a bounded,
 windowed pass for the current MLB season (January still counts as the previous season):
 
-| Setting | Value | Why |
-|---|---|---|
-| `discoverSinceDays` | 10 | ask the schedule for the last 10 days (1-2 requests), not all ten months |
-| `refreshRecentDays` | 2 | re-ingest recent finals to absorb late MLB corrections |
-| `limit` | 80 | ~15 games/day x 2 refresh days + new games must stay under this or a backlog builds |
-| `concurrency` | 2 | polite to the MLB API |
+| Setting             | Value                 | Why                                                                                                                                                    |
+| ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `discoverSinceDays` | unset                 | reconcile the full season across ten sequential monthly schedule requests, so outages longer than a rolling window do not permanently miss games       |
+| `refreshRecentDays` | 2                     | re-ingest recent finals to absorb late MLB corrections                                                                                                 |
+| `limit`             | 80                    | ~15 games/day x 2 refresh days + new games must stay under this or a backlog builds                                                                    |
+| `concurrency`       | 2 (CLI/API maximum 8) | polite to the MLB API; the hard ceiling prevents accidental request bursts                                                                             |
+| `timeBudgetMs`      | 240000                | after four minutes of batch processing, workers finish already-claimed games and stop claiming more; remaining queue work is resumable on the next run |
 
 Responses: 200 with a run report; 503 `{ ok: false, reason: "database-not-configured" }`
 with no database; 500 only if the run itself throws (so Heartbeat retries). `ok` is `false`
 only for failures someone can act on (real feed errors or schedule-window errors). A final game
 that has zero pitches usually never will (failed games are retried on up to 5 runs, so a feed that
 is merely late can still heal), so it is listed under `knownEmptyGames` and does not flip `ok`. Run `pnpm ingest:mlb --season YYYY` once first to backfill; the heartbeat
-timeout is unknown, which is why batches are small and resumable.
+timeout is unknown, which is why batches are small and resumable. The time budget applies to game processing, not schedule discovery or already-active games; a run can exceed it by the duration of its final in-flight games. The response reports `batchElapsedMs`, `timeBudgetExceeded`, and `unprocessed` for operations monitoring.
 
 ## Read API: `GET /api/mlb-warehouse`
 
 Read-only, rate-limited, CORS-enabled. Pick a `view`:
 
-| `view` | Required | Optional | Returns |
-|---|---|---|---|
-| `status` | `season` | | ingestion counts (pending / processing / complete / failed) |
-| `arsenal` | `player`, `season` | | per-pitch-type counts and average velocity, spin, IVB, HB, pfx_x, pfx_z |
-| `pitches` | `player`, `season` | `from`, `to` (YYYY-MM-DD), `page`, `pageSize` (max 250) | paged raw pitches, newest first |
-| `game` | `game` | `page`, `pageSize` | the game row plus paged pitches (404 if unknown) |
-| `team-games` | `team`, `season` | `limit` (max 250) | the team's games, newest first |
+| `view`       | Required           | Optional                                                | Returns                                                                 |
+| ------------ | ------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `status`     | `season`           |                                                         | ingestion counts (pending / processing / complete / failed)             |
+| `arsenal`    | `player`, `season` |                                                         | per-pitch-type counts and average velocity, spin, IVB, HB, pfx_x, pfx_z |
+| `pitches`    | `player`, `season` | `from`, `to` (YYYY-MM-DD), `page`, `pageSize` (max 250) | paged raw pitches, newest first                                         |
+| `game`       | `game`             | `page`, `pageSize`                                      | the game row plus paged pitches (404 if unknown)                        |
+| `team-games` | `team`, `season`   | `limit` (max 250)                                       | the team's games, newest first                                          |
 
 Paging is bounded: `page` x `pageSize` may not exceed an offset of 50,000 rows (a pitcher-season
 is a few thousand pitches, a game about 300); deeper requests get a 400 telling the caller to narrow

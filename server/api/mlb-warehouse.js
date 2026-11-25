@@ -170,12 +170,10 @@ export default async function mlbWarehouseHandler(req, res) {
 
   let queries;
   try {
-    const { getDb } = await import("../db.ts");
-    const db = await getDb();
-    if (!db) return unavailable(res, "database-not-configured");
-    const { createMlbWarehouseQueries } =
-      await import("../mlb-warehouse/queries.ts");
-    queries = createMlbWarehouseQueries(db);
+    const { loadMlbWarehouseQueries } =
+      await import("./mlb-warehouse-runtime.js");
+    queries = await loadMlbWarehouseQueries();
+    if (!queries) return unavailable(res, "database-not-configured");
   } catch (error) {
     console.error("[mlb-warehouse] init failed", error);
     return unavailable(res, "warehouse-init-failed");

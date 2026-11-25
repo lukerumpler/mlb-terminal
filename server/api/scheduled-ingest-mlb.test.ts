@@ -45,6 +45,9 @@ const report = (over: Record<string, unknown> = {}) => ({
   warnings: [],
   status: { pending: 0, processing: 0, complete: 400, failed: 0 },
   parserVersion: 1,
+  batchElapsedMs: 900,
+  timeBudgetExceeded: false,
+  unprocessed: 0,
   ...over,
 });
 
@@ -71,15 +74,20 @@ describe("scheduled MLB warehouse ingest", () => {
     expect(runIngestion).not.toHaveBeenCalled();
   });
 
-  it("runs a bounded, windowed ingest for the current season", async () => {
+  it("runs a bounded full-season reconciliation for the current season", async () => {
     const res = response();
     await scheduledIngestMlb({} as never, res as never);
     const opts = runIngestion.mock.calls[0][0];
     expect(opts.limit).toBeGreaterThanOrEqual(60);
-    expect(opts.discoverSinceDays).toBeGreaterThan(0);
+    expect(opts.discoverSinceDays).toBeUndefined();
+    expect(opts.timeBudgetMs).toBeGreaterThan(0);
     expect(opts.refreshRecentDays).toBeGreaterThan(0);
     expect(res.payload.statusCode).toBe(200);
     expect(res.payload.body).toMatchObject({ ok: true, succeeded: 30 });
+    expect(res.payload.body).toMatchObject({
+      timeBudgetExceeded: false,
+      unprocessed: 0,
+    });
   });
 
   it("reports known-empty games as status, not as a failed run", async () => {

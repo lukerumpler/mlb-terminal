@@ -78,6 +78,9 @@ export interface ClaimOptions {
 
 /** A 'processing' row older than this is presumed to belong to a dead worker. */
 export const STALE_PROCESSING_MS = 30 * 60_000;
+export const MAX_INGEST_CONCURRENCY = 8;
+export const DEFAULT_INGEST_TIME_BUDGET_MS = 4 * 60_000;
+export const MAX_INGEST_TIME_BUDGET_MS = 15 * 60_000;
 
 /** 1876 is the first National League season; allow next year for early schedules. */
 export function isValidSeason(season: number, now: Date = new Date()): boolean {
@@ -195,7 +198,9 @@ export function isKnownEmptyGameFailure(error: string): boolean {
   return /produced zero pitches/i.test(error);
 }
 
-export function splitFailures(failures: Array<{ gamePk: number; error: string }>) {
+export function splitFailures(
+  failures: Array<{ gamePk: number; error: string }>
+) {
   return {
     knownEmpty: failures.filter(f => isKnownEmptyGameFailure(f.error)),
     actionable: failures.filter(f => !isKnownEmptyGameFailure(f.error)),
@@ -358,6 +363,8 @@ export interface RunOptions {
    * whole season. Use for daily jobs; leave unset for a full backfill.
    */
   discoverSinceDays?: number;
+  /** Processing deadline; active games finish safely, then workers stop claiming. */
+  timeBudgetMs?: number;
 }
 
 export interface RunReport {
@@ -376,18 +383,46 @@ export interface RunReport {
   warnings: Array<{ gamePk: number; issues: ValidationIssue[] }>;
   status: StatusSummary;
   parserVersion: number;
+  batchElapsedMs: number;
+  timeBudgetExceeded: boolean;
+  unprocessed: number;
 }
 
 export async function runIngestion(
   opts: RunOptions,
-  deps: { store: WarehouseStore; fetchJson?: FetchJson; now?: () => Date }
+  deps: {
+    store: WarehouseStore;
+    fetchJson?: FetchJson;
+    now?: () => Date;
+    clock?: () => number;
+  }
 ): Promise<RunReport> {
   const store = deps.store;
   const fetchJson = deps.fetchJson ?? fetchMlbJson;
   const now = deps.now ?? (() => new Date());
+  const clock = deps.clock ?? (() => performance.now());
   const limit = opts.limit ?? 200;
   const maxAttempts = opts.maxAttempts ?? 5;
-  const concurrency = Math.max(1, opts.concurrency ?? 3);
+  const concurrency = opts.concurrency ?? 3;
+  const timeBudgetMs = opts.timeBudgetMs ?? DEFAULT_INGEST_TIME_BUDGET_MS;
+  if (
+    !Number.isInteger(concurrency) ||
+    concurrency < 1 ||
+    concurrency > MAX_INGEST_CONCURRENCY
+  ) {
+    throw new Error(
+      `concurrency must be an integer from 1 to ${MAX_INGEST_CONCURRENCY}`
+    );
+  }
+  if (
+    !Number.isInteger(timeBudgetMs) ||
+    timeBudgetMs < 1 ||
+    timeBudgetMs > MAX_INGEST_TIME_BUDGET_MS
+  ) {
+    throw new Error(
+      `timeBudgetMs must be an integer from 1 to ${MAX_INGEST_TIME_BUDGET_MS}`
+    );
+  }
 
   let discovered = 0;
   let skippedNotFinal = 0;
@@ -433,8 +468,17 @@ export async function runIngestion(
 
   const results: GameResult[] = [];
   let cursor = 0;
+  let timeBudgetExceeded = false;
+  const batchStarted = clock();
+  const deadline = batchStarted + timeBudgetMs;
   const worker = async () => {
     while (cursor < work.length) {
+      // Never abandon a claimed game mid-write. Drain current claims, but stop
+      // reserving new work once the shared processing budget expires.
+      if (clock() >= deadline) {
+        timeBudgetExceeded = true;
+        return;
+      }
       const item = work[cursor++];
       results.push(
         await ingestGame(item.gamePk, { store, fetchJson, now, claim })
@@ -444,6 +488,7 @@ export async function runIngestion(
   await Promise.all(
     Array.from({ length: Math.min(concurrency, work.length) }, worker)
   );
+  const batchElapsedMs = Math.max(0, Math.round(clock() - batchStarted));
 
   return {
     season: opts.season,
@@ -463,5 +508,8 @@ export async function runIngestion(
       .map(r => ({ gamePk: r.gamePk, issues: r.warnings })),
     status: await store.summary(opts.season),
     parserVersion: PARSER_VERSION,
+    batchElapsedMs,
+    timeBudgetExceeded,
+    unprocessed: work.length - cursor,
   };
 }

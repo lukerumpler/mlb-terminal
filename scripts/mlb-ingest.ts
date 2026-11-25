@@ -14,7 +14,12 @@
  */
 import { getDb } from "../server/db.js";
 import { checkArgs } from "../server/mlb-warehouse/cliArgs.js";
-import { isValidSeason, runIngestion } from "../server/mlb-warehouse/ingest.js";
+import {
+  isValidSeason,
+  MAX_INGEST_CONCURRENCY,
+  MAX_INGEST_TIME_BUDGET_MS,
+  runIngestion,
+} from "../server/mlb-warehouse/ingest.js";
 import { createDrizzleWarehouseStore } from "../server/mlb-warehouse/store.js";
 
 function arg(name: string): string | undefined {
@@ -37,7 +42,14 @@ const numArg = (name: string): number | undefined => {
 async function main(): Promise<number> {
   const argError = checkArgs(
     process.argv.slice(2),
-    ["season", "limit", "max-attempts", "concurrency", "refresh-days"],
+    [
+      "season",
+      "limit",
+      "max-attempts",
+      "concurrency",
+      "refresh-days",
+      "time-budget-ms",
+    ],
     ["status", "requeue-failed", "skip-discovery"]
   );
   if (argError) {
@@ -50,6 +62,26 @@ async function main(): Promise<number> {
   if (!isValidSeason(season)) {
     console.error(
       `--season must be a year from 1876 to next year, got ${season}`
+    );
+    return 2;
+  }
+  const concurrency = numArg("concurrency");
+  if (
+    concurrency !== undefined &&
+    (concurrency < 1 || concurrency > MAX_INGEST_CONCURRENCY)
+  ) {
+    console.error(
+      `--concurrency must be between 1 and ${MAX_INGEST_CONCURRENCY}`
+    );
+    return 2;
+  }
+  const timeBudgetMs = numArg("time-budget-ms");
+  if (
+    timeBudgetMs !== undefined &&
+    (timeBudgetMs < 1 || timeBudgetMs > MAX_INGEST_TIME_BUDGET_MS)
+  ) {
+    console.error(
+      `--time-budget-ms must be between 1 and ${MAX_INGEST_TIME_BUDGET_MS}`
     );
     return 2;
   }
@@ -79,7 +111,8 @@ async function main(): Promise<number> {
         season,
         limit: numArg("limit"),
         maxAttempts: numArg("max-attempts"),
-        concurrency: numArg("concurrency"),
+        concurrency,
+        timeBudgetMs,
         refreshRecentDays: numArg("refresh-days"),
         skipDiscovery: flag("skip-discovery"),
       },
