@@ -9,9 +9,11 @@ const queries = {
   getGamePitches: vi.fn(),
   getTeamGames: vi.fn(),
 };
-vi.mock("../db.ts", () => ({ getDb: () => getDb() }));
-vi.mock("../mlb-warehouse/queries.ts", () => ({
-  createMlbWarehouseQueries: () => queries,
+vi.mock("./mlb-warehouse-runtime.js", () => ({
+  loadMlbWarehouseQueries: async () => {
+    const db = await getDb();
+    return db ? queries : null;
+  },
 }));
 
 // @ts-expect-error JavaScript handler has no separate declaration file.

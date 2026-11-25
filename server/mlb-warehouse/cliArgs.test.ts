@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkArgs } from "./cliArgs.js";
 
-const V = ["season", "limit"] as const;
+const V = ["season", "limit", "time-budget-ms", "concurrency"] as const;
 const B = ["status", "skip-discovery"] as const;
 
 describe("checkArgs", () => {
@@ -9,6 +9,9 @@ describe("checkArgs", () => {
     expect(checkArgs([], V, B)).toBeNull();
     expect(checkArgs(["--season", "2026", "--status"], V, B)).toBeNull();
     expect(checkArgs(["--skip-discovery", "--limit", "5"], V, B)).toBeNull();
+    expect(
+      checkArgs(["--time-budget-ms", "50000", "--concurrency", "2"], V, B)
+    ).toBeNull();
   });
   it("rejects a typo'd flag instead of silently ignoring it", () => {
     expect(checkArgs(["--seasn", "2026"], V, B)).toMatch(
@@ -19,6 +22,9 @@ describe("checkArgs", () => {
     expect(checkArgs(["--limit"], V, B)).toMatch(/--limit needs a value/);
     expect(checkArgs(["--limit", "--status"], V, B)).toMatch(
       /--limit needs a value/
+    );
+    expect(checkArgs(["--time-budget-ms"], V, B)).toMatch(
+      /--time-budget-ms needs a value/
     );
   });
   it("rejects a stray value-less word only via its flag, not positionally", () => {

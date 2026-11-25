@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   currentMlbSeason,
   discoverSeasonGames,
@@ -140,5 +140,49 @@ describe("windowed discovery", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain("startDate=2026-09-29&endDate=2026-09-30");
     expect(calls[1]).toContain("startDate=2026-10-01&endDate=2026-10-02");
+  });
+
+  it("full-season reconciliation rediscovers a game older than a long outage", async () => {
+    const calls: string[] = [];
+    const registerGames = vi.fn();
+    const store = {
+      registerGames,
+      requeueComplete: async () => 0,
+      listWork: async () => [],
+      summary: async () => ({
+        pending: 0,
+        processing: 0,
+        complete: 0,
+        failed: 0,
+      }),
+    } as unknown as WarehouseStore;
+    const fetchJson = async (url: string) => {
+      calls.push(url);
+      if (url.includes("2026-04")) {
+        return {
+          dates: [
+            {
+              date: "2026-04-03",
+              games: [
+                {
+                  gamePk: 404,
+                  officialDate: "2026-04-03",
+                  status: { codedGameState: "F", detailedState: "Final" },
+                },
+              ],
+            },
+          ],
+        };
+      }
+      return { dates: [] };
+    };
+    await runIngestion(
+      { season: 2026 },
+      { store, fetchJson, now: () => new Date("2026-10-02T12:00:00Z") }
+    );
+    expect(calls).toHaveLength(10);
+    expect(registerGames).toHaveBeenCalledWith([
+      { gamePk: 404, season: 2026, officialDate: "2026-04-03" },
+    ]);
   });
 });

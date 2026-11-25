@@ -5,6 +5,7 @@
 # Build outputs
 dist/
 build/
+server/api/mlb-warehouse-runtime.bundle.js
 *.dist
 
 # Environment variables
